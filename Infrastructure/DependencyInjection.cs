@@ -30,6 +30,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBookRepository, BookRepository>();
         builder.Services.AddScoped<IGenreRepository, GenreRepository>();
         builder.Services.AddScoped<IStatusRepository, StatusRepository>();
+        builder.Services.AddScoped<ITypeRepository, TypeRepository>();
 
         builder.Services.AddScoped<IUser, CurrentUser>();
 

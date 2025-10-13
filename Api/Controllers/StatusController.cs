@@ -1,10 +1,11 @@
 ﻿namespace Api.Controllers;
 
+using Application.Common.DTOs.Status;
 using Application.Features.StatusFeatures.Commands;
 using Application.Features.StatusFeatures.Queries.GetStatus;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/status")]
 public class StatusController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -36,7 +37,49 @@ public class StatusController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var statusDto = await _mediator.Send(new GetStatusQuery(id));
+        var statusDto = await _mediator.Send(new GetStatusQuery<StatusDto>(id));
+
+        if (statusDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(statusDto);
+    }
+
+    [HttpGet("{id:guid}/details")]
+    [Authorize]
+    public async Task<IActionResult> GetByIdDetails(Guid id)
+    {
+        var statusDto = await _mediator.Send(new GetStatusQuery<StatusDetailsDto>(id));
+
+        if (statusDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(statusDto);
+    }
+
+    [HttpGet("by-name/{name}")]
+    [Authorize]
+    public async Task<IActionResult> GetByName(string name)
+    {
+        var statusDto = await _mediator.Send(new GetStatusByNameQuery<StatusDto>(name));
+
+        if (statusDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(statusDto);
+    }
+
+    [HttpGet("by-name/{name}/details")]
+    [Authorize]
+    public async Task<IActionResult> GetByNameDetails(string name)
+    {
+        var statusDto = await _mediator.Send(new GetStatusByNameQuery<StatusDetailsDto>(name));
 
         if (statusDto == null)
         {

@@ -23,7 +23,7 @@ public class CreateStatusCommandHandler : IRequestHandler<CreateStatusCommand, S
     public async Task<StatusDto> Handle(CreateStatusCommand request, CancellationToken cancellationToken)
     {
         var status = await _statusRepository.GetByNameAsync(request.Name, cancellationToken);
-        Guard.ThrowIfFound<Status, Guid>(
+        Guard.ThrowIfFound(
             status,
             request.Name,
             g => g.Id);

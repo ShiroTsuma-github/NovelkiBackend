@@ -19,7 +19,7 @@ public class BookRepository : IBookRepository
     }
     public async Task<Book?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await _context.Books.FirstOrDefaultAsync(b => b.Title == name, cancellationToken);
+        return await _context.Books.FirstOrDefaultAsync(b => EF.Functions.Like(b.Title.ToLower(), name.ToLower()));
     }
 
     public async Task<IEnumerable<Book>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)

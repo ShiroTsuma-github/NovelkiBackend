@@ -1,5 +1,4 @@
 namespace Application.Features.StatusFeatures.Commands;
-
 public record DeleteStatusCommand(Guid Id) : IRequest;
 
 public class DeleteStatusCommandHandler : IRequestHandler<DeleteStatusCommand>
@@ -14,7 +13,7 @@ public class DeleteStatusCommandHandler : IRequestHandler<DeleteStatusCommand>
     public async Task Handle(DeleteStatusCommand request, CancellationToken cancellationToken)
     {
         var status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken);
-        Guard.ThrowIfNotFound<Status, Guid>(status, request.Id);
+        Guard.ThrowIfNotFound(status, request.Id);
         await _statusRepository.DeleteAsync(request.Id, cancellationToken);
     }
 }
