@@ -4,7 +4,7 @@ using Application.Features.BookFeatures.Queries.GetBook;
 using Application.Features.BookFeatures.Commands;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/book")]
 public class BookController : ControllerBase
 {
     private readonly IMediator _mediator;

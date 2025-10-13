@@ -16,7 +16,7 @@ public class GenreRepository : IGenreRepository
 
     public async Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await _context.Genres.FirstOrDefaultAsync(g => g.Name == name, cancellationToken);
+        return await _context.Genres.FirstOrDefaultAsync(g => EF.Functions.Like(g.Name.ToLower(), name.ToLower()));
     }
 
     public async Task<IEnumerable<Genre>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)

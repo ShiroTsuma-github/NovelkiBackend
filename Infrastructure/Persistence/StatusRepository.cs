@@ -36,7 +36,7 @@ public class StatusRepository : IStatusRepository
 
     public async Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await _context.Statuses.FirstOrDefaultAsync(g => g.Name == name, cancellationToken);
+        return await _context.Statuses.FirstOrDefaultAsync(s => EF.Functions.Like(s.Name.ToLower(), name.ToLower()));
     }
 
     public Task<int> GetCountAsync(CancellationToken cancellationToken)

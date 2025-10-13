@@ -28,7 +28,7 @@ public class UpdateStatusCommandHandler : IRequestHandler<UpdateStatusCommand, S
     public async Task<StatusDto> Handle(UpdateStatusCommand request, CancellationToken cancellationToken)
     {
         var status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken);
-        Guard.ThrowIfNotFound<Status, Guid>(status, request.Id);
+        Guard.ThrowIfNotFound(status, request.Id);
 
         _createMapper.Map(request, status);
 

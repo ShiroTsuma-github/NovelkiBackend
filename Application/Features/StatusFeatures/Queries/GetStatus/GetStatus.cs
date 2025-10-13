@@ -1,21 +1,23 @@
 ﻿namespace Application.Features.StatusFeatures.Queries.GetStatus;
 
-using Application.Common.DTOs.Status;
+public record GetStatusQuery<TDto> : IRequest<TDto?>
+{
+    public Guid Id { get; }
+    public GetStatusQuery(Guid id) => Id = id;
+};
 
-public record GetStatusQuery(Guid Id) : IRequest<StatusDto?>;
-
-public class GetStatusQueryHandler : IRequestHandler<GetStatusQuery, StatusDto?>
+public class GetStatusQueryHandler<TDto> : IRequestHandler<GetStatusQuery<TDto>, TDto?>
 {
     private readonly IStatusRepository _statusRepository;
-    private readonly IMapper<Status, StatusDto> _statusMapper;
+    private readonly IMapper<Status, TDto> _statusMapper;
 
-    public GetStatusQueryHandler(IStatusRepository statusRepository, IMapper<Status, StatusDto> statusMapper)
+    public GetStatusQueryHandler(IStatusRepository statusRepository, IMapper<Status, TDto> statusMapper)
     {
         _statusRepository = statusRepository;
         _statusMapper = statusMapper;
     }
 
-    public async Task<StatusDto?> Handle(GetStatusQuery request, CancellationToken cancellationToken)
+    public async Task<TDto?> Handle(GetStatusQuery<TDto> request, CancellationToken cancellationToken)
     {
         var status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken);
         Guard.ThrowIfNotFound<Status, Guid>(status, request.Id);

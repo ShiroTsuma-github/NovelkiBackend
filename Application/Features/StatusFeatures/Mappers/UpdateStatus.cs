@@ -1,6 +1,5 @@
 ﻿namespace Application.Features.StatusFeatures.Mappers;
 
-using Application.Features.GenreFeatures.Commands;
 using Application.Features.StatusFeatures.Commands;
 
 public class UpdateStatusMapper : IMapper<UpdateStatusCommand, Status>

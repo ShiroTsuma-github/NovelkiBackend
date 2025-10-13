@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
+using Type = Domain.Entities.Type;
 using ValidationException = FluentValidation.ValidationException;
 
 namespace Infrastructure.Middleware;
@@ -92,6 +93,20 @@ public class ErrorHandlingMiddleware
                 title = "Not Found";
                 detail = exception.Message;
                 _logger.LogWarning("Status not found");
+                break;
+
+            case EntityAlreadyExistsException<Type, Guid>:
+                statusCode = HttpStatusCode.Conflict;
+                title = "Conflict";
+                detail = exception.Message;
+                _logger.LogWarning("Type already exists");
+                break;
+
+            case EntityNotFoundException<Type, Guid>:
+                statusCode = HttpStatusCode.NotFound;
+                title = "Not Found";
+                detail = exception.Message;
+                _logger.LogWarning("Type not found");
                 break;
 
             default:

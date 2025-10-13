@@ -3,7 +3,7 @@
 using Application.Features.AccountFeatures.Commands;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/account")]
 public class AccountController : ControllerBase
 {
     private readonly IMediator _mediator;

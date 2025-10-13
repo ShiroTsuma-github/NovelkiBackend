@@ -1,10 +1,11 @@
 ﻿namespace Api.Controllers;
 
+using Application.Common.DTOs.Genre;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.GenreFeatures.Queries.GetGenre;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/genre")]
 public class GenreController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -36,7 +37,49 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var genreDto = await _mediator.Send(new GetGenreQuery(id));
+        var genreDto = await _mediator.Send(new GetGenreQuery<GenreDto>(id));
+
+        if (genreDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(genreDto);
+    }
+
+    [HttpGet("{id:guid}/details")]
+    [Authorize]
+    public async Task<IActionResult> GetByIdDetails(Guid id)
+    {
+        var genreDto = await _mediator.Send(new GetGenreQuery<GenreDetailsDto>(id));
+
+        if (genreDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(genreDto);
+    }
+
+    [HttpGet("by-name/{name}")]
+    [Authorize]
+    public async Task<IActionResult> GetByName(string name)
+    {
+        var genreDto = await _mediator.Send(new GetGenreByNameQuery<GenreDto>(name));
+
+        if (genreDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(genreDto);
+    }
+
+    [HttpGet("by-name/{name}/details")]
+    [Authorize]
+    public async Task<IActionResult> GetByNameDetails(string name)
+    {
+        var genreDto = await _mediator.Send(new GetGenreByNameQuery<GenreDetailsDto>(name));
 
         if (genreDto == null)
         {
