@@ -1,0 +1,66 @@
+﻿namespace Api.Controllers;
+
+using Application.Features.GenreFeatures.Commands;
+using Application.Features.GenreFeatures.Queries.GetGenre;
+
+[ApiController]
+[Route("api/v1/[controller]")]
+public class GenreController : ControllerBase
+{
+    private readonly IMediator _mediator;
+
+    public GenreController(IMediator mediator)
+    {
+        _mediator = mediator;
+    }
+
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> Create([FromBody] CreateGenreCommand command)
+    {
+        var Genre = await _mediator.Send(command);
+
+        return Ok(Genre);
+    }
+
+    [HttpGet()]
+    [Authorize]
+    public async Task<IActionResult> GetAll([FromQuery] GetAllGenresQuery getAllGenres)
+    {
+        var genres = await _mediator.Send(getAllGenres);
+
+        return Ok(genres);
+    }
+
+    [HttpGet("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> GetById(Guid id)
+    {
+        var genreDto = await _mediator.Send(new GetGenreQuery(id));
+
+        if (genreDto == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(genreDto);
+    }
+
+    [HttpPut("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> Update(Guid id, UpdateGenreCommand updateGenre)
+    {
+        updateGenre.Id = id;
+        var genre = await _mediator.Send(updateGenre);
+
+        return Ok(genre);
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _mediator.Send(new DeleteGenreCommand(id));
+        return NoContent();
+    }
+}
