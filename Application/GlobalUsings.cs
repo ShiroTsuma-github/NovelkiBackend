@@ -1,0 +1,12 @@
+﻿global using MediatR;
+global using Application.Common.Interfaces;
+global using Domain.Entities;
+global using Domain.Repositories;
+global using FluentValidation;
+global using System.Text.Json.Serialization;
+global using Domain.Exceptions;
+global using Application.Common.Models;
+global using Application.Common;
+
+
+

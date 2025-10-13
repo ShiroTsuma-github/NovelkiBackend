@@ -1,0 +1,6 @@
+@NovelkiBackend_HostAddress = http://localhost:5232
+
+GET {{NovelkiBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
