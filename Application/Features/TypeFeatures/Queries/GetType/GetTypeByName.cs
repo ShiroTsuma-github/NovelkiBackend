@@ -1,29 +1,23 @@
-﻿namespace Application.Features.TypeFeatures.Queries.GetType;
+namespace Application.Features.TypeFeatures.Queries.GetType;
 
-using Type = Domain.Entities.Type;
+using Application.Common.DTOs.Type;
 
-public class GetTypeByNameQuery<TDto> : IRequest<TDto?>
-{
-    public string Name { get; }
-    public GetTypeByNameQuery(string name) => Name = name;
-}
+public record GetTypeByNameQuery(string Name) : IRequest<TypeDto>;
 
-public class GetTypeByNameQueryHandler<TDto> : IRequestHandler<GetTypeByNameQuery<TDto>, TDto?>
+public class GetTypeByNameQueryHandler : IRequestHandler<GetTypeByNameQuery, TypeDto>
 {
     private readonly ITypeRepository _typeRepository;
-    private readonly IMapper<Type, TDto> _typeMapper;
 
-    public GetTypeByNameQueryHandler(ITypeRepository typeRepository, IMapper<Type, TDto> typeMapper)
+    public GetTypeByNameQueryHandler(ITypeRepository typeRepository)
     {
         _typeRepository = typeRepository;
-        _typeMapper = typeMapper;
     }
 
-    public async Task<TDto?> Handle(GetTypeByNameQuery<TDto> request, CancellationToken cancellationToken)
+    public async Task<TypeDto> Handle(GetTypeByNameQuery request, CancellationToken cancellationToken)
     {
-        var type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken);
-        Guard.ThrowIfNotFound<Type, string>(type, request.Name);
-        return _typeMapper.Map(type);
+        var type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken)
+            ?? throw new EntityNotFoundException<ContentType, string>(request.Name);
+
+        return type.ToDto();
     }
 }
-

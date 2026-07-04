@@ -28,10 +28,13 @@ public static class DependencyInjection
             options.UseNpgsql(connectionString);
         });
         builder.Services.AddScoped<IBookRepository, BookRepository>();
+        builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
         builder.Services.AddScoped<IGenreRepository, GenreRepository>();
         builder.Services.AddScoped<IStatusRepository, StatusRepository>();
         builder.Services.AddScoped<ITypeRepository, TypeRepository>();
+        builder.Services.AddScoped<ITagRepository, TagRepository>();
 
+        builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IUser, CurrentUser>();
 
         builder.Services.Configure<JwtSettings>(

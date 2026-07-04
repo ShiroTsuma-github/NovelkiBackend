@@ -1,8 +1,9 @@
-﻿namespace Domain.Entities;
+namespace Domain.Entities;
 
 public class Author : BaseAuditableEntity
 {
-    public required string Name { get; set; }
-    public IEnumerable<string> OtherNames { get; set; } = new List<string>();
-    public IEnumerable<Book> Books { get; set; } = new HashSet<Book>();
+    public required string PrimaryName { get; set; }
+    public required string NormalizedPrimaryName { get; set; }
+    public ICollection<AuthorName> Names { get; set; } = new HashSet<AuthorName>();
+    public ICollection<Book> Books { get; set; } = new HashSet<Book>();
 }

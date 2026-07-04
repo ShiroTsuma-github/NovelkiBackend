@@ -20,8 +20,12 @@ public class IdentityService : IIdentityService
 
     public async Task<TokenResponse> LoginUser(LoginDto login, CancellationToken cancellation)
     {
+        var identifier = login.username ?? login.email ?? "No Identifier";
         var user = await _userManager.FindByNameAsync(login.username ?? "") ?? await _userManager.FindByEmailAsync(login.email ?? "");
-        Guard.ThrowIfNotFound<User, string>(user, login.username ?? login.email ?? "No Identifier");
+        if (user == null)
+        {
+            throw new EntityNotFoundException<User, string>(identifier);
+        }
 
         var result = await _signInManager.CheckPasswordSignInAsync(user, login.password, false);
 
@@ -56,6 +60,10 @@ public class IdentityService : IIdentityService
 
         var user = new User { UserName = register.username, Email = register.email };
         var result = await _userManager.CreateAsync(user, register.password);
+        if (!result.Succeeded)
+        {
+            throw new IdentityOperationFailedException(result.Errors.Select(e => e.Description));
+        }
 
         return new RegisterResponse
         {

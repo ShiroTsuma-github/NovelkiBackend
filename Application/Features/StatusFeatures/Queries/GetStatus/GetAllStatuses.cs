@@ -7,12 +7,10 @@ public record GetAllStatusesQuery(int Skip = 0, int Take = 100) : IRequest<Pagin
 public class GetAllStatusesQueryHandler : IRequestHandler<GetAllStatusesQuery, PaginatedResult<StatusDto>>
 {
     private readonly IStatusRepository _statusRepository;
-    private readonly IMapper<Status, StatusDto> _statusMapper;
 
-    public GetAllStatusesQueryHandler(IStatusRepository statusRepository, IMapper<Status, StatusDto> statusMapper)
+    public GetAllStatusesQueryHandler(IStatusRepository statusRepository)
     {
         _statusRepository = statusRepository;
-        _statusMapper = statusMapper;
     }
 
     public async Task<PaginatedResult<StatusDto>> Handle(GetAllStatusesQuery request, CancellationToken cancellationToken)
@@ -23,7 +21,7 @@ public class GetAllStatusesQueryHandler : IRequestHandler<GetAllStatusesQuery, P
         {
             Take = request.Take,
             Skip = request.Skip,
-            Data = _statusMapper.Map(statuses).ToList(),
+            Data = statuses.Select(s => s.ToDto()).ToList(),
             Total = total
         };
     }

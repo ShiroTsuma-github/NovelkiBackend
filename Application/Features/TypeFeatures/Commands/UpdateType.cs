@@ -1,7 +1,6 @@
 namespace Application.Features.TypeFeatures.Commands;
 
 using Application.Common.DTOs.Type;
-using Type = Domain.Entities.Type;
 
 public sealed record UpdateTypeCommand : IRequest<TypeDto>
 {
@@ -14,27 +13,21 @@ public sealed record UpdateTypeCommand : IRequest<TypeDto>
 public class UpdateTypeCommandHandler : IRequestHandler<UpdateTypeCommand, TypeDto>
 {
     private readonly ITypeRepository _typeRepository;
-    private readonly IMapper<UpdateTypeCommand, Type> _createMapper;
-    private readonly IMapper<Type, TypeDto> _returnMapper;
 
-    public UpdateTypeCommandHandler(ITypeRepository genreRepository,
-        IMapper<UpdateTypeCommand, Type> createMapper,
-        IMapper<Type, TypeDto> returnMapper)
+    public UpdateTypeCommandHandler(ITypeRepository genreRepository)
     {
         _typeRepository = genreRepository;
-        _createMapper = createMapper;
-        _returnMapper = returnMapper;
     }
 
     public async Task<TypeDto> Handle(UpdateTypeCommand request, CancellationToken cancellationToken)
     {
-        var type = await _typeRepository.GetByIdAsync(request.Id, cancellationToken);
-        Guard.ThrowIfNotFound(type, request.Id);
+        var type = await _typeRepository.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new EntityNotFoundException<ContentType, Guid>(request.Id);
 
-        _createMapper.Map(request, type);
+        request.ApplyTo(type);
 
         await _typeRepository.SaveAsync(cancellationToken);
 
-        return _returnMapper.Map(type);
+        return type.ToDto();
     }
 }

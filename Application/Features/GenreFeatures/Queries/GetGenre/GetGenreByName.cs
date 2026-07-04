@@ -1,26 +1,23 @@
-﻿namespace Application.Features.GenreFeatures.Queries.GetGenre;
+namespace Application.Features.GenreFeatures.Queries.GetGenre;
 
-public class GetGenreByNameQuery<TDto> : IRequest<TDto?>
-{
-    public string Name { get; }
-    public GetGenreByNameQuery(string name) => Name = name;
-}
+using Application.Common.DTOs.Genre;
 
-public class GetGenreByNameQueryHandler<TDto> : IRequestHandler<GetGenreByNameQuery<TDto>, TDto?>
+public record GetGenreByNameQuery(string Name) : IRequest<GenreDto>;
+
+public class GetGenreByNameQueryHandler : IRequestHandler<GetGenreByNameQuery, GenreDto>
 {
     private readonly IGenreRepository _genreRepository;
-    private readonly IMapper<Genre, TDto> _genreMapper;
 
-    public GetGenreByNameQueryHandler(IGenreRepository genreRepository, IMapper<Genre, TDto> GenreMapper)
+    public GetGenreByNameQueryHandler(IGenreRepository genreRepository)
     {
         _genreRepository = genreRepository;
-        _genreMapper = GenreMapper;
     }
 
-    public async Task<TDto?> Handle(GetGenreByNameQuery<TDto> request, CancellationToken cancellationToken)
+    public async Task<GenreDto> Handle(GetGenreByNameQuery request, CancellationToken cancellationToken)
     {
-        var genre = await _genreRepository.GetByNameAsync(request.Name, cancellationToken);
-        Guard.ThrowIfNotFound<Genre, string>(genre, request.Name);
-        return _genreMapper.Map(genre);
+        var genre = await _genreRepository.GetByNameAsync(request.Name, cancellationToken)
+            ?? throw new EntityNotFoundException<Genre, string>(request.Name);
+
+        return genre.ToDto();
     }
 }

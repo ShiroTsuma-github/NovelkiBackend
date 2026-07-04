@@ -1,28 +1,23 @@
-﻿namespace Application.Features.StatusFeatures.Queries.GetStatus;
+namespace Application.Features.StatusFeatures.Queries.GetStatus;
 
+using Application.Common.DTOs.Status;
 
-public class GetStatusByNameQuery<TDto> : IRequest<TDto?>
-{
-    public string Name { get; }
-    public GetStatusByNameQuery(string name) => Name = name;
-}
+public record GetStatusByNameQuery(string Name) : IRequest<StatusDto>;
 
-public class GetStatusByNameQueryHandler<TDto> : IRequestHandler<GetStatusByNameQuery<TDto>, TDto?>
+public class GetStatusByNameQueryHandler : IRequestHandler<GetStatusByNameQuery, StatusDto>
 {
     private readonly IStatusRepository _statusRepository;
-    private readonly IMapper<Status, TDto> _statusMapper;
 
-    public GetStatusByNameQueryHandler(IStatusRepository statusRepository, IMapper<Status, TDto> statusMapper)
+    public GetStatusByNameQueryHandler(IStatusRepository statusRepository)
     {
         _statusRepository = statusRepository;
-        _statusMapper = statusMapper;
     }
 
-    public async Task<TDto?> Handle(GetStatusByNameQuery<TDto> request, CancellationToken cancellationToken)
+    public async Task<StatusDto> Handle(GetStatusByNameQuery request, CancellationToken cancellationToken)
     {
-        var status = await _statusRepository.GetByNameAsync(request.Name, cancellationToken);
-        Guard.ThrowIfNotFound<Status, string>(status, request.Name);
-        return _statusMapper.Map(status);
+        var status = await _statusRepository.GetByNameAsync(request.Name, cancellationToken)
+            ?? throw new EntityNotFoundException<Status, string>(request.Name);
+
+        return status.ToDto();
     }
 }
-
