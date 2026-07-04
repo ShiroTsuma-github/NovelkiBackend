@@ -38,19 +38,14 @@ public class BookController : ControllerBase
     {
         var bookDto = await _mediator.Send(new GetBookQuery(id));
 
-        if (bookDto == null)
-        {
-            return NotFound();
-        }
-
         return Ok(bookDto);
     }
 
-    [HttpPut("{id:guid}")]
+    [HttpPatch("{id:guid}/progress")]
     [Authorize]
-    public async Task<IActionResult> Update(Guid id, UpdateBookCommand model)
+    public async Task<IActionResult> UpdateProgress(Guid id, UpdateBookProgressCommand model)
     {
-        var command = new UpdateBookCommand(id, model.Title, model.Author);
+        var command = new UpdateBookProgressCommand(id, model.CurrentChapterNumber, model.CurrentChapterLabel, model.Comment);
         await _mediator.Send(command);
 
         return NoContent();

@@ -16,12 +16,19 @@ public class GenreRepository : IGenreRepository
 
     public async Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await _context.Genres.FirstOrDefaultAsync(g => EF.Functions.Like(g.Name.ToLower(), name.ToLower()));
+        var normalizedName = name.Trim().ToUpperInvariant();
+        return await _context.Genres.FirstOrDefaultAsync(g => g.NormalizedName == normalizedName, cancellationToken);
     }
 
     public async Task<IEnumerable<Genre>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
     {
         return await _context.Genres.Skip(Skip).Take(Take).ToListAsync(cancellationToken);
+    }
+
+    public async Task<IEnumerable<Genre>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
+    {
+        var idList = ids.ToList();
+        return await _context.Genres.Where(g => idList.Contains(g.Id)).ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(Genre genre, CancellationToken cancellationToken)
@@ -33,8 +40,11 @@ public class GenreRepository : IGenreRepository
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var genre = await _context.Genres.FindAsync(new object[] { id }, cancellationToken);
-        _context.Genres.Remove(genre!);
-        await _context.SaveChangesAsync(cancellationToken);
+        if (genre != null)
+        {
+            _context.Genres.Remove(genre);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken)

@@ -1,21 +1,25 @@
-﻿namespace Application.Features.BookFeatures.Queries.GetBook;
+namespace Application.Features.BookFeatures.Queries.GetBook;
 
 using Application.Common.DTOs.Book;
 
-public record GetBookQuery(Guid Id) : IRequest<BookDto?>;
+public record GetBookQuery(Guid Id) : IRequest<BookDto>;
 
-public class GetBookHandler : IRequestHandler<GetBookQuery, BookDto?>
+public class GetBookHandler : IRequestHandler<GetBookQuery, BookDto>
 {
     private readonly IBookRepository _repository;
+    private readonly IUser _user;
 
-    public GetBookHandler(IBookRepository repository) => _repository = repository;
-
-    public async Task<BookDto?> Handle(GetBookQuery request, CancellationToken cancellationToken)
+    public GetBookHandler(IBookRepository repository, IUser user)
     {
-        var book = await _repository.GetByIdAsync(request.Id, cancellationToken);
+        _repository = repository;
+        _user = user;
+    }
 
-        if (book == null) return null;
+    public async Task<BookDto> Handle(GetBookQuery request, CancellationToken cancellationToken)
+    {
+        var book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
+            ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
 
-        return new BookDto { Id=book.Id, Title=book.Title, Author=book.Author.Name };
+        return book.ToDto();
     }
 }

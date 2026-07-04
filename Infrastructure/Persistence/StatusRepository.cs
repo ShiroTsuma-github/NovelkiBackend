@@ -20,8 +20,11 @@ public class StatusRepository : IStatusRepository
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
         var status = await _context.Statuses.FindAsync(new object[] { id }, cancellationToken);
-        _context.Statuses.Remove(status!);
-        await _context.SaveChangesAsync(cancellationToken);
+        if (status != null)
+        {
+            _context.Statuses.Remove(status);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 
     public async Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
@@ -36,7 +39,10 @@ public class StatusRepository : IStatusRepository
 
     public async Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await _context.Statuses.FirstOrDefaultAsync(s => EF.Functions.Like(s.Name.ToLower(), name.ToLower()));
+        var normalizedName = name.Trim().ToUpperInvariant();
+        return await _context.Statuses.FirstOrDefaultAsync(
+            s => s.Name.ToUpper() == normalizedName || s.Slug.ToUpper() == normalizedName,
+            cancellationToken);
     }
 
     public Task<int> GetCountAsync(CancellationToken cancellationToken)

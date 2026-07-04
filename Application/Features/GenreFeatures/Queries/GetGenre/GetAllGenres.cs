@@ -7,12 +7,10 @@ public record GetAllGenresQuery(int Skip = 0, int Take = 100) : IRequest<Paginat
 public class GetAllGenresQueryHandler : IRequestHandler<GetAllGenresQuery, PaginatedResult<GenreDto>>
 {
     private readonly IGenreRepository _genreRepository;
-    private readonly IMapper<Genre, GenreDto> _genreMapper;
 
-    public GetAllGenresQueryHandler(IGenreRepository genreRepository, IMapper<Genre, GenreDto> genreMapper)
+    public GetAllGenresQueryHandler(IGenreRepository genreRepository)
     {
         _genreRepository = genreRepository;
-        _genreMapper = genreMapper;
     }
 
     public async Task<PaginatedResult<GenreDto>> Handle(GetAllGenresQuery request, CancellationToken cancellationToken)
@@ -23,7 +21,7 @@ public class GetAllGenresQueryHandler : IRequestHandler<GetAllGenresQuery, Pagin
         {
             Take = request.Take,
             Skip = request.Skip,
-            Data = _genreMapper.Map(genres).ToList(),
+            Data = genres.Select(g => g.ToDto()).ToList(),
             Total = total
         };
     }

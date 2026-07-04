@@ -1,6 +1,5 @@
 ﻿namespace Api.Controllers;
 
-using Application.Common.DTOs.Genre;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.GenreFeatures.Queries.GetGenre;
 
@@ -19,9 +18,9 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Create([FromBody] CreateGenreCommand command)
     {
-        var Genre = await _mediator.Send(command);
+        var genre = await _mediator.Send(command);
 
-        return Ok(Genre);
+        return CreatedAtAction(nameof(GetById), new { id = genre.Id }, genre);
     }
 
     [HttpGet()]
@@ -37,12 +36,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var genreDto = await _mediator.Send(new GetGenreQuery<GenreDto>(id));
-
-        if (genreDto == null)
-        {
-            return NotFound();
-        }
+        var genreDto = await _mediator.Send(new GetGenreQuery(id));
 
         return Ok(genreDto);
     }
@@ -51,12 +45,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
-        var genreDto = await _mediator.Send(new GetGenreQuery<GenreDetailsDto>(id));
-
-        if (genreDto == null)
-        {
-            return NotFound();
-        }
+        var genreDto = await _mediator.Send(new GetGenreDetailsQuery(id));
 
         return Ok(genreDto);
     }
@@ -65,12 +54,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
-        var genreDto = await _mediator.Send(new GetGenreByNameQuery<GenreDto>(name));
-
-        if (genreDto == null)
-        {
-            return NotFound();
-        }
+        var genreDto = await _mediator.Send(new GetGenreByNameQuery(name));
 
         return Ok(genreDto);
     }
@@ -79,12 +63,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
-        var genreDto = await _mediator.Send(new GetGenreByNameQuery<GenreDetailsDto>(name));
-
-        if (genreDto == null)
-        {
-            return NotFound();
-        }
+        var genreDto = await _mediator.Send(new GetGenreDetailsByNameQuery(name));
 
         return Ok(genreDto);
     }

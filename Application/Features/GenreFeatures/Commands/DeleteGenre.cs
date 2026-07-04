@@ -15,8 +15,8 @@ public class DeleteGenreCommandHandler : IRequestHandler<DeleteGenreCommand>
 
     public async Task Handle(DeleteGenreCommand request, CancellationToken cancellationToken)
     {
-        var genre = await _genreRepository.GetByIdAsync(request.Id, cancellationToken);
-        Guard.ThrowIfNotFound<Genre, Guid>(genre, request.Id);
+        _ = await _genreRepository.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new EntityNotFoundException<Genre, Guid>(request.Id);
         await _genreRepository.DeleteAsync(request.Id, cancellationToken);
     }
 }

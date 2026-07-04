@@ -2,7 +2,6 @@
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Text.Json;
-using Type = Domain.Entities.Type;
 using ValidationException = FluentValidation.ValidationException;
 
 namespace Infrastructure.Middleware;
@@ -48,10 +47,35 @@ public class ErrorHandlingMiddleware
                 break;
 
             case WrongPasswordException:
-                statusCode = HttpStatusCode.NotFound;
+                statusCode = HttpStatusCode.Unauthorized;
                 title = "Authentication Failed";
                 detail = exception.Message;
                 _logger.LogWarning("Incorrect Password");
+                break;
+
+            case UsernameTakenException:
+                statusCode = HttpStatusCode.Conflict;
+                title = "Conflict";
+                detail = exception.Message;
+                _logger.LogWarning("Username already exists");
+                break;
+
+            case EmailInUseException:
+                statusCode = HttpStatusCode.Conflict;
+                title = "Conflict";
+                detail = exception.Message;
+                _logger.LogWarning("Email already exists");
+                break;
+
+            case IdentityOperationFailedException identityException:
+                statusCode = HttpStatusCode.BadRequest;
+                title = "Identity operation failed.";
+                detail = exception.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["Identity"] = identityException.Errors
+                };
+                _logger.LogWarning("Identity operation failed");
                 break;
 
             case ValidationException validationException:
@@ -95,18 +119,25 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Status not found");
                 break;
 
-            case EntityAlreadyExistsException<Type, Guid>:
+            case EntityAlreadyExistsException<ContentType, Guid>:
                 statusCode = HttpStatusCode.Conflict;
                 title = "Conflict";
                 detail = exception.Message;
                 _logger.LogWarning("Type already exists");
                 break;
 
-            case EntityNotFoundException<Type, Guid>:
+            case EntityNotFoundException<ContentType, Guid>:
                 statusCode = HttpStatusCode.NotFound;
                 title = "Not Found";
                 detail = exception.Message;
                 _logger.LogWarning("Type not found");
+                break;
+
+            case EntityNotFoundException<Book, Guid>:
+                statusCode = HttpStatusCode.NotFound;
+                title = "Not Found";
+                detail = exception.Message;
+                _logger.LogWarning("Book not found");
                 break;
 
             default:

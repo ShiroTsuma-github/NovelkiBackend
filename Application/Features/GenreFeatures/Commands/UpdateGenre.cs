@@ -13,26 +13,20 @@ public sealed record UpdateGenreCommand : IRequest<GenreDto>
 public class UpdateGenreCommandHandler : IRequestHandler<UpdateGenreCommand, GenreDto>
 {
     private readonly IGenreRepository _genreRepository;
-    private readonly IMapper<UpdateGenreCommand, Genre> _createMapper;
-    private readonly IMapper<Genre, GenreDto> _returnMapper;
 
-    public UpdateGenreCommandHandler(IGenreRepository genreRepository,
-        IMapper<UpdateGenreCommand, Genre> createMapper,
-        IMapper<Genre, GenreDto> returnMapper)
+    public UpdateGenreCommandHandler(IGenreRepository genreRepository)
     {
         _genreRepository = genreRepository;
-        _createMapper = createMapper;
-        _returnMapper = returnMapper;
     }
 
     public async Task<GenreDto> Handle(UpdateGenreCommand request, CancellationToken cancellationToken)
     {
-        var genre = await _genreRepository.GetByIdAsync(request.Id, cancellationToken);
-        Guard.ThrowIfNotFound<Genre, Guid>(genre, request.Id);
+        var genre = await _genreRepository.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new EntityNotFoundException<Genre, Guid>(request.Id);
 
-        _createMapper.Map(request, genre);
+        request.ApplyTo(genre);
         await _genreRepository.SaveAsync(cancellationToken);
 
-        return _returnMapper.Map(genre);
+        return genre.ToDto();
     }
 }

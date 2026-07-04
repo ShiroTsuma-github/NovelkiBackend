@@ -12,8 +12,8 @@ public class DeleteStatusCommandHandler : IRequestHandler<DeleteStatusCommand>
 
     public async Task Handle(DeleteStatusCommand request, CancellationToken cancellationToken)
     {
-        var status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken);
-        Guard.ThrowIfNotFound(status, request.Id);
+        _ = await _statusRepository.GetByIdAsync(request.Id, cancellationToken)
+            ?? throw new EntityNotFoundException<Status, Guid>(request.Id);
         await _statusRepository.DeleteAsync(request.Id, cancellationToken);
     }
 }

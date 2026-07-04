@@ -1,6 +1,5 @@
 ﻿namespace Api.Controllers;
 
-using Application.Common.DTOs.Type;
 using Application.Features.TypeFeatures.Commands;
 using Application.Features.TypeFeatures.Queries.GetType;
 
@@ -21,7 +20,7 @@ public class TypeController : ControllerBase
     {
         var type = await _mediator.Send(command);
 
-        return Ok(type);
+        return CreatedAtAction(nameof(GetById), new { id = type.Id }, type);
     }
 
     [HttpGet()]
@@ -37,12 +36,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var typeDto = await _mediator.Send(new GetTypeQuery<TypeDto>(id));
-
-        if (typeDto == null)
-        {
-            return NotFound();
-        }
+        var typeDto = await _mediator.Send(new GetTypeQuery(id));
 
         return Ok(typeDto);
     }
@@ -51,12 +45,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
-        var typeDto = await _mediator.Send(new GetTypeQuery<TypeDetailsDto>(id));
-
-        if (typeDto == null)
-        {
-            return NotFound();
-        }
+        var typeDto = await _mediator.Send(new GetTypeDetailsQuery(id));
 
         return Ok(typeDto);
     }
@@ -65,12 +54,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
-        var typeDto = await _mediator.Send(new GetTypeByNameQuery<TypeDto>(name));
-
-        if (typeDto == null)
-        {
-            return NotFound();
-        }
+        var typeDto = await _mediator.Send(new GetTypeByNameQuery(name));
 
         return Ok(typeDto);
     }
@@ -79,12 +63,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
-        var typeDto = await _mediator.Send(new GetTypeByNameQuery<TypeDetailsDto>(name));
-
-        if (typeDto == null)
-        {
-            return NotFound();
-        }
+        var typeDto = await _mediator.Send(new GetTypeDetailsByNameQuery(name));
 
         return Ok(typeDto);
     }

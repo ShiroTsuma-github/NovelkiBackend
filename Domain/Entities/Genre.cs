@@ -1,8 +1,11 @@
-﻿namespace Domain.Entities;
+namespace Domain.Entities;
+
+using Domain.Associations;
 
 public class Genre : BaseAuditableEntity
 {
-    public required string Name {  get; set; }
+    public required string Name { get; set; }
+    public required string NormalizedName { get; set; }
     public string? Description { get; set; }
-    public ICollection<Book> Books { get; set; } = new HashSet<Book>();
+    public ICollection<BookGenre> BookGenres { get; set; } = new HashSet<BookGenre>();
 }

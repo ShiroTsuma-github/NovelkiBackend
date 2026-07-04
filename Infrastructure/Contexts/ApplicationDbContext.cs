@@ -1,7 +1,6 @@
-﻿namespace Infrastructure.Contexts;
+namespace Infrastructure.Contexts;
 
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Type = Domain.Entities.Type;
 
 public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
 {
@@ -14,11 +13,15 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     }
 
     public DbSet<Book> Books { get; set; }
+    public DbSet<BookTitle> BookTitles { get; set; }
+    public DbSet<BookLink> BookLinks { get; set; }
+    public DbSet<BookProgressHistory> BookProgressHistory { get; set; }
     public DbSet<Author> Authors { get; set; }
+    public DbSet<AuthorName> AuthorNames { get; set; }
     public DbSet<Genre> Genres { get; set; }
     public DbSet<Status> Statuses { get; set; }
-    public DbSet<Type> Types { get; set; }
-
+    public DbSet<ContentType> ContentTypes { get; set; }
+    public DbSet<Tag> Tags { get; set; }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
     {
@@ -45,51 +48,198 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Book>()
-            .HasOne(b => b.Author)
-            .WithMany(a => a.Books)
-            .HasForeignKey(b => b.AuthorId);
+        ConfigureBook(modelBuilder);
+        ConfigureAuthor(modelBuilder);
+        ConfigureGenre(modelBuilder);
+        ConfigureStatus(modelBuilder);
+        ConfigureContentType(modelBuilder);
+        ConfigureTag(modelBuilder);
+        SeedSystemDictionaries(modelBuilder);
+    }
 
-        modelBuilder.Entity<Book>()
-            .HasOne(b => b.Type)
-            .WithMany(t => t.Books)
-            .HasForeignKey(b => b.TypeId);
-
-        modelBuilder.Entity<Book>()
-            .HasOne(b => b.Status)
-            .WithMany(s => s.Books)
-            .HasForeignKey(b => b.StatusId);
-
-        modelBuilder.Entity<Book>()
-            .HasMany(b => b.Genres)
-            .WithMany(g => g.Books);
-
-        modelBuilder.Entity<Book>()
-            .HasOne<User>()
-            .WithMany(u => u.Books)
-            .HasForeignKey(b => b.OwnerId)
-            .IsRequired(true);
-
-        modelBuilder.Entity<BookTagAssociation>(entity =>
+    private static void ConfigureBook(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Book>(entity =>
         {
-            entity.HasKey(e => new { e.BookId, e.TagId, e.OwnerId });
+            entity.HasIndex(b => new { b.OwnerId, b.NormalizedPrimaryTitle });
+            entity.HasIndex(b => new { b.OwnerId, b.CurrentChapterNumber });
+            entity.HasIndex(b => new { b.OwnerId, b.Rating });
+            entity.HasIndex(b => new { b.OwnerId, b.StatusId });
+            entity.HasIndex(b => new { b.OwnerId, b.ContentTypeId });
 
-            entity.HasOne(e => e.Book)
-                .WithMany(b => b.BookTags)
-                .HasForeignKey(e => e.BookId);
+            entity.Property(b => b.PrimaryTitle).HasMaxLength(500);
+            entity.Property(b => b.NormalizedPrimaryTitle).HasMaxLength(500);
+            entity.Property(b => b.CurrentChapterLabel).HasMaxLength(100);
 
-            entity.HasOne(e => e.Tag)
-                .WithMany(t => t.BookAssociations)
-                .HasForeignKey(e => e.TagId);
+            entity.HasOne(b => b.Author)
+                .WithMany(a => a.Books)
+                .HasForeignKey(b => b.AuthorId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(b => b.ContentType)
+                .WithMany(t => t.Books)
+                .HasForeignKey(b => b.ContentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(b => b.Status)
+                .WithMany(s => s.Books)
+                .HasForeignKey(b => b.StatusId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             entity.HasOne<User>()
-                .WithMany( u => u.TagAssociations)
-                .HasForeignKey(e => e.OwnerId);
+                .WithMany(u => u.Books)
+                .HasForeignKey(b => b.OwnerId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<Tag>()
-            .HasOne<User>()
-            .WithMany(u => u.OwnedTags)
-            .HasForeignKey(t => t.OwnerId);
+        modelBuilder.Entity<BookTitle>(entity =>
+        {
+            entity.HasIndex(t => t.NormalizedTitle);
+            entity.HasIndex(t => new { t.BookId, t.NormalizedTitle }).IsUnique();
+            entity.Property(t => t.Title).HasMaxLength(500);
+            entity.Property(t => t.NormalizedTitle).HasMaxLength(500);
+            entity.Property(t => t.Language).HasMaxLength(10);
+            entity.Property(t => t.Source).HasMaxLength(50);
+            entity.HasOne(t => t.Book)
+                .WithMany(b => b.Titles)
+                .HasForeignKey(t => t.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BookLink>(entity =>
+        {
+            entity.Property(l => l.Url).HasMaxLength(2000);
+            entity.Property(l => l.Label).HasMaxLength(200);
+            entity.Property(l => l.SourceType).HasMaxLength(50);
+            entity.HasOne(l => l.Book)
+                .WithMany(b => b.Links)
+                .HasForeignKey(l => l.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BookProgressHistory>(entity =>
+        {
+            entity.HasIndex(h => new { h.BookId, h.ChangedAt });
+            entity.Property(h => h.ChapterLabel).HasMaxLength(100);
+            entity.HasOne(h => h.Book)
+                .WithMany(b => b.ProgressHistory)
+                .HasForeignKey(h => h.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BookGenre>(entity =>
+        {
+            entity.HasKey(e => new { e.BookId, e.GenreId });
+            entity.HasOne(e => e.Book)
+                .WithMany(b => b.BookGenres)
+                .HasForeignKey(e => e.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Genre)
+                .WithMany(g => g.BookGenres)
+                .HasForeignKey(e => e.GenreId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<BookTag>(entity =>
+        {
+            entity.HasKey(e => new { e.BookId, e.TagId });
+            entity.HasOne(e => e.Book)
+                .WithMany(b => b.BookTags)
+                .HasForeignKey(e => e.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(e => e.Tag)
+                .WithMany(t => t.BookTags)
+                .HasForeignKey(e => e.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAuthor(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Author>(entity =>
+        {
+            entity.HasIndex(a => a.NormalizedPrimaryName).IsUnique();
+            entity.Property(a => a.PrimaryName).HasMaxLength(300);
+            entity.Property(a => a.NormalizedPrimaryName).HasMaxLength(300);
+        });
+
+        modelBuilder.Entity<AuthorName>(entity =>
+        {
+            entity.HasIndex(a => a.NormalizedName).IsUnique();
+            entity.Property(a => a.Name).HasMaxLength(300);
+            entity.Property(a => a.NormalizedName).HasMaxLength(300);
+            entity.Property(a => a.Language).HasMaxLength(10);
+            entity.Property(a => a.Source).HasMaxLength(50);
+            entity.HasOne(a => a.Author)
+                .WithMany(a => a.Names)
+                .HasForeignKey(a => a.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureGenre(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Genre>(entity =>
+        {
+            entity.HasIndex(g => g.NormalizedName).IsUnique();
+            entity.Property(g => g.Name).HasMaxLength(100);
+            entity.Property(g => g.NormalizedName).HasMaxLength(100);
+        });
+    }
+
+    private static void ConfigureStatus(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Status>(entity =>
+        {
+            entity.HasIndex(s => s.Slug).IsUnique();
+            entity.Property(s => s.Name).HasMaxLength(100);
+            entity.Property(s => s.Slug).HasMaxLength(100);
+        });
+    }
+
+    private static void ConfigureContentType(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ContentType>(entity =>
+        {
+            entity.HasIndex(t => t.Slug).IsUnique();
+            entity.Property(t => t.Name).HasMaxLength(100);
+            entity.Property(t => t.Slug).HasMaxLength(100);
+        });
+    }
+
+    private static void ConfigureTag(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Tag>(entity =>
+        {
+            entity.HasIndex(t => new { t.OwnerId, t.NormalizedName }).IsUnique();
+            entity.Property(t => t.Name).HasMaxLength(100);
+            entity.Property(t => t.NormalizedName).HasMaxLength(100);
+            entity.Property(t => t.Color).HasMaxLength(32);
+            entity.HasOne<User>()
+                .WithMany(u => u.OwnedTags)
+                .HasForeignKey(t => t.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void SeedSystemDictionaries(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ContentType>().HasData(
+            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000001"), Name = "Novel", Slug = "novel" },
+            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000002"), Name = "Manga", Slug = "manga" },
+            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000003"), Name = "Manhwa", Slug = "manhwa" },
+            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000004"), Name = "Manhua", Slug = "manhua" },
+            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000005"), Name = "Other", Slug = "other" }
+        );
+
+        modelBuilder.Entity<Status>().HasData(
+            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000001"), Name = "Reading", Slug = "reading", SortOrder = 10 },
+            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000002"), Name = "Completed", Slug = "completed", SortOrder = 20 },
+            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000003"), Name = "Plan To Read", Slug = "plan-to-read", SortOrder = 30 },
+            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000004"), Name = "On Hold", Slug = "on-hold", SortOrder = 40 },
+            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000005"), Name = "Dropped", Slug = "dropped", SortOrder = 50 },
+            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000006"), Name = "Unknown", Slug = "unknown", SortOrder = 60 }
+        );
     }
 }
