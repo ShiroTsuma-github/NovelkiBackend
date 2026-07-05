@@ -1,0 +1,71 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Save } from 'lucide-react'
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { api } from '@/api/client'
+import type { BookDto } from '@/api/types'
+import { HttpError } from '@/api/http'
+import {
+  buttonClass,
+  inputClass,
+  secondaryButtonClass,
+} from '@/components/app/FormField'
+
+export function ProgressDialog({ book }: { book: BookDto }) {
+  const [open, setOpen] = useState(false)
+  const [currentChapterNumber, setCurrentChapterNumber] = useState(
+    book.currentChapterNumber?.toString() ?? '',
+  )
+  const [currentChapterLabel, setCurrentChapterLabel] = useState(
+    book.currentChapterLabel ?? '',
+  )
+  const [comment, setComment] = useState('')
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: () =>
+      api.updateProgress(book.id, {
+        currentChapterNumber: currentChapterNumber ? Number(currentChapterNumber) : null,
+        currentChapterLabel: currentChapterLabel || null,
+        comment: comment || null,
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', book.id] }),
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+      ])
+      toast.success('Progres zapisany.')
+      setOpen(false)
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Nie udało się zapisać progresu.')
+    },
+  })
+
+  if (!open) {
+    return (
+      <button className={secondaryButtonClass} type="button" onClick={() => setOpen(true)}>
+        <Save className="h-4 w-4" />
+        Progres
+      </button>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
+      <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+        <h2 className="text-lg font-semibold text-slate-950">Aktualizuj progres</h2>
+        <div className="mt-4 grid gap-3">
+          <input className={inputClass} placeholder="Numer rozdziału" type="number" value={currentChapterNumber} onChange={(event) => setCurrentChapterNumber(event.target.value)} />
+          <input className={inputClass} placeholder="Etykieta rozdziału" value={currentChapterLabel} onChange={(event) => setCurrentChapterLabel(event.target.value)} />
+          <textarea className={`${inputClass} min-h-24`} placeholder="Komentarz" value={comment} onChange={(event) => setComment(event.target.value)} />
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>Anuluj</button>
+          <button className={buttonClass} disabled={mutation.isPending} type="button" onClick={() => mutation.mutate()}>
+            Zapisz
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}

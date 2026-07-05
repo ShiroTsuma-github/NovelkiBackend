@@ -15,7 +15,7 @@ public class StatusController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateStatusCommand command)
     {
         var status = await _mediator.Send(command);
@@ -69,7 +69,7 @@ public class StatusController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, UpdateStatusCommand updateStatus)
     {
         updateStatus.Id = id;
@@ -79,7 +79,7 @@ public class StatusController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _mediator.Send(new DeleteStatusCommand(id));

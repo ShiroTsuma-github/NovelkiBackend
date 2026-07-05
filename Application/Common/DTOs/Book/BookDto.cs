@@ -21,6 +21,11 @@ public record BookDto
     public IReadOnlyCollection<BookLinkDto> Links { get; set; } = Array.Empty<BookLinkDto>();
 }
 
+public record AdminBookDto : BookDto
+{
+    public Guid OwnerId { get; set; }
+}
+
 public record BookLinkDto
 {
     public Guid Id { get; set; }

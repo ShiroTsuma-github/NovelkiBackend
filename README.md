@@ -34,12 +34,16 @@ dotnet user-secrets set "Jwt:Key" "<dlugi-sekretny-klucz>" --project Api
 dotnet user-secrets set "Jwt:Issuer" "NovelkiBackend" --project Api
 dotnet user-secrets set "Jwt:Audience" "NovelkiBackend" --project Api
 dotnet user-secrets set "ConnectionStrings:DB" "Host=localhost;Port=5432;Database=novelki;Username=postgres;Password=<password>" --project Api
+dotnet user-secrets set "Admin:Emails:0" "<admin-email>" --project Api
 ```
+
+Frontend uruchamiany jako osobny dev server powinien miec origin dopisany w `Cors:AllowedOrigins`. Domyslnie `Api/appsettings.json` dopuszcza `http://localhost:5173`, `http://localhost:3000` i `http://localhost:4200`.
+Rola `Admin` jest tworzona przy starcie API. Uzytkownicy z mailami z `Admin:Emails` dostaja role automatycznie i musza zalogowac sie ponownie, zeby token JWT zawieral uprawnienia admina.
 
 Start API:
 
 ```powershell
-dotnet run --project Api
+dotnet run --project Api --launch-profile https
 ```
 
 Profile z `Api/Properties/launchSettings.json`:
@@ -191,6 +195,7 @@ Aktualne kontrolery:
   - `POST`
   - `GET`
   - `GET {id:guid}`
+  - `PUT {id:guid}`
   - `PATCH {id:guid}/progress`
   - `DELETE {id:guid}`
 - `api/v1/author`
@@ -208,6 +213,10 @@ Aktualne kontrolery:
   - `DELETE {id:guid}`
 - `api/v1/status`
 - `api/v1/type`
+
+Przyklady pelnych wywolan HTTP, custom query dla ksiazek i flow dodawania ksiazki sa w `docs/http-examples.md`.
+
+Custom query dla `GET /api/v1/book` przyjmuje parametr `query`, np. `title:"Lord of Mysteries" tag:favorite rating>=8`. Obslugiwane sa filtry `title`, `author`, `tag`, `genre`, `status`, `type` oraz porownania numeryczne dla `rating`, `priority`, `current/currentChapter` i `total/totalChapters`.
 
 `StatusController` i `TypeController` sa analogiczne do `GenreController`; `TypeController` operuje pod spodem na encji `ContentType`.
 

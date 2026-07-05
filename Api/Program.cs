@@ -33,6 +33,8 @@ app.UseSerilogRequestLogging();
 
 app.UseHttpsRedirection();
 
+app.UseCors(Api.DependencyInjection.FrontendCorsPolicy);
+
 app.UseAuthentication();
 app.UseAuthorization();
 

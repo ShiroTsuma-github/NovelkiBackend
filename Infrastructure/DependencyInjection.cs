@@ -1,6 +1,7 @@
 ﻿namespace Infrastructure;
 
 using Infrastructure.Authentication;
+using Infrastructure.Identity;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -42,6 +43,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
         builder.Services.AddScoped<IIdentityService, IdentityService>();
+        builder.Services.AddHostedService<AdminRoleSeeder>();
         builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
         {
             options.Password.RequireDigit = true;

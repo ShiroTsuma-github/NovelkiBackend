@@ -15,7 +15,7 @@ public class TypeController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateTypeCommand command)
     {
         var type = await _mediator.Send(command);
@@ -69,7 +69,7 @@ public class TypeController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, UpdateTypeCommand updateType)
     {
         updateType.Id = id;
@@ -79,7 +79,7 @@ public class TypeController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _mediator.Send(new DeleteTypeCommand(id));

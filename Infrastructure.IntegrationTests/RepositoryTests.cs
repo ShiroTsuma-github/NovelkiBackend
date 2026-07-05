@@ -1,5 +1,7 @@
 using Application.Common;
+using Domain.Associations;
 using Domain.Entities;
+using Domain.Repositories;
 using Infrastructure.IntegrationTests.TestSupport;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +49,68 @@ public class RepositoryTests
         Assert.NotEmpty(result.ProgressHistory);
         Assert.Equal("Novel", result.ContentType.Name);
         Assert.Equal("Reading", result.Status.Name);
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSearchByCustomCriteria()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var matching = await TestData.AddBookWithRelationsAsync(context, database.UserId);
+        matching.Rating = 9;
+        matching.CurrentChapterNumber = 42;
+        await TestData.AddBookAsync(context, database.UserId, "Unrelated Title");
+        await context.SaveChangesAsync();
+        var repository = new BookRepository(context);
+        var criteria = new BookSearchCriteria(
+            new[] { "returnee" },
+            new[] { new BookSearchFieldFilter(BookSearchField.Tag, "favorite"), new BookSearchFieldFilter(BookSearchField.Author, "toi") },
+            new[] { new BookSearchNumberFilter(BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, 8) });
+
+        var books = (await repository.SearchAsync(database.UserId, criteria, 0, 10, CancellationToken.None)).ToList();
+        var count = await repository.GetSearchCountAsync(database.UserId, criteria, CancellationToken.None);
+
+        Assert.Single(books);
+        Assert.Equal(matching.Id, books[0].Id);
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldReplaceCollectionsAfterDuplicateTitleLookup()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var book = await TestData.AddBookWithRelationsAsync(context, database.UserId);
+        var genreId = book.BookGenres.First().GenreId;
+        var tagId = book.BookTags.First().TagId;
+        var repository = new BookRepository(context);
+
+        var editableBook = await repository.GetForUpdateAsync(book.Id, database.UserId, CancellationToken.None);
+        var duplicateCheck = await repository.GetByNameAsync(book.PrimaryTitle, database.UserId, CancellationToken.None);
+
+        Assert.NotNull(editableBook);
+        Assert.NotNull(duplicateCheck);
+
+        await repository.ReplaceEditableCollectionsAsync(
+            book.Id,
+            new[] { "Updated Title".ToPrimaryTitle() },
+            Array.Empty<BookLink>(),
+            new[] { genreId },
+            new[] { tagId },
+            null,
+            CancellationToken.None);
+        await repository.SaveAsync(CancellationToken.None);
+
+        context.ChangeTracker.Clear();
+        var savedBook = await context.Books
+            .Include(b => b.BookGenres)
+            .Include(b => b.BookTags)
+            .Include(b => b.Titles)
+            .FirstAsync(b => b.Id == book.Id);
+
+        Assert.Single(savedBook.BookGenres);
+        Assert.Single(savedBook.BookTags);
+        Assert.Contains(savedBook.Titles, t => t.Title == "Updated Title");
     }
 
     [Fact]

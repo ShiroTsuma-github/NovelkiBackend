@@ -86,9 +86,37 @@ public class BookProgressTests
         public Task AddAsync(Book book, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
+        public Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
         public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(_book?.OwnerId == ownerId ? _book : null);
         public Task<Book?> GetByNameAsync(string name, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
         public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber, string? currentChapterLabel, string? comment, CancellationToken cancellationToken)
+        {
+            if (_book == null || _book.OwnerId != ownerId)
+            {
+                return Task.FromResult(false);
+            }
+
+            var changed = _book.CurrentChapterNumber != currentChapterNumber ||
+                          _book.CurrentChapterLabel != currentChapterLabel;
+            _book.CurrentChapterNumber = currentChapterNumber;
+            _book.CurrentChapterLabel = currentChapterLabel;
+            if (changed)
+            {
+                _book.ProgressHistory.Add(new BookProgressHistory
+                {
+                    BookId = _book.Id,
+                    ChapterNumber = currentChapterNumber,
+                    ChapterLabel = currentChapterLabel,
+                    Comment = comment
+                });
+            }
+
+            Saved = true;
+            return Task.FromResult(true);
+        }
+
         public Task SaveAsync(CancellationToken cancellationToken)
         {
             Saved = true;

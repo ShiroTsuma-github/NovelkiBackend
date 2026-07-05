@@ -54,6 +54,8 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
     public async Task<Guid> Handle(CreateBookCommand request, CancellationToken cancellationToken)
     {
         var ownerId = _user.RequiredId;
+        await EnsureBookDoesNotExistAsync(ownerId, request.PrimaryTitle, request.AlternativeTitles, cancellationToken);
+
         var contentType = await _typeRepository.GetByIdAsync(request.ContentTypeId, cancellationToken)
             ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
         var status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
@@ -120,6 +122,22 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         return book.Id;
     }
 
+    private async Task EnsureBookDoesNotExistAsync(
+        Guid ownerId,
+        string primaryTitle,
+        IEnumerable<BookTitleInput>? alternativeTitles,
+        CancellationToken cancellationToken)
+    {
+        foreach (var title in EnumerateTitles(primaryTitle, alternativeTitles))
+        {
+            var existing = await _bookRepository.GetByNameAsync(title, ownerId, cancellationToken);
+            if (existing != null)
+            {
+                throw new EntityAlreadyExistsException<Book, Guid>(title, existing.Id);
+            }
+        }
+    }
+
     private async Task<Author?> ResolveAuthorAsync(CreateBookCommand request, CancellationToken cancellationToken)
     {
         if (request.AuthorId.HasValue)
@@ -177,5 +195,18 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         }
 
         return existingTags;
+    }
+
+    private static IEnumerable<string> EnumerateTitles(string primaryTitle, IEnumerable<BookTitleInput>? alternativeTitles)
+    {
+        yield return primaryTitle;
+
+        foreach (var title in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
+        {
+            if (!string.IsNullOrWhiteSpace(title.Title))
+            {
+                yield return title.Title;
+            }
+        }
     }
 }

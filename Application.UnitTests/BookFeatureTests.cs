@@ -1,7 +1,11 @@
+using Application.Common;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Features.BookFeatures.Commands;
+using Application.Features.BookFeatures.Validators;
+using Domain.Associations;
 using Domain.Entities;
+using Domain.Exceptions;
 using Domain.Repositories;
 
 namespace Application.UnitTests;
@@ -57,6 +61,103 @@ public class BookFeatureTests
         Assert.Single(book.ProgressHistory);
         Assert.Equal(348, book.ProgressHistory.First().ChapterNumber);
         Assert.Equal("ex4", book.ProgressHistory.First().ChapterLabel);
+    }
+
+    [Fact]
+    public async Task CreateBook_ShouldThrowWhenTitleAlreadyExists()
+    {
+        var fixture = CreateFixture();
+        fixture.BookRepository.Seed(new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Na Bbaego Da Gwihwanja",
+            NormalizedPrimaryTitle = "NA BBAEGO DA GWIHWANJA",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId
+        });
+        var command = ValidCreateCommand();
+
+        await Assert.ThrowsAsync<EntityAlreadyExistsException<Book, Guid>>(
+            () => fixture.Handler.Handle(command, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task UpdateBook_ShouldReplaceEditableDetailsAndAppendProgressHistory()
+    {
+        var fixture = CreateFixture();
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Old Title",
+            NormalizedPrimaryTitle = "OLD TITLE",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId,
+            CurrentChapterNumber = 1,
+            CurrentChapterLabel = "1"
+        };
+        book.Titles.Add("Old Title".ToPrimaryTitle());
+        book.Links.Add(new BookLink { Url = "https://old.example.com", SourceType = "Other" });
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookHandler(
+            fixture.BookRepository,
+            fixture.AuthorRepository,
+            new FakeTypeRepository(),
+            new FakeStatusRepository(),
+            new FakeGenreRepository(),
+            new FakeTagRepository(),
+            new FakeUser());
+        var command = new UpdateBookCommand(
+            book.Id,
+            "New Title",
+            ContentTypeId,
+            StatusId,
+            null,
+            "Toika",
+            new[] { new BookTitleInput("New Alias") },
+            null,
+            new[] { "favorite" },
+            100,
+            20,
+            "20",
+            8,
+            2,
+            "Description",
+            "Progress changed",
+            "Notes",
+            null,
+            new[] { new BookLinkInput("https://new.example.com", "New", "Other", true, true) });
+
+        await handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal("New Title", book.PrimaryTitle);
+        Assert.Contains(book.Titles, t => t.IsPrimary && t.Title == "New Title");
+        Assert.Contains(book.Titles, t => !t.IsPrimary && t.Title == "New Alias");
+        Assert.Single(book.Links);
+        Assert.Equal("https://new.example.com", book.Links.First().Url);
+        Assert.Single(book.BookTags);
+        Assert.Single(book.ProgressHistory);
+        Assert.Equal(20, book.ProgressHistory.First().ChapterNumber);
+        Assert.True(fixture.BookRepository.Saved);
+    }
+
+    [Fact]
+    public void CreateBookValidator_ShouldRejectInvalidFrontendInput()
+    {
+        var command = ValidCreateCommand(
+            links: new[] { new BookLinkInput("not-a-url") },
+            currentChapterNumber: 11);
+        command = command with { TotalChapters = 10, Rating = 11, Priority = 0 };
+        var validator = new CreateBookCommandValidator();
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterNumber");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Rating");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Priority");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[0].Url");
     }
 
     private static Fixture CreateFixture()
@@ -124,6 +225,12 @@ public class BookFeatureTests
     private sealed class FakeBookRepository : IBookRepository
     {
         public Book? LastBook { get; private set; }
+        public bool Saved { get; private set; }
+
+        public void Seed(Book book)
+        {
+            LastBook = book;
+        }
 
         public Task AddAsync(Book book, CancellationToken cancellationToken)
         {
@@ -133,10 +240,74 @@ public class BookFeatureTests
 
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
-        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<Book?>(LastBook);
-        public Task<Book?> GetByNameAsync(string name, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<Book?>(LastBook);
+        public Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
+        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
+        public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, CancellationToken cancellationToken)
+        {
+            var normalized = name.Trim().ToUpperInvariant();
+            var match = LastBook != null &&
+                        LastBook.OwnerId == ownerId &&
+                        (LastBook.NormalizedPrimaryTitle == normalized ||
+                         LastBook.Titles.Any(t => t.NormalizedTitle == normalized));
+            return Task.FromResult(match ? LastBook : null);
+        }
         public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook == null ? 0 : 1);
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task ReplaceEditableCollectionsAsync(
+            Guid bookId,
+            IEnumerable<BookTitle> titles,
+            IEnumerable<BookLink> links,
+            IEnumerable<Guid> genreIds,
+            IEnumerable<Guid> tagIds,
+            BookProgressHistory? progressHistory,
+            CancellationToken cancellationToken)
+        {
+            if (LastBook == null || LastBook.Id != bookId)
+            {
+                return Task.CompletedTask;
+            }
+
+            LastBook.Titles.Clear();
+            foreach (var title in titles)
+            {
+                title.BookId = bookId;
+                LastBook.Titles.Add(title);
+            }
+
+            LastBook.Links.Clear();
+            foreach (var link in links)
+            {
+                link.BookId = bookId;
+                LastBook.Links.Add(link);
+            }
+
+            LastBook.BookGenres.Clear();
+            foreach (var genreId in genreIds.Distinct())
+            {
+                LastBook.BookGenres.Add(new BookGenre { BookId = bookId, GenreId = genreId });
+            }
+
+            LastBook.BookTags.Clear();
+            foreach (var tagId in tagIds.Distinct())
+            {
+                LastBook.BookTags.Add(new BookTag { BookId = bookId, TagId = tagId });
+            }
+
+            if (progressHistory != null)
+            {
+                progressHistory.BookId = bookId;
+                LastBook.ProgressHistory.Add(progressHistory);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            Saved = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeAuthorRepository : IAuthorRepository
