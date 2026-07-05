@@ -1,0 +1,71 @@
+import { apiRequest, toQueryString } from './http'
+import type {
+  AuthorDto,
+  AdminBookDto,
+  BookDto,
+  BookMutationRequest,
+  DictionaryMutationRequest,
+  DictionaryDto,
+  LoginRequest,
+  PaginatedResult,
+  RegisterRequest,
+  RegisterResponse,
+  TagDto,
+  TokenResponse,
+  UpdateProgressRequest,
+} from './types'
+
+export const api = {
+  login: (request: LoginRequest) =>
+    apiRequest<TokenResponse>('/account/login', {
+      method: 'POST',
+      body: request,
+      token: null,
+    }),
+  register: (request: RegisterRequest) =>
+    apiRequest<RegisterResponse>('/account/register', {
+      method: 'POST',
+      body: request,
+      token: null,
+    }),
+  getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
+    apiRequest<PaginatedResult<BookDto>>(`/book${toQueryString(params)}`),
+  getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),
+  getAdminBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
+    apiRequest<PaginatedResult<AdminBookDto>>(`/admin/books${toQueryString(params)}`),
+  getAdminBook: (id: string) => apiRequest<AdminBookDto>(`/admin/books/${id}`),
+  createBook: (request: BookMutationRequest) =>
+    apiRequest<{ id: string }>('/book', { method: 'POST', body: request }),
+  updateBook: (id: string, request: BookMutationRequest) =>
+    apiRequest<void>(`/book/${id}`, { method: 'PUT', body: request }),
+  updateAdminBook: (id: string, request: BookMutationRequest) =>
+    apiRequest<void>(`/admin/books/${id}`, { method: 'PUT', body: request }),
+  updateProgress: (id: string, request: UpdateProgressRequest) =>
+    apiRequest<void>(`/book/${id}/progress`, { method: 'PATCH', body: request }),
+  deleteBook: (id: string) =>
+    apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
+  searchAuthors: (search: string, take = 10) =>
+    apiRequest<AuthorDto[]>(
+      `/author${toQueryString({ search, take })}`,
+    ),
+  searchTags: (search: string, take = 10) =>
+    apiRequest<TagDto[]>(`/tag${toQueryString({ search, take })}`),
+  getTypes: () =>
+    apiRequest<PaginatedResult<DictionaryDto>>(
+      `/type${toQueryString({ skip: 0, take: 100 })}`,
+    ),
+  getStatuses: () =>
+    apiRequest<PaginatedResult<DictionaryDto>>(
+      `/status${toQueryString({ skip: 0, take: 100 })}`,
+    ),
+  getGenres: () =>
+    apiRequest<PaginatedResult<DictionaryDto>>(
+      `/genre${toQueryString({ skip: 0, take: 100 })}`,
+    ),
+  createAdminStatus: (request: DictionaryMutationRequest) =>
+    apiRequest<DictionaryDto>('/admin/statuses', { method: 'POST', body: request }),
+  createAdminType: (request: DictionaryMutationRequest) =>
+    apiRequest<DictionaryDto>('/admin/types', { method: 'POST', body: request }),
+  createAdminGenre: (request: DictionaryMutationRequest) =>
+    apiRequest<DictionaryDto>('/admin/genres', { method: 'POST', body: request }),
+}

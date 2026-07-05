@@ -140,6 +140,13 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Book not found");
                 break;
 
+            case EntityAlreadyExistsException<Book, Guid>:
+                statusCode = HttpStatusCode.Conflict;
+                title = "Conflict";
+                detail = exception.Message;
+                _logger.LogWarning("Book already exists");
+                break;
+
             default:
                 title = "Internal Server Error";
                 detail = "An internal server error occurred. Please check the logs.";

@@ -187,6 +187,39 @@ public static class MappingExtensions
         };
     }
 
+    public static AdminBookDto ToAdminDto(this Book source)
+    {
+        return new AdminBookDto
+        {
+            Id = source.Id,
+            OwnerId = source.OwnerId,
+            PrimaryTitle = source.PrimaryTitle,
+            AlternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList(),
+            AuthorId = source.AuthorId,
+            Author = source.Author?.PrimaryName,
+            ContentType = source.ContentType.Name,
+            Status = source.Status.Name,
+            CurrentChapterNumber = source.CurrentChapterNumber,
+            CurrentChapterLabel = source.CurrentChapterLabel,
+            TotalChapters = source.TotalChapters,
+            Rating = source.Rating,
+            Priority = source.Priority,
+            Comment = source.Comment,
+            Notes = source.Notes,
+            Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
+            Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
+            Links = source.Links.Select(l => new BookLinkDto
+            {
+                Id = l.Id,
+                Url = l.Url,
+                Label = l.Label,
+                SourceType = l.SourceType,
+                IsPrimary = l.IsPrimary,
+                LastReadHere = l.LastReadHere
+            }).ToList()
+        };
+    }
+
     public static BookTitle ToPrimaryTitle(this string title)
     {
         return new BookTitle

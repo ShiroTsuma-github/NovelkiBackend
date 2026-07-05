@@ -15,7 +15,7 @@ public class GenreController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateGenreCommand command)
     {
         var genre = await _mediator.Send(command);
@@ -69,7 +69,7 @@ public class GenreController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(Guid id, UpdateGenreCommand updateGenre)
     {
         updateGenre.Id = id;
@@ -79,7 +79,7 @@ public class GenreController : ControllerBase
     }
 
     [HttpDelete("{id:guid}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _mediator.Send(new DeleteGenreCommand(id));

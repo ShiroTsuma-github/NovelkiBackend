@@ -1,6 +1,112 @@
 @NovelkiBackend_HostAddress = http://localhost:5232
+@AccessToken = paste-token-here
 
-GET {{NovelkiBackend_HostAddress}}/weatherforecast/
+POST {{NovelkiBackend_HostAddress}}/api/v1/account/login
+Content-Type: application/json
+
+{
+  "email": "reader@example.com",
+  "password": "secret-password"
+}
+
+###
+
+GET {{NovelkiBackend_HostAddress}}/api/v1/book?skip=0&take=20
+Authorization: Bearer {{AccessToken}}
 Accept: application/json
 
 ###
+
+GET {{NovelkiBackend_HostAddress}}/api/v1/book?skip=0&take=20&query=title:%22Lord%20of%20Mysteries%22%20tag:favorite%20rating%3E=8
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+###
+
+GET {{NovelkiBackend_HostAddress}}/api/v1/author?search=toi&take=10
+Authorization: Bearer {{AccessToken}}
+Accept: application/json
+
+###
+
+POST {{NovelkiBackend_HostAddress}}/api/v1/book
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+
+{
+  "primaryTitle": "Everyone Else is a Returnee",
+  "contentTypeId": "10000000-0000-0000-0000-000000000001",
+  "statusId": "20000000-0000-0000-0000-000000000001",
+  "authorName": "Toika",
+  "alternativeTitles": [
+    {
+      "title": "Na Bbaego Da Gwihwanja",
+      "language": "ko",
+      "source": "manual"
+    }
+  ],
+  "genreIds": [],
+  "tags": [
+    "favorite",
+    "completed"
+  ],
+  "totalChapters": 348,
+  "currentChapterNumber": 12,
+  "currentChapterLabel": "12",
+  "rating": 9,
+  "priority": 1,
+  "comment": "Started from recommendation list.",
+  "notes": "Check side stories later.",
+  "links": [
+    {
+      "url": "https://example.com/everyone-else-is-a-returnee",
+      "label": "Main source",
+      "sourceType": "Other",
+      "isPrimary": true,
+      "lastReadHere": true
+    }
+  ]
+}
+
+###
+
+PUT {{NovelkiBackend_HostAddress}}/api/v1/book/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{AccessToken}}
+Content-Type: application/json
+
+{
+  "primaryTitle": "Everyone Else is a Returnee",
+  "contentTypeId": "10000000-0000-0000-0000-000000000001",
+  "statusId": "20000000-0000-0000-0000-000000000001",
+  "authorName": "Toika",
+  "alternativeTitles": [
+    {
+      "title": "Na Bbaego Da Gwihwanja",
+      "language": "ko",
+      "source": "manual"
+    }
+  ],
+  "genreIds": [],
+  "tags": [
+    "favorite",
+    "completed"
+  ],
+  "totalChapters": 348,
+  "currentChapterNumber": 20,
+  "currentChapterLabel": "20",
+  "rating": 9,
+  "priority": 1,
+  "description": "Updated description.",
+  "comment": "Progress updated.",
+  "notes": "Check side stories later.",
+  "rawImportedLine": null,
+  "links": [
+    {
+      "url": "https://example.com/everyone-else-is-a-returnee",
+      "label": "Main source",
+      "sourceType": "Other",
+      "isPrimary": true,
+      "lastReadHere": true
+    }
+  ]
+}

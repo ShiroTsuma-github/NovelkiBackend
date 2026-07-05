@@ -4,9 +4,30 @@ using Microsoft.OpenApi.Models;
 
 static class DependencyInjection
 {
+    public const string FrontendCorsPolicy = "Frontend";
+
     public static void AddWebServices(this IHostApplicationBuilder builder)
     {
         builder.Services.AddControllers();
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy(FrontendCorsPolicy, policy =>
+            {
+                var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+                if (origins.Length > 0)
+                {
+                    policy.WithOrigins(origins)
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                }
+                else
+                {
+                    policy.AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                }
+            });
+        });
         builder.Services.AddEndpointsApiExplorer();
         builder.Services.AddSwaggerGen(c =>
         {

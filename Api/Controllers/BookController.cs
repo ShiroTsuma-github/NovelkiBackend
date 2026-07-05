@@ -41,6 +41,35 @@ public class BookController : ControllerBase
         return Ok(bookDto);
     }
 
+    [HttpPut("{id:guid}")]
+    [Authorize]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBookCommand model)
+    {
+        var command = new UpdateBookCommand(
+            id,
+            model.PrimaryTitle,
+            model.ContentTypeId,
+            model.StatusId,
+            model.AuthorId,
+            model.AuthorName,
+            model.AlternativeTitles,
+            model.GenreIds,
+            model.Tags,
+            model.TotalChapters,
+            model.CurrentChapterNumber,
+            model.CurrentChapterLabel,
+            model.Rating,
+            model.Priority,
+            model.Description,
+            model.Comment,
+            model.Notes,
+            model.RawImportedLine,
+            model.Links);
+        await _mediator.Send(command);
+
+        return NoContent();
+    }
+
     [HttpPatch("{id:guid}/progress")]
     [Authorize]
     public async Task<IActionResult> UpdateProgress(Guid id, UpdateBookProgressCommand model)
