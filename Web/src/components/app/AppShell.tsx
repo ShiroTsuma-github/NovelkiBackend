@@ -30,17 +30,17 @@ export function AppShell() {
             </div>
             <div>
               <div className="text-base font-semibold text-slate-950">Novelki</div>
-              <div className="text-xs text-slate-500">Biblioteka czytelnicza</div>
+              <div className="text-xs text-slate-500">Reading library</div>
             </div>
           </div>
           <nav className="hidden items-center gap-2 md:flex">
             <NavLink className={navLinkClass} to="/books">
               <Search className="h-4 w-4" />
-              Książki
+              Books
             </NavLink>
             <NavLink className={navLinkClass} to="/books/new">
               <Plus className="h-4 w-4" />
-              Dodaj
+              Add
             </NavLink>
             {isAdmin ? (
               <NavLink className={navLinkClass} to="/admin">
@@ -55,7 +55,7 @@ export function AppShell() {
             onClick={handleLogout}
           >
             <LogOut className="h-4 w-4" />
-            Wyloguj
+            Log out
           </button>
         </div>
       </header>

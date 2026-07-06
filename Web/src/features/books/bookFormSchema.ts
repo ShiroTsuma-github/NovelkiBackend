@@ -3,29 +3,29 @@ import type { BookDto, BookMutationRequest } from '@/api/types'
 
 const optionalNumberString = z
   .string()
-  .refine((value) => !value.trim() || !Number.isNaN(Number(value)), 'Wartość musi być liczbą.')
-  .refine((value) => !value.trim() || Number(value) >= 0, 'Wartość nie może być ujemna.')
+  .refine((value) => !value.trim() || !Number.isNaN(Number(value)), 'Value must be a number.')
+  .refine((value) => !value.trim() || Number(value) >= 0, 'Value cannot be negative.')
 
 const optionalIntegerString = optionalNumberString.refine(
   (value) => !value.trim() || Number.isInteger(Number(value)),
-  'Wartość musi być liczbą całkowitą.',
+  'Value must be an integer.',
 )
 
 export const bookFormSchema = z
   .object({
-    primaryTitle: z.string().min(1, 'Tytuł jest wymagany.').max(500),
+    primaryTitle: z.string().min(1, 'Title is required.').max(500),
     authorId: z.string().optional(),
     authorName: z.string().max(300).optional(),
-    contentTypeId: z.string().min(1, 'Typ jest wymagany.'),
-    statusId: z.string().min(1, 'Status jest wymagany.'),
+    contentTypeId: z.string().min(1, 'Type is required.'),
+    statusId: z.string().min(1, 'Status is required.'),
     genreIds: z.array(z.string()),
     alternativeTitlesText: z.string(),
     tagsText: z.string(),
     totalChapters: optionalNumberString,
     currentChapterNumber: optionalNumberString,
     currentChapterLabel: z.string().max(100).optional(),
-    rating: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 10), 'Ocena musi być od 1 do 10.'),
-    priority: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 5), 'Priorytet musi być od 1 do 5.'),
+    rating: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 10), 'Rating must be between 1 and 10.'),
+    priority: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 5), 'Priority must be between 1 and 5.'),
     description: z.string().max(4000).optional(),
     comment: z.string().max(1000).optional(),
     notes: z.string().max(4000).optional(),
@@ -37,7 +37,7 @@ export const bookFormSchema = z
       !value.totalChapters.trim() ||
       Number(value.currentChapterNumber) <= Number(value.totalChapters),
     {
-      message: 'Aktualny rozdział nie może być większy niż liczba rozdziałów.',
+      message: 'Current chapter cannot be greater than total chapters.',
       path: ['currentChapterNumber'],
     },
   )
@@ -64,7 +64,7 @@ export function toBookMutationRequest(values: BookFormValues): BookMutationReque
     rating: toOptionalNumber(values.rating),
     priority: toOptionalNumber(values.priority),
     description: values.description?.trim() || null,
-    comment: values.comment?.trim() || null,
+    comment: null,
     notes: values.notes?.trim() || null,
     rawImportedLine: null,
     links: splitLines(values.linksText).map((url) => ({
@@ -92,7 +92,7 @@ export function defaultBookFormValues(book?: BookDto): BookFormValues {
     currentChapterLabel: book?.currentChapterLabel ?? '',
     rating: book?.rating?.toString() ?? '',
     priority: book?.priority?.toString() ?? '',
-    description: '',
+    description: book?.description ?? '',
     comment: book?.comment ?? '',
     notes: book?.notes ?? '',
     linksText: book?.links.map((link) => link.url).join('\n') ?? '',

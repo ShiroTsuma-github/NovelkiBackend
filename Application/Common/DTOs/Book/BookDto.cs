@@ -3,7 +3,10 @@ namespace Application.Common.DTOs.Book;
 public record BookDto
 {
     public Guid Id { get; set; }
+    public DateTimeOffset Created { get; set; }
+    public DateTimeOffset LastModified { get; set; }
     public required string PrimaryTitle { get; set; }
+    public string? Description { get; set; }
     public IReadOnlyCollection<string> AlternativeTitles { get; set; } = Array.Empty<string>();
     public Guid? AuthorId { get; set; }
     public string? Author { get; set; }

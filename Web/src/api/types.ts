@@ -41,7 +41,10 @@ export type RegisterRequest = {
 
 export type BookDto = {
   id: string
+  created: string
+  lastModified: string
   primaryTitle: string
+  description?: string | null
   alternativeTitles: string[]
   authorId?: string | null
   author?: string | null

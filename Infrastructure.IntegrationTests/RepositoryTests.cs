@@ -76,6 +76,47 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldSearchByWildcardTitleCriteria()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var matching = await TestData.AddBookAsync(context, database.UserId, "I Shall Seal the Heavens");
+        await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
+        var repository = new BookRepository(context);
+        var criteria = new BookSearchCriteria(
+            Array.Empty<string>(),
+            new[] { new BookSearchFieldFilter(BookSearchField.Title, "i sha*") },
+            Array.Empty<BookSearchNumberFilter>());
+
+        var books = (await repository.SearchAsync(database.UserId, criteria, 0, 10, CancellationToken.None)).ToList();
+
+        Assert.Single(books);
+        Assert.Equal(matching.Id, books[0].Id);
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSortByLastModifiedDescendingByDefault()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var older = await TestData.AddBookAsync(context, database.UserId, "Older");
+        var newer = await TestData.AddBookAsync(context, database.UserId, "Newer");
+        var olderTimestamp = DateTimeOffset.Parse("2026-07-01T10:00:00+00:00");
+        var newerTimestamp = DateTimeOffset.Parse("2026-07-02T10:00:00+00:00");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE Books SET LastModified = {olderTimestamp} WHERE Id = {older.Id}");
+        await context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE Books SET LastModified = {newerTimestamp} WHERE Id = {newer.Id}");
+        context.ChangeTracker.Clear();
+        var repository = new BookRepository(context);
+
+        var books = (await repository.GetAllAsync(database.UserId, 0, 10, CancellationToken.None)).ToList();
+
+        Assert.Equal(newer.Id, books[0].Id);
+        Assert.Equal(older.Id, books[1].Id);
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldReplaceCollectionsAfterDuplicateTitleLookup()
     {
         using var database = new SqliteTestDatabase();

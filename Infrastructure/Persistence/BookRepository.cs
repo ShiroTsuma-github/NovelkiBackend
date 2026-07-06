@@ -3,10 +3,12 @@ namespace Infrastructure.Persistence;
 public class BookRepository : IBookRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly bool _supportsILike;
 
     public BookRepository(ApplicationDbContext context)
     {
         _context = context;
+        _supportsILike = context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     public async Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
@@ -52,10 +54,13 @@ public class BookRepository : IBookRepository
 
     public async Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, string? SortBy, string? SortDirection, CancellationToken cancellationToken)
     {
-        return await ApplySorting(IncludeDetails(_context.Books).Where(b => b.OwnerId == ownerId), SortBy, SortDirection)
-            .Skip(Skip)
-            .Take(Take)
-            .ToListAsync(cancellationToken);
+        return await ToSortedPageAsync(
+            IncludeDetails(_context.Books).Where(b => b.OwnerId == ownerId),
+            Skip,
+            Take,
+            SortBy,
+            SortDirection,
+            cancellationToken);
     }
 
     public async Task<IEnumerable<Book>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
@@ -65,10 +70,7 @@ public class BookRepository : IBookRepository
 
     public async Task<IEnumerable<Book>> GetAllAsync(int Skip, int Take, string? SortBy, string? SortDirection, CancellationToken cancellationToken)
     {
-        return await ApplySorting(IncludeDetails(_context.Books), SortBy, SortDirection)
-            .Skip(Skip)
-            .Take(Take)
-            .ToListAsync(cancellationToken);
+        return await ToSortedPageAsync(IncludeDetails(_context.Books), Skip, Take, SortBy, SortDirection, cancellationToken);
     }
 
     public async Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken)
@@ -78,10 +80,13 @@ public class BookRepository : IBookRepository
 
     public async Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, string? SortBy, string? SortDirection, CancellationToken cancellationToken)
     {
-        return await ApplySorting(ApplyCriteria(IncludeDetails(_context.Books).Where(b => b.OwnerId == ownerId), criteria), SortBy, SortDirection)
-            .Skip(Skip)
-            .Take(Take)
-            .ToListAsync(cancellationToken);
+        return await ToSortedPageAsync(
+            ApplyCriteria(IncludeDetails(_context.Books).Where(b => b.OwnerId == ownerId), criteria),
+            Skip,
+            Take,
+            SortBy,
+            SortDirection,
+            cancellationToken);
     }
 
     public async Task<IEnumerable<Book>> SearchAsync(BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken)
@@ -91,10 +96,7 @@ public class BookRepository : IBookRepository
 
     public async Task<IEnumerable<Book>> SearchAsync(BookSearchCriteria criteria, int Skip, int Take, string? SortBy, string? SortDirection, CancellationToken cancellationToken)
     {
-        return await ApplySorting(ApplyCriteria(IncludeDetails(_context.Books), criteria), SortBy, SortDirection)
-            .Skip(Skip)
-            .Take(Take)
-            .ToListAsync(cancellationToken);
+        return await ToSortedPageAsync(ApplyCriteria(IncludeDetails(_context.Books), criteria), Skip, Take, SortBy, SortDirection, cancellationToken);
     }
 
     public async Task AddAsync(Book book, CancellationToken cancellationToken)
@@ -256,6 +258,34 @@ public class BookRepository : IBookRepository
 
     private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 
+    private async Task<IEnumerable<Book>> ToSortedPageAsync(
+        IQueryable<Book> query,
+        int skip,
+        int take,
+        string? sortBy,
+        string? sortDirection,
+        CancellationToken cancellationToken)
+    {
+        if (!_supportsILike && IsDateSort(sortBy))
+        {
+            var descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+            var books = await query.ToListAsync(cancellationToken);
+            var sorted = NormalizeSort(sortBy) == "created"
+                ? descending
+                    ? books.OrderByDescending(b => b.Created).ThenBy(b => b.PrimaryTitle)
+                    : books.OrderBy(b => b.Created).ThenBy(b => b.PrimaryTitle)
+                : descending
+                    ? books.OrderByDescending(b => b.LastModified).ThenBy(b => b.PrimaryTitle)
+                    : books.OrderBy(b => b.LastModified).ThenBy(b => b.PrimaryTitle);
+            return sorted.Skip(skip).Take(take).ToList();
+        }
+
+        return await ApplySorting(query, sortBy, sortDirection)
+            .Skip(skip)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
+
     private static IQueryable<Book> ApplySorting(IQueryable<Book> query, string? sortBy, string? sortDirection)
     {
         var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
@@ -282,9 +312,13 @@ public class BookRepository : IBookRepository
             "owner" => descending
                 ? query.OrderByDescending(b => b.OwnerId).ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.OwnerId).ThenBy(b => b.PrimaryTitle),
-            _ => descending
-                ? query.OrderByDescending(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.PrimaryTitle)
+            "created" => descending
+                ? query.OrderByDescending(b => b.Created).ThenBy(b => b.PrimaryTitle)
+                : query.OrderBy(b => b.Created).ThenBy(b => b.PrimaryTitle),
+            "lastmodified" => descending
+                ? query.OrderByDescending(b => b.LastModified).ThenBy(b => b.PrimaryTitle)
+                : query.OrderBy(b => b.LastModified).ThenBy(b => b.PrimaryTitle),
+            _ => query.OrderByDescending(b => b.LastModified).ThenBy(b => b.PrimaryTitle)
         };
     }
 
@@ -300,38 +334,35 @@ public class BookRepository : IBookRepository
             "rating" => "rating",
             "priority" => "priority",
             "owner" or "ownerid" => "owner",
-            _ => "title"
+            "created" or "createdat" => "created",
+            "lastmodified" or "updated" or "updatedat" => "lastmodified",
+            _ => "lastmodified"
         };
     }
 
-    private static IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
+    private static bool IsDateSort(string? sortBy)
+    {
+        var normalizedSort = NormalizeSort(sortBy);
+        return normalizedSort is "created" or "lastmodified";
+    }
+
+    private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
     {
         foreach (var term in criteria.Terms)
         {
-            var normalized = Normalize(term);
-            query = query.Where(b =>
-                b.NormalizedPrimaryTitle.Contains(normalized) ||
-                b.Titles.Any(t => t.NormalizedTitle.Contains(normalized)) ||
-                (b.Author != null && (
-                    b.Author.NormalizedPrimaryName.Contains(normalized) ||
-                    b.Author.Names.Any(n => n.NormalizedName.Contains(normalized)))));
+            query = ApplyGeneralTextSearch(query, term);
         }
 
         foreach (var filter in criteria.Fields)
         {
-            var normalized = Normalize(filter.Value);
             query = filter.Field switch
             {
-                BookSearchField.Title => query.Where(b =>
-                    b.NormalizedPrimaryTitle.Contains(normalized) ||
-                    b.Titles.Any(t => t.NormalizedTitle.Contains(normalized))),
-                BookSearchField.Author => query.Where(b => b.Author != null && (
-                    b.Author.NormalizedPrimaryName.Contains(normalized) ||
-                    b.Author.Names.Any(n => n.NormalizedName.Contains(normalized)))),
-                BookSearchField.Tag => query.Where(b => b.BookTags.Any(bt => bt.Tag.NormalizedName.Contains(normalized))),
-                BookSearchField.Genre => query.Where(b => b.BookGenres.Any(bg => bg.Genre.NormalizedName.Contains(normalized))),
-                BookSearchField.Status => query.Where(b => b.Status.Name.ToUpper().Contains(normalized)),
-                BookSearchField.Type => query.Where(b => b.ContentType.Name.ToUpper().Contains(normalized)),
+                BookSearchField.Title => ApplyTitleSearch(query, filter.Value),
+                BookSearchField.Author => ApplyAuthorSearch(query, filter.Value),
+                BookSearchField.Tag => ApplyTagSearch(query, filter.Value),
+                BookSearchField.Genre => ApplyGenreSearch(query, filter.Value),
+                BookSearchField.Status => ApplyStatusSearch(query, filter.Value),
+                BookSearchField.Type => ApplyTypeSearch(query, filter.Value),
                 _ => query
             };
         }
@@ -349,6 +380,122 @@ public class BookRepository : IBookRepository
         }
 
         return query;
+    }
+
+    private IQueryable<Book> ApplyGeneralTextSearch(IQueryable<Book> query, string term)
+    {
+        var pattern = ToLikePattern(term);
+        if (_supportsILike)
+        {
+            return query.Where(b =>
+                EF.Functions.ILike(b.PrimaryTitle, pattern) ||
+                b.Titles.Any(t => EF.Functions.ILike(t.Title, pattern)) ||
+                (b.Author != null && (
+                    EF.Functions.ILike(b.Author.PrimaryName, pattern) ||
+                    b.Author.Names.Any(n => EF.Functions.ILike(n.Name, pattern)))));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(term));
+        return query.Where(b =>
+            EF.Functions.Like(b.NormalizedPrimaryTitle, normalizedPattern) ||
+            b.Titles.Any(t => EF.Functions.Like(t.NormalizedTitle, normalizedPattern)) ||
+            (b.Author != null && (
+                EF.Functions.Like(b.Author.NormalizedPrimaryName, normalizedPattern) ||
+                b.Author.Names.Any(n => EF.Functions.Like(n.NormalizedName, normalizedPattern)))));
+    }
+
+    private IQueryable<Book> ApplyTitleSearch(IQueryable<Book> query, string search)
+    {
+        var pattern = ToLikePattern(search);
+        if (_supportsILike)
+        {
+            return query.Where(b =>
+                EF.Functions.ILike(b.PrimaryTitle, pattern) ||
+                b.Titles.Any(t => EF.Functions.ILike(t.Title, pattern)));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(search));
+        return query.Where(b =>
+            EF.Functions.Like(b.NormalizedPrimaryTitle, normalizedPattern) ||
+            b.Titles.Any(t => EF.Functions.Like(t.NormalizedTitle, normalizedPattern)));
+    }
+
+    private IQueryable<Book> ApplyAuthorSearch(IQueryable<Book> query, string search)
+    {
+        var pattern = ToLikePattern(search);
+        if (_supportsILike)
+        {
+            return query.Where(b => b.Author != null && (
+                EF.Functions.ILike(b.Author.PrimaryName, pattern) ||
+                b.Author.Names.Any(n => EF.Functions.ILike(n.Name, pattern))));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(search));
+        return query.Where(b => b.Author != null && (
+            EF.Functions.Like(b.Author.NormalizedPrimaryName, normalizedPattern) ||
+            b.Author.Names.Any(n => EF.Functions.Like(n.NormalizedName, normalizedPattern))));
+    }
+
+    private IQueryable<Book> ApplyTagSearch(IQueryable<Book> query, string search)
+    {
+        var pattern = ToLikePattern(search);
+        if (_supportsILike)
+        {
+            return query.Where(b => b.BookTags.Any(bt => EF.Functions.ILike(bt.Tag.Name, pattern)));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(search));
+        return query.Where(b => b.BookTags.Any(bt => EF.Functions.Like(bt.Tag.NormalizedName, normalizedPattern)));
+    }
+
+    private IQueryable<Book> ApplyGenreSearch(IQueryable<Book> query, string search)
+    {
+        var pattern = ToLikePattern(search);
+        if (_supportsILike)
+        {
+            return query.Where(b => b.BookGenres.Any(bg => EF.Functions.ILike(bg.Genre.Name, pattern)));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(search));
+        return query.Where(b => b.BookGenres.Any(bg => EF.Functions.Like(bg.Genre.NormalizedName, normalizedPattern)));
+    }
+
+    private IQueryable<Book> ApplyStatusSearch(IQueryable<Book> query, string search)
+    {
+        var pattern = ToLikePattern(search);
+        if (_supportsILike)
+        {
+            return query.Where(b => EF.Functions.ILike(b.Status.Name, pattern));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(search));
+        return query.Where(b => EF.Functions.Like(b.Status.Name.ToUpper(), normalizedPattern));
+    }
+
+    private IQueryable<Book> ApplyTypeSearch(IQueryable<Book> query, string search)
+    {
+        var pattern = ToLikePattern(search);
+        if (_supportsILike)
+        {
+            return query.Where(b => EF.Functions.ILike(b.ContentType.Name, pattern));
+        }
+
+        var normalizedPattern = ToLikePattern(Normalize(search));
+        return query.Where(b => EF.Functions.Like(b.ContentType.Name.ToUpper(), normalizedPattern));
+    }
+
+    private static string ToLikePattern(string value)
+    {
+        var pattern = EscapeLike(value.Trim()).Replace("*", "%", StringComparison.Ordinal);
+        return pattern.Contains('%') ? pattern : $"%{pattern}%";
+    }
+
+    private static string EscapeLike(string value)
+    {
+        return value
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
     }
 
     private static IQueryable<Book> ApplyRating(IQueryable<Book> query, BookSearchOperator op, decimal value)

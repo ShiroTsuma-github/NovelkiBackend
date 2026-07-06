@@ -33,11 +33,11 @@ export function ProgressDialog({ book }: { book: BookDto }) {
         queryClient.invalidateQueries({ queryKey: ['book', book.id] }),
         queryClient.invalidateQueries({ queryKey: ['books'] }),
       ])
-      toast.success('Progres zapisany.')
+      toast.success('Progress saved.')
       setOpen(false)
     },
     onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Nie udało się zapisać progresu.')
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to save progress.')
     },
   })
 
@@ -45,7 +45,7 @@ export function ProgressDialog({ book }: { book: BookDto }) {
     return (
       <button className={secondaryButtonClass} type="button" onClick={() => setOpen(true)}>
         <Save className="h-4 w-4" />
-        Progres
+        Progress
       </button>
     )
   }
@@ -53,16 +53,16 @@ export function ProgressDialog({ book }: { book: BookDto }) {
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
       <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
-        <h2 className="text-lg font-semibold text-slate-950">Aktualizuj progres</h2>
+        <h2 className="text-lg font-semibold text-slate-950">Update progress</h2>
         <div className="mt-4 grid gap-3">
-          <input className={inputClass} placeholder="Numer rozdziału" type="number" value={currentChapterNumber} onChange={(event) => setCurrentChapterNumber(event.target.value)} />
-          <input className={inputClass} placeholder="Etykieta rozdziału" value={currentChapterLabel} onChange={(event) => setCurrentChapterLabel(event.target.value)} />
-          <textarea className={`${inputClass} min-h-24`} placeholder="Komentarz" value={comment} onChange={(event) => setComment(event.target.value)} />
+          <input className={inputClass} placeholder="Chapter number" type="number" value={currentChapterNumber} onChange={(event) => setCurrentChapterNumber(event.target.value)} />
+          <input className={inputClass} placeholder="Chapter label" value={currentChapterLabel} onChange={(event) => setCurrentChapterLabel(event.target.value)} />
+          <textarea className={`${inputClass} min-h-24`} placeholder="Comment" value={comment} onChange={(event) => setComment(event.target.value)} />
         </div>
         <div className="mt-5 flex justify-end gap-2">
-          <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>Anuluj</button>
+          <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>Cancel</button>
           <button className={buttonClass} disabled={mutation.isPending} type="button" onClick={() => mutation.mutate()}>
-            Zapisz
+            Save
           </button>
         </div>
       </section>

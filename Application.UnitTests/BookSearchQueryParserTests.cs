@@ -16,4 +16,13 @@ public class BookSearchQueryParserTests
         Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.GreaterThanOrEqual && f.Value == 8);
         Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.CurrentChapter && f.Operator == BookSearchOperator.LessThan && f.Value == 120);
     }
+
+    [Fact]
+    public void Parse_ShouldReadSingleQuotedWildcardFieldValues()
+    {
+        var criteria = BookSearchQueryParser.Parse("author:'Er Gen' title:'i sha*'");
+
+        Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Author && f.Value == "Er Gen");
+        Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Title && f.Value == "i sha*");
+    }
 }

@@ -20,40 +20,48 @@ export function BookDetailsPage() {
     queryFn: () => api.getBook(id!),
     enabled: Boolean(id),
   })
+  const typesQuery = useQuery({ queryKey: ['types'], queryFn: api.getTypes, staleTime: 300_000 })
+  const statusesQuery = useQuery({ queryKey: ['statuses'], queryFn: api.getStatuses, staleTime: 300_000 })
+  const genresQuery = useQuery({ queryKey: ['genres'], queryFn: api.getGenres, staleTime: 300_000 })
   const deleteMutation = useMutation({
     mutationFn: () => api.deleteBook(id!),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['books'] })
-      toast.success('Książka usunięta.')
+      toast.success('Book deleted.')
       navigate('/books', { replace: true })
     },
     onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Nie udało się usunąć książki.')
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to delete the book.')
     },
   })
 
   if (bookQuery.isLoading) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Ładowanie...</div>
+    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Loading...</div>
   }
 
   if (!bookQuery.data) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Nie znaleziono książki.</div>
+    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Book not found.</div>
   }
 
   const book = bookQuery.data
+  const typeDescription = typesQuery.data?.data.find((type) => type.name === book.contentType)?.description
+  const statusDescription = statusesQuery.data?.data.find((status) => status.name === book.status)?.description
+  const genreDescriptions = genresQuery.data?.data
+    .filter((genre) => book.genres.includes(genre.name) && genre.description)
+    .map((genre) => `${genre.name}: ${genre.description}`)
 
   return (
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link className={secondaryButtonClass} to="/books">
           <ArrowLeft className="h-4 w-4" />
-          Lista
+          List
         </Link>
         <div className="flex flex-wrap gap-2">
           <ProgressDialog book={book} />
           <Link className={buttonClass} to={`/books/${book.id}/edit`}>
             <Edit className="h-4 w-4" />
-            Edytuj
+            Edit
           </Link>
           <button
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
@@ -62,7 +70,7 @@ export function BookDetailsPage() {
             onClick={() => deleteMutation.mutate()}
           >
             <Trash2 className="h-4 w-4" />
-            Usuń
+            Delete
           </button>
         </div>
       </div>
@@ -70,40 +78,45 @@ export function BookDetailsPage() {
       <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="grid gap-1">
           <h1 className="text-3xl font-semibold text-slate-950">{book.primaryTitle}</h1>
-          <p className="text-sm text-slate-500">{book.author ?? 'Autor nieznany'}</p>
+          <p className="text-sm text-slate-500">{book.author ?? 'Unknown author'}</p>
         </div>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <Metric label="Status" value={book.status} />
-          <Metric label="Typ" value={book.contentType} />
-          <Metric label="Progres" value={formatProgress(book)} />
-          <Metric label="Ocena" value={book.rating?.toString() ?? '-'} />
+          <Metric description={statusDescription} label="Status" value={book.status} />
+          <Metric description={typeDescription} label="Type" value={book.contentType} />
+          <Metric label="Progress" value={formatProgress(book)} />
+          <Metric label="Rating" value={book.rating?.toString() ?? '-'} />
         </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
-        <Panel title="Tytuły alternatywne">
-          <Pills values={book.alternativeTitles} empty="Brak aliasów." />
+        <Panel title="Alternative titles">
+          <Pills values={book.alternativeTitles} empty="No aliases." />
         </Panel>
-        <Panel title="Tagi i gatunki">
+        <Panel title="Tags and genres">
           <div className="grid gap-3">
-            <Pills values={book.tags} empty="Brak tagów." />
-            <Pills values={book.genres} empty="Brak gatunków." />
+            <Pills values={book.tags} empty="No tags." />
+            <Pills values={book.genres} empty="No genres." />
+            {genreDescriptions?.length ? (
+              <div className="grid gap-1 text-xs text-slate-500">
+                {genreDescriptions.map((description) => <p key={description}>{description}</p>)}
+              </div>
+            ) : null}
           </div>
         </Panel>
-        <Panel title="Linki">
+        <Panel title="Links">
           <div className="grid gap-2">
             {book.links.length ? book.links.map((link) => (
               <a className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-50" href={link.url} key={link.id} rel="noreferrer" target="_blank">
                 <span>{link.label || link.sourceType}</span>
                 <ExternalLink className="h-4 w-4 text-slate-400" />
               </a>
-            )) : <p className="text-sm text-slate-500">Brak linków.</p>}
+            )) : <p className="text-sm text-slate-500">No links.</p>}
           </div>
         </Panel>
-        <Panel title="Notatki">
+        <Panel title="Notes">
           <div className="grid gap-3 text-sm text-slate-700">
-            <p>{book.comment || 'Brak komentarza.'}</p>
-            <p>{book.notes || 'Brak notatek.'}</p>
+            <p>{book.comment || 'No comment.'}</p>
+            <p>{book.notes || 'No notes.'}</p>
           </div>
         </Panel>
       </section>
@@ -111,11 +124,12 @@ export function BookDetailsPage() {
   )
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({ description, label, value }: { description?: string | null; label: string; value: string }) {
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
       <div className="text-xs uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 font-semibold text-slate-950">{value}</div>
+      {description ? <div className="mt-1 text-xs font-normal text-slate-500">{description}</div> : null}
     </div>
   )
 }

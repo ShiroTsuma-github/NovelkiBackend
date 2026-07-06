@@ -8,11 +8,11 @@ type FormFieldProps = {
 
 export function FormField({ label, error, children }: FormFieldProps) {
   return (
-    <label className="grid gap-1.5 text-sm font-medium text-slate-200">
+    <div className="grid gap-1.5 text-sm font-medium text-slate-200">
       <span>{label}</span>
       <div className="contents dark-field">{children}</div>
       {error ? <span className="text-xs text-red-600">{error}</span> : null}
-    </label>
+    </div>
   )
 }
 

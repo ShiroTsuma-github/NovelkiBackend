@@ -1,26 +1,33 @@
 using Api;
+using Api.Health;
+using Api.Observability;
 using Application;
 using Infrastructure;
 using Infrastructure.Middleware;
+using Serilog.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+if (builder.Environment.IsDevelopment())
+{
+    builder.Configuration.AddUserSecrets<Program>();
+}
+
+builder.AddObservability();
 builder.AddWebServices();
 builder.AddApplicationServices();
 builder.AddInfrastructureServices();
-builder.Host.UseSerilog();
-
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseReadyHealthCheck>("database");
 
 var app = builder.Build();
+
+await app.ApplyDatabaseMigrationsAsync();
 
 app.UseErrorHandlingMiddleware();
 
 if (app.Environment.IsDevelopment())
 {
-    builder.Configuration.AddUserSecrets<Program>();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -29,7 +36,34 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-app.UseSerilogRequestLogging();
+app.UseSerilogRequestLogging(options =>
+{
+    options.GetLevel = (httpContext, _, exception) =>
+    {
+        if (exception != null || httpContext.Response.StatusCode >= StatusCodes.Status500InternalServerError)
+        {
+            return LogEventLevel.Error;
+        }
+
+        return ObservabilityExtensions.IsHealthCheckPath(httpContext.Request.Path)
+            ? LogEventLevel.Verbose
+            : LogEventLevel.Information;
+    };
+
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
+        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+        diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
+        diagnosticContext.Set("TraceId", System.Diagnostics.Activity.Current?.TraceId.ToString() ?? string.Empty);
+        diagnosticContext.Set("SpanId", System.Diagnostics.Activity.Current?.SpanId.ToString() ?? string.Empty);
+        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (!string.IsNullOrWhiteSpace(userId))
+        {
+            diagnosticContext.Set("UserId", userId);
+        }
+    };
+});
 
 app.UseHttpsRedirection();
 
@@ -38,6 +72,8 @@ app.UseCors(Api.DependencyInjection.FrontendCorsPolicy);
 app.UseAuthentication();
 app.UseAuthorization();
 
+app.MapHealthChecks("/health/ready");
+app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
 app.MapControllers();
 
 app.Run();

@@ -11,11 +11,11 @@ export function RegisterPage() {
   const mutation = useMutation({
     mutationFn: api.register,
     onSuccess: () => {
-      toast.success('Konto utworzone. Możesz się zalogować.')
+      toast.success('Account created. You can log in now.')
       navigate('/login', { replace: true })
     },
     onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Nie udało się utworzyć konta.')
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to create account.')
     },
   })
 
@@ -30,19 +30,19 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthFrame title="Rejestracja" description="Utwórz konto czytelnika.">
+    <AuthFrame title="Register" description="Create a reader account.">
       <form className="grid gap-4" onSubmit={handleSubmit}>
-        <input className={inputClass} name="username" placeholder="Nazwa użytkownika" />
+        <input className={inputClass} name="username" placeholder="Username" />
         <input className={inputClass} name="email" placeholder="Email" type="email" />
-        <input className={inputClass} name="password" placeholder="Hasło" type="password" />
+        <input className={inputClass} name="password" placeholder="Password" type="password" />
         <button className={buttonClass} disabled={mutation.isPending} type="submit">
-          Zarejestruj
+          Register
         </button>
       </form>
       <p className="mt-4 text-sm text-slate-500">
-        Masz konto?{' '}
+        Already have an account?{' '}
         <Link className="font-semibold text-slate-950 underline" to="/login">
-          Zaloguj się
+          Log in
         </Link>
       </p>
     </AuthFrame>

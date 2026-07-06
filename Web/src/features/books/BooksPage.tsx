@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, Plus, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, Plus, Search, Settings2 } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { BookDto } from '@/api/types'
@@ -8,30 +9,59 @@ import {
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
-import { buildBookQuery, emptyFilters, type BookFilters } from './queryBuilder'
 
 const pageSizeOptions = [20, 50, 100, 500]
+const bookColumnsStorageKey = 'novelki.books.columns.v1'
 type SortDirection = 'asc' | 'desc'
+export type ColumnPreference = { id: string; visible: boolean }
+export type ColumnDefinition<T> = {
+  id: string
+  label: string
+  defaultVisible: boolean
+  sortBy?: string
+  render: (item: T) => ReactNode
+}
+
+const bookColumns: ColumnDefinition<BookDto>[] = [
+  { id: 'id', label: 'Id', defaultVisible: false, render: (book) => <span className="font-mono text-xs">{book.id}</span> },
+  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', render: (book) => <span className="font-medium text-slate-950">{book.primaryTitle}</span> },
+  { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, render: (book) => formatList(book.alternativeTitles) },
+  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', render: (book) => book.author ?? '-' },
+  { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', render: (book) => book.status },
+  { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', render: (book) => book.contentType },
+  { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', render: formatProgress },
+  { id: 'totalChapters', label: 'Chapters', defaultVisible: false, render: (book) => book.totalChapters ?? '-' },
+  { id: 'rating', label: 'Rating', defaultVisible: true, sortBy: 'rating', render: (book) => book.rating ?? '-' },
+  { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', render: (book) => book.priority ?? '-' },
+  { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', render: (book) => formatDate(book.created) },
+  { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', render: (book) => formatDate(book.lastModified || book.created) },
+  { id: 'genres', label: 'Genres', defaultVisible: false, render: (book) => <Pills values={book.genres.slice(0, 3)} /> },
+  { id: 'tags', label: 'Tags', defaultVisible: true, render: (book) => <Pills values={book.tags.slice(0, 3)} /> },
+  { id: 'links', label: 'Links', defaultVisible: false, render: (book) => book.links.length },
+  { id: 'notes', label: 'Notes', defaultVisible: false, render: (book) => truncate(book.notes) },
+  { id: 'description', label: 'Description', defaultVisible: false, render: (book) => truncate(book.description) },
+]
 
 export function BooksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const [columnPreferences, setColumnPreferences] = useColumnPreferences(bookColumnsStorageKey, bookColumns)
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
-  const sortBy = searchParams.get('sortBy') ?? 'title'
+  const sortBy = searchParams.get('sortBy') ?? 'lastModified'
   const sortDirection = readSortDirection(searchParams)
-  const filters = readFilters(searchParams)
-  const query = buildBookQuery(filters)
+  const query = searchParams.get('query') ?? ''
+  const visibleColumns = getVisibleColumns(bookColumns, columnPreferences)
   const booksQuery = useQuery({
     queryKey: ['books', skip, pageSize, query, sortBy, sortDirection],
     queryFn: () => api.getBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
   })
 
-  function updateFilter(key: keyof BookFilters, value: string) {
+  function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
     if (value) {
-      next.set(key, value)
+      next.set('query', value)
     } else {
-      next.delete(key)
+      next.delete('query')
     }
     next.delete('skip')
     setSearchParams(next)
@@ -52,7 +82,10 @@ export function BooksPage() {
 
   function setSort(nextSortBy: string) {
     const next = new URLSearchParams(searchParams)
-    const nextDirection = sortBy === nextSortBy && sortDirection === 'asc' ? 'desc' : 'asc'
+    const defaultDirection = nextSortBy === 'lastModified' || nextSortBy === 'created' ? 'desc' : 'asc'
+    const nextDirection = sortBy === nextSortBy
+      ? sortDirection === 'asc' ? 'desc' : 'asc'
+      : defaultDirection
     next.set('sortBy', nextSortBy)
     next.set('sortDirection', nextDirection)
     next.delete('skip')
@@ -67,79 +100,59 @@ export function BooksPage() {
     <div className="grid gap-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-950">Książki</h1>
-          <p className="text-sm text-slate-500">Lista, wyszukiwanie i szybka nawigacja po bibliotece.</p>
+          <h1 className="text-2xl font-semibold text-slate-950">Books</h1>
+          <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
         </div>
         <Link className={buttonClass} to="/books/new">
           <Plus className="h-4 w-4" />
-          Dodaj książkę
+          Add book
         </Link>
       </div>
 
-      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_1fr]">
-          <label className="relative">
-            <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
-            <input
-              className={`${inputClass} w-full pl-9`}
-              placeholder="Szukaj po tytule lub autorze"
-              value={filters.text}
-              onChange={(event) => updateFilter('text', event.target.value)}
-            />
-          </label>
-          <input className={inputClass} placeholder="Tag" value={filters.tag} onChange={(event) => updateFilter('tag', event.target.value)} />
-          <input className={inputClass} placeholder="Autor" value={filters.author} onChange={(event) => updateFilter('author', event.target.value)} />
-          <input className={inputClass} placeholder="Ocena min." type="number" value={filters.ratingMin} onChange={(event) => updateFilter('ratingMin', event.target.value)} />
-        </div>
-        <div className="grid gap-3 md:grid-cols-5">
-          <input className={inputClass} placeholder="Tytuł" value={filters.title} onChange={(event) => updateFilter('title', event.target.value)} />
-          <input className={inputClass} placeholder="Gatunek" value={filters.genre} onChange={(event) => updateFilter('genre', event.target.value)} />
-          <input className={inputClass} placeholder="Status" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)} />
-          <input className={inputClass} placeholder="Typ" value={filters.type} onChange={(event) => updateFilter('type', event.target.value)} />
-          <input className={inputClass} placeholder="Priorytet" type="number" value={filters.priority} onChange={(event) => updateFilter('priority', event.target.value)} />
-        </div>
-        {query ? <p className="text-xs text-slate-500">Backend query: <code>{query}</code></p> : null}
-      </section>
+      <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
             <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <SortableHeader activeDirection={sortBy === 'title' ? sortDirection : null} label="Tytuł" sortBy="title" onSort={setSort} />
-                <SortableHeader activeDirection={sortBy === 'author' ? sortDirection : null} label="Autor" sortBy="author" onSort={setSort} />
-                <SortableHeader activeDirection={sortBy === 'status' ? sortDirection : null} label="Status" sortBy="status" onSort={setSort} />
-                <SortableHeader activeDirection={sortBy === 'type' ? sortDirection : null} label="Typ" sortBy="type" onSort={setSort} />
-                <SortableHeader activeDirection={sortBy === 'progress' ? sortDirection : null} label="Progres" sortBy="progress" onSort={setSort} />
-                <SortableHeader activeDirection={sortBy === 'rating' ? sortDirection : null} label="Ocena" sortBy="rating" onSort={setSort} />
-                <th className="px-4 py-3">Tagi</th>
-                <th className="px-4 py-3"></th>
+                {visibleColumns.map((column) => (
+                  <ColumnHeader
+                    activeDirection={column.sortBy === sortBy ? sortDirection : null}
+                    column={column}
+                    key={column.id}
+                    onSort={setSort}
+                  />
+                ))}
+                <th className="relative px-4 py-3 text-right">
+                  <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
+                </th>
               </tr>
             </thead>
             <tbody>
               {booksQuery.isLoading ? (
-                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={8}>Ładowanie...</td></tr>
+                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>Loading...</td></tr>
               ) : null}
               {booksQuery.data?.data.map((book) => (
-                <BookRow book={book} key={book.id} />
+                <BookRow book={book} columns={visibleColumns} key={book.id} />
               ))}
               {booksQuery.data?.data.length === 0 ? (
-                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={8}>Brak książek dla aktualnych filtrów.</td></tr>
+                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>No books match the current filters.</td></tr>
               ) : null}
             </tbody>
           </table>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} z ${total}` : '0 wyników'}</span>
+          <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2">
-              <span>Na stronę</span>
+              <span>Per page</span>
               <select className={`${inputClass} h-10 w-24`} value={pageSize} onChange={(event) => setPageSize(event.target.value)}>
                 {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
             </label>
-            <button className={secondaryButtonClass} disabled={!canGoBack} type="button" onClick={() => setSkip(skip - pageSize)}>Poprzednie</button>
-            <button className={secondaryButtonClass} disabled={!canGoForward} type="button" onClick={() => setSkip(skip + pageSize)}>Następne</button>
+            <button className={secondaryButtonClass} disabled={!canGoBack} type="button" onClick={() => setSkip(skip - pageSize)}>Previous</button>
+            <button className={secondaryButtonClass} disabled={!canGoForward} type="button" onClick={() => setSkip(skip + pageSize)}>Next</button>
           </div>
         </div>
       </section>
@@ -147,49 +160,246 @@ export function BooksPage() {
   )
 }
 
-function SortableHeader({
+export function BookAdvancedSearch({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <label className="relative">
+        <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+        <input
+          className={`${inputClass} w-full pl-9`}
+          placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" rating>=8 title:i*'}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+      <p className="text-xs text-slate-500">
+        Supports filters like <code>author:John</code>, <code>tag:favorite</code>, <code>rating&gt;=8</code>, and wildcard searches like <code>title:i*</code>.
+      </p>
+    </section>
+  )
+}
+
+export function ColumnSettingsPopup<T>({
+  columns,
+  preferences,
+  onChange,
+}: {
+  columns: ColumnDefinition<T>[]
+  preferences: ColumnPreference[]
+  onChange: (preferences: ColumnPreference[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [position, setPosition] = useState({ left: 'auto', top: 'auto' })
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function updatePosition() {
+      const rect = buttonRef.current?.getBoundingClientRect()
+      if (!rect) {
+        return
+      }
+
+      const panelWidthVw = 20
+      const horizontalGapVw = 1.25
+      const verticalLiftVh = 1.25
+      const edgeGapVw = 1
+      const edgeGapVh = 1
+      const preferredLeftVw = (rect.right / window.innerWidth) * 100 + horizontalGapVw
+      const preferredTopVh = (rect.top / window.innerHeight) * 100 - verticalLiftVh
+      setPosition({
+        left: `clamp(${edgeGapVw}vw, ${preferredLeftVw}vw, ${100 - panelWidthVw - edgeGapVw}vw)`,
+        top: `clamp(${edgeGapVh}vh, ${preferredTopVh}vh, calc(100vh - ${edgeGapVh}vh))`,
+      })
+    }
+
+    updatePosition()
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open])
+
+  function toggleColumn(id: string) {
+    onChange(preferences.map((preference) => (
+      preference.id === id ? { ...preference, visible: !preference.visible } : preference
+    )))
+  }
+
+  function moveColumn(id: string, direction: -1 | 1) {
+    const index = preferences.findIndex((preference) => preference.id === id)
+    const nextIndex = index + direction
+    if (index < 0 || nextIndex < 0 || nextIndex >= preferences.length) {
+      return
+    }
+
+    const next = [...preferences]
+    const [item] = next.splice(index, 1)
+    next.splice(nextIndex, 0, item)
+    onChange(next)
+  }
+
+  function resetColumns() {
+    onChange(defaultColumnPreferences(columns))
+  }
+
+  return (
+    <div className="inline-block text-left" ref={containerRef}>
+      <button
+        ref={buttonRef}
+        className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+        type="button"
+        onClick={() => setOpen(!open)}
+      >
+        <Settings2 className="h-3.5 w-3.5" />
+        Columns
+      </button>
+      {open ? (
+        <div
+          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-80 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl"
+          style={position}
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+            <div>
+              <div className="text-sm font-semibold text-slate-950">Visible columns</div>
+              <div className="text-xs font-normal text-slate-500">Change table order and visibility.</div>
+            </div>
+            <button className="text-xs font-semibold text-slate-500 hover:text-slate-950" type="button" onClick={resetColumns}>Reset</button>
+          </div>
+          {preferences.map((preference, index) => {
+            const column = columns.find((item) => item.id === preference.id)
+            if (!column) {
+              return null
+            }
+
+            return (
+              <div className={`flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2 text-sm text-slate-700 ${preference.visible ? 'border-emerald-400' : 'border-slate-200'}`} key={preference.id}>
+                <button
+                  aria-pressed={preference.visible}
+                  className="inline-flex min-w-0 flex-1 items-center gap-2 text-left font-medium text-inherit"
+                  type="button"
+                  onClick={() => toggleColumn(preference.id)}
+                >
+                  <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border transition ${preference.visible ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300 bg-slate-200'}`}>
+                    <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition ${preference.visible ? 'left-4' : 'left-0.5'}`} />
+                  </span>
+                  {column.label}
+                </button>
+                <div className="flex shrink-0 gap-1">
+                  <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === 0} type="button" onClick={() => moveColumn(preference.id, -1)}>Up</button>
+                  <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === preferences.length - 1} type="button" onClick={() => moveColumn(preference.id, 1)}>Down</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+export function useColumnPreferences<T>(storageKey: string, columns: ColumnDefinition<T>[]) {
+  const [preferences, setPreferences] = useState<ColumnPreference[]>(() => readColumnPreferences(storageKey, columns))
+
+  function updatePreferences(next: ColumnPreference[]) {
+    setPreferences(next)
+    window.localStorage.setItem(storageKey, JSON.stringify(next))
+  }
+
+  return [preferences, updatePreferences] as const
+}
+
+export function getVisibleColumns<T>(columns: ColumnDefinition<T>[], preferences: ColumnPreference[]) {
+  return preferences
+    .filter((preference) => preference.visible)
+    .map((preference) => columns.find((column) => column.id === preference.id))
+    .filter((column): column is ColumnDefinition<T> => Boolean(column))
+}
+
+export function defaultColumnPreferences<T>(columns: ColumnDefinition<T>[]): ColumnPreference[] {
+  return columns.map((column) => ({ id: column.id, visible: column.defaultVisible }))
+}
+
+function readColumnPreferences<T>(storageKey: string, columns: ColumnDefinition<T>[]) {
+  const defaults = defaultColumnPreferences(columns)
+  const stored = window.localStorage.getItem(storageKey)
+  if (!stored) {
+    return defaults
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as ColumnPreference[]
+    const knownIds = new Set(columns.map((column) => column.id))
+    const storedKnown = parsed.filter((preference) => knownIds.has(preference.id))
+    const missing = defaults.filter((preference) => !storedKnown.some((item) => item.id === preference.id))
+    return [...storedKnown, ...missing]
+  } catch {
+    return defaults
+  }
+}
+
+export function ColumnHeader<T>({
   activeDirection,
-  label,
-  sortBy,
+  column,
   onSort,
 }: {
   activeDirection: SortDirection | null
-  label: string
-  sortBy: string
+  column: ColumnDefinition<T>
   onSort: (sortBy: string) => void
 }) {
   const Icon = activeDirection === 'asc' ? ArrowUp : activeDirection === 'desc' ? ArrowDown : ChevronsUpDown
+
+  if (!column.sortBy) {
+    return <th className="px-4 py-3">{column.label}</th>
+  }
 
   return (
     <th className="px-4 py-3">
       <button
         className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-200 hover:text-slate-950"
         type="button"
-        onClick={() => onSort(sortBy)}
+        onClick={() => onSort(column.sortBy!)}
       >
-        {label}
+        {column.label}
         <Icon className="h-3.5 w-3.5" />
       </button>
     </th>
   )
 }
 
-function BookRow({ book }: { book: BookDto }) {
+function BookRow({ book, columns }: { book: BookDto; columns: ColumnDefinition<BookDto>[] }) {
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50">
-      <td className="px-4 py-3 font-medium text-slate-950">{book.primaryTitle}</td>
-      <td className="px-4 py-3 text-slate-600">{book.author ?? '-'}</td>
-      <td className="px-4 py-3 text-slate-600">{book.status}</td>
-      <td className="px-4 py-3 text-slate-600">{book.contentType}</td>
-      <td className="px-4 py-3 text-slate-600">{formatProgress(book)}</td>
-      <td className="px-4 py-3 text-slate-600">{book.rating ?? '-'}</td>
-      <td className="px-4 py-3">
-        <div className="flex flex-wrap gap-1">
-          {book.tags.slice(0, 3).map((tag) => (
-            <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" key={tag}>{tag}</span>
-          ))}
-        </div>
-      </td>
+      {columns.map((column) => (
+        <td className="px-4 py-3 text-slate-600" key={column.id}>{column.render(book)}</td>
+      ))}
       <td className="px-4 py-3">
         <div className="flex justify-end gap-2">
           <Link className={secondaryButtonClass} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
@@ -200,19 +410,18 @@ function BookRow({ book }: { book: BookDto }) {
   )
 }
 
-function readFilters(searchParams: URLSearchParams): BookFilters {
-  return {
-    ...emptyFilters,
-    text: searchParams.get('text') ?? '',
-    title: searchParams.get('title') ?? '',
-    author: searchParams.get('author') ?? '',
-    tag: searchParams.get('tag') ?? '',
-    genre: searchParams.get('genre') ?? '',
-    status: searchParams.get('status') ?? '',
-    type: searchParams.get('type') ?? '',
-    ratingMin: searchParams.get('ratingMin') ?? '',
-    priority: searchParams.get('priority') ?? '',
+function Pills({ values }: { values: string[] }) {
+  if (!values.length) {
+    return '-'
   }
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {values.map((value) => (
+        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" key={value}>{value}</span>
+      ))}
+    </div>
+  )
 }
 
 function readPageSize(searchParams: URLSearchParams) {
@@ -221,7 +430,7 @@ function readPageSize(searchParams: URLSearchParams) {
 }
 
 function readSortDirection(searchParams: URLSearchParams): SortDirection {
-  return searchParams.get('sortDirection') === 'desc' ? 'desc' : 'asc'
+  return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
 }
 
 export function formatProgress(book: BookDto) {
@@ -230,4 +439,24 @@ export function formatProgress(book: BookDto) {
     return '-'
   }
   return `${current ?? '?'}${book.totalChapters ? ` / ${book.totalChapters}` : ''}`
+}
+
+export function formatDate(value?: string | null) {
+  if (!value) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
+function formatList(values: string[]) {
+  return values.length ? values.slice(0, 3).join(', ') : '-'
+}
+
+function truncate(value?: string | null) {
+  if (!value) {
+    return '-'
+  }
+
+  return value.length > 80 ? `${value.slice(0, 77)}...` : value
 }

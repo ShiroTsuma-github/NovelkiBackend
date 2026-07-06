@@ -17,32 +17,34 @@ export function LoginPage() {
       navigate('/books', { replace: true })
     },
     onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Nie udało się zalogować.')
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to log in.')
     },
   })
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const formData = new FormData(event.currentTarget)
+    const identifier = String(formData.get('identifier') ?? '').trim()
     mutation.mutate({
-      email: String(formData.get('email') ?? ''),
+      email: identifier.includes('@') ? identifier : null,
+      username: identifier.includes('@') ? null : identifier,
       password: String(formData.get('password') ?? ''),
     })
   }
 
   return (
-    <AuthFrame title="Logowanie" description="Wejdź do swojej biblioteki.">
+    <AuthFrame title="Log in" description="Enter your library.">
       <form className="grid gap-4" onSubmit={handleSubmit}>
-        <input className={inputClass} name="email" placeholder="Email" type="email" />
-        <input className={inputClass} name="password" placeholder="Hasło" type="password" />
+        <input className={inputClass} name="identifier" placeholder="Email or username" type="text" />
+        <input className={inputClass} name="password" placeholder="Password" type="password" />
         <button className={buttonClass} disabled={mutation.isPending} type="submit">
-          Zaloguj
+          Log in
         </button>
       </form>
       <p className="mt-4 text-sm text-slate-500">
-        Nie masz konta?{' '}
+        Do not have an account?{' '}
         <Link className="font-semibold text-slate-950 underline" to="/register">
-          Zarejestruj się
+          Register
         </Link>
       </p>
     </AuthFrame>
