@@ -115,17 +115,26 @@ public static class BookSearchQueryParser
     private static IEnumerable<string> Tokenize(string query)
     {
         var token = new List<char>();
-        var inQuotes = false;
+        char? quote = null;
 
         foreach (var c in query)
         {
-            if (c == '"')
+            if (c is '"' or '\'')
             {
-                inQuotes = !inQuotes;
-                continue;
+                if (quote == c)
+                {
+                    quote = null;
+                    continue;
+                }
+
+                if (quote == null)
+                {
+                    quote = c;
+                    continue;
+                }
             }
 
-            if (char.IsWhiteSpace(c) && !inQuotes)
+            if (char.IsWhiteSpace(c) && quote == null)
             {
                 if (token.Count > 0)
                 {

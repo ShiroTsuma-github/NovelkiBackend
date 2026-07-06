@@ -18,6 +18,40 @@ public class AccountValidationTests
     }
 
     [Fact]
+    public void LoginValidator_ShouldAcceptUsernameOnly()
+    {
+        var validator = new LoginUserCommandValidator();
+        var command = new LoginUserCommand { Username = "reader", Password = "Password1!" };
+
+        var result = validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void LoginValidator_ShouldAcceptEmailOnly()
+    {
+        var validator = new LoginUserCommandValidator();
+        var command = new LoginUserCommand { Email = "reader@example.com", Password = "Password1!" };
+
+        var result = validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void LoginValidator_ShouldRejectUsernameAndEmailTogether()
+    {
+        var validator = new LoginUserCommandValidator();
+        var command = new LoginUserCommand { Username = "reader", Email = "reader@example.com", Password = "Password1!" };
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("Either Username or Email"));
+    }
+
+    [Fact]
     public void RegisterValidator_ShouldAcceptValidPasswordPolicy()
     {
         var validator = new RegisterUserCommandValidator();

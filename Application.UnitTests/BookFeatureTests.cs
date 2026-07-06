@@ -52,6 +52,7 @@ public class BookFeatureTests
             links: new[] { new BookLinkInput("https://novelupdates.com/example", "NU", "NovelUpdates", true, true) },
             currentChapterNumber: 348,
             currentChapterLabel: "ex4");
+        command = command with { Notes = "Private notes", Comment = null };
 
         await fixture.Handler.Handle(command, CancellationToken.None);
 
@@ -59,6 +60,8 @@ public class BookFeatureTests
         Assert.Equal(2, book.BookTags.Count);
         Assert.Single(book.Links);
         Assert.Single(book.ProgressHistory);
+        Assert.Equal("Private notes", book.Notes);
+        Assert.Null(book.Comment);
         Assert.Equal(348, book.ProgressHistory.First().ChapterNumber);
         Assert.Equal("ex4", book.ProgressHistory.First().ChapterLabel);
     }

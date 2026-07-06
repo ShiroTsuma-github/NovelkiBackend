@@ -160,7 +160,10 @@ public static class MappingExtensions
         return new BookDto
         {
             Id = source.Id,
+            Created = source.Created,
+            LastModified = source.LastModified,
             PrimaryTitle = source.PrimaryTitle,
+            Description = source.Description,
             AlternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList(),
             AuthorId = source.AuthorId,
             Author = source.Author?.PrimaryName,
@@ -192,8 +195,11 @@ public static class MappingExtensions
         return new AdminBookDto
         {
             Id = source.Id,
+            Created = source.Created,
+            LastModified = source.LastModified,
             OwnerId = source.OwnerId,
             PrimaryTitle = source.PrimaryTitle,
+            Description = source.Description,
             AlternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList(),
             AuthorId = source.AuthorId,
             Author = source.Author?.PrimaryName,

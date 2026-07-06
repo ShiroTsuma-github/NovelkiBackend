@@ -14,8 +14,11 @@ public class MappingExtensionTests
         var tag = new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" };
         var book = new Book
         {
+            Created = DateTimeOffset.Parse("2026-07-01T10:00:00Z"),
+            LastModified = DateTimeOffset.Parse("2026-07-02T10:00:00Z"),
             PrimaryTitle = "Everyone Else is a Returnee",
             NormalizedPrimaryTitle = "EVERYONE ELSE IS A RETURNEE",
+            Description = "Portal fantasy with returnee progression.",
             Author = author,
             AuthorId = author.Id,
             ContentType = new ContentType { Name = "Novel", Slug = "novel" },
@@ -35,6 +38,9 @@ public class MappingExtensionTests
         var dto = book.ToDto();
 
         Assert.Equal("Everyone Else is a Returnee", dto.PrimaryTitle);
+        Assert.Equal("Portal fantasy with returnee progression.", dto.Description);
+        Assert.Equal(DateTimeOffset.Parse("2026-07-01T10:00:00Z"), dto.Created);
+        Assert.Equal(DateTimeOffset.Parse("2026-07-02T10:00:00Z"), dto.LastModified);
         Assert.Contains("Na Bbaego Da Gwihwanja", dto.AlternativeTitles);
         Assert.Equal("Toika", dto.Author);
         Assert.Equal("Novel", dto.ContentType);

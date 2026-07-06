@@ -6,8 +6,8 @@ public record GetAllBooksQuery(
     int Skip = 0,
     int Take = 100,
     string? Query = null,
-    string? SortBy = null,
-    string? SortDirection = null) : IRequest<PaginatedResult<BookDto>>;
+    string? SortBy = "lastModified",
+    string? SortDirection = "desc") : IRequest<PaginatedResult<BookDto>>;
 
 public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedResult<BookDto>>
 {

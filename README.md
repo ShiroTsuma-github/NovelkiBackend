@@ -53,6 +53,39 @@ Profile z `Api/Properties/launchSettings.json`:
 
 W trybie `Development` endpoint root przekierowuje do Swaggera pod `/swagger`.
 
+## Lokalny stack Docker + observability
+
+Repo zawiera lokalny stack: Web, API, OpenTelemetry Collector, Loki, Tempo, Prometheus i Grafana. Baza danych jest brana z connection stringa w `.env`.
+
+1. Skopiuj `.env.example` do `.env` i ustaw przynajmniej `DB_CONNECTION_STRING`, `JWT_KEY` i `ADMIN_EMAIL`.
+2. Uruchom:
+
+```powershell
+docker compose up --build
+```
+
+Domyslne adresy:
+
+- Web: `http://localhost:8080`
+- API: `http://localhost:5232`
+- API health: `http://localhost:5232/health/ready`
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+- Loki: `http://localhost:3100`
+- Tempo: `http://localhost:3200`
+
+Porty Web, API i Grafany mozna zmienic przez `WEB_PORT`, `API_PORT` i `GRAFANA_PORT` w `.env`. W compose API ustawia `Database:AutoMigrate=true`, wiec migracje EF sa aplikowane przy starcie kontenera. Poza compose domyslnie zostaje `false`.
+
+Observability flow:
+
+```text
+API --OTLP logs/traces/metrics--> OpenTelemetry Collector
+Collector logs  --> Loki
+Collector traces --> Tempo
+Collector metrics --> Prometheus scrape endpoint
+Grafana czyta Loki, Tempo i Prometheus jako provisioned datasources
+```
+
 ## Migracje EF Core
 
 Komendy sa zapisane tez w `Migrations.txt`:
