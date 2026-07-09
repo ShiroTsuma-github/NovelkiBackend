@@ -119,6 +119,7 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
         cover.Height = stored.Height;
         cover.FailureReason = null;
         cover.LastAttemptAt = DateTimeOffset.UtcNow;
+        BookCoverLinkHelper.EnsureCoverSourceLink(book, request.ImageUrl, cover.Source);
 
         if (book.Cover == null)
         {
@@ -221,5 +222,32 @@ public class GetBookCoverFileHandler : IRequestHandler<GetBookCoverFileQuery, Bo
 
         var stream = await _storage.OpenReadAsync(cover.StoragePath, cancellationToken);
         return new BookCoverFileResult(stream, cover.MimeType, $"{request.BookId}{Path.GetExtension(cover.StoragePath)}");
+    }
+}
+
+internal static class BookCoverLinkHelper
+{
+    public static void EnsureCoverSourceLink(Book book, string? imageUrl, BookCoverSource? source)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl) || !Uri.TryCreate(imageUrl, UriKind.Absolute, out _))
+        {
+            return;
+        }
+
+        if (book.Links.Any(link => string.Equals(link.Url, imageUrl, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        book.Links.Add(new BookLink
+        {
+            BookId = book.Id,
+            Book = book,
+            Url = imageUrl,
+            Label = source?.ToString(),
+            SourceType = "Cover",
+            IsPrimary = false,
+            LastReadHere = false,
+        });
     }
 }

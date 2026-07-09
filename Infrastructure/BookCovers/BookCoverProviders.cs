@@ -447,10 +447,29 @@ public sealed class BookCoverResolver
     {
         foreach (var provider in _providers)
         {
-            var candidate = await provider.FindAsync(book, cancellationToken);
-            if (candidate != null)
+            try
             {
-                return candidate;
+                var candidate = await provider.FindAsync(book, cancellationToken);
+                if (candidate != null)
+                {
+                    return candidate;
+                }
+            }
+            catch (HttpRequestException)
+            {
+                continue;
+            }
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                continue;
+            }
+            catch (JsonException)
+            {
+                continue;
+            }
+            catch (InvalidOperationException)
+            {
+                continue;
             }
         }
 
