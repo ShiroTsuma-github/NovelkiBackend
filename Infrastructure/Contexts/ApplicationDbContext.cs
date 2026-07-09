@@ -13,6 +13,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     }
 
     public DbSet<Book> Books { get; set; }
+    public DbSet<BookCover> BookCovers { get; set; }
     public DbSet<BookTitle> BookTitles { get; set; }
     public DbSet<BookLink> BookLinks { get; set; }
     public DbSet<BookProgressHistory> BookProgressHistory { get; set; }
@@ -90,6 +91,21 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
                 .WithMany(u => u.Books)
                 .HasForeignKey(b => b.OwnerId)
                 .IsRequired()
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BookCover>(entity =>
+        {
+            entity.HasIndex(c => c.BookId).IsUnique();
+            entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
+            entity.Property(c => c.Source).HasConversion<string>().HasMaxLength(32);
+            entity.Property(c => c.StoragePath).HasMaxLength(500);
+            entity.Property(c => c.OriginalImageUrl).HasMaxLength(2000);
+            entity.Property(c => c.MimeType).HasMaxLength(100);
+            entity.Property(c => c.FailureReason).HasMaxLength(1000);
+            entity.HasOne(c => c.Book)
+                .WithOne(b => b.Cover)
+                .HasForeignKey<BookCover>(c => c.BookId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

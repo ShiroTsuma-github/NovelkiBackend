@@ -14,6 +14,7 @@ public class Book : BaseAuditableEntity
     public Guid StatusId { get; set; }
     public Status Status { get; set; } = default!;
     public Guid OwnerId { get; set; }
+    public BookCover? Cover { get; set; }
     public ICollection<BookTitle> Titles { get; set; } = new HashSet<BookTitle>();
     public ICollection<BookGenre> BookGenres { get; set; } = new HashSet<BookGenre>();
     public ICollection<BookTag> BookTags { get; set; } = new HashSet<BookTag>();

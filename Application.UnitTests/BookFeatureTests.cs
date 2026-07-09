@@ -28,6 +28,9 @@ public class BookFeatureTests
         Assert.Equal("Na Bbaego Da Gwihwanja", fixture.BookRepository.LastBook.PrimaryTitle);
         Assert.Contains(fixture.BookRepository.LastBook.Titles, t => t.IsPrimary && t.Title == "Na Bbaego Da Gwihwanja");
         Assert.Contains(fixture.BookRepository.LastBook.Titles, t => !t.IsPrimary && t.Title == "Everyone Else is a Returnee");
+        Assert.NotNull(fixture.BookRepository.LastBook.Cover);
+        Assert.Equal(BookCoverStatus.Pending, fixture.BookRepository.LastBook.Cover.Status);
+        Assert.Equal(fixture.BookRepository.LastBook.Id, fixture.BookCoverQueue.QueuedBookId);
     }
 
     [Fact]
@@ -172,6 +175,7 @@ public class BookFeatureTests
         var genreRepository = new FakeGenreRepository();
         var tagRepository = new FakeTagRepository();
         var user = new FakeUser();
+        var bookCoverQueue = new FakeBookCoverQueue();
         var handler = new CreateBookHandler(
             bookRepository,
             authorRepository,
@@ -179,8 +183,9 @@ public class BookFeatureTests
             statusRepository,
             genreRepository,
             tagRepository,
+            bookCoverQueue,
             user);
-        return new Fixture(bookRepository, authorRepository, handler);
+        return new Fixture(bookRepository, authorRepository, bookCoverQueue, handler);
     }
 
     private static CreateBookCommand ValidCreateCommand(
@@ -212,7 +217,7 @@ public class BookFeatureTests
             Links: links);
     }
 
-    private sealed record Fixture(FakeBookRepository BookRepository, FakeAuthorRepository AuthorRepository, CreateBookHandler Handler);
+    private sealed record Fixture(FakeBookRepository BookRepository, FakeAuthorRepository AuthorRepository, FakeBookCoverQueue BookCoverQueue, CreateBookHandler Handler);
 
     private sealed class FakeUser : IUser
     {
@@ -310,6 +315,17 @@ public class BookFeatureTests
         {
             Saved = true;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeBookCoverQueue : IBookCoverQueue
+    {
+        public Guid? QueuedBookId { get; private set; }
+
+        public ValueTask QueueAsync(Guid bookId, CancellationToken cancellationToken)
+        {
+            QueuedBookId = bookId;
+            return ValueTask.CompletedTask;
         }
     }
 

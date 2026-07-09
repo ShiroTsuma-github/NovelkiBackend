@@ -31,6 +31,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
     private readonly IStatusRepository _statusRepository;
     private readonly IGenreRepository _genreRepository;
     private readonly ITagRepository _tagRepository;
+    private readonly IBookCoverQueue _bookCoverQueue;
     private readonly IUser _user;
 
     public CreateBookHandler(
@@ -40,6 +41,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         IStatusRepository statusRepository,
         IGenreRepository genreRepository,
         ITagRepository tagRepository,
+        IBookCoverQueue bookCoverQueue,
         IUser user)
     {
         _bookRepository = bookRepository;
@@ -48,6 +50,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         _statusRepository = statusRepository;
         _genreRepository = genreRepository;
         _tagRepository = tagRepository;
+        _bookCoverQueue = bookCoverQueue;
         _user = user;
     }
 
@@ -81,7 +84,8 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             Priority = request.Priority,
             Comment = request.Comment,
             Notes = request.Notes,
-            RawImportedLine = request.RawImportedLine
+            RawImportedLine = request.RawImportedLine,
+            Cover = new BookCover()
         };
 
         book.Titles.Add(request.PrimaryTitle.ToPrimaryTitle());
@@ -119,6 +123,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         }
 
         await _bookRepository.AddAsync(book, cancellationToken);
+        await _bookCoverQueue.QueueAsync(book.Id, cancellationToken);
         return book.Id;
     }
 

@@ -82,6 +82,7 @@ public class ApplicationDbContextTests
         Assert.Empty(await context.BookTitles.ToListAsync());
         Assert.Empty(await context.BookLinks.ToListAsync());
         Assert.Empty(await context.BookProgressHistory.ToListAsync());
+        Assert.Empty(await context.BookCovers.ToListAsync());
     }
 
     [Fact]

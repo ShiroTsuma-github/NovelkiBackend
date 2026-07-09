@@ -34,6 +34,15 @@ public class MappingExtensionTests
         book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         book.Links.Add(new BookLink { Url = "https://example.com", SourceType = "NovelUpdates", IsPrimary = true });
+        book.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.Jikan,
+            StoragePath = "owner/book.jpg",
+            OriginalImageUrl = "https://cdn.example.com/book.jpg",
+            MimeType = "image/jpeg",
+            SizeBytes = 42
+        };
 
         var dto = book.ToDto();
 
@@ -48,6 +57,10 @@ public class MappingExtensionTests
         Assert.Contains("Fantasy", dto.Genres);
         Assert.Contains("favorite", dto.Tags);
         Assert.Single(dto.Links);
+        Assert.NotNull(dto.Cover);
+        Assert.Equal("Found", dto.Cover.Status);
+        Assert.Equal("Jikan", dto.Cover.Source);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/file", dto.Cover.ImageUrl);
     }
 
     [Fact]

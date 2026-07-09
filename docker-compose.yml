@@ -20,6 +20,8 @@ services:
       OTEL_SERVICE_NAME: novelki-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+    volumes:
+      - ./storage/covers:/app/storage/covers
     ports:
       - "${API_PORT:-5232}:5232"
     healthcheck:

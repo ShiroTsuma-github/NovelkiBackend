@@ -1,8 +1,9 @@
-import { apiRequest, toQueryString } from './http'
+import { apiFormRequest, apiRequest, toQueryString } from './http'
 import type {
   AuthorDto,
   AdminBookDto,
   BookDto,
+  BookCoverDto,
   BookMutationRequest,
   DictionaryMutationRequest,
   DictionaryDto,
@@ -42,6 +43,15 @@ export const api = {
     apiRequest<void>(`/admin/books/${id}`, { method: 'PUT', body: request }),
   updateProgress: (id: string, request: UpdateProgressRequest) =>
     apiRequest<void>(`/book/${id}/progress`, { method: 'PATCH', body: request }),
+  setBookCoverFromUrl: (id: string, imageUrl: string) =>
+    apiRequest<BookCoverDto>(`/book/${id}/cover/url`, { method: 'PUT', body: { imageUrl } }),
+  uploadBookCover: (id: string, file: File) => {
+    const formData = new FormData()
+    formData.set('file', file)
+    return apiFormRequest<BookCoverDto>(`/book/${id}/cover`, formData, { method: 'PUT' })
+  },
+  refreshBookCover: (id: string) =>
+    apiRequest<BookCoverDto>(`/book/${id}/cover/refresh`, { method: 'POST' }),
   deleteBook: (id: string) =>
     apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
   searchAuthors: (search: string, take = 10) =>

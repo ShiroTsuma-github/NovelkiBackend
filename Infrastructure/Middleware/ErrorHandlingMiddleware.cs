@@ -140,6 +140,13 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Book not found");
                 break;
 
+            case EntityNotFoundException<BookCover, Guid>:
+                statusCode = HttpStatusCode.NotFound;
+                title = "Not Found";
+                detail = exception.Message;
+                _logger.LogWarning("Book cover not found");
+                break;
+
             case EntityAlreadyExistsException<Book, Guid>:
                 statusCode = HttpStatusCode.Conflict;
                 title = "Conflict";

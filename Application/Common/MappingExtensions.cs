@@ -176,6 +176,7 @@ public static class MappingExtensions
             Priority = source.Priority,
             Comment = source.Comment,
             Notes = source.Notes,
+            Cover = source.Cover?.ToDto(source.Id),
             Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
             Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
             Links = source.Links.Select(l => new BookLinkDto
@@ -212,6 +213,7 @@ public static class MappingExtensions
             Priority = source.Priority,
             Comment = source.Comment,
             Notes = source.Notes,
+            Cover = source.Cover?.ToDto(source.Id),
             Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
             Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
             Links = source.Links.Select(l => new BookLinkDto
@@ -223,6 +225,24 @@ public static class MappingExtensions
                 IsPrimary = l.IsPrimary,
                 LastReadHere = l.LastReadHere
             }).ToList()
+        };
+    }
+
+    public static BookCoverDto ToDto(this BookCover source, Guid bookId)
+    {
+        return new BookCoverDto
+        {
+            Id = source.Id,
+            Status = source.Status.ToString(),
+            Source = source.Source?.ToString(),
+            ImageUrl = source.StoragePath == null ? null : $"/api/v1/book/{bookId}/cover/file",
+            OriginalImageUrl = source.OriginalImageUrl,
+            MimeType = source.MimeType,
+            SizeBytes = source.SizeBytes,
+            Width = source.Width,
+            Height = source.Height,
+            FailureReason = source.FailureReason,
+            LastAttemptAt = source.LastAttemptAt
         };
     }
 

@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Edit, ExternalLink, Trash2 } from 'lucide-react'
+import { ArrowLeft, Edit, ExternalLink, RefreshCw, Trash2, Upload } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
-import { HttpError } from '@/api/http'
+import { API_BASE_URL, HttpError, tokenStorageKey } from '@/api/http'
+import type { BookDto } from '@/api/types'
 import {
   buttonClass,
+  inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
 import { formatProgress } from './BooksPage'
@@ -32,6 +35,45 @@ export function BookDetailsPage() {
     },
     onError: (error) => {
       toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to delete the book.')
+    },
+  })
+  const refreshCoverMutation = useMutation({
+    mutationFn: () => api.refreshBookCover(id!),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', id] }),
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+      ])
+      toast.success('Cover search queued.')
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to refresh cover.')
+    },
+  })
+  const setCoverUrlMutation = useMutation({
+    mutationFn: (imageUrl: string) => api.setBookCoverFromUrl(id!, imageUrl),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', id] }),
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+      ])
+      toast.success('Cover saved.')
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to save cover URL.')
+    },
+  })
+  const uploadCoverMutation = useMutation({
+    mutationFn: (file: File) => api.uploadBookCover(id!, file),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', id] }),
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+      ])
+      toast.success('Cover uploaded.')
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to upload cover.')
     },
   })
 
@@ -89,6 +131,15 @@ export function BookDetailsPage() {
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">
+        <CoverPanel
+          book={book}
+          refreshPending={refreshCoverMutation.isPending}
+          setUrlPending={setCoverUrlMutation.isPending}
+          uploadPending={uploadCoverMutation.isPending}
+          onRefresh={() => refreshCoverMutation.mutate()}
+          onSetUrl={(imageUrl) => setCoverUrlMutation.mutate(imageUrl)}
+          onUpload={(file) => uploadCoverMutation.mutate(file)}
+        />
         <Panel title="Alternative titles">
           <Pills values={book.alternativeTitles} empty="No aliases." />
         </Panel>
@@ -122,6 +173,127 @@ export function BookDetailsPage() {
       </section>
     </div>
   )
+}
+
+function CoverPanel({
+  book,
+  refreshPending,
+  setUrlPending,
+  uploadPending,
+  onRefresh,
+  onSetUrl,
+  onUpload,
+}: {
+  book: BookDto
+  refreshPending: boolean
+  setUrlPending: boolean
+  uploadPending: boolean
+  onRefresh: () => void
+  onSetUrl: (imageUrl: string) => void
+  onUpload: (file: File) => void
+}) {
+  const [imageUrl, setImageUrl] = useState('')
+
+  function submitUrl(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const trimmed = imageUrl.trim()
+    if (trimmed) {
+      onSetUrl(trimmed)
+      setImageUrl('')
+    }
+  }
+
+  return (
+    <Panel title="Cover">
+      <div className="grid gap-3">
+        <CoverImage book={book} />
+        <div className="grid gap-1 text-sm text-slate-600">
+          <p>Status: <span className="font-medium text-slate-900">{book.cover?.status ?? 'Missing'}</span></p>
+          {book.cover?.source ? <p>Source: {book.cover.source}</p> : null}
+          {book.cover?.failureReason ? <p className="text-red-600">{book.cover.failureReason}</p> : null}
+        </div>
+        <form className="grid gap-2" onSubmit={submitUrl}>
+          <input
+            className={inputClass}
+            placeholder="Paste image URL"
+            value={imageUrl}
+            onChange={(event) => setImageUrl(event.target.value)}
+          />
+          <div className="flex flex-wrap gap-2">
+            <button className={buttonClass} disabled={setUrlPending || !imageUrl.trim()} type="submit">
+              Save URL
+            </button>
+            <label className={secondaryButtonClass}>
+              <Upload className="h-4 w-4" />
+              Upload
+              <input
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                disabled={uploadPending}
+                type="file"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  if (file) {
+                    onUpload(file)
+                    event.target.value = ''
+                  }
+                }}
+              />
+            </label>
+            <button className={secondaryButtonClass} disabled={refreshPending} type="button" onClick={onRefresh}>
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </button>
+          </div>
+        </form>
+      </div>
+    </Panel>
+  )
+}
+
+function CoverImage({ book }: { book: BookDto }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    let objectUrl: string | null = null
+
+    async function loadImage() {
+      if (!book.cover?.imageUrl) {
+        setBlobUrl(null)
+        return
+      }
+
+      const apiOrigin = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
+      const token = localStorage.getItem(tokenStorageKey)
+      const response = await fetch(`${apiOrigin}${book.cover.imageUrl}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+      if (!response.ok) {
+        return
+      }
+
+      objectUrl = URL.createObjectURL(await response.blob())
+      if (active) {
+        setBlobUrl(objectUrl)
+      }
+    }
+
+    loadImage()
+
+    return () => {
+      active = false
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl)
+      }
+    }
+  }, [book.cover?.imageUrl, book.cover?.lastAttemptAt])
+
+  if (!blobUrl) {
+    return <div className="flex aspect-[2/3] max-h-72 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">No cover</div>
+  }
+
+  return <img alt={book.primaryTitle} className="max-h-72 rounded-md border border-slate-200 object-cover" src={blobUrl} />
 }
 
 function Metric({ description, label, value }: { description?: string | null; label: string; value: string }) {

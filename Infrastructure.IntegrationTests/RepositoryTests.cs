@@ -47,6 +47,8 @@ public class RepositoryTests
         Assert.NotEmpty(result.BookTags);
         Assert.NotEmpty(result.Links);
         Assert.NotEmpty(result.ProgressHistory);
+        Assert.NotNull(result.Cover);
+        Assert.Equal(BookCoverStatus.Found, result.Cover.Status);
         Assert.Equal("Novel", result.ContentType.Name);
         Assert.Equal("Reading", result.Status.Name);
     }

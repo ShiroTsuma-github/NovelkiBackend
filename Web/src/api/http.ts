@@ -1,6 +1,6 @@
 import type { ApiError } from './types'
 
-const API_BASE_URL =
+export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'https://localhost:7121/api/v1'
 
 export const tokenStorageKey = 'novelki.accessToken'
@@ -39,6 +39,38 @@ export async function apiRequest<T>(
     ...options,
     headers,
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  })
+
+  if (response.status === 204) {
+    return undefined as T
+  }
+
+  const text = await response.text()
+  const data = text ? JSON.parse(text) : undefined
+
+  if (!response.ok) {
+    throw new HttpError(normalizeApiError(data, response.status, path))
+  }
+
+  return data as T
+}
+
+export async function apiFormRequest<T>(
+  path: string,
+  formData: FormData,
+  options: Omit<RequestInit, 'body'> & { token?: string | null } = {},
+): Promise<T> {
+  const headers = new Headers(options.headers)
+  const token = options.token ?? localStorage.getItem(tokenStorageKey)
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+    body: formData,
   })
 
   if (response.status === 204) {
