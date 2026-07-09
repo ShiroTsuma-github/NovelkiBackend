@@ -3,6 +3,7 @@ namespace Infrastructure.BookCovers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 public sealed class BookCoverBackgroundService : BackgroundService
 {
@@ -130,6 +131,7 @@ public sealed class BookCoverProcessor
             cover.Width = stored.Width;
             cover.Height = stored.Height;
             cover.FailureReason = null;
+            CoverLinkHelper.EnsureCoverSourceLink(cover.Book, candidate.ImageUrl, candidate.Source);
             await _coverRepository.SaveAsync(cancellationToken);
             _logger.LogInformation("Cover found. BookId={BookId} Source={Source}", cover.BookId, candidate.Source);
         }
@@ -141,10 +143,52 @@ public sealed class BookCoverProcessor
         }
         catch (Exception ex)
         {
-            cover.Status = BookCoverStatus.Failed;
-            cover.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
+            if (IsProviderResponseFailure(ex))
+            {
+                cover.Status = BookCoverStatus.NotFound;
+                cover.FailureReason = "No valid cover response was found from the configured providers.";
+            }
+            else
+            {
+                cover.Status = BookCoverStatus.Failed;
+                cover.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
+            }
             await _coverRepository.SaveAsync(cancellationToken);
             _logger.LogWarning(ex, "Cover provider failed. BookId={BookId}", cover.BookId);
         }
+    }
+
+    private static bool IsProviderResponseFailure(Exception ex)
+    {
+        return ex is JsonException ||
+               ex.Message.Contains("invalid start of a value", StringComparison.OrdinalIgnoreCase) ||
+               ex.Message.Contains("'<'", StringComparison.Ordinal);
+    }
+}
+
+internal static class CoverLinkHelper
+{
+    public static void EnsureCoverSourceLink(Book book, string? imageUrl, BookCoverSource? source)
+    {
+        if (string.IsNullOrWhiteSpace(imageUrl) || !Uri.TryCreate(imageUrl, UriKind.Absolute, out _))
+        {
+            return;
+        }
+
+        if (book.Links.Any(link => string.Equals(link.Url, imageUrl, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        book.Links.Add(new BookLink
+        {
+            BookId = book.Id,
+            Book = book,
+            Url = imageUrl,
+            Label = source?.ToString(),
+            SourceType = "Cover",
+            IsPrimary = false,
+            LastReadHere = false,
+        });
     }
 }
