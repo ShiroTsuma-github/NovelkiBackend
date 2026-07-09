@@ -98,6 +98,57 @@ public class BookController : ControllerBase
         return NoContent();
     }
 
+    [HttpPut("{id:guid}/cover")]
+    [Authorize]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> UploadCover(Guid id, [FromForm] IFormFile? file)
+    {
+        if (file == null)
+        {
+            return BadRequest(new { error = "Cover file is required." });
+        }
+
+        if (file.Length == 0)
+        {
+            return BadRequest(new { error = "Cover file is empty." });
+        }
+
+        await using var stream = file.OpenReadStream();
+        var cover = await _mediator.Send(new UploadBookCoverCommand(id, stream, file.FileName, file.ContentType, file.Length));
+        _logger.LogInformation("Book cover uploaded. BookId={BookId}", id);
+
+        return Ok(cover);
+    }
+
+    [HttpPut("{id:guid}/cover/url")]
+    [Authorize]
+    public async Task<IActionResult> SetCoverFromUrl(Guid id, [FromBody] SetBookCoverFromUrlRequest request)
+    {
+        var cover = await _mediator.Send(new SetBookCoverFromUrlCommand(id, request.ImageUrl));
+        _logger.LogInformation("Book cover set from URL. BookId={BookId}", id);
+
+        return Ok(cover);
+    }
+
+    [HttpPost("{id:guid}/cover/refresh")]
+    [Authorize]
+    public async Task<IActionResult> RefreshCover(Guid id)
+    {
+        var cover = await _mediator.Send(new RefreshBookCoverCommand(id));
+        _logger.LogInformation("Book cover refresh queued. BookId={BookId}", id);
+
+        return Accepted(cover);
+    }
+
+    [HttpGet("{id:guid}/cover/file")]
+    [Authorize]
+    public async Task<IActionResult> GetCoverFile(Guid id)
+    {
+        var result = await _mediator.Send(new GetBookCoverFileQuery(id));
+
+        return File(result.Content, result.MimeType, result.FileName);
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize]
     public async Task<IActionResult> Delete(Guid id)
@@ -107,3 +158,5 @@ public class BookController : ControllerBase
         return NoContent();
     }
 }
+
+public sealed record SetBookCoverFromUrlRequest(string ImageUrl);

@@ -91,6 +91,14 @@ public static class TestData
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         book.Links.Add(new BookLink { Url = "https://example.com", SourceType = "NovelUpdates", IsPrimary = true });
         book.ProgressHistory.Add(new BookProgressHistory { ChapterNumber = 10, ChapterLabel = "10" });
+        book.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.NovelUpdates,
+            StoragePath = "11111111111111111111111111111111/example.jpg",
+            MimeType = "image/jpeg",
+            SizeBytes = 123
+        };
         context.Books.Add(book);
         await context.SaveChangesAsync();
         return book;

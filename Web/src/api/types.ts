@@ -57,6 +57,7 @@ export type BookDto = {
   priority?: number | null
   comment?: string | null
   notes?: string | null
+  cover?: BookCoverDto | null
   genres: string[]
   tags: string[]
   links: BookLinkDto[]
@@ -73,6 +74,20 @@ export type BookLinkDto = {
   sourceType: string
   isPrimary: boolean
   lastReadHere: boolean
+}
+
+export type BookCoverDto = {
+  id: string
+  status: string
+  source?: string | null
+  imageUrl?: string | null
+  originalImageUrl?: string | null
+  mimeType?: string | null
+  sizeBytes?: number | null
+  width?: number | null
+  height?: number | null
+  failureReason?: string | null
+  lastAttemptAt?: string | null
 }
 
 export type BookTitleInput = {

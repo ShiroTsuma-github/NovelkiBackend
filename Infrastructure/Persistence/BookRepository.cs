@@ -247,6 +247,7 @@ public class BookRepository : IBookRepository
     {
         return query
             .Include(b => b.Author).ThenInclude(a => a!.Names)
+            .Include(b => b.Cover)
             .Include(b => b.ContentType)
             .Include(b => b.Status)
             .Include(b => b.Titles)

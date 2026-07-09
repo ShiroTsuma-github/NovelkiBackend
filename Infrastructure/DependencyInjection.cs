@@ -1,6 +1,7 @@
 ﻿namespace Infrastructure;
 
 using Infrastructure.Authentication;
+using Infrastructure.BookCovers;
 using Infrastructure.Identity;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -34,6 +35,49 @@ public static class DependencyInjection
         builder.Services.AddScoped<IStatusRepository, StatusRepository>();
         builder.Services.AddScoped<ITypeRepository, TypeRepository>();
         builder.Services.AddScoped<ITagRepository, TagRepository>();
+        builder.Services.AddScoped<IBookCoverRepository, BookCoverRepository>();
+
+        builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
+        builder.Services.AddScoped<IBookCoverStorage, LocalBookCoverStorage>();
+        builder.Services.AddScoped<IBookCoverRemoteImageService, BookCoverRemoteImageService>();
+        builder.Services.AddSingleton<InMemoryBookCoverQueue>();
+        builder.Services.AddSingleton<IBookCoverQueue>(provider => provider.GetRequiredService<InMemoryBookCoverQueue>());
+        builder.Services.AddScoped<BookCoverResolver>();
+        builder.Services.AddScoped<BookCoverProcessor>();
+        builder.Services.AddHostedService<BookCoverBackgroundService>();
+        builder.Services.AddHttpClient<IBookCoverProvider, BookLinkMetadataCoverProvider>(client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
+        builder.Services.AddHttpClient<IBookCoverProvider, AniListBookCoverProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://graphql.anilist.co");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
+        builder.Services.AddHttpClient<IBookCoverProvider, JikanBookCoverProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.jikan.moe");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
+        builder.Services.AddHttpClient<IBookCoverProvider, GoogleBooksCoverProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://www.googleapis.com");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
+        builder.Services.AddHttpClient<IBookCoverProvider, OpenLibraryCoverProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://openlibrary.org");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
+        builder.Services.AddHttpClient<IBookCoverProvider, WikidataCoverProvider>(client =>
+        {
+            client.BaseAddress = new Uri("https://query.wikidata.org");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
+        builder.Services.AddHttpClient("BookCoverImages", client =>
+        {
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        });
 
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IUser, CurrentUser>();
