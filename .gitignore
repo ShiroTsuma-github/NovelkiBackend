@@ -134,3 +134,16 @@ $RECYCLE.BIN/
 .DS_Store
 
 _NCrunch*
+
+# Local notes / non-public artifacts
+*.md
+*.MD
+!README.md
+books_import.csv
+front.png
+Migrations.txt
+tools/__pycache__/
+*.pyc
+.codex/
+.agents/
+.openai/
