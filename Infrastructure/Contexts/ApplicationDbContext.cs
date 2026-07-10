@@ -17,6 +17,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<BookTitle> BookTitles { get; set; }
     public DbSet<BookLink> BookLinks { get; set; }
     public DbSet<BookProgressHistory> BookProgressHistory { get; set; }
+    public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Author> Authors { get; set; }
     public DbSet<AuthorName> AuthorNames { get; set; }
     public DbSet<Genre> Genres { get; set; }
@@ -55,6 +56,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         ConfigureStatus(modelBuilder);
         ConfigureContentType(modelBuilder);
         ConfigureTag(modelBuilder);
+        ConfigureIdentity(modelBuilder);
         SeedSystemDictionaries(modelBuilder);
     }
 
@@ -235,6 +237,21 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.HasOne<User>()
                 .WithMany(u => u.OwnedTags)
                 .HasForeignKey(t => t.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureIdentity(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RefreshToken>(entity =>
+        {
+            entity.HasIndex(t => t.TokenHash).IsUnique();
+            entity.Property(t => t.TokenHash).HasMaxLength(200);
+            entity.Property(t => t.ReplacedByTokenHash).HasMaxLength(200);
+            entity.Property(t => t.ReasonRevoked).HasMaxLength(200);
+            entity.HasOne<User>()
+                .WithMany(u => u.RefreshTokens)
+                .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
     }

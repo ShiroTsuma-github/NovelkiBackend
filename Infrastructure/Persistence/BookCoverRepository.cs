@@ -46,6 +46,12 @@ public class BookCoverRepository : IBookCoverRepository
         await _context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteAsync(BookCover cover, CancellationToken cancellationToken)
+    {
+        _context.BookCovers.Remove(cover);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
     public Task SaveAsync(CancellationToken cancellationToken)
     {
         return _context.SaveChangesAsync(cancellationToken);

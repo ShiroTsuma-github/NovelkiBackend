@@ -43,7 +43,13 @@ export function buildBookQuery(filters: BookFilters) {
 function addField(parts: string[], field: string, value: string) {
   const trimmed = value.trim()
   if (trimmed) {
-    parts.push(`${field}:${quoteIfNeeded(trimmed)}`)
+    const values = trimmed
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map(quoteIfNeeded)
+
+    parts.push(`${field}:${values.join(',')}`)
   }
 }
 

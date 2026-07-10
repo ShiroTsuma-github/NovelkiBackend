@@ -75,6 +75,7 @@ public sealed class BookCoverProcessor
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverStorage _storage;
     private readonly BookCoverResolver _resolver;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BookCoverProcessor> _logger;
 
@@ -82,12 +83,14 @@ public sealed class BookCoverProcessor
         IBookCoverRepository coverRepository,
         IBookCoverStorage storage,
         BookCoverResolver resolver,
+        IBookListCacheInvalidator cacheInvalidator,
         IHttpClientFactory httpClientFactory,
         ILogger<BookCoverProcessor> logger)
     {
         _coverRepository = coverRepository;
         _storage = storage;
         _resolver = resolver;
+        _cacheInvalidator = cacheInvalidator;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
@@ -108,7 +111,9 @@ public sealed class BookCoverProcessor
             {
                 cover.Status = BookCoverStatus.NotFound;
                 cover.FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
+                CoverLinkHelper.TouchBook(cover.Book);
                 await _coverRepository.SaveAsync(cancellationToken);
+                await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
                 return;
             }
 
@@ -132,14 +137,18 @@ public sealed class BookCoverProcessor
             cover.Height = stored.Height;
             cover.FailureReason = null;
             CoverLinkHelper.EnsureCoverSourceLink(cover.Book, candidate.ImageUrl, candidate.Source);
+            CoverLinkHelper.TouchBook(cover.Book);
             await _coverRepository.SaveAsync(cancellationToken);
+            await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
             _logger.LogInformation("Cover found. BookId={BookId} Source={Source}", cover.BookId, candidate.Source);
         }
         catch (FluentValidation.ValidationException ex)
         {
             cover.Status = BookCoverStatus.Failed;
             cover.FailureReason = ex.Message;
+            CoverLinkHelper.TouchBook(cover.Book);
             await _coverRepository.SaveAsync(cancellationToken);
+            await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
         }
         catch (Exception ex)
         {
@@ -153,7 +162,9 @@ public sealed class BookCoverProcessor
                 cover.Status = BookCoverStatus.Failed;
                 cover.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
             }
+            CoverLinkHelper.TouchBook(cover.Book);
             await _coverRepository.SaveAsync(cancellationToken);
+            await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
             _logger.LogWarning(ex, "Cover provider failed. BookId={BookId}", cover.BookId);
         }
     }
@@ -190,5 +201,10 @@ internal static class CoverLinkHelper
             IsPrimary = false,
             LastReadHere = false,
         });
+    }
+
+    public static void TouchBook(Book book)
+    {
+        book.LastModified = DateTimeOffset.UtcNow;
     }
 }

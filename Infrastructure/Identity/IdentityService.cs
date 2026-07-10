@@ -4,18 +4,29 @@ using Application.Common;
 using Application.Common.DTOs.User;
 using Application.Common.Models;
 using Infrastructure.Authentication;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
+using Infrastructure.Contexts;
 
 public class IdentityService : IIdentityService
 {
+    private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
     private readonly UserManager<User> _userManager;
     private readonly SignInManager<User> _signInManager;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly ApplicationDbContext _context;
 
-    public IdentityService(UserManager<User> userManager, SignInManager<User> signInManager, IJwtTokenGenerator jwtTokenGenerator)
+    public IdentityService(
+        UserManager<User> userManager,
+        SignInManager<User> signInManager,
+        IJwtTokenGenerator jwtTokenGenerator,
+        ApplicationDbContext context)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenGenerator = jwtTokenGenerator;
+        _context = context;
     }
 
     public async Task<TokenResponse> LoginUser(LoginDto login, CancellationToken cancellation)
@@ -48,7 +59,13 @@ public class IdentityService : IIdentityService
         {
             throw new TokenGeneratorFailedException();
         }
-        return tokenResponse;
+
+        var refreshToken = await IssueRefreshTokenAsync(user.Id, cancellation);
+        return tokenResponse with
+        {
+            RefreshToken = refreshToken.Token,
+            RefreshTokenExpiresAt = refreshToken.ExpiresAt
+        };
     }
 
     public async Task<RegisterResponse> RegisterUser(RegisterDto register, CancellationToken cancellation)
@@ -70,5 +87,105 @@ public class IdentityService : IIdentityService
             Id = user.Id,
             Name = register.username
         };
+    }
+
+    public async Task<TokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            throw new UnauthorizedAccessException("Refresh token is required.");
+        }
+
+        var hashedToken = HashToken(refreshToken);
+        var storedToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(token => token.TokenHash == hashedToken, cancellationToken);
+        if (storedToken == null || !storedToken.IsActive)
+        {
+            throw new UnauthorizedAccessException("Refresh token is invalid or expired.");
+        }
+
+        var user = await _userManager.FindByIdAsync(storedToken.UserId.ToString())
+            ?? throw new UnauthorizedAccessException("Refresh token user no longer exists.");
+
+        storedToken.RevokedAt = DateTimeOffset.UtcNow;
+        storedToken.ReasonRevoked = "Rotated";
+
+        var nextRefreshToken = CreateRefreshToken(user.Id);
+        storedToken.ReplacedByTokenHash = HashToken(nextRefreshToken.Token);
+        _context.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = user.Id,
+            TokenHash = storedToken.ReplacedByTokenHash,
+            ExpiresAt = nextRefreshToken.ExpiresAt
+        });
+
+        var authUser = new AuthUser
+        {
+            Username = user.UserName,
+            Email = user.Email,
+            Id = user.Id,
+            IsAuthenticated = true,
+            Roles = await _userManager.GetRolesAsync(user),
+            Valid = true
+        };
+
+        var accessToken = _jwtTokenGenerator.GenerateToken(authUser)
+            ?? throw new TokenGeneratorFailedException();
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return accessToken with
+        {
+            RefreshToken = nextRefreshToken.Token,
+            RefreshTokenExpiresAt = nextRefreshToken.ExpiresAt
+        };
+    }
+
+    public async Task RevokeRefreshTokenAsync(string? refreshToken, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        var hashedToken = HashToken(refreshToken);
+        var storedToken = await _context.RefreshTokens
+            .FirstOrDefaultAsync(token => token.TokenHash == hashedToken, cancellationToken);
+        if (storedToken == null || storedToken.RevokedAt != null)
+        {
+            return;
+        }
+
+        storedToken.RevokedAt = DateTimeOffset.UtcNow;
+        storedToken.ReasonRevoked = "Logged out";
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task<(string Token, DateTimeOffset ExpiresAt)> IssueRefreshTokenAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var nextRefreshToken = CreateRefreshToken(userId);
+        _context.RefreshTokens.Add(new RefreshToken
+        {
+            UserId = userId,
+            TokenHash = HashToken(nextRefreshToken.Token),
+            ExpiresAt = nextRefreshToken.ExpiresAt
+        });
+        await _context.SaveChangesAsync(cancellationToken);
+        return nextRefreshToken;
+    }
+
+    private static (string Token, DateTimeOffset ExpiresAt) CreateRefreshToken(Guid userId)
+    {
+        var bytes = RandomNumberGenerator.GetBytes(64);
+        var token = Convert.ToBase64String(bytes)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        return ($"{userId:N}.{token}", DateTimeOffset.UtcNow.Add(RefreshTokenLifetime));
+    }
+
+    private static string HashToken(string token)
+    {
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token)));
     }
 }

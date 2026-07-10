@@ -13,7 +13,7 @@ export function LoginPage() {
   const mutation = useMutation({
     mutationFn: api.login,
     onSuccess: (response) => {
-      setSession(response.accessToken)
+      setSession(response)
       navigate('/books', { replace: true })
     },
     onError: (error) => {

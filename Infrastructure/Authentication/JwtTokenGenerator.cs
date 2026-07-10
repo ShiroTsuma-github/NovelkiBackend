@@ -51,7 +51,9 @@ public class JwtTokenGenerator : IJwtTokenGenerator
         return new TokenResponse
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
+            RefreshToken = string.Empty,
             ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+            RefreshTokenExpiresAt = DateTimeOffset.UtcNow,
             UserId = user.RequiredId
         };
     }

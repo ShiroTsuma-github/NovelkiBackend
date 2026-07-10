@@ -23,6 +23,18 @@ export const api = {
       body: request,
       token: null,
     }),
+  refresh: (refreshToken: string) =>
+    apiRequest<TokenResponse>('/account/refresh', {
+      method: 'POST',
+      body: { refreshToken },
+      token: null,
+    }),
+  logout: (refreshToken: string | null) =>
+    apiRequest<void>('/account/logout', {
+      method: 'POST',
+      body: { refreshToken },
+      token: null,
+    }),
   register: (request: RegisterRequest) =>
     apiRequest<RegisterResponse>('/account/register', {
       method: 'POST',
@@ -52,6 +64,8 @@ export const api = {
   },
   refreshBookCover: (id: string) =>
     apiRequest<BookCoverDto>(`/book/${id}/cover/refresh`, { method: 'POST' }),
+  deleteBookCover: (id: string) =>
+    apiRequest<void>(`/book/${id}/cover`, { method: 'DELETE' }),
   deleteBook: (id: string) =>
     apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
   searchAuthors: (search: string, take = 10) =>

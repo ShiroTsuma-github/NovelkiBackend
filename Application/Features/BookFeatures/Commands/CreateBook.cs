@@ -32,6 +32,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
     private readonly IGenreRepository _genreRepository;
     private readonly ITagRepository _tagRepository;
     private readonly IBookCoverQueue _bookCoverQueue;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public CreateBookHandler(
@@ -42,6 +43,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         IGenreRepository genreRepository,
         ITagRepository tagRepository,
         IBookCoverQueue bookCoverQueue,
+        IBookListCacheInvalidator cacheInvalidator,
         IUser user)
     {
         _bookRepository = bookRepository;
@@ -51,6 +53,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         _genreRepository = genreRepository;
         _tagRepository = tagRepository;
         _bookCoverQueue = bookCoverQueue;
+        _cacheInvalidator = cacheInvalidator;
         _user = user;
     }
 
@@ -124,6 +127,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
 
         await _bookRepository.AddAsync(book, cancellationToken);
         await _bookCoverQueue.QueueAsync(book.Id, cancellationToken);
+        await _cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
         return book.Id;
     }
 

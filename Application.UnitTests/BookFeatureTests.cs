@@ -113,6 +113,7 @@ public class BookFeatureTests
             new FakeStatusRepository(),
             new FakeGenreRepository(),
             new FakeTagRepository(),
+            new FakeBookListCacheInvalidator(),
             new FakeUser());
         var command = new UpdateBookCommand(
             book.Id,
@@ -184,6 +185,7 @@ public class BookFeatureTests
             genreRepository,
             tagRepository,
             bookCoverQueue,
+            new FakeBookListCacheInvalidator(),
             user);
         return new Fixture(bookRepository, authorRepository, bookCoverQueue, handler);
     }
@@ -327,6 +329,11 @@ public class BookFeatureTests
             QueuedBookId = bookId;
             return ValueTask.CompletedTask;
         }
+    }
+
+    private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
+    {
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeAuthorRepository : IAuthorRepository

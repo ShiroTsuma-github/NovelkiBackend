@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, Plus, Search, Settings2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
@@ -9,10 +9,13 @@ import {
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
+import { BookCoverArtwork } from './BookCoverSection'
 
 const pageSizeOptions = [20, 50, 100, 500]
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
+const bookLayoutStorageKey = 'novelki.books.layout.v1'
 type SortDirection = 'asc' | 'desc'
+export type BookViewMode = 'table' | 'cards'
 export type ColumnPreference = { id: string; visible: boolean }
 export type ColumnDefinition<T> = {
   id: string
@@ -35,8 +38,8 @@ const bookColumns: ColumnDefinition<BookDto>[] = [
   { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', render: (book) => book.priority ?? '-' },
   { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', render: (book) => formatDate(book.created) },
   { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', render: (book) => formatDate(book.lastModified || book.created) },
-  { id: 'genres', label: 'Genres', defaultVisible: false, render: (book) => <Pills values={book.genres.slice(0, 3)} /> },
-  { id: 'tags', label: 'Tags', defaultVisible: true, render: (book) => <Pills values={book.tags.slice(0, 3)} /> },
+  { id: 'genres', label: 'Genres', defaultVisible: false, render: (book) => <Pills values={book.genres} /> },
+  { id: 'tags', label: 'Tags', defaultVisible: true, render: (book) => <Pills values={book.tags} /> },
   { id: 'links', label: 'Links', defaultVisible: false, render: (book) => book.links.length },
   { id: 'notes', label: 'Notes', defaultVisible: false, render: (book) => truncate(book.notes) },
   { id: 'description', label: 'Description', defaultVisible: false, render: (book) => truncate(book.description) },
@@ -45,6 +48,7 @@ const bookColumns: ColumnDefinition<BookDto>[] = [
 export function BooksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(bookColumnsStorageKey, bookColumns)
+  const [viewMode, setViewMode] = useViewMode(bookLayoutStorageKey)
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
@@ -112,36 +116,42 @@ export function BooksPage() {
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
-            <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                {visibleColumns.map((column) => (
-                  <ColumnHeader
-                    activeDirection={column.sortBy === sortBy ? sortDirection : null}
-                    column={column}
-                    key={column.id}
-                    onSort={setSort}
-                  />
-                ))}
-                <th className="relative px-4 py-3 text-right">
-                  <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {booksQuery.isLoading ? (
-                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>Loading...</td></tr>
-              ) : null}
-              {booksQuery.data?.data.map((book) => (
-                <BookRow book={book} columns={visibleColumns} key={book.id} />
-              ))}
-              {booksQuery.data?.data.length === 0 ? (
-                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>No books match the current filters.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
+          <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
+        {viewMode === 'table' ? (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  {visibleColumns.map((column) => (
+                    <ColumnHeader
+                      activeDirection={column.sortBy === sortBy ? sortDirection : null}
+                      column={column}
+                      key={column.id}
+                      onSort={setSort}
+                    />
+                  ))}
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {booksQuery.isLoading ? (
+                  <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>Loading...</td></tr>
+                ) : null}
+                {booksQuery.data?.data.map((book) => (
+                  <BookRow book={book} columns={visibleColumns} key={book.id} />
+                ))}
+                {booksQuery.data?.data.length === 0 ? (
+                  <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>No books match the current filters.</td></tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <BookCardGrid books={booksQuery.data?.data ?? []} isLoading={booksQuery.isLoading} />
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
           <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
           <div className="flex items-center gap-3">
@@ -160,6 +170,35 @@ export function BooksPage() {
   )
 }
 
+export function ViewModeToggle({
+  value,
+  onChange,
+}: {
+  value: BookViewMode
+  onChange: (value: BookViewMode) => void
+}) {
+  return (
+    <div className="inline-flex items-center rounded-md border border-slate-300 bg-white p-1 shadow-sm">
+      <button
+        className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ${value === 'table' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+        type="button"
+        onClick={() => onChange('table')}
+      >
+        <List className="h-3.5 w-3.5" />
+        Table
+      </button>
+      <button
+        className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ${value === 'cards' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+        type="button"
+        onClick={() => onChange('cards')}
+      >
+        <LayoutGrid className="h-3.5 w-3.5" />
+        Cards
+      </button>
+    </div>
+  )
+}
+
 export function BookAdvancedSearch({
   value,
   onChange,
@@ -173,13 +212,13 @@ export function BookAdvancedSearch({
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
         <input
           className={`${inputClass} w-full pl-9`}
-          placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" rating>=8 title:i*'}
+          placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating>=8'}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
       </label>
       <p className="text-xs text-slate-500">
-        Supports filters like <code>author:John</code>, <code>tag:favorite</code>, <code>rating&gt;=8</code>, and wildcard searches like <code>title:i*</code>.
+        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating&gt;=8</code>, and wildcard searches like <code>title:i*</code>.
       </p>
     </section>
   )
@@ -336,6 +375,20 @@ export function useColumnPreferences<T>(storageKey: string, columns: ColumnDefin
   return [preferences, updatePreferences] as const
 }
 
+export function useViewMode(storageKey: string) {
+  const [viewMode, setViewModeState] = useState<BookViewMode>(() => {
+    const stored = window.localStorage.getItem(storageKey)
+    return stored === 'cards' ? 'cards' : 'table'
+  })
+
+  function setViewMode(next: BookViewMode) {
+    setViewModeState(next)
+    window.localStorage.setItem(storageKey, next)
+  }
+
+  return [viewMode, setViewMode] as const
+}
+
 export function getVisibleColumns<T>(columns: ColumnDefinition<T>[], preferences: ColumnPreference[]) {
   return preferences
     .filter((preference) => preference.visible)
@@ -410,16 +463,54 @@ function BookRow({ book, columns }: { book: BookDto; columns: ColumnDefinition<B
   )
 }
 
+function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boolean }) {
+  if (isLoading) {
+    return <div className="px-4 py-8 text-center text-slate-500">Loading...</div>
+  }
+
+  if (!books.length) {
+    return <div className="px-4 py-8 text-center text-slate-500">No books match the current filters.</div>
+  }
+
+  return (
+    <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
+      {books.map((book) => (
+        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
+          <Link className="grid gap-3" to={`/books/${book.id}`}>
+            <BookCoverArtwork
+              className="w-full"
+              cover={book.cover}
+              emptyLabel="No cover"
+              title={book.primaryTitle}
+            />
+            <div className="grid gap-1">
+              <h2 className="line-clamp-2 text-base font-semibold text-slate-950">{book.primaryTitle}</h2>
+              <p className="text-sm text-slate-500">{book.author ?? 'Unknown author'}</p>
+              <p className="text-sm font-medium text-slate-700">{formatProgress(book)}</p>
+            </div>
+          </Link>
+        </article>
+      ))}
+    </div>
+  )
+}
+
 function Pills({ values }: { values: string[] }) {
   if (!values.length) {
     return '-'
   }
 
+  const visibleValues = values.slice(0, 3)
+  const hiddenCount = values.length - visibleValues.length
+
   return (
     <div className="flex flex-wrap gap-1">
-      {values.map((value) => (
+      {visibleValues.map((value) => (
         <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" key={value}>{value}</span>
       ))}
+      {hiddenCount > 0 ? (
+        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">+{hiddenCount} more</span>
+      ) : null}
     </div>
   )
 }

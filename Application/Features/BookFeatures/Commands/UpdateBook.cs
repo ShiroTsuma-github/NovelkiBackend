@@ -36,6 +36,7 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
     private readonly IStatusRepository _statusRepository;
     private readonly IGenreRepository _genreRepository;
     private readonly ITagRepository _tagRepository;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public UpdateBookHandler(
@@ -45,6 +46,7 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
         IStatusRepository statusRepository,
         IGenreRepository genreRepository,
         ITagRepository tagRepository,
+        IBookListCacheInvalidator cacheInvalidator,
         IUser user)
     {
         _bookRepository = bookRepository;
@@ -53,6 +55,7 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
         _statusRepository = statusRepository;
         _genreRepository = genreRepository;
         _tagRepository = tagRepository;
+        _cacheInvalidator = cacheInvalidator;
         _user = user;
     }
 
@@ -130,6 +133,7 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
         await _bookRepository.ReplaceEditableCollectionsAsync(book.Id, titles, links, genreIds, tagIds, progressHistory, cancellationToken);
 
         await _bookRepository.SaveAsync(cancellationToken);
+        await _cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
     }
 
     private async Task EnsureBookDoesNotExistAsync(
@@ -227,11 +231,13 @@ public record UpdateBookProgressCommand(Guid Id, decimal? CurrentChapterNumber, 
 public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressCommand>
 {
     private readonly IBookRepository _repository;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
-    public UpdateBookProgressHandler(IBookRepository repository, IUser user)
+    public UpdateBookProgressHandler(IBookRepository repository, IBookListCacheInvalidator cacheInvalidator, IUser user)
     {
         _repository = repository;
+        _cacheInvalidator = cacheInvalidator;
         _user = user;
     }
 
@@ -248,5 +254,7 @@ public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressComma
         {
             throw new EntityNotFoundException<Book, Guid>(request.Id);
         }
+
+        await _cacheInvalidator.InvalidateBooksAsync(_user.RequiredId, cancellationToken);
     }
 }
