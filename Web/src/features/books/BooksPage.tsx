@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -63,6 +63,7 @@ export function BooksPage() {
   const booksQuery = useQuery({
     queryKey: ['books', skip, pageSize, query, sortBy, sortDirection],
     queryFn: () => api.getBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
+    placeholderData: keepPreviousData,
   })
   function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
@@ -152,6 +153,9 @@ export function BooksPage() {
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
+          {booksQuery.isFetching && !booksQuery.isLoading ? (
+            <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
+          ) : null}
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
           <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>

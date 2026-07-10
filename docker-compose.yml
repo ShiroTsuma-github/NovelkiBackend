@@ -18,6 +18,11 @@ services:
       Admin__Emails__0: ${ADMIN_EMAIL}
       Cors__AllowedOrigins__0: http://localhost:${WEB_PORT:-8080}
       Cors__AllowedOrigins__1: http://localhost:5173
+      BookCovers__S3__Endpoint: ${BOOK_COVERS__S3__ENDPOINT:-}
+      BookCovers__S3__Region: ${BOOK_COVERS__S3__REGION:-}
+      BookCovers__S3__AccessKey: ${BOOK_COVERS__S3__ACCESS_KEY:-}
+      BookCovers__S3__SecretKey: ${BOOK_COVERS__S3__SECRET_KEY:-}
+      BookCovers__S3__Bucket: ${BOOK_COVERS__S3__BUCKET:-}
       OTEL_SERVICE_NAME: novelki-api
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4317
       OTEL_EXPORTER_OTLP_PROTOCOL: grpc

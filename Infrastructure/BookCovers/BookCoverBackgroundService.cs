@@ -131,7 +131,6 @@ public sealed class BookCoverProcessor
                 cover.FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
                 CoverLinkHelper.TouchBook(cover.Book);
                 await _coverRepository.SaveAsync(cancellationToken);
-                await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
                 return;
             }
 
@@ -170,10 +169,12 @@ public sealed class BookCoverProcessor
         }
         catch (Exception ex)
         {
+            var shouldInvalidateCache = true;
             if (IsProviderResponseFailure(ex))
             {
                 cover.Status = BookCoverStatus.NotFound;
                 cover.FailureReason = "No valid cover response was found from the configured providers.";
+                shouldInvalidateCache = false;
             }
             else
             {
@@ -182,7 +183,10 @@ public sealed class BookCoverProcessor
             }
             CoverLinkHelper.TouchBook(cover.Book);
             await _coverRepository.SaveAsync(cancellationToken);
-            await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
+            if (shouldInvalidateCache)
+            {
+                await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
+            }
             _logger.LogWarning(ex, "Cover provider failed. BookId={BookId}", cover.BookId);
         }
     }
@@ -211,8 +215,8 @@ internal static class CoverLinkHelper
 
         book.Links.Add(new BookLink
         {
+            Id = Guid.Empty,
             BookId = book.Id,
-            Book = book,
             Url = imageUrl,
             Label = source?.ToString(),
             SourceType = "Cover",

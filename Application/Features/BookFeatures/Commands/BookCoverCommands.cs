@@ -42,11 +42,12 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
 
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var hadExistingCover = book.Cover != null;
+        var stored = await _storage.SaveAsync(book.OwnerId, book.Id, request.Content, request.FileName, request.ContentType, cancellationToken);
+
+        var hadExistingCover = book.Cover is not null;
         book.Cover ??= new BookCover { BookId = book.Id, Book = book };
         var cover = book.Cover;
         var previousStoragePath = cover.StoragePath;
-        var stored = await _storage.SaveAsync(book.OwnerId, book.Id, request.Content, request.FileName, request.ContentType, cancellationToken);
 
         cover.Status = BookCoverStatus.Uploaded;
         cover.Source = BookCoverSource.ManualUpload;
@@ -114,12 +115,12 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
 
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var hadExistingCover = book.Cover != null;
+        var stored = await _remoteImageService.SaveFromUrlAsync(book.OwnerId, book.Id, request.ImageUrl, cancellationToken);
+
+        var hadExistingCover = book.Cover is not null;
         book.Cover ??= new BookCover { BookId = book.Id, Book = book };
         var cover = book.Cover;
         var previousStoragePath = cover.StoragePath;
-
-        var stored = await _remoteImageService.SaveFromUrlAsync(book.OwnerId, book.Id, request.ImageUrl, cancellationToken);
 
         cover.Status = BookCoverStatus.Uploaded;
         cover.Source = BookCoverSource.ManualUrl;
@@ -184,7 +185,7 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
     {
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var hadExistingCover = book.Cover != null;
+        var hadExistingCover = book.Cover is not null;
         book.Cover ??= new BookCover { BookId = book.Id, Book = book };
         var cover = book.Cover;
         var previousStoragePath = cover.StoragePath;
@@ -312,8 +313,8 @@ internal static class BookCoverLinkHelper
 
         book.Links.Add(new BookLink
         {
+            Id = Guid.Empty,
             BookId = book.Id,
-            Book = book,
             Url = imageUrl,
             Label = source?.ToString(),
             SourceType = "Cover",

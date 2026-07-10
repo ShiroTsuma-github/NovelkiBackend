@@ -57,12 +57,18 @@ public class BookCoverTests
     [Fact]
     public async Task SetBookCoverFromUrl_ShouldStoreManualUrlCover()
     {
-        var book = CreateBook();
+        var book = CreateBook(new BookCover
+        {
+            BookId = BookId,
+            Status = BookCoverStatus.NotFound,
+            FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata."
+        });
         var repository = new FakeBookRepository(book);
+        var coverRepository = new FakeBookCoverRepository();
         var remoteImageService = new FakeRemoteImageService();
         var handler = new SetBookCoverFromUrlHandler(
             repository,
-            new FakeBookCoverRepository(),
+            coverRepository,
             new FakeCoverStorage(),
             remoteImageService,
             new FakeBookListCacheInvalidator(),
@@ -75,9 +81,57 @@ public class BookCoverTests
         Assert.Equal("https://example.com/cover.jpg", book.Cover!.OriginalImageUrl);
         Assert.Equal("owner/book.jpg", book.Cover.StoragePath);
         Assert.True(repository.Saved);
+        Assert.False(coverRepository.Added);
     }
 
-    private static Book CreateBook()
+    [Fact]
+    public async Task SetBookCoverFromUrl_ShouldAddCover_WhenBookHasNoCoverRow()
+    {
+        var book = CreateBook(hasCover: false);
+        var repository = new FakeBookRepository(book);
+        var coverRepository = new FakeBookCoverRepository();
+        var handler = new SetBookCoverFromUrlHandler(
+            repository,
+            coverRepository,
+            new FakeCoverStorage(),
+            new FakeRemoteImageService(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+
+        var dto = await handler.Handle(new SetBookCoverFromUrlCommand(book.Id, "https://example.com/cover.jpg"), CancellationToken.None);
+
+        Assert.Equal("Uploaded", dto.Status);
+        Assert.Equal("ManualUrl", dto.Source);
+        Assert.NotNull(book.Cover);
+        Assert.True(coverRepository.Added);
+        Assert.False(repository.Saved);
+    }
+
+    [Fact]
+    public async Task RefreshBookCover_ShouldAddPendingCover_WhenBookHasNoCoverRow()
+    {
+        var book = CreateBook(hasCover: false);
+        var repository = new FakeBookRepository(book);
+        var coverRepository = new FakeBookCoverRepository();
+        var queue = new FakeBookCoverQueue();
+        var handler = new RefreshBookCoverHandler(
+            repository,
+            coverRepository,
+            queue,
+            new FakeCoverStorage(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+
+        var dto = await handler.Handle(new RefreshBookCoverCommand(book.Id), CancellationToken.None);
+
+        Assert.Equal("Pending", dto.Status);
+        Assert.NotNull(book.Cover);
+        Assert.True(coverRepository.Added);
+        Assert.False(repository.Saved);
+        Assert.Equal(book.Id, queue.QueuedBookId);
+    }
+
+    private static Book CreateBook(BookCover? cover = null, bool hasCover = true)
     {
         return new Book
         {
@@ -87,7 +141,7 @@ public class BookCoverTests
             NormalizedPrimaryTitle = "I SHALL SEAL THE HEAVENS",
             ContentTypeId = Guid.NewGuid(),
             StatusId = Guid.NewGuid(),
-            Cover = new BookCover { BookId = BookId }
+            Cover = hasCover ? cover ?? new BookCover { BookId = BookId } : null
         };
     }
 
@@ -167,12 +221,14 @@ public class BookCoverTests
     private sealed class FakeBookCoverRepository : IBookCoverRepository
     {
         public bool Saved { get; private set; }
+        public bool Added { get; private set; }
 
         public Task<BookCover?> GetByBookIdAsync(Guid bookId, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<BookCover?>(null);
         public Task<BookCover?> GetByBookIdAsync(Guid bookId, CancellationToken cancellationToken) => Task.FromResult<BookCover?>(null);
         public Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyCollection<BookCover>>(Array.Empty<BookCover>());
         public Task AddAsync(BookCover cover, CancellationToken cancellationToken)
         {
+            Added = true;
             Saved = true;
             return Task.CompletedTask;
         }
@@ -209,6 +265,17 @@ public class BookCoverTests
         public Task<BookCoverStoredFile> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
         {
             return Task.FromResult(new BookCoverStoredFile("owner/book.jpg", "image/jpeg", 123, null, null));
+        }
+    }
+
+    private sealed class FakeBookCoverQueue : IBookCoverQueue
+    {
+        public Guid? QueuedBookId { get; private set; }
+
+        public ValueTask QueueAsync(Guid bookId, CancellationToken cancellationToken)
+        {
+            QueuedBookId = bookId;
+            return ValueTask.CompletedTask;
         }
     }
 }

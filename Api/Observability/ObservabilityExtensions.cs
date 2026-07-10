@@ -1,5 +1,7 @@
 namespace Api.Observability;
 
+using System.Data;
+using Infrastructure.Observability;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -47,9 +49,28 @@ public static class ObservabilityExtensions
             {
                 tracing
                     .AddSource(NovelkiTelemetry.ActivitySourceName)
+                    .AddSource(InfrastructureTelemetry.ActivitySourceName)
                     .AddAspNetCoreInstrumentation(options =>
                     {
                         options.Filter = context => !IsHealthCheckPath(context.Request.Path);
+                    })
+                    .AddEntityFrameworkCoreInstrumentation(options =>
+                    {
+                        options.EnrichWithIDbCommand = (activity, command) =>
+                        {
+                            activity.DisplayName = $"db {command.CommandType.ToString().ToLowerInvariant()}";
+                            activity.SetTag("db.system", GetDbSystem(command));
+                            activity.SetTag("db.operation.name", command.CommandType.ToString());
+
+                            if (command.CommandType == CommandType.Text)
+                            {
+                                activity.SetTag("db.statement", command.CommandText);
+                            }
+                            else if (!string.IsNullOrWhiteSpace(command.CommandText))
+                            {
+                                activity.SetTag("db.statement.name", command.CommandText);
+                            }
+                        };
                     })
                     .AddHttpClientInstrumentation();
 
@@ -93,6 +114,27 @@ public static class ObservabilityExtensions
         {
             options.Endpoint = new Uri(endpoint);
         });
+    }
+
+    private static string GetDbSystem(IDbCommand command)
+    {
+        var provider = command.GetType().Namespace ?? string.Empty;
+        if (provider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+        {
+            return "postgresql";
+        }
+
+        if (provider.Contains("SqlClient", StringComparison.OrdinalIgnoreCase))
+        {
+            return "mssql";
+        }
+
+        if (provider.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            return "sqlite";
+        }
+
+        return "database";
     }
 
     private static string GetServiceName(IConfiguration configuration) =>

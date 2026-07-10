@@ -111,7 +111,7 @@ export function BookDetailsPage() {
 
   return (
     <>
-      <div className="grid gap-5">
+      <div className="mx-auto grid w-full max-w-7xl gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Link className={secondaryButtonClass} to="/books">
             <ArrowLeft className="h-4 w-4" />
@@ -174,7 +174,7 @@ export function BookDetailsPage() {
                       ) : null}
                       <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">
                         AUTHOR:{' '}
-                        <span className="text-lg font-semibold normal-case tracking-normal text-slate-950">{book.author ?? 'Unknown author'}</span>
+                        <span className="text-lg font-semibold normal-case tracking-normal text-slate-950">{book.author ?? 'unknown'}</span>
                       </p>
                     </div>
                     <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -254,7 +254,7 @@ export function BookDetailsPage() {
             {book.progressHistory.length ? book.progressHistory.map((entry) => (
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" key={entry.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-slate-900">
+                  <div className="text-sm font-semibold text-slate-950">
                     {entry.chapterLabel || entry.chapterNumber || 'Updated progress'}
                   </div>
                   <div className="text-xs text-slate-500">{formatDate(entry.changedAt)}</div>

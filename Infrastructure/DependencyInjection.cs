@@ -1,5 +1,7 @@
 ﻿namespace Infrastructure;
 
+using Amazon.Runtime;
+using Amazon.S3;
 using Infrastructure.Authentication;
 using Infrastructure.BookCovers;
 using Infrastructure.Caching;
@@ -56,7 +58,29 @@ public static class DependencyInjection
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 
         builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
-        builder.Services.AddScoped<IBookCoverStorage, LocalBookCoverStorage>();
+        var s3Options = builder.Configuration.GetSection("BookCovers:S3").Get<BookCoverS3Options>();
+        if (!string.IsNullOrWhiteSpace(s3Options?.Endpoint) &&
+            !string.IsNullOrWhiteSpace(s3Options.AccessKey) &&
+            !string.IsNullOrWhiteSpace(s3Options.SecretKey) &&
+            !string.IsNullOrWhiteSpace(s3Options.Bucket))
+        {
+            builder.Services.AddSingleton<IAmazonS3>(_ =>
+            {
+                var credentials = new BasicAWSCredentials(s3Options.AccessKey, s3Options.SecretKey);
+                var config = new AmazonS3Config
+                {
+                    ServiceURL = s3Options.Endpoint,
+                    ForcePathStyle = true,
+                    AuthenticationRegion = string.IsNullOrWhiteSpace(s3Options.Region) ? "garage" : s3Options.Region
+                };
+                return new AmazonS3Client(credentials, config);
+            });
+            builder.Services.AddScoped<IBookCoverStorage, S3BookCoverStorage>();
+        }
+        else
+        {
+            builder.Services.AddScoped<IBookCoverStorage, LocalBookCoverStorage>();
+        }
         builder.Services.AddScoped<IBookCoverRemoteImageService, BookCoverRemoteImageService>();
         builder.Services.AddSingleton<InMemoryBookCoverQueue>();
         builder.Services.AddSingleton<IBookCoverQueue>(provider => provider.GetRequiredService<InMemoryBookCoverQueue>());

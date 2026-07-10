@@ -77,3 +77,5 @@ app.MapGet("/health/live", () => Results.Ok(new { status = "Healthy" }));
 app.MapControllers();
 
 app.Run();
+
+public partial class Program;
