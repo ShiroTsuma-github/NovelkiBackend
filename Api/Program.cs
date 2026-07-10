@@ -24,18 +24,6 @@ var app = builder.Build();
 
 await app.ApplyDatabaseMigrationsAsync();
 
-app.UseErrorHandlingMiddleware();
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
-        app.Map("/", () => Results.Redirect("/swagger"));
-    });
-}
-
 app.UseSerilogRequestLogging(options =>
 {
     options.GetLevel = (httpContext, _, exception) =>
@@ -64,6 +52,18 @@ app.UseSerilogRequestLogging(options =>
         }
     };
 });
+
+app.UseErrorHandlingMiddleware();
+
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "My API V1");
+        app.Map("/", () => Results.Redirect("/swagger"));
+    });
+}
 
 app.UseHttpsRedirection();
 

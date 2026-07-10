@@ -79,16 +79,20 @@ public class ErrorHandlingMiddleware
                 break;
 
             case ValidationException validationException:
-                statusCode = HttpStatusCode.BadRequest;
-                title = "One or more validation errors occurred.";
-                detail = "The request contains invalid data.";
-                errors = validationException.Errors
+                var validationErrors = validationException.Errors
                     .GroupBy(e => e.PropertyName)
                     .ToDictionary(
                         g => g.Key,
                         g => g.Select(e => e.ErrorMessage).ToArray()
                     );
-                _logger.LogWarning("User validation error");
+
+                statusCode = HttpStatusCode.BadRequest;
+                title = "One or more validation errors occurred.";
+                detail = validationErrors
+                    .SelectMany(entry => entry.Value.Select(message => $"{entry.Key}: {message}"))
+                    .FirstOrDefault() ?? "The request contains invalid data.";
+                errors = validationErrors;
+                _logger.LogWarning("User validation error. Errors: {@ValidationErrors}", validationErrors);
                 break;
 
             case EntityAlreadyExistsException<Genre, Guid>:
