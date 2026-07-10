@@ -6,11 +6,16 @@ using Microsoft.EntityFrameworkCore;
 public sealed class AdminLibraryService : IAdminLibraryService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IBookCoverStorage _storage;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
 
-    public AdminLibraryService(ApplicationDbContext context, IBookListCacheInvalidator cacheInvalidator)
+    public AdminLibraryService(
+        ApplicationDbContext context,
+        IBookCoverStorage storage,
+        IBookListCacheInvalidator cacheInvalidator)
     {
         _context = context;
+        _storage = storage;
         _cacheInvalidator = cacheInvalidator;
     }
 
@@ -21,6 +26,10 @@ public sealed class AdminLibraryService : IAdminLibraryService
         var books = await _context.Books
             .Where(book => book.OwnerId == ownerId)
             .Select(book => new { book.Id, book.AuthorId })
+            .ToListAsync(cancellationToken);
+        var storagePaths = await _context.BookCovers
+            .Where(cover => cover.Book.OwnerId == ownerId && cover.StoragePath != null)
+            .Select(cover => cover.StoragePath)
             .ToListAsync(cancellationToken);
 
         if (books.Count == 0)
@@ -45,6 +54,12 @@ public sealed class AdminLibraryService : IAdminLibraryService
                 .ExecuteDeleteAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);
+
+        foreach (var storagePath in storagePaths)
+        {
+            await _storage.DeleteIfExistsAsync(storagePath, cancellationToken);
+        }
+
         await _cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
 
         return new AdminLibraryPurgeResult(deletedBooks, deletedAuthors, deletedTags);

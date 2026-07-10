@@ -195,51 +195,19 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   }
 
   function storeDraftFile(file: File) {
+    setExistingCoverChange({ kind: 'keep' })
     replaceDraftCover({ kind: 'file', file, previewUrl: URL.createObjectURL(file) })
     closeCoverDialog()
     toast.success('Cover ready. It will be saved with the book.')
   }
 
   function storeDraftUrl(imageUrl: string) {
+    setExistingCoverChange({ kind: 'keep' })
     replaceDraftCover({ kind: 'url', imageUrl, previewUrl: imageUrl })
     syncCoverLinkInForm({ originalImageUrl: imageUrl } as BookCoverDto)
     closeCoverDialog()
     toast.success('Cover URL ready. It will be saved with the book.')
   }
-
-  const setCoverUrlMutation = useMutation({
-    mutationFn: (imageUrl: string) => api.setBookCoverFromUrl(id!, imageUrl),
-    onSuccess: async (cover) => {
-      queryClient.setQueryData(bookQueryKey, (current: typeof bookQuery.data) => current ? { ...current, cover } : current)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-        queryClient.invalidateQueries({ queryKey: ['adminBooks'] }),
-      ])
-      syncCoverLinkInForm(cover)
-      closeCoverDialog()
-      toast.success('Cover saved.')
-    },
-    onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to save cover URL.')
-    },
-  })
-
-  const uploadCoverMutation = useMutation({
-    mutationFn: (file: File) => api.uploadBookCover(id!, file),
-    onSuccess: async (cover) => {
-      queryClient.setQueryData(bookQueryKey, (current: typeof bookQuery.data) => current ? { ...current, cover } : current)
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-        queryClient.invalidateQueries({ queryKey: ['adminBooks'] }),
-      ])
-      syncCoverLinkInForm(cover)
-      closeCoverDialog()
-      toast.success('Cover uploaded.')
-    },
-    onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to upload cover.')
-    },
-  })
   const mutation = useMutation({
     mutationFn: async (values: BookFormValues): Promise<SaveResult> => {
       const resolvedValues = await resolveAuthor(values)
@@ -269,10 +237,18 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       }
 
       await (admin ? api.updateAdminBook(id!, request) : api.updateBook(id!, request))
-      if (existingCoverChange.kind === 'remove') {
-        await api.deleteBookCover(id!)
+      let coverError: string | null = null
+      try {
+        if (draftCover) {
+          await saveCover(id!, draftCover)
+        } else if (existingCoverChange.kind === 'remove') {
+          await api.deleteBookCover(id!)
+        }
+      } catch (error) {
+        coverError = error instanceof HttpError ? error.apiError.detail : error instanceof Error ? error.message : 'Failed to save cover.'
       }
-      return { id: id!, coverError: null }
+
+      return { id: id!, coverError }
     },
     onSuccess: async (response) => {
       await Promise.all([
@@ -299,10 +275,10 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const currentCover = bookQuery.data?.cover
   const visibleCoverUrl = mode === 'create'
     ? draftCover?.previewUrl ?? null
-    : existingCoverChange.kind === 'remove'
+    : draftCover?.previewUrl ?? (existingCoverChange.kind === 'remove'
       ? null
-      : resolvedCoverUrl
-  const effectiveCurrentCover = mode === 'edit' && existingCoverChange.kind === 'remove'
+      : resolvedCoverUrl)
+  const effectiveCurrentCover = mode === 'edit' && (existingCoverChange.kind === 'remove' || draftCover)
     ? null
     : currentCover
   const coverInfo: CoverInfoItem[] = mode === 'create'
@@ -311,6 +287,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       draftCover?.kind === 'file' ? { text: 'Source: Upload' } : draftCover?.kind === 'url' ? { text: 'Source: URL' } : null,
       draftCover?.kind === 'url' ? { text: draftCover.imageUrl, truncate: true } : null,
     ].filter(isCoverInfoItem)
+    : draftCover
+      ? [
+        { text: 'Status: Will replace on save' },
+        draftCover.kind === 'file' ? { text: 'Source: Upload' } : { text: 'Source: URL' },
+        draftCover.kind === 'url' ? { text: draftCover.imageUrl, truncate: true } : null,
+      ].filter(isCoverInfoItem)
     : effectiveCurrentCover
       ? [
         { text: `Status: ${effectiveCurrentCover.status}` },
@@ -327,7 +309,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
   return (
     <>
-      <form className="grid gap-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <form className="mx-auto grid w-full max-w-7xl gap-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-slate-950">{admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}</h1>
@@ -370,6 +352,13 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                   onRemove={() => {
                     if (mode === 'create') {
                       replaceDraftCover(null)
+                      return
+                    }
+
+                    if (draftCover) {
+                      replaceDraftCover(null)
+                      setExistingCoverChange({ kind: 'keep' })
+                      toast.success('Draft cover removed.')
                       return
                     }
 
@@ -516,14 +505,14 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       <CoverSourceDialog
         mode={mode}
         open={coverDialogOpen}
-        setUrlPending={setCoverUrlMutation.isPending}
-        uploadPending={uploadCoverMutation.isPending}
+        setUrlPending={mutation.isPending}
+        uploadPending={mutation.isPending}
         urlInput={coverUrlInput}
         view={coverDialogView}
         onBackToChoice={() => setCoverDialogView('choice')}
         onClose={closeCoverDialog}
         onOpenUrl={() => setCoverDialogView('url')}
-        onUpload={(file) => mode === 'create' ? storeDraftFile(file) : uploadCoverMutation.mutate(file)}
+        onUpload={storeDraftFile}
         onUrlChange={setCoverUrlInput}
         onUrlSubmit={() => {
           const trimmed = coverUrlInput.trim()
@@ -531,12 +520,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
             return
           }
 
-          if (mode === 'create') {
-            storeDraftUrl(trimmed)
-            return
-          }
-
-          setCoverUrlMutation.mutate(trimmed)
+          storeDraftUrl(trimmed)
         }}
       />
       <CoverLightbox
