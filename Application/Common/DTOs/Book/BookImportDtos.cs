@@ -1,0 +1,55 @@
+namespace Application.Common.DTOs.Book;
+
+public record BookImportSessionDto
+{
+    public Guid SessionId { get; set; }
+    public required string FileName { get; set; }
+    public int TotalRows { get; set; }
+    public int ValidRows { get; set; }
+    public int InvalidRows { get; set; }
+    public bool CanFinalize { get; set; }
+    public IReadOnlyCollection<BookImportRowDto> Rows { get; set; } = Array.Empty<BookImportRowDto>();
+}
+
+public record BookImportRowDto
+{
+    public Guid RowId { get; set; }
+    public int LineNumber { get; set; }
+    public bool IsValid { get; set; }
+    public string? PrimaryTitle { get; set; }
+    public string? AuthorName { get; set; }
+    public string? ContentType { get; set; }
+    public string? Status { get; set; }
+    public string? Tags { get; set; }
+    public string? TotalChapters { get; set; }
+    public string? CurrentChapterNumber { get; set; }
+    public string? CurrentChapterLabel { get; set; }
+    public string? Rating { get; set; }
+    public string? Priority { get; set; }
+    public string? Description { get; set; }
+    public string? Notes { get; set; }
+    public string? RawImportedLine { get; set; }
+    public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
+}
+
+public record UpdateBookImportRowRequest(
+    string? PrimaryTitle,
+    string? AuthorName,
+    string? ContentType,
+    string? Status,
+    string? Tags,
+    string? TotalChapters,
+    string? CurrentChapterNumber,
+    string? CurrentChapterLabel,
+    string? Rating,
+    string? Priority,
+    string? Description,
+    string? Notes,
+    string? RawImportedLine);
+
+public record BookImportFinalizeResultDto
+{
+    public int ImportedCount { get; set; }
+    public int SkippedCount { get; set; }
+    public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
+}

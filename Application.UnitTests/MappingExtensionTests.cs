@@ -34,6 +34,13 @@ public class MappingExtensionTests
         book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         book.Links.Add(new BookLink { Url = "https://example.com", SourceType = "NovelUpdates", IsPrimary = true });
+        book.ProgressHistory.Add(new BookProgressHistory
+        {
+            ChangedAt = DateTimeOffset.Parse("2026-07-03T10:00:00Z"),
+            ChapterNumber = 348,
+            ChapterLabel = "ex4",
+            Comment = "Progress note"
+        });
         book.Cover = new BookCover
         {
             Status = BookCoverStatus.Found,
@@ -57,6 +64,8 @@ public class MappingExtensionTests
         Assert.Contains("Fantasy", dto.Genres);
         Assert.Contains("favorite", dto.Tags);
         Assert.Single(dto.Links);
+        var progressEntry = Assert.Single(dto.ProgressHistory);
+        Assert.Equal("Progress note", progressEntry.Comment);
         Assert.NotNull(dto.Cover);
         Assert.Equal("Found", dto.Cover.Status);
         Assert.Equal("Jikan", dto.Cover.Source);

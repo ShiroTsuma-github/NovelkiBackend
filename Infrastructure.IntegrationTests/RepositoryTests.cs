@@ -23,7 +23,7 @@ public class RepositoryTests
 
         var books = (await repository.GetAllAsync(database.UserId, 0, 10, CancellationToken.None)).ToList();
         var count = await repository.GetCountAsync(database.UserId, CancellationToken.None);
-        var otherBook = await repository.GetByNameAsync("Other", database.UserId, CancellationToken.None);
+        var otherBook = await repository.GetByNameAsync("Other", database.UserId, Guid.Parse("10000000-0000-0000-0000-000000000001"), CancellationToken.None);
 
         Assert.Single(books);
         Assert.Equal(1, count);
@@ -129,7 +129,7 @@ public class RepositoryTests
         var repository = new BookRepository(context);
 
         var editableBook = await repository.GetForUpdateAsync(book.Id, database.UserId, CancellationToken.None);
-        var duplicateCheck = await repository.GetByNameAsync(book.PrimaryTitle, database.UserId, CancellationToken.None);
+        var duplicateCheck = await repository.GetByNameAsync(book.PrimaryTitle, database.UserId, book.ContentTypeId, CancellationToken.None);
 
         Assert.NotNull(editableBook);
         Assert.NotNull(duplicateCheck);

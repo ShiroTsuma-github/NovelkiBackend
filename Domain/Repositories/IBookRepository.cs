@@ -6,7 +6,7 @@ public interface IBookRepository
     Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
     Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => GetByIdAsync(id, cancellationToken);
-    Task<Book?> GetByNameAsync(string name, Guid ownerId, CancellationToken cancellationToken);
+    Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken);
     Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, CancellationToken cancellationToken);
     Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, string? SortBy, string? SortDirection, CancellationToken cancellationToken)
         => GetAllAsync(ownerId, Skip, Take, cancellationToken);
@@ -24,6 +24,7 @@ public interface IBookRepository
     Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken);
     Task<int> GetSearchCountAsync(BookSearchCriteria criteria, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber, string? currentChapterLabel, string? comment, CancellationToken cancellationToken) => throw new NotSupportedException();
+    Task<decimal?> GetTotalChaptersAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task ReplaceEditableCollectionsAsync(
         Guid bookId,
         IEnumerable<BookTitle> titles,

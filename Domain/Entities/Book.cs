@@ -24,7 +24,6 @@ public class Book : BaseAuditableEntity
     public decimal? CurrentChapterNumber { get; set; }
     public string? CurrentChapterLabel { get; set; }
     public string? Notes { get; set; }
-    public string? Comment { get; set; }
     public string? RawImportedLine { get; set; }
     public int? Priority { get; set; }
     public int? Rating { get; set; }

@@ -1,8 +1,10 @@
 ﻿namespace Api.Controllers;
 
-using Api.Observability;
-using Application.Features.BookFeatures.Queries.GetBook;
 using Application.Features.BookFeatures.Commands;
+using Application.Features.BookFeatures.Queries.GetBook;
+using Application.Common.DTOs.Book;
+using Application.Common.Interfaces;
+using Api.Observability;
 using System.Diagnostics;
 
 [ApiController]
@@ -10,11 +12,13 @@ using System.Diagnostics;
 public class BookController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IBookCsvImportService _bookCsvImportService;
     private readonly ILogger<BookController> _logger;
 
-    public BookController(IMediator mediator, ILogger<BookController> logger)
+    public BookController(IMediator mediator, IBookCsvImportService bookCsvImportService, ILogger<BookController> logger)
     {
         _mediator = mediator;
+        _bookCsvImportService = bookCsvImportService;
         _logger = logger;
     }
 
@@ -75,7 +79,6 @@ public class BookController : ControllerBase
             model.Rating,
             model.Priority,
             model.Description,
-            model.Comment,
             model.Notes,
             model.RawImportedLine,
             model.Links);
@@ -83,6 +86,69 @@ public class BookController : ControllerBase
         NovelkiTelemetry.BooksUpdated.Add(1);
         _logger.LogInformation("Book updated. BookId={BookId}", id);
 
+        return NoContent();
+    }
+
+    [HttpPost("import/sessions")]
+    [Authorize]
+    [RequestSizeLimit(10 * 1024 * 1024)]
+    public async Task<IActionResult> CreateImportSession([FromForm] IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file == null)
+        {
+            return BadRequest(new { error = "CSV file is required." });
+        }
+
+        if (file.Length == 0)
+        {
+            return BadRequest(new { error = "CSV file is empty." });
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await _bookCsvImportService.CreateSessionAsync(stream, file.FileName, cancellationToken);
+        _logger.LogInformation("Book CSV import session created. SessionId={SessionId}", result.SessionId);
+
+        return Ok(result);
+    }
+
+    [HttpGet("import/sessions/{sessionId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> GetImportSession(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var result = await _bookCsvImportService.GetSessionAsync(sessionId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPut("import/sessions/{sessionId:guid}/rows/{rowId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> UpdateImportRow(Guid sessionId, Guid rowId, [FromBody] UpdateBookImportRowRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _bookCsvImportService.UpdateRowAsync(sessionId, rowId, request, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpDelete("import/sessions/{sessionId:guid}/rows/{rowId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> DeleteImportRow(Guid sessionId, Guid rowId, CancellationToken cancellationToken)
+    {
+        var result = await _bookCsvImportService.DeleteRowAsync(sessionId, rowId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpPost("import/sessions/{sessionId:guid}/finalize")]
+    [Authorize]
+    public async Task<IActionResult> FinalizeImport(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var result = await _bookCsvImportService.FinalizeAsync(sessionId, cancellationToken);
+        _logger.LogInformation("Book CSV import finalized. SessionId={SessionId} Imported={Imported} Skipped={Skipped}", sessionId, result.ImportedCount, result.SkippedCount);
+        return Ok(result);
+    }
+
+    [HttpDelete("import/sessions/{sessionId:guid}")]
+    [Authorize]
+    public async Task<IActionResult> CancelImport(Guid sessionId, CancellationToken cancellationToken)
+    {
+        await _bookCsvImportService.CancelAsync(sessionId, cancellationToken);
         return NoContent();
     }
 

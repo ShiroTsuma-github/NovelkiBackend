@@ -21,9 +21,9 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen overflow-x-hidden bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[112rem] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-md bg-cyan-500 text-slate-950">
               <BookOpen className="h-5 w-5" />
@@ -59,7 +59,7 @@ export function AppShell() {
           </button>
         </div>
       </header>
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto w-full max-w-[112rem] px-4 py-6 sm:px-6 lg:px-8">
         <Outlet />
       </main>
     </div>

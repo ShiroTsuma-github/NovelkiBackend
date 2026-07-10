@@ -1,6 +1,7 @@
 namespace Infrastructure.Persistence;
 
 using System.Linq.Expressions;
+using FluentValidation;
 
 public class BookRepository : IBookRepository
 {
@@ -37,13 +38,14 @@ public class BookRepository : IBookRepository
             .FirstOrDefaultAsync(b => b.Id == id, cancellationToken);
     }
 
-    public async Task<Book?> GetByNameAsync(string name, Guid ownerId, CancellationToken cancellationToken)
+    public async Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
     {
         var normalizedName = Normalize(name);
         return await _context.Books
             .AsNoTracking()
             .FirstOrDefaultAsync(
                 b => b.OwnerId == ownerId &&
+                     b.ContentTypeId == contentTypeId &&
                      (b.NormalizedPrimaryTitle == normalizedName ||
                       b.Titles.Any(t => t.NormalizedTitle == normalizedName)),
                 cancellationToken);
@@ -161,6 +163,11 @@ public class BookRepository : IBookRepository
 
         var changed = book.CurrentChapterNumber != currentChapterNumber ||
                       book.CurrentChapterLabel != currentChapterLabel;
+        if (book.TotalChapters.HasValue && currentChapterNumber.HasValue && currentChapterNumber > book.TotalChapters)
+        {
+            throw new ValidationException("Current chapter cannot be greater than total chapters.");
+        }
+
         book.CurrentChapterNumber = currentChapterNumber;
         book.CurrentChapterLabel = currentChapterLabel;
 
@@ -177,6 +184,14 @@ public class BookRepository : IBookRepository
 
         await SaveAsync(cancellationToken);
         return true;
+    }
+
+    public async Task<decimal?> GetTotalChaptersAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+    {
+        return await _context.Books
+            .Where(b => b.Id == id && b.OwnerId == ownerId)
+            .Select(b => b.TotalChapters)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task ReplaceEditableCollectionsAsync(
@@ -294,6 +309,9 @@ public class BookRepository : IBookRepository
         var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
         return NormalizeSort(sortBy) switch
         {
+            "title" => descending
+                ? query.OrderByDescending(b => b.PrimaryTitle).ThenBy(b => b.Id)
+                : query.OrderBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
             "author" => descending
                 ? query.OrderByDescending(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle),
@@ -307,8 +325,8 @@ public class BookRepository : IBookRepository
                 ? query.OrderByDescending(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle),
             "rating" => descending
-                ? query.OrderByDescending(b => b.Rating).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.Rating).ThenBy(b => b.PrimaryTitle),
+                ? query.OrderBy(b => b.Rating == null).ThenByDescending(b => b.Rating).ThenBy(b => b.PrimaryTitle)
+                : query.OrderBy(b => b.Rating == null).ThenBy(b => b.Rating).ThenBy(b => b.PrimaryTitle),
             "priority" => descending
                 ? query.OrderByDescending(b => b.Priority).ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.Priority).ThenBy(b => b.PrimaryTitle),

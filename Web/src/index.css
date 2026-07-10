@@ -22,6 +22,30 @@ body {
   min-height: 100vh;
 }
 
+.import-rows-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #0f172a;
+}
+
+.import-rows-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.import-rows-scroll::-webkit-scrollbar-track {
+  background: #0f172a;
+  border-radius: 9999px;
+}
+
+.import-rows-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #334155 0%, #475569 100%);
+  border: 2px solid #0f172a;
+  border-radius: 9999px;
+}
+
+.import-rows-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #475569 0%, #64748b 100%);
+}
+
 button,
 input,
 select,

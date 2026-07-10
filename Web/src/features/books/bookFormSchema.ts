@@ -27,7 +27,6 @@ export const bookFormSchema = z
     rating: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 10), 'Rating must be between 1 and 10.'),
     priority: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 5), 'Priority must be between 1 and 5.'),
     description: z.string().max(4000).optional(),
-    comment: z.string().max(1000).optional(),
     notes: z.string().max(4000).optional(),
     linksText: z.string(),
   })
@@ -64,7 +63,6 @@ export function toBookMutationRequest(values: BookFormValues): BookMutationReque
     rating: toOptionalNumber(values.rating),
     priority: toOptionalNumber(values.priority),
     description: values.description?.trim() || null,
-    comment: null,
     notes: values.notes?.trim() || null,
     rawImportedLine: null,
     links: splitLines(values.linksText).map((url) => ({
@@ -93,7 +91,6 @@ export function defaultBookFormValues(book?: BookDto): BookFormValues {
     rating: book?.rating?.toString() ?? '',
     priority: book?.priority?.toString() ?? '',
     description: book?.description ?? '',
-    comment: book?.comment ?? '',
     notes: book?.notes ?? '',
     linksText: book?.links.map((link) => link.url).join('\n') ?? '',
   }

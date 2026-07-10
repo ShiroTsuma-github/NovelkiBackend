@@ -19,7 +19,6 @@ public class CreateBookCommandValidator : AbstractValidator<CreateBookCommand>
             x => x.Rating,
             x => x.Priority,
             x => x.Description,
-            x => x.Comment,
             x => x.Notes,
             x => x.RawImportedLine,
             x => x.Links));
@@ -44,7 +43,6 @@ public class UpdateBookCommandValidator : AbstractValidator<UpdateBookCommand>
             x => x.Rating,
             x => x.Priority,
             x => x.Description,
-            x => x.Comment,
             x => x.Notes,
             x => x.RawImportedLine,
             x => x.Links));
@@ -83,7 +81,6 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
         Expression<Func<TCommand, int?>> rating,
         Expression<Func<TCommand, int?>> priority,
         Expression<Func<TCommand, string?>> description,
-        Expression<Func<TCommand, string?>> comment,
         Expression<Func<TCommand, string?>> notes,
         Expression<Func<TCommand, string?>> rawImportedLine,
         Expression<Func<TCommand, IEnumerable<BookLinkInput>?>> links)
@@ -130,9 +127,6 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
 
         RuleFor(description)
             .MaximumLength(4000);
-
-        RuleFor(comment)
-            .MaximumLength(1000);
 
         RuleFor(notes)
             .MaximumLength(4000);

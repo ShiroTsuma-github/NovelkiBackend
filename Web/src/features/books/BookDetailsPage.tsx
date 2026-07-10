@@ -96,13 +96,9 @@ export function BookDetailsPage() {
   const displayCoverStatus = getDisplayCoverStatus(book.cover?.status, book.cover?.failureReason)
   const displayCoverFailure = getDisplayCoverFailure(book.cover?.failureReason)
   const coverSourceLabel = book.cover?.source ? `Source: ${book.cover.source}` : undefined
-  const coverFacts: string[] = []
-  if (!book.cover?.imageUrl) {
-    coverFacts.push(`Status: ${displayCoverStatus}`)
-  }
-  if (displayCoverFailure) {
-    coverFacts.push(displayCoverFailure)
-  }
+  const coverHint = !book.cover?.imageUrl
+    ? [`Status: ${displayCoverStatus}`, displayCoverFailure].filter(Boolean).join('\n')
+    : undefined
 
   const descriptionStyle: CSSProperties | undefined = !descriptionExpanded
     ? {
@@ -148,7 +144,7 @@ export function BookDetailsPage() {
                   cover={book.cover}
                   emptyActionLabel={!book.cover?.imageUrl && shouldOfferRefresh ? refreshLabel : undefined}
                   emptyLabel="No cover in library yet."
-                  hint={!book.cover?.imageUrl ? `Status: ${displayCoverStatus}` : undefined}
+                  hint={coverHint}
                   hoverFooter={coverSourceLabel}
                   interactive
                   title={book.primaryTitle}
@@ -226,17 +222,6 @@ export function BookDetailsPage() {
                       )}
                     </div>
                   </div>
-                  {displayCoverFailure || (book.cover?.imageUrl && coverFacts.length) ? (
-                    <div className="flex flex-wrap items-start gap-3">
-                      {coverFacts.length ? (
-                        <div className="grid gap-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                          {coverFacts.map((fact) => (
-                            <p className={fact === displayCoverFailure ? 'text-red-600' : ''} key={fact}>{fact}</p>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               </div>
             </div>
@@ -256,17 +241,39 @@ export function BookDetailsPage() {
           </Panel>
           <Panel title="Notes">
             <div className="grid gap-3 text-sm text-slate-700">
-              {book.comment || book.notes ? (
-                <>
-                  {book.comment ? <p>{book.comment}</p> : null}
-                  {book.notes ? <p>{book.notes}</p> : null}
-                </>
+              {book.notes ? (
+                <p className="whitespace-pre-line">{book.notes}</p>
               ) : (
                 <p className="text-slate-500">No notes.</p>
               )}
             </div>
           </Panel>
         </section>
+        <Panel title="Changelog">
+          <div className="grid gap-3">
+            {book.progressHistory.length ? book.progressHistory.map((entry) => (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" key={entry.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-slate-900">
+                    {entry.chapterLabel || entry.chapterNumber || 'Updated progress'}
+                  </div>
+                  <div className="text-xs text-slate-500">{formatDate(entry.changedAt)}</div>
+                </div>
+                <div className="mt-1 text-sm text-slate-600">
+                  {entry.chapterNumber != null || entry.chapterLabel ? (
+                    <p>
+                      Progress: {entry.chapterLabel || entry.chapterNumber}
+                      {entry.chapterNumber != null && entry.chapterLabel ? ` (${entry.chapterNumber})` : ''}
+                    </p>
+                  ) : null}
+                  {entry.comment ? <p className="whitespace-pre-line">{entry.comment}</p> : null}
+                </div>
+              </div>
+            )) : (
+              <p className="text-sm text-slate-500">No changelog yet.</p>
+            )}
+          </div>
+        </Panel>
       </div>
 
       <CoverLightbox
@@ -351,11 +358,15 @@ function StatusPill({ status }: { status: string }) {
 }
 
 function formatProgressInline(book: {
+  status?: string | null
   currentChapterNumber?: number | null
   currentChapterLabel?: string | null
   totalChapters?: number | null
 }) {
-  const current = book.currentChapterLabel || book.currentChapterNumber
+  const isCompleted = book.status?.trim().toLowerCase() === 'completed'
+  const current = isCompleted && book.currentChapterNumber != null
+    ? book.currentChapterNumber
+    : book.currentChapterLabel || book.currentChapterNumber
   if (!current && !book.totalChapters) {
     return '-'
   }
@@ -502,4 +513,12 @@ function isProviderResponseFailure(failureReason?: string | null) {
   }
 
   return failureReason.includes("invalid start of a value") || failureReason.includes("'<'")
+}
+
+function formatDate(value?: string | null) {
+  if (!value) {
+    return '-'
+  }
+
+  return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
 }

@@ -21,6 +21,9 @@ export function ProgressDialog({ book }: { book: BookDto }) {
   )
   const [comment, setComment] = useState('')
   const queryClient = useQueryClient()
+  const totalChapters = typeof book.totalChapters === 'number' ? Number(book.totalChapters) : null
+  const numericCurrent = currentChapterNumber.trim() ? Number(currentChapterNumber) : null
+  const exceedsTotal = numericCurrent != null && totalChapters != null && numericCurrent > totalChapters
   const mutation = useMutation({
     mutationFn: () =>
       api.updateProgress(book.id, {
@@ -55,13 +58,15 @@ export function ProgressDialog({ book }: { book: BookDto }) {
       <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
         <h2 className="text-lg font-semibold text-slate-950">Update progress</h2>
         <div className="mt-4 grid gap-3">
-          <input className={inputClass} placeholder="Chapter number" type="number" value={currentChapterNumber} onChange={(event) => setCurrentChapterNumber(event.target.value)} />
+          {totalChapters != null ? <p className="text-sm text-slate-500">Total chapters: {totalChapters}</p> : null}
+          <input className={inputClass} max={totalChapters ?? undefined} placeholder="Chapter number" type="number" value={currentChapterNumber} onChange={(event) => setCurrentChapterNumber(event.target.value)} />
           <input className={inputClass} placeholder="Chapter label" value={currentChapterLabel} onChange={(event) => setCurrentChapterLabel(event.target.value)} />
           <textarea className={`${inputClass} min-h-24`} placeholder="Comment" value={comment} onChange={(event) => setComment(event.target.value)} />
+          {exceedsTotal ? <p className="text-sm text-red-600">Current chapter cannot be greater than total chapters.</p> : null}
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>Cancel</button>
-          <button className={buttonClass} disabled={mutation.isPending} type="button" onClick={() => mutation.mutate()}>
+          <button className={buttonClass} disabled={mutation.isPending || exceedsTotal} type="button" onClick={() => mutation.mutate()}>
             Save
           </button>
         </div>

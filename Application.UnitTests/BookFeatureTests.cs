@@ -7,6 +7,7 @@ using Domain.Associations;
 using Domain.Entities;
 using Domain.Exceptions;
 using Domain.Repositories;
+using FluentValidation;
 
 namespace Application.UnitTests;
 
@@ -55,7 +56,7 @@ public class BookFeatureTests
             links: new[] { new BookLinkInput("https://novelupdates.com/example", "NU", "NovelUpdates", true, true) },
             currentChapterNumber: 348,
             currentChapterLabel: "ex4");
-        command = command with { Notes = "Private notes", Comment = null };
+        command = command with { Notes = "Private notes" };
 
         await fixture.Handler.Handle(command, CancellationToken.None);
 
@@ -64,7 +65,6 @@ public class BookFeatureTests
         Assert.Single(book.Links);
         Assert.Single(book.ProgressHistory);
         Assert.Equal("Private notes", book.Notes);
-        Assert.Null(book.Comment);
         Assert.Equal(348, book.ProgressHistory.First().ChapterNumber);
         Assert.Equal("ex4", book.ProgressHistory.First().ChapterLabel);
     }
@@ -131,7 +131,6 @@ public class BookFeatureTests
             8,
             2,
             "Description",
-            "Progress changed",
             "Notes",
             null,
             new[] { new BookLinkInput("https://new.example.com", "New", "Other", true, true) });
@@ -147,6 +146,27 @@ public class BookFeatureTests
         Assert.Single(book.ProgressHistory);
         Assert.Equal(20, book.ProgressHistory.First().ChapterNumber);
         Assert.True(fixture.BookRepository.Saved);
+    }
+
+    [Fact]
+    public async Task UpdateProgress_ShouldRejectChapterGreaterThanTotal()
+    {
+        var fixture = CreateFixture();
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Old Title",
+            NormalizedPrimaryTitle = "OLD TITLE",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId,
+            TotalChapters = 10
+        };
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookProgressHandler(fixture.BookRepository, new FakeBookListCacheInvalidator(), new FakeUser());
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            handler.Handle(new UpdateBookProgressCommand(book.Id, 11, "11", "too much"), CancellationToken.None));
     }
 
     [Fact]
@@ -213,7 +233,6 @@ public class BookFeatureTests
             Rating: 9,
             Priority: 1,
             Description: null,
-            Comment: null,
             Notes: null,
             RawImportedLine: null,
             Links: links);
@@ -253,11 +272,12 @@ public class BookFeatureTests
         public Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
         public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
         public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
-        public Task<Book?> GetByNameAsync(string name, Guid ownerId, CancellationToken cancellationToken)
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
         {
             var normalized = name.Trim().ToUpperInvariant();
             var match = LastBook != null &&
                         LastBook.OwnerId == ownerId &&
+                        LastBook.ContentTypeId == contentTypeId &&
                         (LastBook.NormalizedPrimaryTitle == normalized ||
                          LastBook.Titles.Any(t => t.NormalizedTitle == normalized));
             return Task.FromResult(match ? LastBook : null);

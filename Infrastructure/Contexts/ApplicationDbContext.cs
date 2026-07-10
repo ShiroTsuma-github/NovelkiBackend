@@ -64,7 +64,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<Book>(entity =>
         {
-            entity.HasIndex(b => new { b.OwnerId, b.NormalizedPrimaryTitle });
+            entity.HasIndex(b => new { b.OwnerId, b.NormalizedPrimaryTitle, b.ContentTypeId }).IsUnique();
             entity.HasIndex(b => new { b.OwnerId, b.CurrentChapterNumber });
             entity.HasIndex(b => new { b.OwnerId, b.Rating });
             entity.HasIndex(b => new { b.OwnerId, b.StatusId });
