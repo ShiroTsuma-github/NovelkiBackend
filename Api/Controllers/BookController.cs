@@ -91,8 +91,9 @@ public class BookController : ControllerBase
 
     [HttpPost("import/sessions")]
     [Authorize]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]
-    public async Task<IActionResult> CreateImportSession([FromForm] IFormFile? file, CancellationToken cancellationToken)
+    public async Task<IActionResult> CreateImportSession(IFormFile? file, CancellationToken cancellationToken)
     {
         if (file == null)
         {
@@ -166,8 +167,9 @@ public class BookController : ControllerBase
 
     [HttpPut("{id:guid}/cover")]
     [Authorize]
+    [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]
-    public async Task<IActionResult> UploadCover(Guid id, [FromForm] IFormFile? file)
+    public async Task<IActionResult> UploadCover(Guid id, IFormFile? file)
     {
         if (file == null)
         {
