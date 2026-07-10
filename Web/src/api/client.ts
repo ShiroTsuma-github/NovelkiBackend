@@ -1,9 +1,13 @@
 import { apiFormRequest, apiRequest, toQueryString } from './http'
 import type {
   AuthorDto,
+  AdminLibraryPurgeResult,
   AdminBookDto,
   BookDto,
   BookCoverDto,
+  BookImportFinalizeResult,
+  BookImportRowUpdateRequest,
+  BookImportSessionDto,
   BookMutationRequest,
   DictionaryMutationRequest,
   DictionaryDto,
@@ -51,6 +55,21 @@ export const api = {
     apiRequest<{ id: string }>('/book', { method: 'POST', body: request }),
   updateBook: (id: string, request: BookMutationRequest) =>
     apiRequest<void>(`/book/${id}`, { method: 'PUT', body: request }),
+  createBookImportSession: (file: File) => {
+    const formData = new FormData()
+    formData.set('file', file)
+    return apiFormRequest<BookImportSessionDto>('/book/import/sessions', formData, { method: 'POST' })
+  },
+  getBookImportSession: (sessionId: string) =>
+    apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}`),
+  updateBookImportRow: (sessionId: string, rowId: string, request: BookImportRowUpdateRequest) =>
+    apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}/rows/${rowId}`, { method: 'PUT', body: request }),
+  deleteBookImportRow: (sessionId: string, rowId: string) =>
+    apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}/rows/${rowId}`, { method: 'DELETE' }),
+  finalizeBookImport: (sessionId: string) =>
+    apiRequest<BookImportFinalizeResult>(`/book/import/sessions/${sessionId}/finalize`, { method: 'POST' }),
+  cancelBookImport: (sessionId: string) =>
+    apiRequest<void>(`/book/import/sessions/${sessionId}`, { method: 'DELETE' }),
   updateAdminBook: (id: string, request: BookMutationRequest) =>
     apiRequest<void>(`/admin/books/${id}`, { method: 'PUT', body: request }),
   updateProgress: (id: string, request: UpdateProgressRequest) =>
@@ -92,4 +111,6 @@ export const api = {
     apiRequest<DictionaryDto>('/admin/types', { method: 'POST', body: request }),
   createAdminGenre: (request: DictionaryMutationRequest) =>
     apiRequest<DictionaryDto>('/admin/genres', { method: 'POST', body: request }),
+  deleteAdminBooksByOwner: (ownerId: string) =>
+    apiRequest<AdminLibraryPurgeResult>(`/admin/books/owner/${ownerId}`, { method: 'DELETE' }),
 }

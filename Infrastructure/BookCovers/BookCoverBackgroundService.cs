@@ -3,10 +3,13 @@ namespace Infrastructure.BookCovers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Text.Json;
 
 public sealed class BookCoverBackgroundService : BackgroundService
 {
+    private readonly ConcurrentDictionary<Guid, byte> _inFlight = new();
     private readonly InMemoryBookCoverQueue _queue;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<BookCoverBackgroundService> _logger;
@@ -53,6 +56,11 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
     private async Task ProcessBookAsync(Guid bookId, CancellationToken stoppingToken)
     {
+        if (!_inFlight.TryAdd(bookId, 0))
+        {
+            return;
+        }
+
         try
         {
             using var scope = _scopeFactory.CreateScope();
@@ -63,9 +71,17 @@ public sealed class BookCoverBackgroundService : BackgroundService
         {
             throw;
         }
+        catch (DbUpdateConcurrencyException)
+        {
+            _logger.LogDebug("Skipping stale cover job. BookId={BookId}", bookId);
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Cover processing failed. BookId={BookId}", bookId);
+        }
+        finally
+        {
+            _inFlight.TryRemove(bookId, out _);
         }
     }
 }
@@ -104,6 +120,8 @@ public sealed class BookCoverProcessor
         }
 
         cover.LastAttemptAt = DateTimeOffset.UtcNow;
+        await _coverRepository.SaveAsync(cancellationToken);
+
         try
         {
             var candidate = await _resolver.FindAsync(cover.Book, cancellationToken);

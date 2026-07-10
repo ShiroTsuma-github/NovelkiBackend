@@ -29,7 +29,10 @@ public static class DependencyInjection
         var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseNpgsql(connectionString);
+            options.UseNpgsql(connectionString, npgsqlOptions =>
+            {
+                npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            });
         });
         builder.Services.AddDistributedMemoryCache();
         if (!string.IsNullOrWhiteSpace(redisConnectionString))
@@ -49,6 +52,8 @@ public static class DependencyInjection
         builder.Services.AddScoped<BookListCache>();
         builder.Services.AddScoped<IBookListCache>(provider => provider.GetRequiredService<BookListCache>());
         builder.Services.AddScoped<IBookListCacheInvalidator>(provider => provider.GetRequiredService<BookListCache>());
+        builder.Services.AddScoped<IBookCsvImportService, BookCsvImportService>();
+        builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 
         builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
         builder.Services.AddScoped<IBookCoverStorage, LocalBookCoverStorage>();

@@ -57,8 +57,8 @@ export type BookDto = {
   totalChapters?: number | null
   rating?: number | null
   priority?: number | null
-  comment?: string | null
   notes?: string | null
+  progressHistory: BookProgressHistoryDto[]
   cover?: BookCoverDto | null
   genres: string[]
   tags: string[]
@@ -121,10 +121,75 @@ export type BookMutationRequest = {
   rating?: number | null
   priority?: number | null
   description?: string | null
-  comment?: string | null
   notes?: string | null
   rawImportedLine?: string | null
   links: BookLinkInput[]
+}
+
+export type BookProgressHistoryDto = {
+  id: string
+  changedAt: string
+  chapterNumber?: number | null
+  chapterLabel?: string | null
+  comment?: string | null
+}
+
+export type BookImportRowDto = {
+  rowId: string
+  lineNumber: number
+  isValid: boolean
+  primaryTitle?: string | null
+  authorName?: string | null
+  contentType?: string | null
+  status?: string | null
+  tags?: string | null
+  totalChapters?: string | null
+  currentChapterNumber?: string | null
+  currentChapterLabel?: string | null
+  rating?: string | null
+  priority?: string | null
+  description?: string | null
+  notes?: string | null
+  rawImportedLine?: string | null
+  errors: string[]
+}
+
+export type BookImportSessionDto = {
+  sessionId: string
+  fileName: string
+  totalRows: number
+  validRows: number
+  invalidRows: number
+  canFinalize: boolean
+  rows: BookImportRowDto[]
+}
+
+export type BookImportRowUpdateRequest = {
+  primaryTitle?: string | null
+  authorName?: string | null
+  contentType?: string | null
+  status?: string | null
+  tags?: string | null
+  totalChapters?: string | null
+  currentChapterNumber?: string | null
+  currentChapterLabel?: string | null
+  rating?: string | null
+  priority?: string | null
+  description?: string | null
+  notes?: string | null
+  rawImportedLine?: string | null
+}
+
+export type BookImportFinalizeResult = {
+  importedCount: number
+  skippedCount: number
+  errors: string[]
+}
+
+export type AdminLibraryPurgeResult = {
+  deletedBooks: number
+  deletedAuthors: number
+  deletedTags: number
 }
 
 export type UpdateProgressRequest = {

@@ -23,27 +23,29 @@ const adminColumnsStorageKey = 'novelki.adminBooks.columns.v1'
 type SortDirection = 'asc' | 'desc'
 
 const adminBookColumns: ColumnDefinition<AdminBookDto>[] = [
-  { id: 'id', label: 'Id', defaultVisible: false, render: (book) => <span className="font-mono text-xs">{book.id}</span> },
-  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', render: (book) => <span className="font-medium text-slate-950">{book.primaryTitle}</span> },
-  { id: 'ownerId', label: 'OwnerId', defaultVisible: true, sortBy: 'owner', render: (book) => <span className="font-mono text-xs">{book.ownerId}</span> },
-  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', render: (book) => book.author ?? '-' },
-  { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', render: (book) => book.status },
-  { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', render: (book) => book.contentType },
-  { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', render: formatProgress },
-  { id: 'rating', label: 'Rating', defaultVisible: true, sortBy: 'rating', render: (book) => book.rating ?? '-' },
-  { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', render: (book) => book.priority ?? '-' },
-  { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', render: (book) => formatDate(book.created) },
-  { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', render: (book) => formatDate(book.lastModified || book.created) },
-  { id: 'genres', label: 'Genres', defaultVisible: false, render: (book) => formatList(book.genres) },
-  { id: 'tags', label: 'Tags', defaultVisible: false, render: (book) => formatList(book.tags) },
-  { id: 'links', label: 'Links', defaultVisible: false, render: (book) => book.links.length },
-  { id: 'notes', label: 'Notes', defaultVisible: false, render: (book) => truncate(book.notes) },
-  { id: 'description', label: 'Description', defaultVisible: false, render: (book) => truncate(book.description) },
+  { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
+  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-[24%]', render: (book) => <span className="block truncate font-medium text-slate-950">{book.primaryTitle}</span> },
+  { id: 'ownerId', label: 'OwnerId', defaultVisible: true, sortBy: 'owner', widthClass: 'w-[15%]', render: (book) => <span className="font-mono text-xs">{book.ownerId}</span> },
+  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-[11%]', render: (book) => <span className="block truncate">{book.author ?? '-'}</span> },
+  { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-20', render: (book) => book.status },
+  { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-20', render: (book) => book.contentType },
+  { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', widthClass: 'w-24', render: formatProgress },
+  { id: 'rating', label: 'Rating', defaultVisible: true, sortBy: 'rating', widthClass: 'w-16', render: (book) => book.rating ?? '-' },
+  { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', widthClass: 'w-20', render: (book) => book.priority ?? '-' },
+  { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', widthClass: 'w-36', render: (book) => formatDate(book.created) },
+  { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-32', render: (book) => formatDate(book.lastModified || book.created) },
+  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => formatList(book.genres) },
+  { id: 'tags', label: 'Tags', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => formatList(book.tags) },
+  { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.links.length },
+  { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => truncate(book.notes) },
+  { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => truncate(book.description) },
 ]
 
 export function AdminPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(adminColumnsStorageKey, adminBookColumns)
+  const [ownerIdToPurge, setOwnerIdToPurge] = useState('')
+  const queryClient = useQueryClient()
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
@@ -53,6 +55,20 @@ export function AdminPage() {
   const adminBooksQuery = useQuery({
     queryKey: ['adminBooks', skip, pageSize, query, sortBy, sortDirection],
     queryFn: () => api.getAdminBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
+  })
+  const purgeMutation = useMutation({
+    mutationFn: (ownerId: string) => api.deleteAdminBooksByOwner(ownerId),
+    onSuccess: async (result) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['adminBooks'] }),
+        queryClient.invalidateQueries({ queryKey: ['books'] }),
+      ])
+      toast.success(`Deleted ${result.deletedBooks} books, ${result.deletedAuthors} authors, ${result.deletedTags} tags.`)
+      setOwnerIdToPurge('')
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : error.message)
+    },
   })
 
   function updateQuery(value: string) {
@@ -122,14 +138,42 @@ export function AdminPage() {
         </div>
       </section>
 
+      <section className="grid gap-4 rounded-lg border border-red-200 bg-white p-5 shadow-sm">
+        <h2 className="text-base font-semibold text-slate-950">Purge user library</h2>
+        <p className="text-sm text-slate-500">Deletes all books for the given owner id, then removes orphaned authors and that user&apos;s orphaned tags.</p>
+        <div className="flex flex-wrap gap-2">
+          <input
+            className={`${inputClass} min-w-80`}
+            placeholder="OwnerId"
+            value={ownerIdToPurge}
+            onChange={(event) => setOwnerIdToPurge(event.target.value)}
+          />
+          <button
+            className="inline-flex min-h-10 items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+            disabled={purgeMutation.isPending || !ownerIdToPurge.trim()}
+            type="button"
+            onClick={() => {
+              const ownerId = ownerIdToPurge.trim()
+              if (!window.confirm(`Delete all books for owner ${ownerId}? This also removes orphaned authors and tags.`)) {
+                return
+              }
+
+              purgeMutation.mutate(ownerId)
+            }}
+          >
+            {purgeMutation.isPending ? 'Purging...' : 'Delete all by owner id'}
+          </button>
+        </div>
+      </section>
+
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           <ColumnSettingsPopup columns={adminBookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
+        <div className="w-full">
+          <table className="w-full table-fixed border-collapse text-left text-sm">
             <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 {visibleColumns.map((column) => (
@@ -140,7 +184,7 @@ export function AdminPage() {
                     onSort={setSort}
                   />
                 ))}
-                <th className="px-4 py-3 text-right">Actions</th>
+                <th className="w-24 px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -224,9 +268,13 @@ function AdminBookRow({ book, columns }: { book: AdminBookDto; columns: ColumnDe
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50">
       {columns.map((column) => (
-        <td className="px-4 py-3 text-slate-600" key={column.id}>{column.render(book)}</td>
+        <td className="px-4 py-3 text-slate-600" key={column.id}>
+          <div className="overflow-hidden">
+            {column.render(book)}
+          </div>
+        </td>
       ))}
-      <td className="px-4 py-3">
+      <td className="w-24 px-4 py-3">
         <div className="flex justify-end">
           <Link className={secondaryButtonClass} to={`/admin/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
         </div>

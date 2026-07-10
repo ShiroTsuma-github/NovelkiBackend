@@ -17,8 +17,8 @@ public record BookDto
     public decimal? TotalChapters { get; set; }
     public int? Rating { get; set; }
     public int? Priority { get; set; }
-    public string? Comment { get; set; }
     public string? Notes { get; set; }
+    public IReadOnlyCollection<BookProgressHistoryDto> ProgressHistory { get; set; } = Array.Empty<BookProgressHistoryDto>();
     public BookCoverDto? Cover { get; set; }
     public IReadOnlyCollection<string> Genres { get; set; } = Array.Empty<string>();
     public IReadOnlyCollection<string> Tags { get; set; } = Array.Empty<string>();
@@ -63,3 +63,12 @@ public record BookLinkInput(
     string SourceType = "Other",
     bool IsPrimary = false,
     bool LastReadHere = false);
+
+public record BookProgressHistoryDto
+{
+    public Guid Id { get; set; }
+    public DateTimeOffset ChangedAt { get; set; }
+    public decimal? ChapterNumber { get; set; }
+    public string? ChapterLabel { get; set; }
+    public string? Comment { get; set; }
+}

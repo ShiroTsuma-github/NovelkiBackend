@@ -63,7 +63,6 @@ public class AdminController : ControllerBase
             model.Rating,
             model.Priority,
             model.Description,
-            model.Comment,
             model.Notes,
             model.RawImportedLine,
             model.Links)
@@ -106,5 +105,18 @@ public class AdminController : ControllerBase
         _logger.LogInformation("Admin created genre. GenreId={GenreId}", genre.Id);
 
         return Created($"/api/v1/genre/{genre.Id}", genre);
+    }
+
+    [HttpDelete("books/owner/{ownerId:guid}")]
+    public async Task<IActionResult> DeleteBooksByOwner(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new DeleteBooksByOwnerCommand(ownerId), cancellationToken);
+        _logger.LogInformation(
+            "Admin purged owner library. OwnerId={OwnerId} DeletedBooks={DeletedBooks} DeletedAuthors={DeletedAuthors} DeletedTags={DeletedTags}",
+            ownerId,
+            result.DeletedBooks,
+            result.DeletedAuthors,
+            result.DeletedTags);
+        return Ok(result);
     }
 }

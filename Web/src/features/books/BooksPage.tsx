@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { api } from '@/api/client'
-import type { BookDto } from '@/api/types'
+import type { BookDto, BookImportFinalizeResult } from '@/api/types'
 import {
   buttonClass,
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
 import { BookCoverArtwork } from './BookCoverSection'
+import { ImportBooksDialog } from './ImportBooksDialog'
 
 const pageSizeOptions = [20, 50, 100, 500]
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
@@ -22,33 +24,36 @@ export type ColumnDefinition<T> = {
   label: string
   defaultVisible: boolean
   sortBy?: string
+  widthClass?: string
   render: (item: T) => ReactNode
 }
 
 const bookColumns: ColumnDefinition<BookDto>[] = [
-  { id: 'id', label: 'Id', defaultVisible: false, render: (book) => <span className="font-mono text-xs">{book.id}</span> },
-  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', render: (book) => <span className="font-medium text-slate-950">{book.primaryTitle}</span> },
-  { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, render: (book) => formatList(book.alternativeTitles) },
-  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', render: (book) => book.author ?? '-' },
-  { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', render: (book) => book.status },
-  { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', render: (book) => book.contentType },
-  { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', render: formatProgress },
-  { id: 'totalChapters', label: 'Chapters', defaultVisible: false, render: (book) => book.totalChapters ?? '-' },
-  { id: 'rating', label: 'Rating', defaultVisible: true, sortBy: 'rating', render: (book) => book.rating ?? '-' },
-  { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', render: (book) => book.priority ?? '-' },
-  { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', render: (book) => formatDate(book.created) },
-  { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', render: (book) => formatDate(book.lastModified || book.created) },
-  { id: 'genres', label: 'Genres', defaultVisible: false, render: (book) => <Pills values={book.genres} /> },
-  { id: 'tags', label: 'Tags', defaultVisible: true, render: (book) => <Pills values={book.tags} /> },
-  { id: 'links', label: 'Links', defaultVisible: false, render: (book) => book.links.length },
-  { id: 'notes', label: 'Notes', defaultVisible: false, render: (book) => truncate(book.notes) },
-  { id: 'description', label: 'Description', defaultVisible: false, render: (book) => truncate(book.description) },
+  { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
+  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-[26%]', render: (book) => <span className="block truncate font-medium text-slate-950">{book.primaryTitle}</span> },
+  { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => formatList(book.alternativeTitles) },
+  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-[13%]', render: (book) => <span className="block truncate">{book.author ?? '-'}</span> },
+  { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-20', render: (book) => book.status },
+  { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-20', render: (book) => book.contentType },
+  { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', widthClass: 'w-24', render: formatProgress },
+  { id: 'totalChapters', label: 'Chapters', defaultVisible: false, widthClass: 'w-24', render: (book) => book.totalChapters ?? '-' },
+  { id: 'rating', label: 'Rating', defaultVisible: true, sortBy: 'rating', widthClass: 'w-16', render: (book) => book.rating ?? '-' },
+  { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', widthClass: 'w-20', render: (book) => book.priority ?? '-' },
+  { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', widthClass: 'w-36', render: (book) => formatDate(book.created) },
+  { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-32', render: (book) => formatDate(book.lastModified || book.created) },
+  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => <Pills values={book.genres} /> },
+  { id: 'tags', label: 'Tags', defaultVisible: true, widthClass: 'w-[10%]', render: (book) => <Pills values={book.tags} /> },
+  { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.links.length },
+  { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => truncate(book.notes) },
+  { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => truncate(book.description) },
 ]
 
 export function BooksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(bookColumnsStorageKey, bookColumns)
   const [viewMode, setViewMode] = useViewMode(bookLayoutStorageKey)
+  const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
@@ -59,7 +64,6 @@ export function BooksPage() {
     queryKey: ['books', skip, pageSize, query, sortBy, sortDirection],
     queryFn: () => api.getBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
   })
-
   function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
     if (value) {
@@ -99,6 +103,12 @@ export function BooksPage() {
   const total = booksQuery.data?.total ?? 0
   const canGoBack = skip > 0
   const canGoForward = skip + pageSize < total
+  
+  function handleImportComplete(result: BookImportFinalizeResult) {
+    setLastImportResult(result)
+    booksQuery.refetch()
+    toast.success(`Imported ${result.importedCount} books. Skipped ${result.skippedCount}.`)
+  }
 
   return (
     <div className="grid gap-5">
@@ -107,22 +117,47 @@ export function BooksPage() {
           <h1 className="text-2xl font-semibold text-slate-950">Books</h1>
           <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
         </div>
-        <Link className={buttonClass} to="/books/new">
-          <Plus className="h-4 w-4" />
-          Add book
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <button className={secondaryButtonClass} type="button" onClick={() => setImportDialogOpen(true)}>
+            <Upload className="h-4 w-4" />
+            Import CSV
+          </button>
+          <Link className={buttonClass} to="/books/new">
+            <Plus className="h-4 w-4" />
+            Add book
+          </Link>
+        </div>
       </div>
+
+      {lastImportResult ? (
+        <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-sm font-semibold text-slate-950">Last import</div>
+          <p className="text-sm text-slate-600">
+            Imported: {lastImportResult.importedCount}. Skipped: {lastImportResult.skippedCount}.
+          </p>
+          {lastImportResult.errors.length ? (
+            <div className="grid gap-1 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {lastImportResult.errors.slice(0, 10).map((error) => (
+                <p key={error}>{error}</p>
+              ))}
+              {lastImportResult.errors.length > 10 ? (
+                <p>More errors: {lastImportResult.errors.length - 10}</p>
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
           <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
         {viewMode === 'table' ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
+          <div className="w-full">
+            <table className="w-full table-fixed border-collapse text-left text-sm">
               <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   {visibleColumns.map((column) => (
@@ -133,7 +168,7 @@ export function BooksPage() {
                       onSort={setSort}
                     />
                   ))}
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="w-24 px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -166,6 +201,7 @@ export function BooksPage() {
           </div>
         </div>
       </section>
+      <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
     </div>
   )
 }
@@ -430,11 +466,11 @@ export function ColumnHeader<T>({
   const Icon = activeDirection === 'asc' ? ArrowUp : activeDirection === 'desc' ? ArrowDown : ChevronsUpDown
 
   if (!column.sortBy) {
-    return <th className="px-4 py-3">{column.label}</th>
+    return <th className={`${column.widthClass ?? ''} px-4 py-3`}>{column.label}</th>
   }
 
   return (
-    <th className="px-4 py-3">
+    <th className={`${column.widthClass ?? ''} px-4 py-3`}>
       <button
         className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-200 hover:text-slate-950"
         type="button"
@@ -451,9 +487,13 @@ function BookRow({ book, columns }: { book: BookDto; columns: ColumnDefinition<B
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50">
       {columns.map((column) => (
-        <td className="px-4 py-3 text-slate-600" key={column.id}>{column.render(book)}</td>
+        <td className="px-4 py-3 text-slate-600" key={column.id}>
+          <div className="overflow-hidden">
+            {column.render(book)}
+          </div>
+        </td>
       ))}
-      <td className="px-4 py-3">
+      <td className="w-24 px-4 py-3">
         <div className="flex justify-end gap-2">
           <Link className={secondaryButtonClass} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
           <Link className={secondaryButtonClass} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
@@ -525,7 +565,10 @@ function readSortDirection(searchParams: URLSearchParams): SortDirection {
 }
 
 export function formatProgress(book: BookDto) {
-  const current = book.currentChapterLabel || book.currentChapterNumber
+  const isCompleted = book.status.trim().toLowerCase() === 'completed'
+  const current = isCompleted && book.currentChapterNumber != null
+    ? book.currentChapterNumber
+    : book.currentChapterLabel || book.currentChapterNumber
   if (!current && !book.totalChapters) {
     return '-'
   }

@@ -174,8 +174,18 @@ public static class MappingExtensions
             TotalChapters = source.TotalChapters,
             Rating = source.Rating,
             Priority = source.Priority,
-            Comment = source.Comment,
             Notes = source.Notes,
+            ProgressHistory = source.ProgressHistory
+                .OrderByDescending(h => h.ChangedAt)
+                .Select(h => new BookProgressHistoryDto
+                {
+                    Id = h.Id,
+                    ChangedAt = h.ChangedAt,
+                    ChapterNumber = h.ChapterNumber,
+                    ChapterLabel = h.ChapterLabel,
+                    Comment = h.Comment
+                })
+                .ToList(),
             Cover = source.Cover?.ToDto(source.Id),
             Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
             Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
@@ -211,8 +221,18 @@ public static class MappingExtensions
             TotalChapters = source.TotalChapters,
             Rating = source.Rating,
             Priority = source.Priority,
-            Comment = source.Comment,
             Notes = source.Notes,
+            ProgressHistory = source.ProgressHistory
+                .OrderByDescending(h => h.ChangedAt)
+                .Select(h => new BookProgressHistoryDto
+                {
+                    Id = h.Id,
+                    ChangedAt = h.ChangedAt,
+                    ChapterNumber = h.ChapterNumber,
+                    ChapterLabel = h.ChapterLabel,
+                    Comment = h.Comment
+                })
+                .ToList(),
             Cover = source.Cover?.ToDto(source.Id),
             Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
             Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
@@ -248,10 +268,11 @@ public static class MappingExtensions
 
     public static BookTitle ToPrimaryTitle(this string title)
     {
+        var trimmedTitle = title.Trim();
         return new BookTitle
         {
-            Title = title,
-            NormalizedTitle = NormalizeName(title),
+            Title = trimmedTitle,
+            NormalizedTitle = NormalizeName(trimmedTitle),
             IsPrimary = true,
             Source = "Manual"
         };
@@ -259,13 +280,14 @@ public static class MappingExtensions
 
     public static BookTitle ToBookTitle(this BookTitleInput input)
     {
+        var trimmedTitle = input.Title.Trim();
         return new BookTitle
         {
-            Title = input.Title,
-            NormalizedTitle = NormalizeName(input.Title),
-            Language = input.Language,
+            Title = trimmedTitle,
+            NormalizedTitle = NormalizeName(trimmedTitle),
+            Language = string.IsNullOrWhiteSpace(input.Language) ? null : input.Language.Trim(),
             IsPrimary = false,
-            Source = input.Source ?? "Manual"
+            Source = string.IsNullOrWhiteSpace(input.Source) ? "Manual" : input.Source.Trim()
         };
     }
 
@@ -273,9 +295,9 @@ public static class MappingExtensions
     {
         return new BookLink
         {
-            Url = input.Url,
-            Label = input.Label,
-            SourceType = input.SourceType,
+            Url = input.Url.Trim(),
+            Label = string.IsNullOrWhiteSpace(input.Label) ? null : input.Label.Trim(),
+            SourceType = input.SourceType.Trim(),
             IsPrimary = input.IsPrimary,
             LastReadHere = input.LastReadHere
         };

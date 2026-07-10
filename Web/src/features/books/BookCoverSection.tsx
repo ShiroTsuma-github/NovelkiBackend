@@ -99,7 +99,7 @@ export function BookCoverArtwork({
     <div className="grid place-items-center gap-2 px-6 text-center text-slate-500">
       <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">No Cover</div>
       <div className="text-sm">{emptyLabel}</div>
-      {hint ? <div className="text-xs text-slate-400">{hint}</div> : null}
+      {hint ? <div className="whitespace-pre-line text-xs text-slate-400">{hint}</div> : null}
       {emptyActionLabel ? (
         <div className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
           {emptyActionLabel}

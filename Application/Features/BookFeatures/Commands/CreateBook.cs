@@ -18,7 +18,6 @@ public sealed record CreateBookCommand(
     int? Rating,
     int? Priority,
     string? Description,
-    string? Comment,
     string? Notes,
     string? RawImportedLine,
     IEnumerable<BookLinkInput>? Links) : IRequest<Guid>;
@@ -60,19 +59,23 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
     public async Task<Guid> Handle(CreateBookCommand request, CancellationToken cancellationToken)
     {
         var ownerId = _user.RequiredId;
-        await EnsureBookDoesNotExistAsync(ownerId, request.PrimaryTitle, request.AlternativeTitles, cancellationToken);
-
         var contentType = await _typeRepository.GetByIdAsync(request.ContentTypeId, cancellationToken)
             ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
         var status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
             ?? throw new EntityNotFoundException<Status, Guid>(request.StatusId);
+        await EnsureBookDoesNotExistAsync(ownerId, contentType.Id, request.PrimaryTitle, request.AlternativeTitles, cancellationToken);
 
         var author = await ResolveAuthorAsync(request, cancellationToken);
+        var primaryTitle = request.PrimaryTitle.Trim();
+        var description = TrimToNull(request.Description);
+        var currentChapterLabel = TrimToNull(request.CurrentChapterLabel);
+        var notes = TrimToNull(request.Notes);
+        var rawImportedLine = TrimToNull(request.RawImportedLine);
         var book = new Book
         {
-            PrimaryTitle = request.PrimaryTitle,
-            NormalizedPrimaryTitle = MappingExtensions.NormalizeName(request.PrimaryTitle),
-            Description = request.Description,
+            PrimaryTitle = primaryTitle,
+            NormalizedPrimaryTitle = MappingExtensions.NormalizeName(primaryTitle),
+            Description = description,
             OwnerId = ownerId,
             AuthorId = author?.Id,
             Author = author,
@@ -82,16 +85,15 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             Status = status,
             TotalChapters = request.TotalChapters,
             CurrentChapterNumber = request.CurrentChapterNumber,
-            CurrentChapterLabel = request.CurrentChapterLabel,
+            CurrentChapterLabel = currentChapterLabel,
             Rating = request.Rating,
             Priority = request.Priority,
-            Comment = request.Comment,
-            Notes = request.Notes,
-            RawImportedLine = request.RawImportedLine,
+            Notes = notes,
+            RawImportedLine = rawImportedLine,
             Cover = new BookCover()
         };
 
-        book.Titles.Add(request.PrimaryTitle.ToPrimaryTitle());
+        book.Titles.Add(primaryTitle.ToPrimaryTitle());
         foreach (var title in request.AlternativeTitles ?? Enumerable.Empty<BookTitleInput>())
         {
             if (!string.IsNullOrWhiteSpace(title.Title))
@@ -133,13 +135,14 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
 
     private async Task EnsureBookDoesNotExistAsync(
         Guid ownerId,
+        Guid contentTypeId,
         string primaryTitle,
         IEnumerable<BookTitleInput>? alternativeTitles,
         CancellationToken cancellationToken)
     {
         foreach (var title in EnumerateTitles(primaryTitle, alternativeTitles))
         {
-            var existing = await _bookRepository.GetByNameAsync(title, ownerId, cancellationToken);
+            var existing = await _bookRepository.GetByNameAsync(title, ownerId, contentTypeId, cancellationToken);
             if (existing != null)
             {
                 throw new EntityAlreadyExistsException<Book, Guid>(title, existing.Id);
@@ -160,7 +163,8 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             return null;
         }
 
-        var existing = await _authorRepository.GetByNameAsync(request.AuthorName, cancellationToken);
+        var authorName = request.AuthorName.Trim();
+        var existing = await _authorRepository.GetByNameAsync(authorName, cancellationToken);
         if (existing != null)
         {
             return existing;
@@ -168,13 +172,13 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
 
         var author = new Author
         {
-            PrimaryName = request.AuthorName,
-            NormalizedPrimaryName = MappingExtensions.NormalizeName(request.AuthorName)
+            PrimaryName = authorName,
+            NormalizedPrimaryName = MappingExtensions.NormalizeName(authorName)
         };
         author.Names.Add(new AuthorName
         {
-            Name = request.AuthorName,
-            NormalizedName = MappingExtensions.NormalizeName(request.AuthorName),
+            Name = authorName,
+            NormalizedName = MappingExtensions.NormalizeName(authorName),
             IsPrimary = true,
             Source = "Manual"
         });
@@ -217,5 +221,10 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
                 yield return title.Title;
             }
         }
+    }
+
+    private static string? TrimToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
