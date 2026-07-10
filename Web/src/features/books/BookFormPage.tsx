@@ -27,6 +27,15 @@ type SaveResult = {
   coverError?: string | null
 }
 
+type CoverInfoItem = {
+  text: string
+  truncate?: boolean
+}
+
+type ExistingCoverChange =
+  | { kind: 'keep' }
+  | { kind: 'remove' }
+
 export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -38,6 +47,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const [coverUrlInput, setCoverUrlInput] = useState('')
   const [coverPreviewOpen, setCoverPreviewOpen] = useState(false)
   const [draftCover, setDraftCover] = useState<DraftCoverState>(null)
+  const [existingCoverChange, setExistingCoverChange] = useState<ExistingCoverChange>({ kind: 'keep' })
   const bookQueryKey = [admin ? 'adminBook' : 'book', id] as const
   const bookQuery = useQuery({
     queryKey: bookQueryKey,
@@ -54,7 +64,6 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   })
 
   const authorName = form.watch('authorName') ?? ''
-  const authorId = form.watch('authorId') ?? ''
   const primaryTitle = form.watch('primaryTitle') ?? ''
   const selectedGenreIds = form.watch('genreIds')
   const selectedTags = splitComma(form.watch('tagsText'))
@@ -70,6 +79,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
   useEffect(() => {
     initializedBookIdRef.current = null
+    setExistingCoverChange({ kind: 'keep' })
   }, [id, mode])
 
   useEffect(() => {
@@ -230,7 +240,6 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to upload cover.')
     },
   })
-
   const mutation = useMutation({
     mutationFn: async (values: BookFormValues): Promise<SaveResult> => {
       const resolvedValues = await resolveAuthor(values)
@@ -260,6 +269,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       }
 
       await (admin ? api.updateAdminBook(id!, request) : api.updateBook(id!, request))
+      if (existingCoverChange.kind === 'remove') {
+        await api.deleteBookCover(id!)
+      }
       return { id: id!, coverError: null }
     },
     onSuccess: async (response) => {
@@ -285,20 +297,29 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const isLoadingDictionaries = typesQuery.isLoading || statusesQuery.isLoading || genresQuery.isLoading
   const isLoadingBook = mode === 'edit' && bookQuery.isLoading
   const currentCover = bookQuery.data?.cover
-  const visibleCoverUrl = mode === 'create' ? draftCover?.previewUrl ?? null : resolvedCoverUrl
-  const coverInfo = mode === 'create'
-    ? [
-      draftCover ? `Status: Ready to save` : 'Status: Missing',
-      draftCover?.kind === 'file' ? `Source: Upload` : draftCover?.kind === 'url' ? 'Source: URL' : null,
-      draftCover?.kind === 'url' ? draftCover.imageUrl : null,
-    ].filter(Boolean)
+  const visibleCoverUrl = mode === 'create'
+    ? draftCover?.previewUrl ?? null
+    : existingCoverChange.kind === 'remove'
+      ? null
+      : resolvedCoverUrl
+  const effectiveCurrentCover = mode === 'edit' && existingCoverChange.kind === 'remove'
+    ? null
     : currentCover
+  const coverInfo: CoverInfoItem[] = mode === 'create'
+    ? [
+      draftCover ? { text: 'Status: Ready to save' } : { text: 'Status: Missing' },
+      draftCover?.kind === 'file' ? { text: 'Source: Upload' } : draftCover?.kind === 'url' ? { text: 'Source: URL' } : null,
+      draftCover?.kind === 'url' ? { text: draftCover.imageUrl, truncate: true } : null,
+    ].filter(isCoverInfoItem)
+    : effectiveCurrentCover
       ? [
-        `Status: ${currentCover.status}`,
-        currentCover.source ? `Source: ${currentCover.source}` : null,
-        currentCover.failureReason ?? null,
-      ].filter(Boolean)
-      : ['Status: Missing']
+        { text: `Status: ${effectiveCurrentCover.status}` },
+        effectiveCurrentCover.source ? { text: `Source: ${effectiveCurrentCover.source}` } : null,
+        effectiveCurrentCover.failureReason ? { text: effectiveCurrentCover.failureReason } : null,
+      ].filter(isCoverInfoItem)
+      : existingCoverChange.kind === 'remove'
+        ? [{ text: 'Status: Will be removed on save' }]
+        : [{ text: 'Status: Missing' }]
 
   if (isLoadingDictionaries || isLoadingBook) {
     return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Loading form...</div>
@@ -331,11 +352,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
               <div className="flex-none lg:w-[320px]">
                 <BookCoverArtwork
                   className="w-full lg:w-[320px]"
-                  cover={mode === 'edit' ? currentCover : null}
+                  cover={mode === 'edit' ? effectiveCurrentCover : null}
                   emptyLabel="Click to add a cover."
                   hint={mode === 'create' ? 'The cover will be uploaded right after the book is created.' : 'Choose file upload or image URL.'}
                   imageUrl={visibleCoverUrl}
                   interactive
+                  removeLabel="Remove cover"
                   title={primaryTitle || 'Book cover'}
                   onClick={() => {
                     if (visibleCoverUrl) {
@@ -345,10 +367,25 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
                     openCoverDialog()
                   }}
+                  onRemove={() => {
+                    if (mode === 'create') {
+                      replaceDraftCover(null)
+                      return
+                    }
+
+                    setExistingCoverChange({ kind: 'remove' })
+                    toast.success('Cover will be removed after saving the book.')
+                  }}
                 />
                 <div className="mt-2 grid content-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
                   {coverInfo.map((item) => (
-                    <p className={item === currentCover?.failureReason ? 'text-red-600' : ''} key={item}>{item}</p>
+                    <p
+                      className={`${item.text === effectiveCurrentCover?.failureReason ? 'text-red-600' : ''} ${item.truncate ? 'truncate' : ''}`}
+                      key={item.text}
+                      title={item.truncate ? item.text : undefined}
+                    >
+                      {item.text}
+                    </p>
                   ))}
                   <p className="text-xs text-slate-500">
                     Cover source URLs are appended to book links automatically.
@@ -358,12 +395,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
               <div className="min-w-0 flex-1">
                 <div className="grid gap-5">
-                  <div className="grid items-start gap-x-4 gap-y-7 md:grid-cols-2">
+                  <div className="grid items-start gap-x-4 gap-y-4 md:grid-cols-2">
                     <FormField error={errors.primaryTitle?.message} label="Primary title">
                       <input className={inputClass} {...form.register('primaryTitle')} />
                     </FormField>
                     <FormField error={errors.authorName?.message} label="Author">
-                      <div className="relative pb-4">
+                      <div className="relative">
                         <input
                           className={`${inputClass} w-full`}
                           value={authorName}
@@ -398,14 +435,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                               <div className="px-3 py-2 text-sm text-slate-400">No author found. A new one will be created.</div>
                             ) : null}
                           </div>
-                      ) : null}
-                      {authorId ? (
-                        <div className="pointer-events-none absolute left-0 top-full mt-1 text-xs text-cyan-400">Existing author selected.</div>
-                      ) : authorName.trim() ? (
-                        <div className="pointer-events-none absolute left-0 top-full mt-1 text-xs text-slate-400">If you do not choose a suggestion, the backend will create a new author.</div>
-                      ) : null}
-                    </div>
-                  </FormField>
+                        ) : null}
+                      </div>
+                    </FormField>
                     <FormField error={errors.contentTypeId?.message} label="Type">
                       <select className={inputClass} {...form.register('contentTypeId')}>
                         {typesQuery.data?.data.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
@@ -520,6 +552,10 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
 function normalizeAuthorName(value: string) {
   return value.trim().toLocaleUpperCase()
+}
+
+function isCoverInfoItem(value: CoverInfoItem | null): value is CoverInfoItem {
+  return value !== null
 }
 
 function GenreChipSelect({

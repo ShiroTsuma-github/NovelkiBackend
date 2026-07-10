@@ -2,6 +2,7 @@
 
 using Infrastructure.Authentication;
 using Infrastructure.BookCovers;
+using Infrastructure.Caching;
 using Infrastructure.Identity;
 using Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,10 +26,19 @@ public static class DependencyInjection
         var key = Encoding.UTF8.GetBytes(keyString);
 
         var connectionString = builder.Configuration.GetConnectionString("DB");
+        var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseNpgsql(connectionString);
         });
+        builder.Services.AddDistributedMemoryCache();
+        if (!string.IsNullOrWhiteSpace(redisConnectionString))
+        {
+            builder.Services.AddStackExchangeRedisCache(options =>
+            {
+                options.Configuration = redisConnectionString;
+            });
+        }
         builder.Services.AddScoped<IBookRepository, BookRepository>();
         builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
         builder.Services.AddScoped<IGenreRepository, GenreRepository>();
@@ -36,6 +46,9 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITypeRepository, TypeRepository>();
         builder.Services.AddScoped<ITagRepository, TagRepository>();
         builder.Services.AddScoped<IBookCoverRepository, BookCoverRepository>();
+        builder.Services.AddScoped<BookListCache>();
+        builder.Services.AddScoped<IBookListCache>(provider => provider.GetRequiredService<BookListCache>());
+        builder.Services.AddScoped<IBookListCacheInvalidator>(provider => provider.GetRequiredService<BookListCache>());
 
         builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
         builder.Services.AddScoped<IBookCoverStorage, LocalBookCoverStorage>();

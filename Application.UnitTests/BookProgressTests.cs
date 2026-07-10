@@ -15,7 +15,7 @@ public class BookProgressTests
     {
         var book = CreateBook();
         var repository = new FakeBookRepository(book);
-        var handler = new UpdateBookProgressHandler(repository, new FakeUser());
+        var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
         await handler.Handle(new UpdateBookProgressCommand(book.Id, 20, "20", "updated"), CancellationToken.None);
 
@@ -30,7 +30,7 @@ public class BookProgressTests
     {
         var book = CreateBook();
         var repository = new FakeBookRepository(book);
-        var handler = new UpdateBookProgressHandler(repository, new FakeUser());
+        var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
         await handler.Handle(new UpdateBookProgressCommand(book.Id, 10, "10", "same"), CancellationToken.None);
 
@@ -41,7 +41,7 @@ public class BookProgressTests
     public async Task UpdateProgress_ShouldThrowWhenBookDoesNotBelongToUser()
     {
         var repository = new FakeBookRepository(null);
-        var handler = new UpdateBookProgressHandler(repository, new FakeUser());
+        var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
         await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(
             () => handler.Handle(new UpdateBookProgressCommand(Guid.NewGuid(), 20, null, null), CancellationToken.None));
@@ -122,5 +122,10 @@ public class BookProgressTests
             Saved = true;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
+    {
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

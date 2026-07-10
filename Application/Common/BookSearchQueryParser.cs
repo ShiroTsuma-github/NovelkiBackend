@@ -73,7 +73,17 @@ public static class BookSearchQueryParser
             return false;
         }
 
-        filter = new BookSearchFieldFilter(field, value);
+        var values = SplitFieldValues(value)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Select(item => item.Trim())
+            .ToArray();
+
+        if (values.Length == 0)
+        {
+            return false;
+        }
+
+        filter = new BookSearchFieldFilter(field, values);
         return true;
     }
 
@@ -136,6 +146,11 @@ public static class BookSearchQueryParser
 
             if (char.IsWhiteSpace(c) && quote == null)
             {
+                if (ShouldContinueFieldValueList(token))
+                {
+                    continue;
+                }
+
                 if (token.Count > 0)
                 {
                     yield return new string(token.ToArray()).Trim();
@@ -152,5 +167,42 @@ public static class BookSearchQueryParser
         {
             yield return new string(token.ToArray()).Trim();
         }
+    }
+
+    private static bool ShouldContinueFieldValueList(List<char> token)
+    {
+        if (token.Count == 0 || !token.Contains(':'))
+        {
+            return false;
+        }
+
+        for (var i = token.Count - 1; i >= 0; i--)
+        {
+            if (!char.IsWhiteSpace(token[i]))
+            {
+                return token[i] == ',';
+            }
+        }
+
+        return false;
+    }
+
+    private static IEnumerable<string> SplitFieldValues(string value)
+    {
+        return value
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(Unquote)
+            .Where(item => !string.IsNullOrWhiteSpace(item));
+    }
+
+    private static string Unquote(string value)
+    {
+        if (value.Length >= 2 &&
+            ((value[0] == '"' && value[^1] == '"') || (value[0] == '\'' && value[^1] == '\'')))
+        {
+            return value[1..^1];
+        }
+
+        return value;
     }
 }

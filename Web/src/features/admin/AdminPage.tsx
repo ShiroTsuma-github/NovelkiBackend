@@ -125,6 +125,9 @@ export function AdminPage() {
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
+          <ColumnSettingsPopup columns={adminBookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
             <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
@@ -137,9 +140,7 @@ export function AdminPage() {
                     onSort={setSort}
                   />
                 ))}
-                <th className="relative px-4 py-3 text-right">
-                  <ColumnSettingsPopup columns={adminBookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
-                </th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody>

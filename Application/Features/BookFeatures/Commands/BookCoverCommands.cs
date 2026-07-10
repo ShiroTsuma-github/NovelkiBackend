@@ -16,17 +16,20 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
     private readonly IBookRepository _bookRepository;
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverStorage _storage;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public UploadBookCoverHandler(
         IBookRepository bookRepository,
         IBookCoverRepository coverRepository,
         IBookCoverStorage storage,
+        IBookListCacheInvalidator cacheInvalidator,
         IUser user)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
         _storage = storage;
+        _cacheInvalidator = cacheInvalidator;
         _user = user;
     }
 
@@ -39,7 +42,9 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
 
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var cover = book.Cover ?? new BookCover { BookId = book.Id, Book = book };
+        var hadExistingCover = book.Cover != null;
+        book.Cover ??= new BookCover { BookId = book.Id, Book = book };
+        var cover = book.Cover;
         var previousStoragePath = cover.StoragePath;
         var stored = await _storage.SaveAsync(book.OwnerId, book.Id, request.Content, request.FileName, request.ContentType, cancellationToken);
 
@@ -53,20 +58,22 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
         cover.Height = stored.Height;
         cover.FailureReason = null;
         cover.LastAttemptAt = DateTimeOffset.UtcNow;
-
-        if (book.Cover == null)
+        BookCoverLinkHelper.TouchBook(book);
+        if (hadExistingCover)
         {
-            await _coverRepository.AddAsync(cover, cancellationToken);
+            await _bookRepository.SaveAsync(cancellationToken);
         }
         else
         {
-            await _coverRepository.SaveAsync(cancellationToken);
+            await _coverRepository.AddAsync(cover, cancellationToken);
         }
 
         if (!string.Equals(previousStoragePath, stored.StoragePath, StringComparison.OrdinalIgnoreCase))
         {
             await _storage.DeleteIfExistsAsync(previousStoragePath, cancellationToken);
         }
+
+        await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
 
         return cover.ToDto(book.Id);
     }
@@ -78,6 +85,7 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverStorage _storage;
     private readonly IBookCoverRemoteImageService _remoteImageService;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public SetBookCoverFromUrlHandler(
@@ -85,12 +93,14 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
         IBookCoverRepository coverRepository,
         IBookCoverStorage storage,
         IBookCoverRemoteImageService remoteImageService,
+        IBookListCacheInvalidator cacheInvalidator,
         IUser user)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
         _storage = storage;
         _remoteImageService = remoteImageService;
+        _cacheInvalidator = cacheInvalidator;
         _user = user;
     }
 
@@ -104,7 +114,9 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
 
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var cover = book.Cover ?? new BookCover { BookId = book.Id, Book = book };
+        var hadExistingCover = book.Cover != null;
+        book.Cover ??= new BookCover { BookId = book.Id, Book = book };
+        var cover = book.Cover;
         var previousStoragePath = cover.StoragePath;
 
         var stored = await _remoteImageService.SaveFromUrlAsync(book.OwnerId, book.Id, request.ImageUrl, cancellationToken);
@@ -120,20 +132,22 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
         cover.FailureReason = null;
         cover.LastAttemptAt = DateTimeOffset.UtcNow;
         BookCoverLinkHelper.EnsureCoverSourceLink(book, request.ImageUrl, cover.Source);
-
-        if (book.Cover == null)
+        BookCoverLinkHelper.TouchBook(book);
+        if (hadExistingCover)
         {
-            await _coverRepository.AddAsync(cover, cancellationToken);
+            await _bookRepository.SaveAsync(cancellationToken);
         }
         else
         {
-            await _coverRepository.SaveAsync(cancellationToken);
+            await _coverRepository.AddAsync(cover, cancellationToken);
         }
 
         if (!string.Equals(previousStoragePath, stored.StoragePath, StringComparison.OrdinalIgnoreCase))
         {
             await _storage.DeleteIfExistsAsync(previousStoragePath, cancellationToken);
         }
+
+        await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
 
         return cover.ToDto(book.Id);
     }
@@ -147,6 +161,7 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverQueue _queue;
     private readonly IBookCoverStorage _storage;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public RefreshBookCoverHandler(
@@ -154,12 +169,14 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
         IBookCoverRepository coverRepository,
         IBookCoverQueue queue,
         IBookCoverStorage storage,
+        IBookListCacheInvalidator cacheInvalidator,
         IUser user)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
         _queue = queue;
         _storage = storage;
+        _cacheInvalidator = cacheInvalidator;
         _user = user;
     }
 
@@ -167,7 +184,9 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
     {
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var cover = book.Cover ?? new BookCover { BookId = book.Id, Book = book };
+        var hadExistingCover = book.Cover != null;
+        book.Cover ??= new BookCover { BookId = book.Id, Book = book };
+        var cover = book.Cover;
         var previousStoragePath = cover.StoragePath;
 
         cover.Status = BookCoverStatus.Pending;
@@ -180,19 +199,71 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
         cover.Height = null;
         cover.FailureReason = null;
         cover.LastAttemptAt = DateTimeOffset.UtcNow;
-
-        if (book.Cover == null)
+        BookCoverLinkHelper.TouchBook(book);
+        if (hadExistingCover)
         {
-            await _coverRepository.AddAsync(cover, cancellationToken);
+            await _bookRepository.SaveAsync(cancellationToken);
         }
         else
         {
-            await _coverRepository.SaveAsync(cancellationToken);
+            await _coverRepository.AddAsync(cover, cancellationToken);
         }
 
         await _storage.DeleteIfExistsAsync(previousStoragePath, cancellationToken);
         await _queue.QueueAsync(book.Id, cancellationToken);
+        await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
         return cover.ToDto(book.Id);
+    }
+}
+
+public sealed record DeleteBookCoverCommand(Guid BookId) : IRequest;
+
+public class DeleteBookCoverHandler : IRequestHandler<DeleteBookCoverCommand>
+{
+    private readonly IBookRepository _bookRepository;
+    private readonly IBookCoverRepository _coverRepository;
+    private readonly IBookCoverStorage _storage;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
+    private readonly IUser _user;
+
+    public DeleteBookCoverHandler(
+        IBookRepository bookRepository,
+        IBookCoverRepository coverRepository,
+        IBookCoverStorage storage,
+        IBookListCacheInvalidator cacheInvalidator,
+        IUser user)
+    {
+        _bookRepository = bookRepository;
+        _coverRepository = coverRepository;
+        _storage = storage;
+        _cacheInvalidator = cacheInvalidator;
+        _user = user;
+    }
+
+    public async Task Handle(DeleteBookCoverCommand request, CancellationToken cancellationToken)
+    {
+        var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+            ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var cover = book.Cover;
+        if (cover == null)
+        {
+            return;
+        }
+
+        var storagePath = cover.StoragePath;
+        var coverSourceLink = book.Links.FirstOrDefault(link =>
+            string.Equals(link.SourceType, "Cover", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(link.Url, cover.OriginalImageUrl, StringComparison.OrdinalIgnoreCase));
+        if (coverSourceLink != null)
+        {
+            book.Links.Remove(coverSourceLink);
+        }
+
+        book.Cover = null;
+        BookCoverLinkHelper.TouchBook(book);
+        await _coverRepository.DeleteAsync(cover, cancellationToken);
+        await _storage.DeleteIfExistsAsync(storagePath, cancellationToken);
+        await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
     }
 }
 
@@ -249,5 +320,10 @@ internal static class BookCoverLinkHelper
             IsPrimary = false,
             LastReadHere = false,
         });
+    }
+
+    public static void TouchBook(Book book)
+    {
+        book.LastModified = DateTimeOffset.UtcNow;
     }
 }

@@ -1,6 +1,6 @@
 import { X, ZoomIn } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { API_BASE_URL, tokenStorageKey } from '@/api/http'
+import { API_BASE_URL, getStoredSession } from '@/api/http'
 import type { BookCoverDto } from '@/api/types'
 
 type BookCoverArtworkProps = {
@@ -9,9 +9,13 @@ type BookCoverArtworkProps = {
   imageUrl?: string | null
   interactive?: boolean
   onClick?: () => void
+  onRemove?: () => void
   className?: string
   emptyLabel?: string
   hint?: string
+  removeLabel?: string
+  emptyActionLabel?: string
+  hoverFooter?: string
 }
 
 type CoverLightboxProps = {
@@ -19,6 +23,7 @@ type CoverLightboxProps = {
   title: string
   imageUrl: string | null
   emptyLabel?: string
+  footer?: string
   onClose: () => void
 }
 
@@ -36,7 +41,7 @@ export function useResolvedCoverImage(cover?: BookCoverDto | null) {
       }
 
       const apiOrigin = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
-      const token = localStorage.getItem(tokenStorageKey)
+      const token = getStoredSession()?.accessToken
       const response = await fetch(`${apiOrigin}${cover.imageUrl}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       })
@@ -70,15 +75,21 @@ export function BookCoverArtwork({
   imageUrl,
   interactive = false,
   onClick,
+  onRemove,
   className = '',
   emptyLabel = 'No cover',
   hint,
+  removeLabel = 'Remove cover',
+  emptyActionLabel,
+  hoverFooter,
 }: BookCoverArtworkProps) {
   const blobUrl = useResolvedCoverImage(cover)
   const resolvedImageUrl = imageUrl ?? blobUrl
   const wrapperClassName = [
     'group relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm',
-    interactive ? 'cursor-zoom-in transition hover:border-slate-300 hover:shadow-md' : '',
+    interactive ? 'transition hover:border-slate-300 hover:shadow-md' : '',
+    interactive && resolvedImageUrl ? 'cursor-zoom-in' : '',
+    interactive && !resolvedImageUrl ? 'cursor-pointer' : '',
     className,
   ].filter(Boolean).join(' ')
 
@@ -89,20 +100,60 @@ export function BookCoverArtwork({
       <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">No Cover</div>
       <div className="text-sm">{emptyLabel}</div>
       {hint ? <div className="text-xs text-slate-400">{hint}</div> : null}
+      {emptyActionLabel ? (
+        <div className="inline-flex items-center rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+          {emptyActionLabel}
+        </div>
+      ) : null}
     </div>
   )
 
   if (!interactive) {
-    return <div className={wrapperClassName}>{content}</div>
+    return (
+      <div className={wrapperClassName}>
+        {content}
+        {resolvedImageUrl && onRemove ? (
+          <button
+            aria-label={removeLabel}
+            className="absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600/90 text-white opacity-0 shadow-lg transition hover:bg-red-700 group-hover:opacity-100"
+            type="button"
+            onClick={onRemove}
+          >
+            <X className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    )
   }
 
   return (
     <button className={wrapperClassName} type="button" onClick={onClick}>
       {content}
-      <span className="pointer-events-none absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-slate-950/75 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100">
-        <ZoomIn className="h-3 w-3" />
-        Preview
-      </span>
+      {resolvedImageUrl && onRemove ? (
+        <span
+          className="absolute left-3 top-3 z-10"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onRemove()
+          }}
+        >
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600/90 text-white opacity-0 shadow-lg transition hover:bg-red-700 group-hover:opacity-100">
+            <X className="h-4 w-4" />
+          </span>
+        </span>
+      ) : null}
+      {resolvedImageUrl ? (
+        <span className="pointer-events-none absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-slate-950/75 px-2.5 py-1 text-[11px] font-medium text-white opacity-0 transition group-hover:opacity-100">
+          <ZoomIn className="h-3 w-3" />
+          Preview
+        </span>
+      ) : null}
+      {resolvedImageUrl && hoverFooter ? (
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/55 to-transparent px-4 pb-3 pt-8 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+          {hoverFooter}
+        </span>
+      ) : null}
     </button>
   )
 }
@@ -112,6 +163,7 @@ export function CoverLightbox({
   title,
   imageUrl,
   emptyLabel = 'No cover available.',
+  footer,
   onClose,
 }: CoverLightboxProps) {
   useEffect(() => {
@@ -150,7 +202,14 @@ export function CoverLightbox({
           <X className="h-4 w-4" />
         </button>
         {imageUrl ? (
-          <img alt={title} className="max-h-[90vh] w-full rounded-3xl bg-white object-contain shadow-2xl" src={imageUrl} />
+          <div className="grid gap-3">
+            <img alt={title} className="max-h-[82vh] w-full rounded-3xl bg-white object-contain shadow-2xl" src={imageUrl} />
+            {footer ? (
+              <div className="rounded-2xl bg-slate-900/85 px-4 py-3 text-sm text-slate-100 shadow-xl">
+                {footer}
+              </div>
+            ) : null}
+          </div>
         ) : (
           <div className="grid min-h-[70vh] place-items-center rounded-3xl border border-dashed border-slate-600 bg-slate-900 px-8 text-center text-slate-200 shadow-2xl">
             <div className="grid gap-2">

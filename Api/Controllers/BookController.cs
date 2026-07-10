@@ -140,6 +140,15 @@ public class BookController : ControllerBase
         return Accepted(cover);
     }
 
+    [HttpDelete("{id:guid}/cover")]
+    [Authorize]
+    public async Task<IActionResult> DeleteCover(Guid id)
+    {
+        await _mediator.Send(new DeleteBookCoverCommand(id));
+        _logger.LogInformation("Book cover deleted. BookId={BookId}", id);
+        return NoContent();
+    }
+
     [HttpGet("{id:guid}/cover/file")]
     [Authorize]
     public async Task<IActionResult> GetCoverFile(Guid id)

@@ -59,13 +59,13 @@ public class BookCoverTests
     {
         var book = CreateBook();
         var repository = new FakeBookRepository(book);
-        var coverRepository = new FakeBookCoverRepository();
         var remoteImageService = new FakeRemoteImageService();
         var handler = new SetBookCoverFromUrlHandler(
             repository,
-            coverRepository,
+            new FakeBookCoverRepository(),
             new FakeCoverStorage(),
             remoteImageService,
+            new FakeBookListCacheInvalidator(),
             new FakeUser());
 
         var dto = await handler.Handle(new SetBookCoverFromUrlCommand(book.Id, "https://example.com/cover.jpg"), CancellationToken.None);
@@ -74,7 +74,7 @@ public class BookCoverTests
         Assert.Equal("ManualUrl", dto.Source);
         Assert.Equal("https://example.com/cover.jpg", book.Cover!.OriginalImageUrl);
         Assert.Equal("owner/book.jpg", book.Cover.StoragePath);
-        Assert.True(coverRepository.Saved);
+        Assert.True(repository.Saved);
     }
 
     private static Book CreateBook()
@@ -138,6 +138,7 @@ public class BookCoverTests
     private sealed class FakeBookRepository : IBookRepository
     {
         private readonly Book _book;
+        public bool Saved { get; private set; }
 
         public FakeBookRepository(Book book)
         {
@@ -156,7 +157,11 @@ public class BookCoverTests
         public Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(0);
         public Task AddAsync(Book book, CancellationToken cancellationToken) => Task.CompletedTask;
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            Saved = true;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeBookCoverRepository : IBookCoverRepository
@@ -171,11 +176,21 @@ public class BookCoverTests
             Saved = true;
             return Task.CompletedTask;
         }
+        public Task DeleteAsync(BookCover cover, CancellationToken cancellationToken)
+        {
+            Saved = true;
+            return Task.CompletedTask;
+        }
         public Task SaveAsync(CancellationToken cancellationToken)
         {
             Saved = true;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
+    {
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed class FakeCoverStorage : IBookCoverStorage

@@ -12,29 +12,40 @@ public record GetAllBooksQuery(
 public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedResult<BookDto>>
 {
     private readonly IBookRepository _repository;
+    private readonly IBookListCache _cache;
     private readonly IUser _user;
 
-    public GetBooksQueryHandler(IBookRepository repository, IUser user)
+    public GetBooksQueryHandler(IBookRepository repository, IBookListCache cache, IUser user)
     {
         _repository = repository;
+        _cache = cache;
         _user = user;
     }
 
     public async Task<PaginatedResult<BookDto>> Handle(GetAllBooksQuery request, CancellationToken cancellationToken)
     {
+        var ownerId = _user.RequiredId;
+        var cached = await _cache.GetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, request.SortDirection, cancellationToken);
+        if (cached != null)
+        {
+            return cached;
+        }
+
         var criteria = BookSearchQueryParser.Parse(request.Query);
         var books = criteria.HasFilters
-            ? await _repository.SearchAsync(_user.RequiredId, criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
-            : await _repository.GetAllAsync(_user.RequiredId, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
+            ? await _repository.SearchAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
+            : await _repository.GetAllAsync(ownerId, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
         var total = criteria.HasFilters
-            ? await _repository.GetSearchCountAsync(_user.RequiredId, criteria, cancellationToken)
-            : await _repository.GetCountAsync(_user.RequiredId, cancellationToken);
-        return new PaginatedResult<BookDto>
+            ? await _repository.GetSearchCountAsync(ownerId, criteria, cancellationToken)
+            : await _repository.GetCountAsync(ownerId, cancellationToken);
+        var result = new PaginatedResult<BookDto>
         {
             Skip = request.Skip,
             Take = request.Take,
             Total = total,
             Data = books.Select(b => b.ToDto()).ToList()
         };
+        await _cache.SetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, request.SortDirection, result, cancellationToken);
+        return result;
     }
 }

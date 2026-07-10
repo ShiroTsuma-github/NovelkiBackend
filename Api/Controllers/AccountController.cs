@@ -33,4 +33,19 @@ public class AccountController : ControllerBase
             string.IsNullOrWhiteSpace(loginUserCommand.Username) ? "Email" : "Username");
         return Ok(response);
     }
+
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand refreshTokenCommand)
+    {
+        var response = await _mediator.Send(refreshTokenCommand);
+        _logger.LogInformation("Access token refreshed. UserId={UserId}", response.UserId);
+        return Ok(response);
+    }
+
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout([FromBody] LogoutCommand logoutCommand)
+    {
+        await _mediator.Send(logoutCommand);
+        return NoContent();
+    }
 }

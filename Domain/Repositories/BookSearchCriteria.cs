@@ -11,7 +11,13 @@ public sealed record BookSearchCriteria(
     public bool HasFilters => Terms.Count > 0 || Fields.Count > 0 || Numbers.Count > 0;
 }
 
-public sealed record BookSearchFieldFilter(BookSearchField Field, string Value);
+public sealed record BookSearchFieldFilter(BookSearchField Field, IReadOnlyCollection<string> Values)
+{
+    public BookSearchFieldFilter(BookSearchField field, string value)
+        : this(field, new[] { value })
+    {
+    }
+}
 
 public sealed record BookSearchNumberFilter(BookSearchNumberField Field, BookSearchOperator Operator, decimal Value);
 

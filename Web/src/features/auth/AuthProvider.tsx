@@ -2,36 +2,49 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from 'react'
-import { tokenStorageKey } from '@/api/http'
+import type { TokenResponse } from '@/api/types'
+import { api } from '@/api/client'
+import { clearStoredSession, getStoredSession, setStoredSession, subscribeUnauthorized } from '@/api/http'
 
 type AuthContextValue = {
   token: string | null
   isAuthenticated: boolean
   roles: string[]
   isAdmin: boolean
-  setSession: (token: string) => void
-  logout: () => void
+  setSession: (session: TokenResponse) => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(() =>
-    localStorage.getItem(tokenStorageKey),
+    getStoredSession()?.accessToken ?? null,
   )
 
-  const setSession = useCallback((nextToken: string) => {
-    localStorage.setItem(tokenStorageKey, nextToken)
-    setToken(nextToken)
+  useEffect(() => subscribeUnauthorized(() => setToken(null)), [])
+
+  const setSession = useCallback((session: TokenResponse) => {
+    setStoredSession(session)
+    setToken(session.accessToken)
   }, [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(tokenStorageKey)
+  const logout = useCallback(async () => {
+    const refreshToken = getStoredSession()?.refreshToken ?? null
+    clearStoredSession()
     setToken(null)
+    if (refreshToken) {
+      try {
+        await api.logout(refreshToken)
+      } catch {
+        // Explicit logout should still clear the local session even if the backend call fails.
+      }
+    }
   }, [])
 
   const value = useMemo(

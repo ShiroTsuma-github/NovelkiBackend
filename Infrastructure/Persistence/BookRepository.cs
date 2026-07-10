@@ -1,5 +1,7 @@
 namespace Infrastructure.Persistence;
 
+using System.Linq.Expressions;
+
 public class BookRepository : IBookRepository
 {
     private readonly ApplicationDbContext _context;
@@ -358,12 +360,12 @@ public class BookRepository : IBookRepository
         {
             query = filter.Field switch
             {
-                BookSearchField.Title => ApplyTitleSearch(query, filter.Value),
-                BookSearchField.Author => ApplyAuthorSearch(query, filter.Value),
-                BookSearchField.Tag => ApplyTagSearch(query, filter.Value),
-                BookSearchField.Genre => ApplyGenreSearch(query, filter.Value),
-                BookSearchField.Status => ApplyStatusSearch(query, filter.Value),
-                BookSearchField.Type => ApplyTypeSearch(query, filter.Value),
+                BookSearchField.Title => ApplyTitleSearch(query, filter.Values),
+                BookSearchField.Author => ApplyAuthorSearch(query, filter.Values),
+                BookSearchField.Tag => ApplyTagSearch(query, filter.Values),
+                BookSearchField.Genre => ApplyGenreSearch(query, filter.Values),
+                BookSearchField.Status => ApplyStatusSearch(query, filter.Values),
+                BookSearchField.Type => ApplyTypeSearch(query, filter.Values),
                 _ => query
             };
         }
@@ -405,84 +407,160 @@ public class BookRepository : IBookRepository
                 b.Author.Names.Any(n => EF.Functions.Like(n.NormalizedName, normalizedPattern)))));
     }
 
-    private IQueryable<Book> ApplyTitleSearch(IQueryable<Book> query, string search)
+    private IQueryable<Book> ApplyTitleSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var pattern = ToLikePattern(search);
-        if (_supportsILike)
-        {
-            return query.Where(b =>
-                EF.Functions.ILike(b.PrimaryTitle, pattern) ||
-                b.Titles.Any(t => EF.Functions.ILike(t.Title, pattern)));
-        }
+        var predicates = _supportsILike
+            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var pattern = ToLikePattern(search);
+                return b =>
+                    EF.Functions.ILike(b.PrimaryTitle, pattern) ||
+                    b.Titles.Any(t => EF.Functions.ILike(t.Title, pattern));
+            })
+            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var normalizedPattern = ToLikePattern(Normalize(search));
+                return b =>
+                    EF.Functions.Like(b.NormalizedPrimaryTitle, normalizedPattern) ||
+                    b.Titles.Any(t => EF.Functions.Like(t.NormalizedTitle, normalizedPattern));
+            });
 
-        var normalizedPattern = ToLikePattern(Normalize(search));
-        return query.Where(b =>
-            EF.Functions.Like(b.NormalizedPrimaryTitle, normalizedPattern) ||
-            b.Titles.Any(t => EF.Functions.Like(t.NormalizedTitle, normalizedPattern)));
+        return ApplyAnyFieldMatch(query, predicates);
     }
 
-    private IQueryable<Book> ApplyAuthorSearch(IQueryable<Book> query, string search)
+    private IQueryable<Book> ApplyAuthorSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var pattern = ToLikePattern(search);
-        if (_supportsILike)
-        {
-            return query.Where(b => b.Author != null && (
-                EF.Functions.ILike(b.Author.PrimaryName, pattern) ||
-                b.Author.Names.Any(n => EF.Functions.ILike(n.Name, pattern))));
-        }
+        var predicates = _supportsILike
+            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var pattern = ToLikePattern(search);
+                return b => b.Author != null && (
+                    EF.Functions.ILike(b.Author.PrimaryName, pattern) ||
+                    b.Author.Names.Any(n => EF.Functions.ILike(n.Name, pattern)));
+            })
+            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var normalizedPattern = ToLikePattern(Normalize(search));
+                return b => b.Author != null && (
+                    EF.Functions.Like(b.Author.NormalizedPrimaryName, normalizedPattern) ||
+                    b.Author.Names.Any(n => EF.Functions.Like(n.NormalizedName, normalizedPattern)));
+            });
 
-        var normalizedPattern = ToLikePattern(Normalize(search));
-        return query.Where(b => b.Author != null && (
-            EF.Functions.Like(b.Author.NormalizedPrimaryName, normalizedPattern) ||
-            b.Author.Names.Any(n => EF.Functions.Like(n.NormalizedName, normalizedPattern))));
+        return ApplyAnyFieldMatch(query, predicates);
     }
 
-    private IQueryable<Book> ApplyTagSearch(IQueryable<Book> query, string search)
+    private IQueryable<Book> ApplyTagSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var pattern = ToLikePattern(search);
-        if (_supportsILike)
-        {
-            return query.Where(b => b.BookTags.Any(bt => EF.Functions.ILike(bt.Tag.Name, pattern)));
-        }
+        var predicates = _supportsILike
+            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var pattern = ToLikePattern(search);
+                return b => b.BookTags.Any(bt => EF.Functions.ILike(bt.Tag.Name, pattern));
+            })
+            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var normalizedPattern = ToLikePattern(Normalize(search));
+                return b => b.BookTags.Any(bt => EF.Functions.Like(bt.Tag.NormalizedName, normalizedPattern));
+            });
 
-        var normalizedPattern = ToLikePattern(Normalize(search));
-        return query.Where(b => b.BookTags.Any(bt => EF.Functions.Like(bt.Tag.NormalizedName, normalizedPattern)));
+        return ApplyAnyFieldMatch(query, predicates);
     }
 
-    private IQueryable<Book> ApplyGenreSearch(IQueryable<Book> query, string search)
+    private IQueryable<Book> ApplyGenreSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var pattern = ToLikePattern(search);
-        if (_supportsILike)
-        {
-            return query.Where(b => b.BookGenres.Any(bg => EF.Functions.ILike(bg.Genre.Name, pattern)));
-        }
+        var predicates = _supportsILike
+            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var pattern = ToLikePattern(search);
+                return b => b.BookGenres.Any(bg => EF.Functions.ILike(bg.Genre.Name, pattern));
+            })
+            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var normalizedPattern = ToLikePattern(Normalize(search));
+                return b => b.BookGenres.Any(bg => EF.Functions.Like(bg.Genre.NormalizedName, normalizedPattern));
+            });
 
-        var normalizedPattern = ToLikePattern(Normalize(search));
-        return query.Where(b => b.BookGenres.Any(bg => EF.Functions.Like(bg.Genre.NormalizedName, normalizedPattern)));
+        return ApplyAnyFieldMatch(query, predicates);
     }
 
-    private IQueryable<Book> ApplyStatusSearch(IQueryable<Book> query, string search)
+    private IQueryable<Book> ApplyStatusSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var pattern = ToLikePattern(search);
-        if (_supportsILike)
-        {
-            return query.Where(b => EF.Functions.ILike(b.Status.Name, pattern));
-        }
+        var predicates = _supportsILike
+            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var pattern = ToLikePattern(search);
+                return b => EF.Functions.ILike(b.Status.Name, pattern);
+            })
+            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var normalizedPattern = ToLikePattern(Normalize(search));
+                return b => EF.Functions.Like(b.Status.Name.ToUpper(), normalizedPattern);
+            });
 
-        var normalizedPattern = ToLikePattern(Normalize(search));
-        return query.Where(b => EF.Functions.Like(b.Status.Name.ToUpper(), normalizedPattern));
+        return ApplyAnyFieldMatch(query, predicates);
     }
 
-    private IQueryable<Book> ApplyTypeSearch(IQueryable<Book> query, string search)
+    private IQueryable<Book> ApplyTypeSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var pattern = ToLikePattern(search);
-        if (_supportsILike)
+        var predicates = _supportsILike
+            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var pattern = ToLikePattern(search);
+                return b => EF.Functions.ILike(b.ContentType.Name, pattern);
+            })
+            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
+            {
+                var normalizedPattern = ToLikePattern(Normalize(search));
+                return b => EF.Functions.Like(b.ContentType.Name.ToUpper(), normalizedPattern);
+            });
+
+        return ApplyAnyFieldMatch(query, predicates);
+    }
+
+    private static IQueryable<Book> ApplyAnyFieldMatch(
+        IQueryable<Book> query,
+        IEnumerable<Expression<Func<Book, bool>>> predicates)
+    {
+        Expression<Func<Book, bool>>? combined = null;
+
+        foreach (var predicate in predicates)
         {
-            return query.Where(b => EF.Functions.ILike(b.ContentType.Name, pattern));
+            combined = combined == null ? predicate : OrElse(combined, predicate);
         }
 
-        var normalizedPattern = ToLikePattern(Normalize(search));
-        return query.Where(b => EF.Functions.Like(b.ContentType.Name.ToUpper(), normalizedPattern));
+        return combined == null ? query : query.Where(combined);
+    }
+
+    private static Expression<Func<Book, bool>> OrElse(
+        Expression<Func<Book, bool>> left,
+        Expression<Func<Book, bool>> right)
+    {
+        var parameter = Expression.Parameter(typeof(Book), "b");
+        var leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
+        var rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
+        return Expression.Lambda<Func<Book, bool>>(Expression.OrElse(leftBody, rightBody), parameter);
+    }
+
+    private static Expression ReplaceParameter(Expression expression, ParameterExpression source, ParameterExpression target)
+    {
+        return new ParameterReplaceVisitor(source, target).Visit(expression)!;
+    }
+
+    private sealed class ParameterReplaceVisitor : ExpressionVisitor
+    {
+        private readonly ParameterExpression _source;
+        private readonly ParameterExpression _target;
+
+        public ParameterReplaceVisitor(ParameterExpression source, ParameterExpression target)
+        {
+            _source = source;
+            _target = target;
+        }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            return node == _source ? _target : base.VisitParameter(node);
+        }
     }
 
     private static string ToLikePattern(string value)
