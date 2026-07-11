@@ -7,7 +7,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "tsc -b",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:run": "vitest run",
+    "test:layout": "node ./scripts/run-playwright-layout.mjs",
+    "test:all": "npm run lint && npm run test:run && npm run test:layout"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -27,11 +30,17 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.4.1",
+    "jsdom": "^29.1.1",
     "typescript": "~6.0.2",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^4.1.10"
   }
 }

@@ -10,6 +10,13 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                UPDATE "BookProgressHistory"
+                SET "Comment" = left("Comment", 1000)
+                WHERE "Comment" IS NOT NULL AND length("Comment") > 1000
+                """);
+
             migrationBuilder.AlterColumn<string>(
                 name: "Comment",
                 table: "BookProgressHistory",
