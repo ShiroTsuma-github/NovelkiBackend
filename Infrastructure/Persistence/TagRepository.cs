@@ -1,5 +1,7 @@
 namespace Infrastructure.Persistence;
 
+using Application.Common;
+
 public class TagRepository : ITagRepository
 {
     private readonly ApplicationDbContext _context;
@@ -11,7 +13,7 @@ public class TagRepository : ITagRepository
 
     public async Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
     {
-        var normalizedName = Normalize(name);
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Tags.FirstOrDefaultAsync(
             t => t.OwnerId == ownerId && t.NormalizedName == normalizedName,
             cancellationToken);
@@ -19,7 +21,7 @@ public class TagRepository : ITagRepository
 
     public async Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names, CancellationToken cancellationToken)
     {
-        var normalizedNames = names.Select(Normalize).Distinct().ToList();
+        var normalizedNames = names.Select(MappingExtensions.NormalizeName).Distinct().ToList();
         return await _context.Tags
             .Where(t => t.OwnerId == ownerId && normalizedNames.Contains(t.NormalizedName))
             .ToListAsync(cancellationToken);
@@ -30,7 +32,7 @@ public class TagRepository : ITagRepository
         var query = _context.Tags.Where(t => t.OwnerId == ownerId);
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var normalizedSearch = Normalize(search);
+            var normalizedSearch = MappingExtensions.NormalizeName(search);
             query = query.Where(t => t.NormalizedName.Contains(normalizedSearch));
         }
 
@@ -47,6 +49,4 @@ public class TagRepository : ITagRepository
     {
         await _context.SaveChangesAsync(cancellationToken);
     }
-
-    private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 }

@@ -1,3 +1,4 @@
+using Application.Common;
 using Application.Common.Interfaces;
 using Application.Features.AuthorFeatures.Queries;
 using Application.Features.TagFeatures.Queries;
@@ -61,11 +62,11 @@ public class AutocompleteFeatureTests
         }
 
         public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(_authors.FirstOrDefault(a => a.Id == id));
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(_authors.FirstOrDefault(a => a.NormalizedPrimaryName == name.Trim().ToUpperInvariant()));
+        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(_authors.FirstOrDefault(a => a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
 
         public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
         {
-            var normalizedSearch = search?.Trim().ToUpperInvariant() ?? string.Empty;
+            var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Author>>(_authors
                 .Where(a => a.NormalizedPrimaryName.Contains(normalizedSearch) ||
                             a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)))
@@ -88,15 +89,15 @@ public class AutocompleteFeatureTests
 
         public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names, CancellationToken cancellationToken)
         {
-            var normalizedNames = names.Select(n => n.Trim().ToUpperInvariant()).ToList();
+            var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToList();
             return Task.FromResult<IEnumerable<Tag>>(_tags.Where(t => t.OwnerId == ownerId && normalizedNames.Contains(t.NormalizedName)).ToList());
         }
 
-        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) => Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.NormalizedName == name.Trim().ToUpperInvariant()));
+        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) => Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
 
         public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take, CancellationToken cancellationToken)
         {
-            var normalizedSearch = search?.Trim().ToUpperInvariant() ?? string.Empty;
+            var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Tag>>(_tags
                 .Where(t => t.OwnerId == ownerId && t.NormalizedName.Contains(normalizedSearch))
                 .Take(take)

@@ -1,5 +1,6 @@
 namespace Infrastructure.Persistence;
 
+using Application.Common;
 using System.Linq.Expressions;
 using FluentValidation;
 
@@ -40,7 +41,7 @@ public class BookRepository : IBookRepository
 
     public async Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
     {
-        var normalizedName = Normalize(name);
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Books
             .AsNoTracking()
             .FirstOrDefaultAsync(
@@ -274,8 +275,6 @@ public class BookRepository : IBookRepository
             .Include(b => b.ProgressHistory);
     }
 
-    private static string Normalize(string value) => value.Trim().ToUpperInvariant();
-
     private async Task<IEnumerable<Book>> ToSortedPageAsync(
         IQueryable<Book> query,
         int skip,
@@ -416,7 +415,7 @@ public class BookRepository : IBookRepository
                     b.Author.Names.Any(n => EF.Functions.ILike(n.Name, pattern)))));
         }
 
-        var normalizedPattern = ToLikePattern(Normalize(term));
+        var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(term));
         return query.Where(b =>
             EF.Functions.Like(b.NormalizedPrimaryTitle, normalizedPattern) ||
             b.Titles.Any(t => EF.Functions.Like(t.NormalizedTitle, normalizedPattern)) ||
@@ -437,7 +436,7 @@ public class BookRepository : IBookRepository
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
-                var normalizedPattern = ToLikePattern(Normalize(search));
+                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return b =>
                     EF.Functions.Like(b.NormalizedPrimaryTitle, normalizedPattern) ||
                     b.Titles.Any(t => EF.Functions.Like(t.NormalizedTitle, normalizedPattern));
@@ -458,7 +457,7 @@ public class BookRepository : IBookRepository
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
-                var normalizedPattern = ToLikePattern(Normalize(search));
+                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return b => b.Author != null && (
                     EF.Functions.Like(b.Author.NormalizedPrimaryName, normalizedPattern) ||
                     b.Author.Names.Any(n => EF.Functions.Like(n.NormalizedName, normalizedPattern)));
@@ -477,7 +476,7 @@ public class BookRepository : IBookRepository
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
-                var normalizedPattern = ToLikePattern(Normalize(search));
+                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return b => b.BookTags.Any(bt => EF.Functions.Like(bt.Tag.NormalizedName, normalizedPattern));
             });
 
@@ -494,7 +493,7 @@ public class BookRepository : IBookRepository
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
-                var normalizedPattern = ToLikePattern(Normalize(search));
+                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return b => b.BookGenres.Any(bg => EF.Functions.Like(bg.Genre.NormalizedName, normalizedPattern));
             });
 
@@ -511,7 +510,7 @@ public class BookRepository : IBookRepository
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
-                var normalizedPattern = ToLikePattern(Normalize(search));
+                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return b => EF.Functions.Like(b.Status.Name.ToUpper(), normalizedPattern);
             });
 
@@ -528,7 +527,7 @@ public class BookRepository : IBookRepository
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
-                var normalizedPattern = ToLikePattern(Normalize(search));
+                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return b => EF.Functions.Like(b.ContentType.Name.ToUpper(), normalizedPattern);
             });
 

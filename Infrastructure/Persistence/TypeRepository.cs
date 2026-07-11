@@ -1,5 +1,7 @@
 namespace Infrastructure.Persistence;
 
+using Application.Common;
+
 public class TypeRepository : ITypeRepository
 {
     private readonly ApplicationDbContext _context;
@@ -37,7 +39,7 @@ public class TypeRepository : ITypeRepository
 
     public async Task<ContentType?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var normalizedName = name.Trim().ToUpperInvariant();
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.ContentTypes.FirstOrDefaultAsync(
             t => t.Name.ToUpper() == normalizedName || t.Slug.ToUpper() == normalizedName,
             cancellationToken);

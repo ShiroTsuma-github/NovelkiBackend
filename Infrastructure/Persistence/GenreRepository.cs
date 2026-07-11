@@ -1,5 +1,7 @@
 namespace Infrastructure.Persistence;
 
+using Application.Common;
+
 public class GenreRepository : IGenreRepository
 {
     private readonly ApplicationDbContext _context;
@@ -16,7 +18,7 @@ public class GenreRepository : IGenreRepository
 
     public async Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var normalizedName = name.Trim().ToUpperInvariant();
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Genres.FirstOrDefaultAsync(g => g.NormalizedName == normalizedName, cancellationToken);
     }
 
