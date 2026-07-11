@@ -61,10 +61,12 @@ public class UpdateBookProgressCommandValidator : AbstractValidator<UpdateBookPr
             .When(x => x.CurrentChapterNumber.HasValue);
 
         RuleFor(x => x.CurrentChapterLabel)
-            .MaximumLength(100);
+            .MaximumLength(100)
+            .WithMessage("Chapter label must be 100 characters or fewer.");
 
         RuleFor(x => x.Comment)
-            .MaximumLength(1000);
+            .MaximumLength(1000)
+            .WithMessage("Comment must be 1000 characters or fewer.");
     }
 }
 

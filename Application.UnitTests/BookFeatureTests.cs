@@ -241,6 +241,23 @@ public class BookFeatureTests
         Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterNumber");
     }
 
+    [Fact]
+    public void UpdateBookProgressValidator_ShouldRejectOverlongLabelAndComment()
+    {
+        var validator = new UpdateBookProgressCommandValidator();
+        var command = new UpdateBookProgressCommand(
+            Guid.NewGuid(),
+            1,
+            new string('x', 101),
+            new string('x', 1001));
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterLabel" && e.ErrorMessage == "Chapter label must be 100 characters or fewer.");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Comment" && e.ErrorMessage == "Comment must be 1000 characters or fewer.");
+    }
+
     private static Fixture CreateFixture()
     {
         var bookRepository = new FakeBookRepository();

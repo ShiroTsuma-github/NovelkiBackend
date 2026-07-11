@@ -12,6 +12,8 @@ import {
 } from '@/components/app/FormField'
 
 const chapterNumberPattern = /^\d+(?:\.\d+)?$/
+const chapterLabelMaxLength = 100
+const commentMaxLength = 1000
 
 export function ProgressDialog({ book }: { book: BookDto }) {
   const [open, setOpen] = useState(false)
@@ -79,8 +81,8 @@ export function ProgressDialog({ book }: { book: BookDto }) {
             />
             {chapterNumberError ? <p className="mt-1 text-sm text-red-600">{chapterNumberError}</p> : null}
           </div>
-          <input className={inputClass} placeholder="Chapter label" value={currentChapterLabel} onChange={(event) => setCurrentChapterLabel(event.target.value)} />
-          <textarea className={`${inputClass} min-h-24`} placeholder="Comment" value={comment} onChange={(event) => setComment(event.target.value)} />
+          <input className={inputClass} maxLength={chapterLabelMaxLength} placeholder="Chapter label" value={currentChapterLabel} onChange={(event) => setCurrentChapterLabel(event.target.value)} />
+          <textarea className={`${inputClass} min-h-24`} maxLength={commentMaxLength} placeholder="Comment" value={comment} onChange={(event) => setComment(event.target.value)} />
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <button className={secondaryButtonClass} type="button" onClick={() => setOpen(false)}>Cancel</button>
