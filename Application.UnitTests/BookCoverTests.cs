@@ -4,7 +4,10 @@ using Application.Features.BookFeatures.Commands;
 using Domain.Entities;
 using Domain.Repositories;
 using Infrastructure.BookCovers;
+using Microsoft.Extensions.Options;
 using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
 
 namespace Application.UnitTests;
 
@@ -108,6 +111,44 @@ public class BookCoverTests
     }
 
     [Fact]
+    public async Task RemoteImageService_ShouldAcceptImageBytes_WhenUrlExtensionIsMisleading()
+    {
+        var storageRoot = CreateTempStorageRoot();
+        try
+        {
+            var jpegBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10 };
+            var service = CreateRemoteImageService(storageRoot, jpegBytes, "text/plain");
+
+            var stored = await service.SaveFromUrlAsync(OwnerId, BookId, "https://example.com/not-an-image.txt", CancellationToken.None);
+
+            Assert.Equal("image/jpeg", stored.MimeType);
+            Assert.EndsWith(".jpg", stored.StoragePath);
+            Assert.True(File.Exists(Path.Combine(storageRoot, stored.StoragePath)));
+        }
+        finally
+        {
+            DeleteTempStorageRoot(storageRoot);
+        }
+    }
+
+    [Fact]
+    public async Task RemoteImageService_ShouldRejectNonImageBytes_WhenUrlLooksLikeJpg()
+    {
+        var storageRoot = CreateTempStorageRoot();
+        try
+        {
+            var service = CreateRemoteImageService(storageRoot, Encoding.UTF8.GetBytes("<html>not an image</html>"), "text/html");
+
+            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+                service.SaveFromUrlAsync(OwnerId, BookId, "https://example.com/cover.jpg", CancellationToken.None));
+        }
+        finally
+        {
+            DeleteTempStorageRoot(storageRoot);
+        }
+    }
+
+    [Fact]
     public async Task RefreshBookCover_ShouldAddPendingCover_WhenBookHasNoCoverRow()
     {
         var book = CreateBook(hasCover: false);
@@ -145,6 +186,33 @@ public class BookCoverTests
         };
     }
 
+    private static BookCoverRemoteImageService CreateRemoteImageService(string storageRoot, byte[] content, string contentType)
+    {
+        var storage = new LocalBookCoverStorage(Options.Create(new BookCoverOptions
+        {
+            StorageRoot = storageRoot,
+            MaxBytes = 1024
+        }));
+        var client = new HttpClient(new FakeHttpMessageHandler(content, contentType));
+
+        return new BookCoverRemoteImageService(new FakeHttpClientFactory(client), storage);
+    }
+
+    private static string CreateTempStorageRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "novelki-cover-tests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        return root;
+    }
+
+    private static void DeleteTempStorageRoot(string storageRoot)
+    {
+        if (Directory.Exists(storageRoot))
+        {
+            Directory.Delete(storageRoot, recursive: true);
+        }
+    }
+
     private sealed class FakeProvider : IBookCoverProvider
     {
         private readonly BookCoverCandidate? _candidate;
@@ -162,19 +230,44 @@ public class BookCoverTests
 
     private sealed class FakeHttpMessageHandler : HttpMessageHandler
     {
-        private readonly string _html;
+        private readonly byte[] _content;
+        private readonly string _contentType;
 
         public FakeHttpMessageHandler(string html)
+            : this(Encoding.UTF8.GetBytes(html), "text/html")
         {
-            _html = html;
+        }
+
+        public FakeHttpMessageHandler(byte[] content, string contentType)
+        {
+            _content = content;
+            _contentType = contentType;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            var content = new ByteArrayContent(_content);
+            content.Headers.ContentType = new MediaTypeHeaderValue(_contentType);
+
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(_html, System.Text.Encoding.UTF8, "text/html")
+                Content = content
             });
+        }
+    }
+
+    private sealed class FakeHttpClientFactory : IHttpClientFactory
+    {
+        private readonly HttpClient _client;
+
+        public FakeHttpClientFactory(HttpClient client)
+        {
+            _client = client;
+        }
+
+        public HttpClient CreateClient(string name)
+        {
+            return _client;
         }
     }
 
