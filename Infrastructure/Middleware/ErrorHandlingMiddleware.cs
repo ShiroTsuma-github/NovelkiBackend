@@ -151,11 +151,11 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Book cover not found");
                 break;
 
-            case EntityAlreadyExistsException<Book, Guid>:
+            case EntityAlreadyExistsException<Book, Guid> bookConflict:
                 statusCode = HttpStatusCode.Conflict;
                 title = "Conflict";
-                detail = exception.Message;
-                _logger.LogWarning("Book already exists");
+                detail = $"A book named '{bookConflict.Name}' already exists.";
+                _logger.LogWarning("Book already exists. ExistingId={ExistingId}", bookConflict.ExistingId);
                 break;
 
             default:
