@@ -21,20 +21,38 @@ vi.mock('sonner', () => ({
 }))
 
 describe('RegisterPage', () => {
-  it('shows local field errors and password checklist before API submit', async () => {
+  it('shows password checklist only while the password field is focused', async () => {
     const user = userEvent.setup()
     renderWithProviders(<RegisterPage />, { route: '/register' })
 
-    await user.type(screen.getByPlaceholderText('Username'), 'ab')
-    await user.type(screen.getByPlaceholderText('Email'), 'not-an-email')
-    await user.type(screen.getByPlaceholderText('Password'), 'weak')
-    await user.click(screen.getByRole('button', { name: /register/i }))
+    const passwordInput = screen.getByPlaceholderText('Password')
 
-    expect(screen.getByText('Username must be at least 3 characters long.')).toBeInTheDocument()
-    expect(screen.getByText('A valid email address is required.')).toBeInTheDocument()
+    expect(screen.queryByRole('listitem', { name: 'Missing: At least 8 characters' })).not.toBeInTheDocument()
+
+    await user.click(passwordInput)
+    await user.type(passwordInput, 'weak')
+
     expect(screen.getByRole('listitem', { name: 'Missing: At least 8 characters' })).toBeInTheDocument()
     expect(screen.getByRole('listitem', { name: 'Missing: One uppercase letter' })).toBeInTheDocument()
     expect(screen.getByRole('listitem', { name: 'Missing: One number' })).toBeInTheDocument()
+
+    await user.tab()
+
+    expect(screen.queryByRole('listitem', { name: 'Missing: At least 8 characters' })).not.toBeInTheDocument()
+  })
+
+  it('shows local field errors and keeps password requirements out of the inline error slot', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<RegisterPage />, { route: '/register' })
+
+    await user.type(screen.getByPlaceholderText('Username'), 'reader')
+    await user.type(screen.getByPlaceholderText('Email'), 'reader@example.com')
+    await user.type(screen.getByPlaceholderText('Password'), 'weak')
+    await user.click(screen.getByRole('button', { name: /register/i }))
+
+    expect(screen.getByPlaceholderText('Password')).toHaveFocus()
+    expect(screen.getByRole('listitem', { name: 'Missing: At least 8 characters' })).toBeInTheDocument()
+    expect(screen.queryByText('At least 8 characters; One uppercase letter; One number; One non-alphanumeric character')).not.toBeInTheDocument()
     expect(api.register).not.toHaveBeenCalled()
   })
 
@@ -82,7 +100,8 @@ describe('RegisterPage', () => {
     await user.click(screen.getByRole('button', { name: /register/i }))
 
     expect(await screen.findByText('Email is invalid.')).toBeInTheDocument()
-    expect(screen.getByText('Password must contain at least one uppercase letter.')).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('Password')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.queryByText('Password must contain at least one uppercase letter.')).not.toBeInTheDocument()
     expect(toast.error).toHaveBeenCalledWith('One or more validation errors occurred.')
   })
 

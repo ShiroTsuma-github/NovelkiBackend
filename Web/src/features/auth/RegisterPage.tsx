@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import { buttonClass, inputClass } from '@/components/app/FormField'
@@ -33,6 +33,8 @@ export function RegisterPage() {
   const navigate = useNavigate()
   const [values, setValues] = useState<RegisterFormValues>(initialValues)
   const [errors, setErrors] = useState<RegisterFormErrors>({})
+  const [passwordFocused, setPasswordFocused] = useState(false)
+  const passwordInputRef = useRef<HTMLInputElement | null>(null)
   const mutation = useMutation({
     mutationFn: api.register,
     onSuccess: () => {
@@ -43,6 +45,9 @@ export function RegisterPage() {
       if (error instanceof HttpError) {
         const nextErrors = mapApiErrors(error)
         setErrors(nextErrors)
+        if (nextErrors.password) {
+          passwordInputRef.current?.focus()
+        }
         toast.error(nextErrors.form ?? error.apiError.detail)
         return
       }
@@ -57,6 +62,9 @@ export function RegisterPage() {
     const validationErrors = validate(values)
     setErrors(validationErrors)
     if (Object.keys(validationErrors).length) {
+      if (validationErrors.password && !validationErrors.username && !validationErrors.email) {
+        passwordInputRef.current?.focus()
+      }
       return
     }
 
@@ -96,27 +104,32 @@ export function RegisterPage() {
             onChange={(event) => updateField('email', event.target.value)}
           />
         </FieldError>
-        <FieldError error={errors.password}>
+        <FieldError>
           <input
             aria-invalid={errors.password ? 'true' : undefined}
             className={inputClass}
             name="password"
             placeholder="Password"
+            ref={passwordInputRef}
             type="password"
             value={values.password}
             onChange={(event) => updateField('password', event.target.value)}
+            onBlur={() => setPasswordFocused(false)}
+            onFocus={() => setPasswordFocused(true)}
           />
         </FieldError>
-        <ul className="grid gap-1 text-xs text-slate-500">
-          {passwordRules.map((rule) => {
-            const met = rule.isMet(values.password)
-            return (
-              <li aria-label={`${met ? 'Met' : 'Missing'}: ${rule.label}`} className={met ? 'text-emerald-500' : 'text-slate-500'} key={rule.id}>
-                {met ? '[x]' : '[ ]'} {rule.label}
-              </li>
-            )
-          })}
-        </ul>
+        {passwordFocused ? (
+          <ul className="grid gap-1 text-xs text-slate-500">
+            {passwordRules.map((rule) => {
+              const met = rule.isMet(values.password)
+              return (
+                <li aria-label={`${met ? 'Met' : 'Missing'}: ${rule.label}`} className={met ? 'text-emerald-500' : 'text-slate-500'} key={rule.id}>
+                  {met ? '[x]' : '[ ]'} {rule.label}
+                </li>
+              )
+            })}
+          </ul>
+        ) : null}
         {errors.form ? <p className="text-sm text-red-600">{errors.form}</p> : null}
         <button className={buttonClass} disabled={mutation.isPending} type="submit">
           Register
