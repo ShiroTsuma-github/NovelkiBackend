@@ -162,8 +162,9 @@ public class BookRepository : IBookRepository
             return false;
         }
 
-        var changed = book.CurrentChapterNumber != currentChapterNumber ||
-                      book.CurrentChapterLabel != currentChapterLabel;
+        var progressChanged = book.CurrentChapterNumber != currentChapterNumber ||
+                              book.CurrentChapterLabel != currentChapterLabel;
+        var hasComment = !string.IsNullOrWhiteSpace(comment);
         if (book.TotalChapters.HasValue && currentChapterNumber.HasValue && currentChapterNumber > book.TotalChapters)
         {
             throw new ValidationException("Current chapter cannot be greater than total chapters.");
@@ -172,7 +173,7 @@ public class BookRepository : IBookRepository
         book.CurrentChapterNumber = currentChapterNumber;
         book.CurrentChapterLabel = currentChapterLabel;
 
-        if (changed)
+        if (progressChanged || hasComment)
         {
             _context.BookProgressHistory.Add(new BookProgressHistory
             {

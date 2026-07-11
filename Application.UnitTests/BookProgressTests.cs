@@ -32,9 +32,23 @@ public class BookProgressTests
         var repository = new FakeBookRepository(book);
         var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
-        await handler.Handle(new UpdateBookProgressCommand(book.Id, 10, "10", "same"), CancellationToken.None);
+        await handler.Handle(new UpdateBookProgressCommand(book.Id, 10, "10", null), CancellationToken.None);
 
         Assert.Empty(book.ProgressHistory);
+    }
+
+    [Fact]
+    public async Task UpdateProgress_ShouldAddHistoryWhenOnlyCommentChanges()
+    {
+        var book = CreateBook();
+        var repository = new FakeBookRepository(book);
+        var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
+
+        await handler.Handle(new UpdateBookProgressCommand(book.Id, 10, "10", "same chapter note"), CancellationToken.None);
+
+        Assert.Equal(10, book.CurrentChapterNumber);
+        Assert.Single(book.ProgressHistory);
+        Assert.Equal("same chapter note", book.ProgressHistory.First().Comment);
     }
 
     [Fact]
@@ -98,11 +112,12 @@ public class BookProgressTests
                 return Task.FromResult(false);
             }
 
-            var changed = _book.CurrentChapterNumber != currentChapterNumber ||
-                          _book.CurrentChapterLabel != currentChapterLabel;
+            var progressChanged = _book.CurrentChapterNumber != currentChapterNumber ||
+                                  _book.CurrentChapterLabel != currentChapterLabel;
+            var hasComment = !string.IsNullOrWhiteSpace(comment);
             _book.CurrentChapterNumber = currentChapterNumber;
             _book.CurrentChapterLabel = currentChapterLabel;
-            if (changed)
+            if (progressChanged || hasComment)
             {
                 _book.ProgressHistory.Add(new BookProgressHistory
                 {
