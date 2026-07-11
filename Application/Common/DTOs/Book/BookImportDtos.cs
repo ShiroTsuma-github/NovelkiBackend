@@ -30,6 +30,8 @@ public record BookImportRowDto
     public string? Notes { get; set; }
     public string? RawImportedLine { get; set; }
     public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, IReadOnlyCollection<string>> FieldErrors { get; set; } =
+        new Dictionary<string, IReadOnlyCollection<string>>();
 }
 
 public record UpdateBookImportRowRequest(
