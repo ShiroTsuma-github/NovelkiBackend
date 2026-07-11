@@ -229,6 +229,18 @@ public class BookFeatureTests
         Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title is required.");
     }
 
+    [Fact]
+    public void UpdateBookProgressValidator_ShouldRejectNegativeChapterNumber()
+    {
+        var validator = new UpdateBookProgressCommandValidator();
+        var command = new UpdateBookProgressCommand(Guid.NewGuid(), -1, "-1", null);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterNumber");
+    }
+
     private static Fixture CreateFixture()
     {
         var bookRepository = new FakeBookRepository();
