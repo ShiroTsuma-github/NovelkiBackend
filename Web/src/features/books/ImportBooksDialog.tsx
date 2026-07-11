@@ -286,6 +286,10 @@ function ImportRowEditor({
     setDraft((current) => ({ ...current, [key]: value }))
   }
 
+  function fieldError(field: keyof BookImportRowUpdateRequest) {
+    return row.fieldErrors?.[field] ?? []
+  }
+
   return (
       <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -322,21 +326,21 @@ function ImportRowEditor({
       {expanded ? (
         <>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <LabeledInput label="Title" value={draft.primaryTitle ?? ''} onChange={(value) => update('primaryTitle', value)} />
-            <LabeledInput label="Author" value={draft.authorName ?? ''} onChange={(value) => update('authorName', value)} />
-            <LabeledInput label="Tags" value={draft.tags ?? ''} onChange={(value) => update('tags', value)} />
-            <LabeledInput label="Type" value={draft.contentType ?? ''} onChange={(value) => update('contentType', value)} />
-            <LabeledInput label="Status" value={draft.status ?? ''} onChange={(value) => update('status', value)} />
-            <LabeledInput label="Current label" value={draft.currentChapterLabel ?? ''} onChange={(value) => update('currentChapterLabel', value)} />
-            <LabeledInput label="Current chapter" value={draft.currentChapterNumber ?? ''} onChange={(value) => update('currentChapterNumber', value)} />
-            <LabeledInput label="Total chapters" value={draft.totalChapters ?? ''} onChange={(value) => update('totalChapters', value)} />
-            <LabeledInput label="Rating" value={draft.rating ?? ''} onChange={(value) => update('rating', value)} />
-            <LabeledInput label="Priority" value={draft.priority ?? ''} onChange={(value) => update('priority', value)} />
+            <LabeledInput error={fieldError('primaryTitle')} label="Title" value={draft.primaryTitle ?? ''} onChange={(value) => update('primaryTitle', value)} />
+            <LabeledInput error={fieldError('authorName')} label="Author" value={draft.authorName ?? ''} onChange={(value) => update('authorName', value)} />
+            <LabeledInput error={fieldError('tags')} label="Tags" value={draft.tags ?? ''} onChange={(value) => update('tags', value)} />
+            <LabeledInput error={fieldError('contentType')} label="Type" value={draft.contentType ?? ''} onChange={(value) => update('contentType', value)} />
+            <LabeledInput error={fieldError('status')} label="Status" value={draft.status ?? ''} onChange={(value) => update('status', value)} />
+            <LabeledInput error={fieldError('currentChapterLabel')} label="Current label" value={draft.currentChapterLabel ?? ''} onChange={(value) => update('currentChapterLabel', value)} />
+            <LabeledInput error={fieldError('currentChapterNumber')} label="Current chapter" value={draft.currentChapterNumber ?? ''} onChange={(value) => update('currentChapterNumber', value)} />
+            <LabeledInput error={fieldError('totalChapters')} label="Total chapters" value={draft.totalChapters ?? ''} onChange={(value) => update('totalChapters', value)} />
+            <LabeledInput error={fieldError('rating')} label="Rating" value={draft.rating ?? ''} onChange={(value) => update('rating', value)} />
+            <LabeledInput error={fieldError('priority')} label="Priority" value={draft.priority ?? ''} onChange={(value) => update('priority', value)} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
-            <LabeledTextarea label="Notes" value={draft.notes ?? ''} onChange={(value) => update('notes', value)} />
-            <LabeledTextarea label="Description" value={draft.description ?? ''} onChange={(value) => update('description', value)} />
+            <LabeledTextarea error={fieldError('notes')} label="Notes" value={draft.notes ?? ''} onChange={(value) => update('notes', value)} />
+            <LabeledTextarea error={fieldError('description')} label="Description" value={draft.description ?? ''} onChange={(value) => update('description', value)} />
           </div>
         </>
       ) : null}
@@ -359,20 +363,36 @@ function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value:
   )
 }
 
-function LabeledInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function LabeledInput({ error = [], label, value, onChange }: { error?: string[]; label: string; value: string; onChange: (value: string) => void }) {
+  const errorMessage = error.join(' ')
+
   return (
     <label className="grid gap-1 text-sm">
       <span className="font-medium text-slate-300">{label}</span>
-      <input className={inputClass} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        aria-invalid={errorMessage ? 'true' : undefined}
+        className={`${inputClass} ${errorMessage ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400/20' : ''}`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {errorMessage ? <span className="text-xs font-medium text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }
 
-function LabeledTextarea({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function LabeledTextarea({ error = [], label, value, onChange }: { error?: string[]; label: string; value: string; onChange: (value: string) => void }) {
+  const errorMessage = error.join(' ')
+
   return (
     <label className="grid gap-1 text-sm">
       <span className="font-medium text-slate-300">{label}</span>
-      <textarea className={`${inputClass} min-h-28`} value={value} onChange={(event) => onChange(event.target.value)} />
+      <textarea
+        aria-invalid={errorMessage ? 'true' : undefined}
+        className={`${inputClass} min-h-28 ${errorMessage ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400/20' : ''}`}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      />
+      {errorMessage ? <span className="text-xs font-medium text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }
