@@ -156,6 +156,41 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
     }
 
     [Fact]
+    public async Task FinalizeAsync_ShouldCollapseWhitespaceInIdentifyingFields()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+
+        using var stream = CreateCsv("""
+primaryTitle,authorName,contentType,status,tags
+ The   Novel , Er    Gen , Novel , Plan   To Read , favorite   tag; action    tag
+""");
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var row = Assert.Single(session.Rows);
+
+        Assert.True(row.IsValid);
+        Assert.Equal("The Novel", row.PrimaryTitle);
+        Assert.Equal("Er Gen", row.AuthorName);
+        Assert.Equal("Novel", row.ContentType);
+        Assert.Equal("Plan To Read", row.Status);
+        Assert.Equal("favorite tag; action tag", row.Tags);
+
+        await service.FinalizeAsync(session.SessionId, CancellationToken.None);
+
+        var savedBook = await context.Books
+            .Include(b => b.Author)
+            .Include(b => b.BookTags).ThenInclude(bt => bt.Tag)
+            .SingleAsync();
+
+        Assert.Equal("The Novel", savedBook.PrimaryTitle);
+        Assert.Equal("Er Gen", savedBook.Author!.PrimaryName);
+        Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "favorite tag");
+        Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "action tag");
+    }
+
+    [Fact]
     public async Task FinalizeAsync_ShouldSkipRowsThatConflictWithinExistingLibrary()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
