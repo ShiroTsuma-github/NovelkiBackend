@@ -13,7 +13,7 @@ const optionalIntegerString = optionalNumberString.refine(
 
 export const bookFormSchema = z
   .object({
-    primaryTitle: z.string().min(1, 'Title is required.').max(500),
+    primaryTitle: z.string().refine((value) => value.trim().length > 0, 'Title is required.').refine((value) => value.trim().length <= 500, 'Title must be 500 characters or fewer.'),
     authorId: z.string().optional(),
     authorName: z.string().max(300).optional(),
     contentTypeId: z.string().min(1, 'Type is required.'),
@@ -45,7 +45,7 @@ export type BookFormValues = z.infer<typeof bookFormSchema>
 
 export function toBookMutationRequest(values: BookFormValues): BookMutationRequest {
   return {
-    primaryTitle: values.primaryTitle,
+    primaryTitle: values.primaryTitle.trim(),
     contentTypeId: values.contentTypeId,
     statusId: values.statusId,
     authorName: values.authorName?.trim() || null,
