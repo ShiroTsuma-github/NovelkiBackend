@@ -62,7 +62,7 @@ export function RegisterPage() {
     const validationErrors = validate(values)
     setErrors(validationErrors)
     if (Object.keys(validationErrors).length) {
-      if (validationErrors.password && !validationErrors.username && !validationErrors.email) {
+      if (validationErrors.password) {
         passwordInputRef.current?.focus()
       }
       return
@@ -131,7 +131,7 @@ export function RegisterPage() {
           </ul>
         ) : null}
         {errors.form ? <p className="text-sm text-red-600">{errors.form}</p> : null}
-        <button className={buttonClass} disabled={mutation.isPending} type="submit">
+        <button className={buttonClass} disabled={mutation.isPending} type="submit" onMouseDown={(event) => event.preventDefault()}>
           Register
         </button>
       </form>
