@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -196,9 +196,16 @@ export function BooksPage() {
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2">
               <span>Per page</span>
-              <select className={`${inputClass} h-10 w-24`} value={pageSize} onChange={(event) => setPageSize(event.target.value)}>
-                {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
+              <span className="relative inline-flex">
+                <select
+                  className={`${inputClass} h-10 w-24 appearance-none bg-white pr-9 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+                  value={pageSize}
+                  onChange={(event) => setPageSize(event.target.value)}
+                >
+                  {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </span>
             </label>
             <button className={secondaryButtonClass} disabled={!canGoBack} type="button" onClick={() => setSkip(skip - pageSize)}>Previous</button>
             <button className={secondaryButtonClass} disabled={!canGoForward} type="button" onClick={() => setSkip(skip + pageSize)}>Next</button>
