@@ -56,6 +56,22 @@ describe('RegisterPage', () => {
     expect(api.register).not.toHaveBeenCalled()
   })
 
+  it('keeps password focus when submitting from the password field with form errors', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<RegisterPage />, { route: '/register' })
+
+    const passwordInput = screen.getByPlaceholderText('Password')
+    await user.click(passwordInput)
+    await user.type(passwordInput, 'weak')
+    await user.click(screen.getByRole('button', { name: /register/i }))
+
+    expect(passwordInput).toHaveFocus()
+    expect(screen.getByRole('listitem', { name: 'Missing: At least 8 characters' })).toBeInTheDocument()
+    expect(screen.getByText('Username is required.')).toBeInTheDocument()
+    expect(screen.getByText('Email address is required.')).toBeInTheDocument()
+    expect(api.register).not.toHaveBeenCalled()
+  })
+
   it('submits registration fields to the API', async () => {
     vi.mocked(api.register).mockResolvedValue({
       id: 'user-id',
