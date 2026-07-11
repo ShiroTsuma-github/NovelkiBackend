@@ -90,6 +90,11 @@ public static class BookSearchQueryParser
     private static bool TryParseNumberFilter(string token, out BookSearchNumberFilter filter)
     {
         filter = default!;
+        if (TryParseNumberFilterWithColonAlias(token, out filter))
+        {
+            return true;
+        }
+
         foreach (var op in new[] { ">=", "<=", ">", "<", "=" })
         {
             var opIndex = token.IndexOf(op, StringComparison.Ordinal);
@@ -111,6 +116,31 @@ public static class BookSearchQueryParser
         }
 
         return false;
+    }
+
+    private static bool TryParseNumberFilterWithColonAlias(string token, out BookSearchNumberFilter filter)
+    {
+        filter = default!;
+        var separatorIndex = token.IndexOf(':');
+        if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
+        {
+            return false;
+        }
+
+        var fieldName = token[..separatorIndex];
+        var valueText = token[(separatorIndex + 1)..];
+        if (!NumberAliases.TryGetValue(fieldName, out var field))
+        {
+            return false;
+        }
+
+        if (!decimal.TryParse(valueText, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
+        {
+            return false;
+        }
+
+        filter = new BookSearchNumberFilter(field, BookSearchOperator.Equal, value);
+        return true;
     }
 
     private static BookSearchOperator ToOperator(string op) => op switch

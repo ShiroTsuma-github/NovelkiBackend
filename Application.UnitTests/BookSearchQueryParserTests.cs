@@ -34,4 +34,14 @@ public class BookSearchQueryParserTests
         Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Genre && f.Values.SequenceEqual(["fantasy", "slice of life"]));
         Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Tag && f.Values.SequenceEqual(["to read soon", "favorite"]));
     }
+
+    [Fact]
+    public void Parse_ShouldTreatRatingColonAsEqualNumberFilter()
+    {
+        var criteria = BookSearchQueryParser.Parse("rating:8 priority:2");
+
+        Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.Equal && f.Value == 8);
+        Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Priority && f.Operator == BookSearchOperator.Equal && f.Value == 2);
+        Assert.Empty(criteria.Fields);
+    }
 }
