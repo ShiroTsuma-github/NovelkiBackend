@@ -316,7 +316,7 @@ public class BookFeatureTests
         public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
         public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
         {
-            var normalized = name.Trim().ToUpperInvariant();
+            var normalized = MappingExtensions.NormalizeName(name);
             var match = LastBook != null &&
                         LastBook.OwnerId == ownerId &&
                         LastBook.ContentTypeId == contentTypeId &&
@@ -409,7 +409,7 @@ public class BookFeatureTests
         }
 
         public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Authors.FirstOrDefault(a => a.Id == id));
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(Authors.FirstOrDefault(a => a.NormalizedPrimaryName == name.Trim().ToUpperInvariant()));
+        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(Authors.FirstOrDefault(a => a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
         public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Author>>(Authors.Take(take));
         public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
@@ -462,11 +462,11 @@ public class BookFeatureTests
 
         public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names, CancellationToken cancellationToken)
         {
-            var normalized = names.Select(n => n.Trim().ToUpperInvariant()).ToList();
+            var normalized = names.Select(MappingExtensions.NormalizeName).ToList();
             return Task.FromResult<IEnumerable<Tag>>(_tags.Where(t => t.OwnerId == ownerId && normalized.Contains(t.NormalizedName)).ToList());
         }
 
-        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) => Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.NormalizedName == name.Trim().ToUpperInvariant()));
+        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) => Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
         public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Tag>>(_tags.Take(take));
         public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }

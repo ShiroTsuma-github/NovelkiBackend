@@ -13,7 +13,12 @@ using Application.Features.TypeFeatures.Commands;
 
 public static class MappingExtensions
 {
-    public static string NormalizeName(string value) => value.Trim().ToUpperInvariant();
+    public static string NormalizeName(string value) => CollapseWhitespace(value).ToUpperInvariant();
+
+    public static string CollapseWhitespace(string value)
+    {
+        return string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+    }
 
     public static string NormalizeSlug(string value)
     {

@@ -7,6 +7,22 @@ namespace Application.UnitTests;
 public class MappingExtensionTests
 {
     [Fact]
+    public void NormalizeName_ShouldTrimCollapseWhitespaceAndUppercase()
+    {
+        var result = MappingExtensions.NormalizeName("  Er\t \n Gen   ");
+
+        Assert.Equal("ER GEN", result);
+    }
+
+    [Fact]
+    public void CollapseWhitespace_ShouldPreserveDisplayCasing()
+    {
+        var result = MappingExtensions.CollapseWhitespace("  Lord   of\tMysteries  ");
+
+        Assert.Equal("Lord of Mysteries", result);
+    }
+
+    [Fact]
     public void BookToDto_ShouldMapDetails()
     {
         var author = new Author { PrimaryName = "Toika", NormalizedPrimaryName = "TOIKA" };

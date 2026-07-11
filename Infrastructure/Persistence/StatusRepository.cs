@@ -1,5 +1,6 @@
 ﻿namespace Infrastructure.Persistence;
 
+using Application.Common;
 using Domain.Entities;
 
 public class StatusRepository : IStatusRepository
@@ -39,7 +40,7 @@ public class StatusRepository : IStatusRepository
 
     public async Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var normalizedName = name.Trim().ToUpperInvariant();
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Statuses.FirstOrDefaultAsync(
             s => s.Name.ToUpper() == normalizedName || s.Slug.ToUpper() == normalizedName,
             cancellationToken);

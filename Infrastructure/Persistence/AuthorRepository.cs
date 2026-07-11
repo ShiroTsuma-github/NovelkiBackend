@@ -1,5 +1,7 @@
 namespace Infrastructure.Persistence;
 
+using Application.Common;
+
 public class AuthorRepository : IAuthorRepository
 {
     private readonly ApplicationDbContext _context;
@@ -18,7 +20,7 @@ public class AuthorRepository : IAuthorRepository
 
     public async Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var normalizedName = Normalize(name);
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Authors
             .Include(a => a.Names)
             .FirstOrDefaultAsync(
@@ -32,7 +34,7 @@ public class AuthorRepository : IAuthorRepository
         var query = _context.Authors.Include(a => a.Names).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var normalizedSearch = Normalize(search);
+            var normalizedSearch = MappingExtensions.NormalizeName(search);
             query = query.Where(a =>
                 a.NormalizedPrimaryName.Contains(normalizedSearch) ||
                 a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)));
@@ -51,6 +53,4 @@ public class AuthorRepository : IAuthorRepository
     {
         await _context.SaveChangesAsync(cancellationToken);
     }
-
-    private static string Normalize(string value) => value.Trim().ToUpperInvariant();
 }
