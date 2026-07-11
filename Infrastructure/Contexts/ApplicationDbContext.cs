@@ -140,6 +140,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         {
             entity.HasIndex(h => new { h.BookId, h.ChangedAt });
             entity.Property(h => h.ChapterLabel).HasMaxLength(100);
+            entity.Property(h => h.Comment).HasMaxLength(1000);
             entity.HasOne(h => h.Book)
                 .WithMany(b => b.ProgressHistory)
                 .HasForeignKey(h => h.BookId)
