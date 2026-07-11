@@ -360,11 +360,11 @@ export function ColumnSettingsPopup<T>({
     <div className="inline-block text-left" ref={containerRef}>
       <button
         ref={buttonRef}
-        className="inline-flex h-8 items-center gap-1 rounded-md border border-slate-300 bg-white px-2 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+        className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
         type="button"
         onClick={() => setOpen(!open)}
       >
-        <Settings2 className="h-3.5 w-3.5" />
+        <Settings2 className="h-4 w-4" />
         Columns
       </button>
       {open ? (
