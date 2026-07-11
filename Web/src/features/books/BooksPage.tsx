@@ -319,7 +319,9 @@ export function ColumnSettingsPopup<T>({
       const preferredLeftVw = (rect.right / window.innerWidth) * 100 + horizontalGapVw
       const preferredTopVh = (rect.top / window.innerHeight) * 100 - verticalLiftVh
       setPosition({
-        left: `clamp(${edgeGapVw}vw, ${preferredLeftVw}vw, ${100 - panelWidthVw - edgeGapVw}vw)`,
+        left: window.innerWidth < 640
+          ? '0.5rem'
+          : `clamp(${edgeGapVw}vw, ${preferredLeftVw}vw, ${100 - panelWidthVw - edgeGapVw}vw)`,
         top: `clamp(${edgeGapVh}vh, ${preferredTopVh}vh, calc(100vh - ${edgeGapVh}vh))`,
       })
     }
@@ -369,7 +371,7 @@ export function ColumnSettingsPopup<T>({
       </button>
       {open ? (
         <div
-          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-80 gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl"
+          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl"
           style={position}
         >
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">

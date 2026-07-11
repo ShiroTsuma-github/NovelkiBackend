@@ -1,0 +1,89 @@
+import { screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
+import { api } from '@/api/client'
+import { books, paginated } from '@/test/fixtures'
+import { renderWithProviders } from '@/test/render'
+import { BooksPage, defaultColumnPreferences, formatProgress, getVisibleColumns } from './BooksPage'
+
+vi.mock('@/api/client', () => ({
+  api: {
+    getBooks: vi.fn(),
+  },
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+  },
+}))
+
+describe('BooksPage', () => {
+  it('renders books in table view and fetches with default list params', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    expect(await screen.findByText('Lord of Mysteries')).toBeInTheDocument()
+    expect(screen.getByText('Cuttlefish')).toBeInTheDocument()
+    expect(api.getBooks).toHaveBeenCalledWith({
+      skip: 0,
+      take: 20,
+      query: '',
+      sortBy: 'lastModified',
+      sortDirection: 'desc',
+    })
+  })
+
+  it('switches to cards view and persists the preference', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+
+    expect(window.localStorage.getItem('novelki.books.layout.v1')).toBe('cards')
+    expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toBeInTheDocument()
+  })
+
+  it('updates query params and refetches when sorting by title', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /title/i }))
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith({
+      skip: 0,
+      take: 20,
+      query: '',
+      sortBy: 'title',
+      sortDirection: 'asc',
+    }))
+  })
+
+  it('keeps column visibility helpers deterministic', () => {
+    const columns = [
+      { id: 'title', label: 'Title', defaultVisible: true, render: () => 'Title' },
+      { id: 'notes', label: 'Notes', defaultVisible: false, render: () => 'Notes' },
+    ]
+
+    const preferences = defaultColumnPreferences(columns)
+
+    expect(preferences).toEqual([
+      { id: 'title', visible: true },
+      { id: 'notes', visible: false },
+    ])
+    expect(getVisibleColumns(columns, preferences).map((column) => column.id)).toEqual(['title'])
+  })
+
+  it('formats progress with chapter label and total', () => {
+    expect(formatProgress(books[0])).toBe('348 / 1432')
+    expect(formatProgress({ ...books[0], currentChapterLabel: 'Side Story', currentChapterNumber: null })).toBe('Side Story / 1432')
+    expect(formatProgress({ ...books[0], currentChapterLabel: null, currentChapterNumber: null, totalChapters: null })).toBe('-')
+  })
+})
