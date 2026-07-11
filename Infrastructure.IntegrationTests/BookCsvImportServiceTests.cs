@@ -65,6 +65,31 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Contains("Current chapter number cannot be negative.", invalidRow.Errors);
         Assert.Contains("Rating must be a valid integer.", invalidRow.Errors);
         Assert.Contains("Priority must be between 1 and 5.", invalidRow.Errors);
+        Assert.Contains("Content type is required and must exist.", invalidRow.FieldErrors["contentType"]);
+        Assert.Contains("Status is required and must exist.", invalidRow.FieldErrors["status"]);
+        Assert.Contains("TotalChapters must be a valid number.", invalidRow.FieldErrors["totalChapters"]);
+        Assert.Contains("Current chapter number cannot be negative.", invalidRow.FieldErrors["currentChapterNumber"]);
+        Assert.Contains("Rating must be a valid integer.", invalidRow.FieldErrors["rating"]);
+        Assert.Contains("Priority must be between 1 and 5.", invalidRow.FieldErrors["priority"]);
+    }
+
+    [Fact]
+    public async Task CreateSessionAsync_ShouldReturnFieldErrorsForMissingTitle()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+
+        using var stream = CreateCsv("""
+primaryTitle,contentType,status
+ ,Novel,Reading
+""");
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var row = Assert.Single(session.Rows);
+
+        Assert.Contains("Primary title is required.", row.Errors);
+        Assert.Contains("Primary title is required.", row.FieldErrors["primaryTitle"]);
     }
 
     [Fact]

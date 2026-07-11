@@ -318,6 +318,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         foreach (var row in session.Rows)
         {
             row.Errors.Clear();
+            row.FieldErrors.Clear();
 
             row.PrimaryTitle = NormalizeNameToNull(row.PrimaryTitle);
             row.AuthorName = NormalizeNameToNull(row.AuthorName);
@@ -335,7 +336,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             if (string.IsNullOrWhiteSpace(row.PrimaryTitle))
             {
-                row.Errors.Add("Primary title is required.");
+                AddFieldError(row, "primaryTitle", "Primary title is required.");
             }
 
             var normalizedContentType = string.IsNullOrWhiteSpace(row.ContentType) ? null : MappingExtensions.NormalizeName(row.ContentType);
@@ -343,32 +344,32 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             if (normalizedContentType == null || !validTypes.Contains(normalizedContentType))
             {
-                row.Errors.Add("Content type is required and must exist.");
+                AddFieldError(row, "contentType", "Content type is required and must exist.");
             }
 
             if (normalizedStatus == null || !validStatuses.Contains(normalizedStatus))
             {
-                row.Errors.Add("Status is required and must exist.");
+                AddFieldError(row, "status", "Status is required and must exist.");
             }
 
-            var totalChapters = ParseDecimal(row.TotalChapters, nameof(row.TotalChapters), row.Errors);
-            var currentChapterNumber = ParseDecimal(row.CurrentChapterNumber, nameof(row.CurrentChapterNumber), row.Errors);
-            _ = ParseInt(row.Rating, nameof(row.Rating), row.Errors, 1, 10);
-            _ = ParseInt(row.Priority, nameof(row.Priority), row.Errors, 1, 5);
+            var totalChapters = ParseDecimal(row, row.TotalChapters, "totalChapters", nameof(row.TotalChapters));
+            var currentChapterNumber = ParseDecimal(row, row.CurrentChapterNumber, "currentChapterNumber", nameof(row.CurrentChapterNumber));
+            _ = ParseInt(row, row.Rating, "rating", nameof(row.Rating), 1, 10);
+            _ = ParseInt(row, row.Priority, "priority", nameof(row.Priority), 1, 5);
 
             if (currentChapterNumber.HasValue && currentChapterNumber < 0)
             {
-                row.Errors.Add("Current chapter number cannot be negative.");
+                AddFieldError(row, "currentChapterNumber", "Current chapter number cannot be negative.");
             }
 
             if (totalChapters.HasValue && totalChapters < 0)
             {
-                row.Errors.Add("Total chapters cannot be negative.");
+                AddFieldError(row, "totalChapters", "Total chapters cannot be negative.");
             }
 
             if (totalChapters.HasValue && currentChapterNumber.HasValue && currentChapterNumber > totalChapters)
             {
-                row.Errors.Add("Current chapter number cannot exceed total chapters.");
+                AddFieldError(row, "currentChapterNumber", "Current chapter number cannot exceed total chapters.");
             }
 
             if (!string.IsNullOrWhiteSpace(row.PrimaryTitle) &&
@@ -378,7 +379,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                     MappingExtensions.NormalizeName(row.PrimaryTitle),
                     typeIdsByName[normalizedContentType])))
             {
-                row.Errors.Add("A book with this title and content type already exists in your library.");
+                AddFieldError(row, "primaryTitle", "A book with this title and content type already exists in your library.");
             }
         }
 
@@ -393,7 +394,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         {
             foreach (var row in duplicateGroup)
             {
-                row.Errors.Add("Duplicate title with the same content type inside this import session.");
+                AddFieldError(row, "primaryTitle", "Duplicate title with the same content type inside this import session.");
             }
         }
     }
@@ -468,7 +469,10 @@ public sealed class BookCsvImportService : IBookCsvImportService
                     Description = row.Description,
                     Notes = row.Notes,
                     RawImportedLine = row.RawImportedLine,
-                    Errors = row.Errors.ToArray()
+                    Errors = row.Errors.ToArray(),
+                    FieldErrors = row.FieldErrors.ToDictionary(
+                        pair => pair.Key,
+                        pair => (IReadOnlyCollection<string>)pair.Value.ToArray())
                 })
                 .ToList()
         };
@@ -538,7 +542,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             : null;
     }
 
-    private static decimal? ParseDecimal(string? value, string fieldName, ICollection<string> errors)
+    private static decimal? ParseDecimal(ImportRow row, string? value, string fieldKey, string fieldName)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -547,7 +551,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
         {
-            errors.Add($"{fieldName} must be a valid number.");
+            AddFieldError(row, fieldKey, $"{fieldName} must be a valid number.");
             return null;
         }
 
@@ -561,7 +565,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             : null;
     }
 
-    private static int? ParseInt(string? value, string fieldName, ICollection<string> errors, int min, int max)
+    private static int? ParseInt(ImportRow row, string? value, string fieldKey, string fieldName, int min, int max)
     {
         if (string.IsNullOrWhiteSpace(value))
         {
@@ -570,16 +574,29 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
         {
-            errors.Add($"{fieldName} must be a valid integer.");
+            AddFieldError(row, fieldKey, $"{fieldName} must be a valid integer.");
             return null;
         }
 
         if (parsed < min || parsed > max)
         {
-            errors.Add($"{fieldName} must be between {min} and {max}.");
+            AddFieldError(row, fieldKey, $"{fieldName} must be between {min} and {max}.");
         }
 
         return parsed;
+    }
+
+    private static void AddFieldError(ImportRow row, string fieldKey, string message)
+    {
+        row.Errors.Add(message);
+
+        if (!row.FieldErrors.TryGetValue(fieldKey, out var errors))
+        {
+            errors = [];
+            row.FieldErrors[fieldKey] = errors;
+        }
+
+        errors.Add(message);
     }
 
     private static int NormalizeLineNumber(int? lineNumber)
@@ -615,5 +632,6 @@ public sealed class BookCsvImportService : IBookCsvImportService
         public string? Notes { get; set; }
         public string? RawImportedLine { get; set; }
         public List<string> Errors { get; set; } = [];
+        public Dictionary<string, List<string>> FieldErrors { get; } = [];
     }
 }

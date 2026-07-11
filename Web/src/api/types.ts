@@ -152,6 +152,7 @@ export type BookImportRowDto = {
   notes?: string | null
   rawImportedLine?: string | null
   errors: string[]
+  fieldErrors: Record<string, string[]>
 }
 
 export type BookImportSessionDto = {
