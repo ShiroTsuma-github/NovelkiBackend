@@ -94,8 +94,10 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
         var linksValue = links.Compile();
 
         RuleFor(primaryTitle)
-            .NotEmpty()
-            .MaximumLength(500);
+            .Must(value => !string.IsNullOrWhiteSpace(value))
+            .WithMessage("Title is required.")
+            .Must(value => value == null || value.Trim().Length <= 500)
+            .WithMessage("Title must be 500 characters or fewer.");
 
         RuleFor(authorName)
             .MaximumLength(300);

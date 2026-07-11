@@ -187,6 +187,48 @@ public class BookFeatureTests
         Assert.Contains(result.Errors, e => e.PropertyName == "Links[0].Url");
     }
 
+    [Fact]
+    public void CreateBookValidator_ShouldRejectWhitespaceOnlyPrimaryTitle()
+    {
+        var validator = new CreateBookCommandValidator();
+        var command = ValidCreateCommand() with { PrimaryTitle = "   " };
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title is required.");
+    }
+
+    [Fact]
+    public void UpdateBookValidator_ShouldRejectWhitespaceOnlyPrimaryTitle()
+    {
+        var validator = new UpdateBookCommandValidator();
+        var command = new UpdateBookCommand(
+            Guid.NewGuid(),
+            "   ",
+            ContentTypeId,
+            StatusId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title is required.");
+    }
+
     private static Fixture CreateFixture()
     {
         var bookRepository = new FakeBookRepository();
