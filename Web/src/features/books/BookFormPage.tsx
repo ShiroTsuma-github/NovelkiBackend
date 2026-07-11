@@ -36,6 +36,9 @@ type ExistingCoverChange =
   | { kind: 'keep' }
   | { kind: 'remove' }
 
+const allowedCoverMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const allowedCoverExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+
 export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -195,6 +198,11 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   }
 
   function storeDraftFile(file: File) {
+    if (!isAllowedCoverFile(file)) {
+      toast.error('Choose a JPG, PNG, or WebP image.')
+      return
+    }
+
     setExistingCoverChange({ kind: 'keep' })
     replaceDraftCover({ kind: 'file', file, previewUrl: URL.createObjectURL(file) })
     closeCoverDialog()
@@ -536,6 +544,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
 function normalizeAuthorName(value: string) {
   return value.trim().toLocaleUpperCase()
+}
+
+function isAllowedCoverFile(file: File) {
+  const lowerName = file.name.toLocaleLowerCase()
+  const extensionAllowed = Array.from(allowedCoverExtensions).some((extension) => lowerName.endsWith(extension))
+  return allowedCoverMimeTypes.has(file.type) && extensionAllowed
 }
 
 function isCoverInfoItem(value: CoverInfoItem | null): value is CoverInfoItem {
