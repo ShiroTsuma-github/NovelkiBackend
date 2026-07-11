@@ -30,4 +30,44 @@ public class ErrorHandlingMiddlewareTests
         Assert.Equal("A book named 'Duplicated Book' already exists.", detail);
         Assert.DoesNotContain(existingId.ToString(), detail);
     }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldReturnFieldErrorForUsernameConflict()
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        var middleware = new ErrorHandlingMiddleware(
+            _ => throw new UsernameTakenException("reader"),
+            Mock.Of<ILogger<ErrorHandlingMiddleware>>());
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.Body.Position = 0;
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
+
+        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
+        Assert.True(errors.TryGetProperty("Username", out var usernameErrors));
+        Assert.Contains("Account with username 'reader' already exists.", usernameErrors.EnumerateArray().Select(e => e.GetString()));
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldReturnFieldErrorForEmailConflict()
+    {
+        var context = new DefaultHttpContext();
+        context.Response.Body = new MemoryStream();
+        var middleware = new ErrorHandlingMiddleware(
+            _ => throw new EmailInUseException("reader@example.com"),
+            Mock.Of<ILogger<ErrorHandlingMiddleware>>());
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.Body.Position = 0;
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
+
+        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
+        Assert.True(errors.TryGetProperty("Email", out var emailErrors));
+        Assert.Contains("The account with email reader@example.com already exists.", emailErrors.EnumerateArray().Select(e => e.GetString()));
+    }
 }

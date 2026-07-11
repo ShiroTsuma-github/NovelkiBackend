@@ -57,6 +57,10 @@ public class ErrorHandlingMiddleware
                 statusCode = HttpStatusCode.Conflict;
                 title = "Conflict";
                 detail = exception.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["Username"] = new[] { exception.Message }
+                };
                 _logger.LogWarning("Username already exists");
                 break;
 
@@ -64,6 +68,10 @@ public class ErrorHandlingMiddleware
                 statusCode = HttpStatusCode.Conflict;
                 title = "Conflict";
                 detail = exception.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["Email"] = new[] { exception.Message }
+                };
                 _logger.LogWarning("Email already exists");
                 break;
 
