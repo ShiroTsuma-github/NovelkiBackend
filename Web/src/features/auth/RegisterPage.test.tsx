@@ -21,6 +21,23 @@ vi.mock('sonner', () => ({
 }))
 
 describe('RegisterPage', () => {
+  it('shows local field errors and password checklist before API submit', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<RegisterPage />, { route: '/register' })
+
+    await user.type(screen.getByPlaceholderText('Username'), 'ab')
+    await user.type(screen.getByPlaceholderText('Email'), 'not-an-email')
+    await user.type(screen.getByPlaceholderText('Password'), 'weak')
+    await user.click(screen.getByRole('button', { name: /register/i }))
+
+    expect(screen.getByText('Username must be at least 3 characters long.')).toBeInTheDocument()
+    expect(screen.getByText('A valid email address is required.')).toBeInTheDocument()
+    expect(screen.getByRole('listitem', { name: 'Missing: At least 8 characters' })).toBeInTheDocument()
+    expect(screen.getByRole('listitem', { name: 'Missing: One uppercase letter' })).toBeInTheDocument()
+    expect(screen.getByRole('listitem', { name: 'Missing: One number' })).toBeInTheDocument()
+    expect(api.register).not.toHaveBeenCalled()
+  })
+
   it('submits registration fields to the API', async () => {
     vi.mocked(api.register).mockResolvedValue({
       id: 'user-id',
@@ -44,19 +61,50 @@ describe('RegisterPage', () => {
     expect(toast.success).toHaveBeenCalledWith('Account created. You can log in now.')
   })
 
-  it('shows backend registration errors', async () => {
+  it('maps backend field errors to registration fields', async () => {
     vi.mocked(api.register).mockRejectedValue(new HttpError({
       type: 'Validation',
       title: 'Validation failed',
       status: 400,
-      detail: 'Email is invalid.',
+      detail: 'One or more validation errors occurred.',
       instance: '/account/register',
+      errors: {
+        Email: ['Email is invalid.'],
+        Password: ['Password must contain at least one uppercase letter.'],
+      },
     }))
     const user = userEvent.setup()
     renderWithProviders(<RegisterPage />, { route: '/register' })
 
+    await user.type(screen.getByPlaceholderText('Username'), 'reader')
+    await user.type(screen.getByPlaceholderText('Email'), 'reader@example.com')
+    await user.type(screen.getByPlaceholderText('Password'), 'Password123!')
     await user.click(screen.getByRole('button', { name: /register/i }))
 
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Email is invalid.'))
+    expect(await screen.findByText('Email is invalid.')).toBeInTheDocument()
+    expect(screen.getByText('Password must contain at least one uppercase letter.')).toBeInTheDocument()
+    expect(toast.error).toHaveBeenCalledWith('One or more validation errors occurred.')
+  })
+
+  it('maps username conflict to the username field', async () => {
+    vi.mocked(api.register).mockRejectedValue(new HttpError({
+      type: 'UsernameTakenException',
+      title: 'Conflict',
+      status: 409,
+      detail: "Account with username 'reader' already exists.",
+      instance: '/account/register',
+      errors: {
+        Username: ["Account with username 'reader' already exists."],
+      },
+    }))
+    const user = userEvent.setup()
+    renderWithProviders(<RegisterPage />, { route: '/register' })
+
+    await user.type(screen.getByPlaceholderText('Username'), 'reader')
+    await user.type(screen.getByPlaceholderText('Email'), 'reader@example.com')
+    await user.type(screen.getByPlaceholderText('Password'), 'Password123!')
+    await user.click(screen.getByRole('button', { name: /register/i }))
+
+    expect(await screen.findByText("Account with username 'reader' already exists.")).toBeInTheDocument()
   })
 })
