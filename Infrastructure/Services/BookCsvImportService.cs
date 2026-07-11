@@ -106,11 +106,11 @@ public sealed class BookCsvImportService : IBookCsvImportService
             {
                 RowId = Guid.NewGuid(),
                 LineNumber = NormalizeLineNumber((int?)parser.LineNumber),
-                PrimaryTitle = Clean(row, "primaryTitle"),
-                AuthorName = Clean(row, "authorName"),
-                ContentType = Clean(row, "contentType"),
-                Status = Clean(row, "status"),
-                Tags = Clean(row, "tags"),
+                PrimaryTitle = CleanName(row, "primaryTitle"),
+                AuthorName = CleanName(row, "authorName"),
+                ContentType = CleanName(row, "contentType"),
+                Status = CleanName(row, "status"),
+                Tags = NormalizeTags(Clean(row, "tags")),
                 TotalChapters = Clean(row, "totalChapters"),
                 CurrentChapterNumber = Clean(row, "currentChapterNumber"),
                 CurrentChapterLabel = Clean(row, "currentChapterLabel"),
@@ -140,11 +140,11 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
             ?? throw new ValidationException("Import row not found.");
 
-        row.PrimaryTitle = TrimToNull(request.PrimaryTitle);
-        row.AuthorName = TrimToNull(request.AuthorName);
-        row.ContentType = TrimToNull(request.ContentType);
-        row.Status = TrimToNull(request.Status);
-        row.Tags = TrimToNull(request.Tags);
+        row.PrimaryTitle = NormalizeNameToNull(request.PrimaryTitle);
+        row.AuthorName = NormalizeNameToNull(request.AuthorName);
+        row.ContentType = NormalizeNameToNull(request.ContentType);
+        row.Status = NormalizeNameToNull(request.Status);
+        row.Tags = NormalizeTags(request.Tags);
         row.TotalChapters = TrimToNull(request.TotalChapters);
         row.CurrentChapterNumber = TrimToNull(request.CurrentChapterNumber);
         row.CurrentChapterLabel = TrimToNull(request.CurrentChapterLabel);
@@ -182,9 +182,9 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         var ownerId = session.OwnerId;
         var typeMap = await _context.ContentTypes.AsNoTracking()
-            .ToDictionaryAsync(t => t.Name.Trim(), t => t, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            .ToDictionaryAsync(t => MappingExtensions.NormalizeName(t.Name), t => t, cancellationToken);
         var statusMap = await _context.Statuses.AsNoTracking()
-            .ToDictionaryAsync(s => s.Name.Trim(), s => s, StringComparer.OrdinalIgnoreCase, cancellationToken);
+            .ToDictionaryAsync(s => MappingExtensions.NormalizeName(s.Name), s => s, cancellationToken);
         var authorMap = await _context.Authors.Include(a => a.Names)
             .ToDictionaryAsync(a => a.NormalizedPrimaryName, cancellationToken);
         var tagMap = await _context.Tags.Where(t => t.OwnerId == ownerId)
@@ -203,7 +203,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         {
             cancellationToken.ThrowIfCancellationRequested();
             var normalizedTitle = MappingExtensions.NormalizeName(row.PrimaryTitle!);
-            var contentTypeId = typeMap[row.ContentType!].Id;
+            var contentTypeId = typeMap[MappingExtensions.NormalizeName(row.ContentType!)].Id;
             var importKey = new BookImportKey(normalizedTitle, contentTypeId);
             if (existingKeys.Contains(importKey))
             {
@@ -222,7 +222,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 Author = author,
                 ContentTypeId = contentTypeId,
                 ContentType = default!,
-                StatusId = statusMap[row.Status!].Id,
+                StatusId = statusMap[MappingExtensions.NormalizeName(row.Status!)].Id,
                 Status = default!,
                 OwnerId = ownerId,
                 TotalChapters = ParseDecimal(row.TotalChapters),
@@ -303,13 +303,13 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var types = await _context.ContentTypes.AsNoTracking()
             .Select(t => new { t.Id, t.Name })
             .ToListAsync(cancellationToken);
-        var typeNames = types.Select(t => t.Name).ToList();
-        var typeIdsByName = types.ToDictionary(t => t.Name, t => t.Id, StringComparer.OrdinalIgnoreCase);
+        var typeNames = types.Select(t => MappingExtensions.NormalizeName(t.Name)).ToList();
+        var typeIdsByName = types.ToDictionary(t => MappingExtensions.NormalizeName(t.Name), t => t.Id);
         var statusNames = await _context.Statuses.AsNoTracking()
             .Select(s => s.Name)
             .ToListAsync(cancellationToken);
         var validTypes = typeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var validStatuses = statusNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var validStatuses = statusNames.Select(MappingExtensions.NormalizeName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var existingKeys = await _context.Books.AsNoTracking()
             .Where(b => b.OwnerId == session.OwnerId)
             .Select(b => new BookImportKey(b.NormalizedPrimaryTitle, b.ContentTypeId))
@@ -319,11 +319,11 @@ public sealed class BookCsvImportService : IBookCsvImportService
         {
             row.Errors.Clear();
 
-            row.PrimaryTitle = TrimToNull(row.PrimaryTitle);
-            row.AuthorName = TrimToNull(row.AuthorName);
-            row.ContentType = TrimToNull(row.ContentType);
-            row.Status = TrimToNull(row.Status);
-            row.Tags = TrimToNull(row.Tags);
+            row.PrimaryTitle = NormalizeNameToNull(row.PrimaryTitle);
+            row.AuthorName = NormalizeNameToNull(row.AuthorName);
+            row.ContentType = NormalizeNameToNull(row.ContentType);
+            row.Status = NormalizeNameToNull(row.Status);
+            row.Tags = NormalizeTags(row.Tags);
             row.TotalChapters = TrimToNull(row.TotalChapters);
             row.CurrentChapterNumber = TrimToNull(row.CurrentChapterNumber);
             row.CurrentChapterLabel = TrimToNull(row.CurrentChapterLabel);
@@ -338,12 +338,15 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 row.Errors.Add("Primary title is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(row.ContentType) || !validTypes.Contains(row.ContentType))
+            var normalizedContentType = string.IsNullOrWhiteSpace(row.ContentType) ? null : MappingExtensions.NormalizeName(row.ContentType);
+            var normalizedStatus = string.IsNullOrWhiteSpace(row.Status) ? null : MappingExtensions.NormalizeName(row.Status);
+
+            if (normalizedContentType == null || !validTypes.Contains(normalizedContentType))
             {
                 row.Errors.Add("Content type is required and must exist.");
             }
 
-            if (string.IsNullOrWhiteSpace(row.Status) || !validStatuses.Contains(row.Status))
+            if (normalizedStatus == null || !validStatuses.Contains(normalizedStatus))
             {
                 row.Errors.Add("Status is required and must exist.");
             }
@@ -369,21 +372,21 @@ public sealed class BookCsvImportService : IBookCsvImportService
             }
 
             if (!string.IsNullOrWhiteSpace(row.PrimaryTitle) &&
-                !string.IsNullOrWhiteSpace(row.ContentType) &&
-                validTypes.Contains(row.ContentType) &&
+                normalizedContentType != null &&
+                validTypes.Contains(normalizedContentType) &&
                 existingKeys.Contains(new BookImportKey(
                     MappingExtensions.NormalizeName(row.PrimaryTitle),
-                    typeIdsByName[row.ContentType])))
+                    typeIdsByName[normalizedContentType])))
             {
                 row.Errors.Add("A book with this title and content type already exists in your library.");
             }
         }
 
         var duplicateGroups = session.Rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.PrimaryTitle) && !string.IsNullOrWhiteSpace(row.ContentType) && validTypes.Contains(row.ContentType))
+            .Where(row => !string.IsNullOrWhiteSpace(row.PrimaryTitle) && !string.IsNullOrWhiteSpace(row.ContentType) && validTypes.Contains(MappingExtensions.NormalizeName(row.ContentType)))
             .GroupBy(row => new BookImportKey(
                 MappingExtensions.NormalizeName(row.PrimaryTitle!),
-                typeIdsByName[row.ContentType!]))
+                typeIdsByName[MappingExtensions.NormalizeName(row.ContentType!)]))
             .Where(group => group.Count() > 1);
 
         foreach (var duplicateGroup in duplicateGroups)
@@ -476,9 +479,25 @@ public sealed class BookCsvImportService : IBookCsvImportService
         return row.TryGetValue(key, out var value) ? TrimToNull(value) : null;
     }
 
+    private static string? CleanName(IReadOnlyDictionary<string, string> row, string key)
+    {
+        return row.TryGetValue(key, out var value) ? NormalizeNameToNull(value) : null;
+    }
+
     private static string? TrimToNull(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static string? NormalizeNameToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : MappingExtensions.CollapseWhitespace(value);
+    }
+
+    private static string? NormalizeTags(string? value)
+    {
+        var tags = SplitTags(value).ToArray();
+        return tags.Length == 0 ? null : string.Join("; ", tags);
     }
 
     private static string? NormalizeNotes(string? value)
@@ -507,7 +526,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         return value
             .Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(tag => tag.Trim())
+            .Select(MappingExtensions.CollapseWhitespace)
             .Where(tag => tag.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase);
     }
