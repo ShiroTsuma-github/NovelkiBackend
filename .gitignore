@@ -136,6 +136,7 @@ $RECYCLE.BIN/
 _NCrunch*
 
 # Local notes / non-public artifacts
+notes/
 *.md
 *.MD
 !README.md
