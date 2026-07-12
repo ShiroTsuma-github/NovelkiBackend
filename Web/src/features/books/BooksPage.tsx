@@ -14,8 +14,10 @@ import { BookCoverArtwork } from './BookCoverSection'
 import { ImportBooksDialog } from './ImportBooksDialog'
 
 const pageSizeOptions = [20, 50, 100, 500]
+const cardsPerRowOptions = [2, 3, 4, 5, 6, 7, 8] as const
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
 const bookLayoutStorageKey = 'novelki.books.layout.v1'
+const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
 const columnPopupWidthPx = 320
 const columnPopupEdgeGapPx = 16
 const columnPopupVerticalGapPx = 10
@@ -55,6 +57,7 @@ export function BooksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(bookColumnsStorageKey, bookColumns)
   const [viewMode, setViewMode] = useViewMode(bookLayoutStorageKey)
+  const [cardsPerRow, setCardsPerRow] = useCardsPerRow(cardsPerRowStorageKey)
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
@@ -209,6 +212,7 @@ export function BooksPage() {
           {booksQuery.isFetching && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
           ) : null}
+          {viewMode === 'cards' ? <CardsPerRowControl value={cardsPerRow} onChange={setCardsPerRow} /> : null}
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
           <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
@@ -256,7 +260,7 @@ export function BooksPage() {
             </table>
           </div>
         ) : (
-          <BookCardGrid books={booksQuery.data?.data ?? []} isLoading={booksQuery.isLoading} />
+          <BookCardGrid books={booksQuery.data?.data ?? []} cardsPerRow={cardsPerRow} isLoading={booksQuery.isLoading} />
         )}
       </section>
       <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
@@ -271,6 +275,31 @@ export function BooksPage() {
         </button>
       ) : null}
     </div>
+  )
+}
+
+function CardsPerRowControl({
+  value,
+  onChange,
+}: {
+  value: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <span>Cards / row</span>
+      <span className="relative inline-flex">
+        <select
+          aria-label="Cards per row"
+          className={`${inputClass} h-10 w-20 appearance-none bg-white pr-9 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+          value={value}
+          onChange={(event) => onChange(Number(event.target.value))}
+        >
+          {cardsPerRowOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      </span>
+    </label>
   )
 }
 
@@ -616,6 +645,18 @@ export function useViewMode(storageKey: string) {
   return [viewMode, setViewMode] as const
 }
 
+export function useCardsPerRow(storageKey: string) {
+  const [cardsPerRow, setCardsPerRowState] = useState<number>(() => readCardsPerRow(storageKey))
+
+  function setCardsPerRow(next: number) {
+    const normalized = normalizeCardsPerRow(next)
+    setCardsPerRowState(normalized)
+    window.localStorage.setItem(storageKey, String(normalized))
+  }
+
+  return [cardsPerRow, setCardsPerRow] as const
+}
+
 export function getVisibleColumns<T>(columns: ColumnDefinition<T>[], preferences: ColumnPreference[]) {
   return preferences
     .filter((preference) => preference.visible)
@@ -694,7 +735,15 @@ function BookRow({ book, columns }: { book: BookDto; columns: ColumnDefinition<B
   )
 }
 
-function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boolean }) {
+function BookCardGrid({
+  books,
+  cardsPerRow,
+  isLoading,
+}: {
+  books: BookDto[]
+  cardsPerRow: number
+  isLoading: boolean
+}) {
   if (isLoading) {
     return <div className="px-4 py-8 text-center text-slate-500">Loading...</div>
   }
@@ -704,7 +753,7 @@ function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boole
   }
 
   return (
-    <div className="grid gap-4 p-4 pb-24 sm:grid-cols-2 xl:grid-cols-4">
+    <div className={`grid gap-4 p-4 pb-24 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
         <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
           <Link className="grid gap-3" to={`/books/${book.id}`}>
@@ -859,8 +908,32 @@ function readPageSize(searchParams: URLSearchParams) {
   return pageSizeOptions.includes(value) ? value : 20
 }
 
+export function readCardsPerRow(storageKey: string) {
+  const stored = Number(window.localStorage.getItem(storageKey) ?? 4)
+  return normalizeCardsPerRow(stored)
+}
+
 function readSortDirection(searchParams: URLSearchParams): SortDirection {
   return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
+}
+
+function normalizeCardsPerRow(value: number) {
+  return cardsPerRowOptions.includes(value as typeof cardsPerRowOptions[number]) ? value : 4
+}
+
+function getDesktopCardsPerRowClass(cardsPerRow: number) {
+  const normalized = normalizeCardsPerRow(cardsPerRow)
+  const classMap: Record<number, string> = {
+    2: 'lg:grid-cols-2',
+    3: 'lg:grid-cols-3',
+    4: 'lg:grid-cols-4',
+    5: 'lg:grid-cols-5',
+    6: 'lg:grid-cols-6',
+    7: 'lg:grid-cols-7',
+    8: 'lg:grid-cols-8',
+  }
+
+  return classMap[normalized]
 }
 
 function getVisiblePageNumbers(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {

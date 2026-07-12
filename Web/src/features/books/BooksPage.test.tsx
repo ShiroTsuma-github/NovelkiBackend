@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { books, paginated } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { BooksPage, defaultColumnPreferences, formatProgress, getColumnPopupPosition, getVisibleColumns } from './BooksPage'
+import { BooksPage, defaultColumnPreferences, formatProgress, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -46,6 +46,20 @@ describe('BooksPage', () => {
 
     expect(window.localStorage.getItem('novelki.books.layout.v1')).toBe('cards')
     expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toBeInTheDocument()
+  })
+
+  it('lets the user change cards per row and persists the preference', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /cards per row/i }), '6')
+
+    expect(window.localStorage.getItem('novelki.books.cards-per-row.v1')).toBe('6')
+    expect(container.querySelector('.lg\\:grid-cols-6')).toBeTruthy()
   })
 
   it('shows rating overlays only on cards with a rating', async () => {
@@ -287,5 +301,11 @@ describe('BooksPage', () => {
     expect(formatProgress(books[0])).toBe('348 / 1432')
     expect(formatProgress({ ...books[0], currentChapterLabel: 'Side Story', currentChapterNumber: null })).toBe('Side Story / 1432')
     expect(formatProgress({ ...books[0], currentChapterLabel: null, currentChapterNumber: null, totalChapters: null })).toBe('-')
+  })
+
+  it('falls back to four cards per row for invalid stored values', () => {
+    window.localStorage.setItem('novelki.books.cards-per-row.v1', '99')
+
+    expect(readCardsPerRow('novelki.books.cards-per-row.v1')).toBe(4)
   })
 })
