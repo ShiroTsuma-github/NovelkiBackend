@@ -143,6 +143,24 @@ describe('BooksPage', () => {
     }))
   })
 
+  it('keeps the list footer sticky in table and cards view', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    let stickyFooter = container.querySelector('.sticky.bottom-3')
+    expect(stickyFooter).toHaveTextContent('Per page')
+    expect(container.querySelector('.overflow-x-auto.pb-24')).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+
+    stickyFooter = container.querySelector('.sticky.bottom-3')
+    expect(stickyFooter).toHaveTextContent('Per page')
+    expect(container.querySelector('.grid.gap-4.p-4.pb-24')).toBeTruthy()
+  })
+
   it('keeps the page jump popover open for invalid page numbers', async () => {
     vi.mocked(api.getBooks).mockResolvedValue({
       skip: 0,
