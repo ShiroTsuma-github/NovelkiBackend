@@ -23,22 +23,26 @@ body {
 }
 
 .import-rows-scroll {
+  padding-right: 0.35rem;
   scrollbar-width: thin;
   scrollbar-color: #475569 #0f172a;
+  scrollbar-gutter: stable;
 }
 
 .import-rows-scroll::-webkit-scrollbar {
-  width: 12px;
+  width: 13px;
 }
 
 .import-rows-scroll::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: padding-box;
+  border: 4px solid transparent;
   border-radius: 9999px;
 }
 
 .import-rows-scroll::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, #334155 0%, #475569 100%);
-  border: 2px solid #0f172a;
+  background-clip: padding-box;
+  border: 3px solid transparent;
   border-radius: 9999px;
 }
 
