@@ -318,7 +318,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
   return (
     <>
-      <form className="mx-auto grid w-full max-w-7xl gap-5" onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
+      <form className="mx-auto grid w-full max-w-7xl gap-5" noValidate onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-slate-950">{admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}</h1>
@@ -395,12 +395,14 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                 <div className="grid gap-5">
                   <div className="grid items-start gap-x-4 gap-y-4 md:grid-cols-2">
                     <FormField error={errors.primaryTitle?.message} label="Primary title">
-                      <input className={inputClass} {...form.register('primaryTitle')} />
+                      <input aria-label="Primary title" className={inputClass} {...form.register('primaryTitle')} />
                     </FormField>
                     <FormField error={errors.authorName?.message} label="Author">
                       <div className="relative">
                         <input
+                          aria-label="Author"
                           className={`${inputClass} w-full`}
+                          name="authorName"
                           value={authorName}
                           onBlur={() => window.setTimeout(() => setAuthorSuggestionsOpen(false), 120)}
                           onChange={(event) => {
@@ -453,18 +455,36 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                   <div className="grid max-w-4xl gap-5">
                     <div className="grid gap-x-5 gap-y-4 md:grid-cols-3">
                     <FormField error={errors.currentChapterNumber?.message} label="Current chapter">
-                        <input className={inputClass} type="number" min="0" step="1" {...form.register('currentChapterNumber')} />
-                      </FormField>
+                      <input
+                        aria-label="Current chapter"
+                        aria-invalid={errors.currentChapterNumber ? 'true' : undefined}
+                        className={inputClass}
+                        inputMode="decimal"
+                        {...form.register('currentChapterNumber')}
+                      />
+                    </FormField>
                       <FormField error={errors.currentChapterLabel?.message} label="Label">
                         <input className={inputClass} {...form.register('currentChapterLabel')} />
                       </FormField>
                     <FormField error={errors.totalChapters?.message} label="Total chapters">
-                        <input className={inputClass} type="number" min="0" step="1" {...form.register('totalChapters')} />
-                      </FormField>
+                      <input
+                        aria-label="Total chapters"
+                        aria-invalid={errors.totalChapters ? 'true' : undefined}
+                        className={inputClass}
+                        inputMode="decimal"
+                        {...form.register('totalChapters')}
+                      />
+                    </FormField>
                     </div>
                     <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
                       <FormField error={errors.priority?.message} label="Priority 1-5">
-                        <input className={inputClass} type="number" min="1" max="5" step="1" {...form.register('priority')} />
+                        <input
+                          aria-label="Priority 1-5"
+                          aria-invalid={errors.priority ? 'true' : undefined}
+                          className={inputClass}
+                          inputMode="numeric"
+                          {...form.register('priority')}
+                        />
                       </FormField>
                       <FormField error={errors.rating?.message} label="Rating">
                         <RatingStars
