@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -58,7 +58,8 @@ export function BooksPage() {
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
-  const [pageJumpValue, setPageJumpValue] = useState('')
+  const [activePageGapId, setActivePageGapId] = useState<string | null>(null)
+  const pendingBottomAnchorRef = useRef<number | null>(null)
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
@@ -124,9 +125,19 @@ export function BooksPage() {
   }, [])
 
   useEffect(() => {
-    setPageJumpValue(String(currentPage))
-  }, [currentPage])
-  
+    if (booksQuery.isFetching || pendingBottomAnchorRef.current == null) {
+      return
+    }
+
+    const distanceFromBottom = pendingBottomAnchorRef.current
+    pendingBottomAnchorRef.current = null
+
+    requestAnimationFrame(() => {
+      const target = Math.max(0, document.documentElement.scrollHeight - window.innerHeight - distanceFromBottom)
+      window.scrollTo({ top: target })
+    })
+  }, [booksQuery.isFetching, booksQuery.data?.data.length, skip])
+
   function handleImportComplete(result: BookImportFinalizeResult) {
     setLastImportResult(result)
     booksQuery.refetch()
@@ -139,16 +150,18 @@ export function BooksPage() {
 
   function goToPage(page: number) {
     const nextPage = Math.min(Math.max(1, page), totalPages)
+    prepareBottomAnchorForPageChange()
+    setActivePageGapId(null)
     setSkip((nextPage - 1) * pageSize)
   }
 
-  function submitPageJump() {
-    const parsed = Number(pageJumpValue)
-    if (!Number.isFinite(parsed)) {
-      return
+  function prepareBottomAnchorForPageChange() {
+    const distanceFromBottom = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight)
+    if (distanceFromBottom <= 24) {
+      pendingBottomAnchorRef.current = Math.max(0, distanceFromBottom)
+    } else {
+      pendingBottomAnchorRef.current = null
     }
-
-    goToPage(parsed)
   }
 
   return (
@@ -248,33 +261,50 @@ export function BooksPage() {
               </span>
             </label>
             <div className="flex flex-wrap items-center gap-1.5">
-              <button className={secondaryButtonClass} disabled={currentPage === 1} type="button" onClick={() => goToPage(1)}>First</button>
-              {visiblePages.map((page) => (
-                <button
-                  aria-current={page === currentPage ? 'page' : undefined}
-                  className={page === currentPage ? buttonClass : secondaryButtonClass}
-                  key={page}
-                  type="button"
-                  onClick={() => goToPage(page)}
-                >
-                  {page}
+              {canGoBack ? (
+                <button aria-label="First page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(1)}>
+                  <ChevronsLeft className="h-4 w-4" />
                 </button>
-              ))}
-              <button className={secondaryButtonClass} disabled={currentPage === totalPages} type="button" onClick={() => goToPage(totalPages)}>Last</button>
+              ) : null}
+              {canGoBack ? (
+                <button aria-label="Previous page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(currentPage - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+              ) : null}
+              {visiblePages.map((item, index) => item === 'ellipsis'
+                ? (
+                  <PageGapJump
+                    gapId={`ellipsis-${index}`}
+                    isOpen={activePageGapId === `ellipsis-${index}`}
+                    key={`ellipsis-${index}`}
+                    totalPages={totalPages}
+                    onGoToPage={goToPage}
+                    onOpen={() => setActivePageGapId(`ellipsis-${index}`)}
+                    onClose={() => setActivePageGapId((current) => current === `ellipsis-${index}` ? null : current)}
+                  />
+                )
+                : (
+                  <button
+                    aria-current={item === currentPage ? 'page' : undefined}
+                    className={item === currentPage ? compactActivePaginationButtonClass : compactPaginationButtonClass}
+                    key={item}
+                    type="button"
+                    onClick={() => goToPage(item)}
+                  >
+                    {item}
+                  </button>
+                ))}
+              {canGoForward ? (
+                <button aria-label="Next page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(currentPage + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              ) : null}
+              {canGoForward ? (
+                <button aria-label="Last page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(totalPages)}>
+                  <ChevronsRight className="h-4 w-4" />
+                </button>
+              ) : null}
             </div>
-            <label className="flex items-center gap-2">
-              <span>Jump to</span>
-              <input
-                aria-label="Jump to page"
-                className={`${inputClass} h-10 w-20 bg-white`}
-                inputMode="numeric"
-                value={pageJumpValue}
-                onChange={(event) => setPageJumpValue(event.target.value.replace(/[^\d]/g, ''))}
-              />
-              <button className={secondaryButtonClass} type="button" onClick={submitPageJump}>Go</button>
-            </label>
-            <button className={secondaryButtonClass} disabled={!canGoBack} type="button" onClick={() => setSkip(skip - pageSize)}>Previous</button>
-            <button className={secondaryButtonClass} disabled={!canGoForward} type="button" onClick={() => setSkip(skip + pageSize)}>Next</button>
           </div>
         </div>
       </section>
@@ -318,6 +348,116 @@ export function ViewModeToggle({
         <LayoutGrid className="h-3.5 w-3.5" />
         Cards
       </button>
+    </div>
+  )
+}
+
+const compactPaginationButtonClass =
+  'inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-xl font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950'
+
+const compactActivePaginationButtonClass =
+  'inline-flex min-h-10 min-w-10 items-center justify-center rounded-full bg-slate-900 px-3 text-xl font-medium text-white shadow-sm'
+
+function PageGapJump({
+  gapId,
+  isOpen,
+  totalPages,
+  onGoToPage,
+  onOpen,
+  onClose,
+}: {
+  gapId: string
+  isOpen: boolean
+  totalPages: number
+  onGoToPage: (page: number) => void
+  onOpen: () => void
+  onClose: () => void
+}) {
+  const [value, setValue] = useState('')
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const parsed = Number(value)
+  const isValid = Number.isInteger(parsed) && parsed >= 1 && parsed <= totalPages
+
+  function submit() {
+    if (!isValid) {
+      return false
+    }
+
+    onGoToPage(parsed)
+    setValue('')
+    return true
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (containerRef.current?.contains(event.target as Node)) {
+        return
+      }
+
+      if (submit()) {
+        return
+      }
+
+      onClose()
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [isOpen, isValid, onClose, parsed, totalPages])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setValue('')
+    }
+  }, [isOpen])
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        aria-label="Jump between pages"
+        aria-expanded={isOpen}
+        className={compactPaginationButtonClass}
+        type="button"
+        onClick={() => {
+          if (isOpen) {
+            onClose()
+            return
+          }
+
+          onOpen()
+        }}
+      >
+        ...
+      </button>
+      {isOpen ? (
+        <div className="absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+          <input
+            aria-invalid={!isValid && value.length > 0 ? 'true' : undefined}
+            data-gap-id={gapId}
+            aria-label="Page number"
+            className={`${inputClass} h-10 w-24 bg-white text-center ${!isValid && value.length > 0 ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+            inputMode="numeric"
+            max={totalPages}
+            min={1}
+            placeholder={`1-${totalPages}`}
+            value={value}
+            onChange={(event) => setValue(event.target.value.replace(/[^\d]/g, ''))}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                submit()
+              }
+              if (event.key === 'Escape') {
+                onClose()
+              }
+            }}
+          />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -676,14 +816,20 @@ function readSortDirection(searchParams: URLSearchParams): SortDirection {
   return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
 }
 
-function getVisiblePageNumbers(currentPage: number, totalPages: number) {
-  const start = Math.max(1, currentPage - 1)
-  const end = Math.min(totalPages, currentPage + 1)
-  const pages = []
-  for (let page = start; page <= end; page += 1) {
-    pages.push(page)
+function getVisiblePageNumbers(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
   }
-  return pages
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, 6, 'ellipsis', totalPages]
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [1, 'ellipsis', totalPages - 5, totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages]
+  }
+
+  return [1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages]
 }
 
 function getRatingBadgeClass(rating: number) {
@@ -705,22 +851,22 @@ function getRatingBadgeClass(rating: number) {
 function getStatusBadgeClass(status: string) {
   const normalized = status.trim().toLowerCase()
   if (normalized === 'reading') {
-    return 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
+    return 'border-indigo-900/80 bg-indigo-600/95 text-white'
   }
   if (normalized === 'completed') {
-    return 'border-cyan-200 bg-cyan-50/95 text-cyan-700'
+    return 'border-emerald-900/80 bg-emerald-600/95 text-white'
   }
   if (normalized === 'plan to read') {
-    return 'border-amber-200 bg-amber-50/95 text-amber-700'
+    return 'border-amber-900/80 bg-amber-400/95 text-slate-950'
   }
   if (normalized === 'on hold') {
-    return 'border-orange-200 bg-orange-50/95 text-orange-700'
+    return 'border-violet-900/80 bg-violet-600/95 text-white'
   }
   if (normalized === 'dropped') {
-    return 'border-rose-200 bg-rose-50/95 text-rose-700'
+    return 'border-rose-900/80 bg-rose-600/95 text-white'
   }
 
-  return 'border-slate-200 bg-slate-100/95 text-slate-700'
+  return 'border-slate-700/80 bg-slate-300/95 text-slate-950'
 }
 
 export function formatProgress(book: BookDto) {
