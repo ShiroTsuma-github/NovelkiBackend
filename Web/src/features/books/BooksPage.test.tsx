@@ -66,6 +66,26 @@ describe('BooksPage', () => {
     }))
   })
 
+  it('shows a back to top button after scrolling and scrolls to the top on click', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    expect(screen.queryByRole('button', { name: /back to top/i })).not.toBeInTheDocument()
+
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 640 })
+    window.dispatchEvent(new Event('scroll'))
+
+    const button = await screen.findByRole('button', { name: /back to top/i })
+    await user.click(button)
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+    scrollTo.mockRestore()
+  })
+
   it('keeps column visibility helpers deterministic', () => {
     const columns = [
       { id: 'title', label: 'Title', defaultVisible: true, render: () => 'Title' },
