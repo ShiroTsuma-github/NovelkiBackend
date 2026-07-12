@@ -54,6 +54,7 @@ export function BooksPage() {
   const [viewMode, setViewMode] = useViewMode(bookLayoutStorageKey)
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [showBackToTop, setShowBackToTop] = useState(false)
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
@@ -104,11 +105,25 @@ export function BooksPage() {
   const total = booksQuery.data?.total ?? 0
   const canGoBack = skip > 0
   const canGoForward = skip + pageSize < total
+
+  useEffect(() => {
+    function updateBackToTopVisibility() {
+      setShowBackToTop(window.scrollY > 480)
+    }
+
+    updateBackToTopVisibility()
+    window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
+    return () => window.removeEventListener('scroll', updateBackToTopVisibility)
+  }, [])
   
   function handleImportComplete(result: BookImportFinalizeResult) {
     setLastImportResult(result)
     booksQuery.refetch()
     toast.success(`Imported ${result.importedCount} books. Skipped ${result.skippedCount}.`)
+  }
+
+  function scrollBackToTop() {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   return (
@@ -213,6 +228,16 @@ export function BooksPage() {
         </div>
       </section>
       <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
+      {showBackToTop ? (
+        <button
+          aria-label="Back to top"
+          className="fixed bottom-6 right-6 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+          type="button"
+          onClick={scrollBackToTop}
+        >
+          <ArrowUp className="h-4 w-4" />
+        </button>
+      ) : null}
     </div>
   )
 }
