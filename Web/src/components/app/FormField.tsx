@@ -11,7 +11,9 @@ export function FormField({ label, error, children }: FormFieldProps) {
     <div className="grid gap-1.5 text-sm font-medium text-slate-200">
       <span>{label}</span>
       <div className="contents dark-field">{children}</div>
-      {error ? <span className="text-xs text-red-600">{error}</span> : null}
+      <span aria-live="polite" className={`min-h-4 text-xs ${error ? 'text-red-600' : 'text-transparent'}`}>
+        {error ?? ' '}
+      </span>
     </div>
   )
 }
