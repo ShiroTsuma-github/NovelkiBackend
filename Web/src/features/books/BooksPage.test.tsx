@@ -70,8 +70,8 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
-    expect(screen.getAllByText('Reading')[0].parentElement).toHaveClass('bg-emerald-50/95', 'text-emerald-700')
-    expect(screen.getAllByText('Completed')[0].parentElement).toHaveClass('bg-cyan-50/95', 'text-cyan-700')
+    expect(screen.getAllByText('Reading')[0].parentElement).toHaveClass('bg-indigo-600/95', 'text-white')
+    expect(screen.getAllByText('Completed')[0].parentElement).toHaveClass('bg-emerald-600/95', 'text-white')
   })
 
   it('updates query params and refetches when sorting by title', async () => {
@@ -96,7 +96,7 @@ describe('BooksPage', () => {
     vi.mocked(api.getBooks).mockResolvedValue({
       skip: 0,
       take: 20,
-      total: 120,
+      total: 220,
       data: books,
     })
     const user = userEvent.setup()
@@ -106,7 +106,8 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     expect(screen.getByRole('button', { name: '1' })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /last/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last page/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /jump between pages/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: '2' }))
 
@@ -118,13 +119,23 @@ describe('BooksPage', () => {
       sortDirection: 'desc',
     }))
 
-    const jumpInput = screen.getByRole('textbox', { name: /jump to page/i })
-    await user.clear(jumpInput)
-    await user.type(jumpInput, '999')
-    await user.click(screen.getByRole('button', { name: /^go$/i }))
+    await user.click(screen.getByRole('button', { name: /next page/i }))
 
     await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith({
-      skip: 100,
+      skip: 40,
+      take: 20,
+      query: '',
+      sortBy: 'lastModified',
+      sortDirection: 'desc',
+    }))
+
+    await user.click(screen.getByRole('button', { name: /jump between pages/i }))
+    const jumpInput = screen.getByRole('textbox', { name: /page number/i })
+    await user.type(jumpInput, '11')
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith({
+      skip: 200,
       take: 20,
       query: '',
       sortBy: 'lastModified',
@@ -132,10 +143,85 @@ describe('BooksPage', () => {
     }))
   })
 
+  it('keeps the page jump popover open for invalid page numbers', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue({
+      skip: 0,
+      take: 20,
+      total: 220,
+      data: books,
+    })
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /jump between pages/i }))
+
+    const jumpInput = screen.getByRole('textbox', { name: /page number/i })
+    await user.type(jumpInput, '0')
+    await user.keyboard('{Enter}')
+
+    expect(jumpInput).toHaveAttribute('aria-invalid', 'true')
+    expect(api.getBooks).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps only one page gap popover open at a time', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue({
+      skip: 100,
+      take: 20,
+      total: 420,
+      data: books,
+    })
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?skip=100&take=20' })
+
+    await screen.findByText('Lord of Mysteries')
+    const gapButtons = screen.getAllByRole('button', { name: /jump between pages/i })
+    expect(gapButtons).toHaveLength(2)
+
+    await user.click(gapButtons[0])
+    expect(screen.getByRole('textbox', { name: /page number/i })).toBeInTheDocument()
+    expect(gapButtons[0]).toHaveAttribute('aria-expanded', 'true')
+    expect(gapButtons[1]).toHaveAttribute('aria-expanded', 'false')
+
+    await user.click(gapButtons[1])
+    expect(screen.getByRole('textbox', { name: /page number/i })).toBeInTheDocument()
+    expect(gapButtons[0]).toHaveAttribute('aria-expanded', 'false')
+    expect(gapButtons[1]).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('preserves bottom anchoring when changing pages near the page bottom', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue({
+      skip: 0,
+      take: 20,
+      total: 220,
+      data: books,
+    })
+    const user = userEvent.setup()
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 1190 })
+    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 2000 })
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: '2' }))
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ top: 1190 })
+    })
+
+    scrollTo.mockRestore()
+  })
+
   it('shows a back to top button after scrolling and scrolls to the top on click', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 })
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
