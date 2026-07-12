@@ -16,6 +16,9 @@ import { ImportBooksDialog } from './ImportBooksDialog'
 const pageSizeOptions = [20, 50, 100, 500]
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
 const bookLayoutStorageKey = 'novelki.books.layout.v1'
+const columnPopupWidthPx = 320
+const columnPopupEdgeGapPx = 16
+const columnPopupVerticalGapPx = 10
 type SortDirection = 'asc' | 'desc'
 export type BookViewMode = 'table' | 'cards'
 export type ColumnPreference = { id: string; visible: boolean }
@@ -336,19 +339,7 @@ export function ColumnSettingsPopup<T>({
         return
       }
 
-      const panelWidthVw = 20
-      const horizontalGapVw = 1.25
-      const verticalLiftVh = 1.25
-      const edgeGapVw = 1
-      const edgeGapVh = 1
-      const preferredLeftVw = (rect.right / window.innerWidth) * 100 + horizontalGapVw
-      const preferredTopVh = (rect.top / window.innerHeight) * 100 - verticalLiftVh
-      setPosition({
-        left: window.innerWidth < 640
-          ? '0.5rem'
-          : `clamp(${edgeGapVw}vw, ${preferredLeftVw}vw, ${100 - panelWidthVw - edgeGapVw}vw)`,
-        top: `clamp(${edgeGapVh}vh, ${preferredTopVh}vh, calc(100vh - ${edgeGapVh}vh))`,
-      })
+      setPosition(getColumnPopupPosition(rect, window.innerWidth, window.innerHeight))
     }
 
     updatePosition()
@@ -396,10 +387,10 @@ export function ColumnSettingsPopup<T>({
       </button>
       {open ? (
         <div
-          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-2 overflow-y-auto rounded-lg border border-slate-200 bg-white p-3 text-left normal-case tracking-normal shadow-xl"
+          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-left normal-case tracking-normal shadow-xl"
           style={position}
         >
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-2">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
               <div className="text-sm font-semibold text-slate-950">Visible columns</div>
               <div className="text-xs font-normal text-slate-500">Change table order and visibility.</div>
@@ -413,7 +404,7 @@ export function ColumnSettingsPopup<T>({
             }
 
             return (
-              <div className={`flex items-center justify-between gap-3 rounded-md border bg-white px-3 py-2 text-sm text-slate-700 ${preference.visible ? 'border-emerald-400' : 'border-slate-200'}`} key={preference.id}>
+              <div className={`flex items-center justify-between gap-3 rounded-md border bg-white px-3.5 py-2.5 text-sm text-slate-700 ${preference.visible ? 'border-emerald-400' : 'border-slate-200'}`} key={preference.id}>
                 <button
                   aria-pressed={preference.visible}
                   className="inline-flex min-w-0 flex-1 items-center gap-2 text-left font-medium text-inherit"
@@ -447,6 +438,29 @@ export function useColumnPreferences<T>(storageKey: string, columns: ColumnDefin
   }
 
   return [preferences, updatePreferences] as const
+}
+
+export function getColumnPopupPosition(
+  rect: Pick<DOMRect, 'left' | 'right' | 'bottom'>,
+  viewportWidth: number,
+  viewportHeight: number,
+) {
+  const maxWidth = Math.min(columnPopupWidthPx, viewportWidth - (columnPopupEdgeGapPx * 2))
+  const left = viewportWidth < 640
+    ? columnPopupEdgeGapPx
+    : Math.min(
+      Math.max(columnPopupEdgeGapPx, rect.right - maxWidth),
+      viewportWidth - maxWidth - columnPopupEdgeGapPx,
+    )
+  const top = Math.min(
+    Math.max(columnPopupEdgeGapPx, rect.bottom + columnPopupVerticalGapPx),
+    viewportHeight - columnPopupEdgeGapPx,
+  )
+
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+  }
 }
 
 export function useViewMode(storageKey: string) {
