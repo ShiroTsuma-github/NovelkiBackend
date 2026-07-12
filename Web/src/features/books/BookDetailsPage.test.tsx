@@ -1,4 +1,5 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/api/client'
@@ -118,5 +119,28 @@ describe('BookDetailsPage', () => {
 
     expect(await screen.findByText('+6')).toHaveClass('bg-emerald-100', 'text-emerald-700')
     expect(screen.getByText('-4')).toHaveClass('bg-rose-100', 'text-rose-700')
+  })
+
+  it('keeps the delete dialog title readable against the light dialog surface', async () => {
+    vi.mocked(api.getGenres).mockResolvedValue({ skip: 0, take: 100, total: genres.length, data: genres })
+    vi.mocked(api.getBook).mockResolvedValue(books[0])
+    const user = userEvent.setup()
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /^delete$/i }))
+
+    const dialog = screen.getByRole('dialog')
+    const panel = dialog.firstElementChild
+
+    expect(screen.getByRole('heading', { name: /delete book/i })).toHaveClass('text-slate-950')
+    expect(within(dialog).getByText('Lord of Mysteries')).toHaveClass('text-slate-900')
+    expect(panel).toHaveClass('bg-white')
   })
 })

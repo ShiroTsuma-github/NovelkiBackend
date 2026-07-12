@@ -95,6 +95,7 @@ Concept tickety:
 - Problem: feedback mowi, ze tytul usuwanej ksiazki ma kolor taki jak tlo, ale aktualny kod ustawia biale tlo i `text-slate-900`.
 - Zakres: odtworzyc przypadek na aktualnym UI, przegladarkach i motywach; dopiero po potwierdzeniu zrobic konkretny fix kontrastu.
 - Akceptacja: wynik reprodukcji jest opisany w tickecie albo komentarzu; jesli problem istnieje, tytul ma kontrast zgodny z reszta dialogu; jesli nie istnieje, ticket zamyka sie jako unreproducible z notatka o sprawdzonej wersji.
+- Weryfikacja `2026-07-12`: na aktualnym UI nie udalo sie odtworzyc problemu. Dialog ma `bg-white`, naglowek `text-slate-950`, a tytul usuwanej ksiazki `text-slate-900`; dodano test regresyjny w `Web/src/features/books/BookDetailsPage.test.tsx`.
 
 ### NB-045 - Zweryfikuj konkretny przypadek dziwnego sortowania po tytule
 
