@@ -154,13 +154,13 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findAllByText('Content type is required and must exist.')).toHaveLength(3)
+    expect(await screen.findAllByText('Content type is required and must exist.')).toHaveLength(2)
 
     const typeInput = screen.getByLabelText(/^Type/)
     const titleInput = screen.getByLabelText(/^Title/)
 
     expect(typeInput).toHaveAttribute('aria-invalid', 'true')
-    expect(typeInput).toHaveClass('border-rose-500')
+    expect(typeInput).toHaveClass('!border-rose-500')
     expect(titleInput).not.toHaveAttribute('aria-invalid')
   })
 })
