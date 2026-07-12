@@ -14,6 +14,10 @@ type ImportBooksDialogProps = {
   onImported: (result: BookImportFinalizeResult) => void
 }
 
+function ImportRowsScroller(props: React.ComponentProps<'div'>) {
+  return <div {...props} className="import-rows-scroll" />
+}
+
 export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDialogProps) {
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
@@ -221,13 +225,11 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                 <div className="h-full min-h-0">
                   <Virtuoso
                     className="import-rows-scroll"
-                    components={{
-                      Scroller: (props) => <div {...props} className="import-rows-scroll" />,
-                    }}
+                    components={{ Scroller: ImportRowsScroller }}
                     data={invalidRows}
                     increaseViewportBy={{ bottom: 160, top: 160 }}
                     itemContent={(_, row) => (
-                      <div className="pb-3">
+                      <div className="pb-3 pr-3">
                         <ImportRowEditor
                           expanded={expandedRowId === row.rowId}
                           row={row}
@@ -490,11 +492,10 @@ function LabeledInput({ error = [], label, value, onChange }: { error?: string[]
       <span className="font-medium text-slate-300">{label}</span>
       <input
         aria-invalid={errorMessage ? 'true' : undefined}
-        className={`${inputClass} ${errorMessage ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400/20' : ''}`}
+        className={`${inputClass} ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      {errorMessage ? <span className="text-xs font-medium text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }
@@ -507,11 +508,10 @@ function LabeledTextarea({ error = [], label, value, onChange }: { error?: strin
       <span className="font-medium text-slate-300">{label}</span>
       <textarea
         aria-invalid={errorMessage ? 'true' : undefined}
-        className={`${inputClass} min-h-28 ${errorMessage ? 'border-rose-500 focus:border-rose-400 focus:ring-rose-400/20' : ''}`}
+        className={`${inputClass} min-h-28 ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      {errorMessage ? <span className="text-xs font-medium text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }
