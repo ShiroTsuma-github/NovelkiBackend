@@ -17,6 +17,7 @@ type ImportBooksDialogProps = {
 export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDialogProps) {
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+  const [allowInvalidRowAutoExpand, setAllowInvalidRowAutoExpand] = useState(true)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const invalidRows = useMemo(() => session?.rows.filter((row) => !row.isValid) ?? [], [session])
 
@@ -24,6 +25,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     mutationFn: (file: File) => api.createBookImportSession(file),
     onSuccess: (nextSession) => {
       setSession(nextSession)
+      setAllowInvalidRowAutoExpand(true)
       setExpandedRowId(nextSession.rows.find((row) => !row.isValid)?.rowId ?? null)
       toast.success('Import draft created.')
     },
@@ -52,6 +54,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     if (!open) {
       setSession(null)
       setExpandedRowId(null)
+      setAllowInvalidRowAutoExpand(true)
     }
   }, [open])
 
@@ -61,10 +64,14 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       return
     }
 
-    if (!expandedRowId || !invalidRows.some((row) => row.rowId === expandedRowId)) {
+    if (expandedRowId && invalidRows.some((row) => row.rowId === expandedRowId)) {
+      return
+    }
+
+    if (allowInvalidRowAutoExpand) {
       setExpandedRowId(invalidRows[0]?.rowId ?? null)
     }
-  }, [expandedRowId, invalidRows])
+  }, [allowInvalidRowAutoExpand, expandedRowId, invalidRows])
 
   if (!open) {
     return null
@@ -175,7 +182,13 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                           row={row}
                           sessionId={session.sessionId}
                           onSessionChange={setSession}
-                          onToggle={() => setExpandedRowId((current) => current === row.rowId ? null : row.rowId)}
+                          onToggle={() => {
+                            setExpandedRowId((current) => {
+                              const isCollapsing = current === row.rowId
+                              setAllowInvalidRowAutoExpand(!isCollapsing)
+                              return isCollapsing ? null : row.rowId
+                            })
+                          }}
                         />
                       </div>
                     )}
