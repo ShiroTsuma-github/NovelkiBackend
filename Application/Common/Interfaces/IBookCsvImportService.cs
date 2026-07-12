@@ -4,6 +4,7 @@ using Application.Common.DTOs.Book;
 
 public interface IBookCsvImportService
 {
+    string CreateTemplate();
     Task<BookImportSessionDto> CreateSessionAsync(Stream csvStream, string fileName, CancellationToken cancellationToken);
     Task<BookImportSessionDto> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken);
     Task<BookImportSessionDto> UpdateRowAsync(Guid sessionId, Guid rowId, UpdateBookImportRowRequest request, CancellationToken cancellationToken);

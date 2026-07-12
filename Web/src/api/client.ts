@@ -1,4 +1,4 @@
-import { apiFormRequest, apiRequest, toQueryString } from './http'
+import { apiBlobRequest, apiFormRequest, apiRequest, toQueryString } from './http'
 import type {
   AuthorDto,
   AdminLibraryPurgeResult,
@@ -60,6 +60,8 @@ export const api = {
     formData.set('file', file)
     return apiFormRequest<BookImportSessionDto>('/book/import/sessions', formData, { method: 'POST' })
   },
+  downloadBookImportTemplate: () =>
+    apiBlobRequest('/book/import/template'),
   getBookImportSession: (sessionId: string) =>
     apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}`),
   updateBookImportRow: (sessionId: string, rowId: string, request: BookImportRowUpdateRequest) =>

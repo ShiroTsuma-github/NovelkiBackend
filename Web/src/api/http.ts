@@ -41,6 +41,38 @@ export async function apiFormRequest<T>(
   return requestWithBody<T>(path, options, formData, true)
 }
 
+export async function apiBlobRequest(
+  path: string,
+  options: Omit<RequestInit, 'body'> & { token?: string | null } = {},
+): Promise<Blob> {
+  const headers = new Headers(options.headers)
+  const token = options.token ?? getStoredSession()?.accessToken ?? null
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`)
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers,
+  })
+
+  if (response.status === 401 && shouldTryRefresh(path)) {
+    const refreshedAccessToken = await refreshSession()
+    if (refreshedAccessToken) {
+      return apiBlobRequest(path, { ...options, token: refreshedAccessToken })
+    }
+  }
+
+  if (!response.ok) {
+    const text = await response.text()
+    const data = text ? JSON.parse(text) : undefined
+    throw new HttpError(normalizeApiError(data, response.status, path))
+  }
+
+  return response.blob()
+}
+
 async function requestWithBody<T>(
   path: string,
   options: Omit<RequestInit, 'body'> & { body?: unknown; token?: string | null },

@@ -6,6 +6,7 @@ using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Api.Observability;
 using System.Diagnostics;
+using System.Text;
 
 [ApiController]
 [Route("api/v1/book")]
@@ -110,6 +111,15 @@ public class BookController : ControllerBase
         _logger.LogInformation("Book CSV import session created. SessionId={SessionId}", result.SessionId);
 
         return Ok(result);
+    }
+
+    [HttpGet("import/template")]
+    [Authorize]
+    public IActionResult DownloadImportTemplate()
+    {
+        var template = _bookCsvImportService.CreateTemplate();
+        var bytes = Encoding.UTF8.GetBytes(template);
+        return File(bytes, "text/csv; charset=utf-8", "book-import-template.csv");
     }
 
     [HttpGet("import/sessions/{sessionId:guid}")]
