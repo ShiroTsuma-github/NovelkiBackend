@@ -53,6 +53,7 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
+app.UseResponseCompression();
 app.UseErrorHandlingMiddleware();
 
 if (app.Environment.IsDevelopment())
