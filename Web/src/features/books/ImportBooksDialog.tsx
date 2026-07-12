@@ -269,6 +269,8 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                     itemContent={(_, row) => (
                       <div className="pb-3 pr-3">
                         <ImportRowEditor
+                          availableContentTypes={session.availableContentTypes}
+                          availableStatuses={session.availableStatuses}
                           expanded={expandedRowId === row.rowId}
                           row={row}
                           sessionId={session.sessionId}
@@ -371,12 +373,16 @@ function CancelImportConfirmDialog({
 }
 
 function ImportRowEditor({
+  availableContentTypes,
+  availableStatuses,
   expanded,
   onToggle,
   row,
   sessionId,
   onSessionChange,
 }: {
+  availableContentTypes: string[]
+  availableStatuses: string[]
   expanded: boolean
   onToggle: () => void
   row: BookImportRowDto
@@ -488,8 +494,8 @@ function ImportRowEditor({
             <LabeledInput error={fieldError('primaryTitle')} label="Title" value={draft.primaryTitle ?? ''} onChange={(value) => update('primaryTitle', value)} />
             <LabeledInput error={fieldError('authorName')} label="Author" value={draft.authorName ?? ''} onChange={(value) => update('authorName', value)} />
             <LabeledInput error={fieldError('tags')} label="Tags" value={draft.tags ?? ''} onChange={(value) => update('tags', value)} />
-            <LabeledInput error={fieldError('contentType')} label="Type" value={draft.contentType ?? ''} onChange={(value) => update('contentType', value)} />
-            <LabeledInput error={fieldError('status')} label="Status" value={draft.status ?? ''} onChange={(value) => update('status', value)} />
+            <LabeledInput error={fieldError('contentType')} label="Type" suggestions={availableContentTypes} value={draft.contentType ?? ''} onChange={(value) => update('contentType', value)} />
+            <LabeledInput error={fieldError('status')} label="Status" suggestions={availableStatuses} value={draft.status ?? ''} onChange={(value) => update('status', value)} />
             <LabeledInput error={fieldError('currentChapterLabel')} label="Current label" value={draft.currentChapterLabel ?? ''} onChange={(value) => update('currentChapterLabel', value)} />
             <LabeledInput error={fieldError('currentChapterNumber')} label="Current chapter" value={draft.currentChapterNumber ?? ''} onChange={(value) => update('currentChapterNumber', value)} />
             <LabeledInput error={fieldError('totalChapters')} label="Total chapters" value={draft.totalChapters ?? ''} onChange={(value) => update('totalChapters', value)} />
@@ -522,18 +528,39 @@ function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value:
   )
 }
 
-function LabeledInput({ error = [], label, value, onChange }: { error?: string[]; label: string; value: string; onChange: (value: string) => void }) {
+function LabeledInput({
+  error = [],
+  label,
+  suggestions = [],
+  value,
+  onChange,
+}: {
+  error?: string[]
+  label: string
+  suggestions?: string[]
+  value: string
+  onChange: (value: string) => void
+}) {
   const errorMessage = error.join(' ')
+  const suggestionsId = suggestions.length ? `import-${label.toLowerCase().replaceAll(/\s+/g, '-')}-options` : undefined
 
   return (
     <label className="grid gap-1 text-sm">
       <span className="font-medium text-slate-300">{label}</span>
       <input
         aria-invalid={errorMessage ? 'true' : undefined}
+        list={suggestionsId}
         className={`${inputClass} ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {suggestionsId ? (
+        <datalist id={suggestionsId}>
+          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
+        </datalist>
+      ) : null}
+      {suggestions.length ? <span className="text-xs text-slate-500">Suggestions: {suggestions.join(', ')}</span> : null}
+      {errorMessage ? <span className="text-xs text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }
@@ -550,6 +577,7 @@ function LabeledTextarea({ error = [], label, value, onChange }: { error?: strin
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
+      {errorMessage ? <span className="text-xs text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }

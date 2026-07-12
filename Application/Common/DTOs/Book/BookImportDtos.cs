@@ -8,6 +8,8 @@ public record BookImportSessionDto
     public int ValidRows { get; set; }
     public int InvalidRows { get; set; }
     public bool CanFinalize { get; set; }
+    public IReadOnlyCollection<string> AvailableContentTypes { get; set; } = Array.Empty<string>();
+    public IReadOnlyCollection<string> AvailableStatuses { get; set; } = Array.Empty<string>();
     public IReadOnlyCollection<BookImportRowDto> Rows { get; set; } = Array.Empty<BookImportRowDto>();
 }
 

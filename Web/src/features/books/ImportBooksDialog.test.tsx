@@ -194,7 +194,7 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findAllByText('Content type is required and must exist.')).toHaveLength(2)
+    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(3)
 
     const typeInput = screen.getByLabelText(/^Type/)
     const titleInput = screen.getByLabelText(/^Title/)
@@ -202,6 +202,28 @@ describe('ImportBooksDialog', () => {
     expect(typeInput).toHaveAttribute('aria-invalid', 'true')
     expect(typeInput).toHaveClass('!border-rose-500')
     expect(titleInput).not.toHaveAttribute('aria-invalid')
+  })
+
+  it('shows type and status suggestions for invalid import rows', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    expect(await screen.findByText('Suggestions: Novel, Manga')).toBeInTheDocument()
+    expect(screen.getByText('Suggestions: Reading, Completed')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Type/)).toHaveAttribute('list', 'import-type-options')
+    expect(screen.getByLabelText(/^Status/)).toHaveAttribute('list', 'import-status-options')
   })
 })
 
@@ -212,6 +234,8 @@ const importSessionWithFieldErrors: BookImportSessionDto = {
   validRows: 0,
   invalidRows: 1,
   canFinalize: false,
+  availableContentTypes: ['Novel', 'Manga'],
+  availableStatuses: ['Reading', 'Completed'],
   rows: [
     {
       rowId: 'row-1',

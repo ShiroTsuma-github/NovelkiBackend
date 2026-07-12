@@ -51,6 +51,8 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal(3, session.TotalRows);
         Assert.Equal(0, session.ValidRows);
         Assert.False(session.CanFinalize);
+        Assert.Equal(new[] { "Novel" }, session.AvailableContentTypes);
+        Assert.Contains("Reading", session.AvailableStatuses);
 
         var existingRows = session.Rows.Where(row => row.PrimaryTitle == "Existing Book").ToList();
         Assert.Equal(2, existingRows.Count);
@@ -59,14 +61,14 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal("one\ntwo", existingRows[0].Notes);
 
         var invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "New Book");
-        Assert.Contains("Content type is required and must exist.", invalidRow.Errors);
-        Assert.Contains("Status is required and must exist.", invalidRow.Errors);
+        Assert.Contains("Content type is required and must exist. Allowed values: Novel.", invalidRow.Errors);
+        Assert.Contains("Status is required and must exist. Allowed values: Reading.", invalidRow.Errors);
         Assert.Contains("TotalChapters must be a valid number.", invalidRow.Errors);
         Assert.Contains("Current chapter number cannot be negative.", invalidRow.Errors);
         Assert.Contains("Rating must be a valid integer.", invalidRow.Errors);
         Assert.Contains("Priority must be between 1 and 5.", invalidRow.Errors);
-        Assert.Contains("Content type is required and must exist.", invalidRow.FieldErrors["contentType"]);
-        Assert.Contains("Status is required and must exist.", invalidRow.FieldErrors["status"]);
+        Assert.Contains("Content type is required and must exist. Allowed values: Novel.", invalidRow.FieldErrors["contentType"]);
+        Assert.Contains("Status is required and must exist. Allowed values: Reading.", invalidRow.FieldErrors["status"]);
         Assert.Contains("TotalChapters must be a valid number.", invalidRow.FieldErrors["totalChapters"]);
         Assert.Contains("Current chapter number cannot be negative.", invalidRow.FieldErrors["currentChapterNumber"]);
         Assert.Contains("Rating must be a valid integer.", invalidRow.FieldErrors["rating"]);
