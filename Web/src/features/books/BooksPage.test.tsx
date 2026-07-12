@@ -57,7 +57,21 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
-    expect(screen.getAllByText('9')).toHaveLength(1)
+    const ratingBadge = screen.getAllByText('9')[0]
+    expect(ratingBadge).toHaveClass('min-h-10', 'min-w-10', 'bg-emerald-500/95')
+  })
+
+  it('shows status overlays on cards with status-specific colors', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+
+    expect(screen.getAllByText('Reading')[0].parentElement).toHaveClass('bg-emerald-50/95', 'text-emerald-700')
+    expect(screen.getAllByText('Completed')[0].parentElement).toHaveClass('bg-cyan-50/95', 'text-cyan-700')
   })
 
   it('updates query params and refetches when sorting by title', async () => {
