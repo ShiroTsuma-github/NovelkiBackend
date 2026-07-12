@@ -119,6 +119,24 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldSortTitlesCaseInsensitivelyAndDeterministically()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var apple = await TestData.AddBookAsync(context, database.UserId, "apple");
+        var bananaLower = await TestData.AddBookAsync(context, database.UserId, "banana");
+        var bananaUpper = await TestData.AddBookAsync(context, database.UserId, "Banana");
+        var zebra = await TestData.AddBookAsync(context, database.UserId, "Zebra");
+        var repository = new BookRepository(context);
+
+        var ascending = (await repository.GetAllAsync(database.UserId, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+        var descending = (await repository.GetAllAsync(database.UserId, 0, 10, "title", "desc", CancellationToken.None)).ToList();
+
+        Assert.Equal([apple.Id, bananaUpper.Id, bananaLower.Id, zebra.Id], ascending.Select(book => book.Id));
+        Assert.Equal([zebra.Id, bananaLower.Id, bananaUpper.Id, apple.Id], descending.Select(book => book.Id));
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldReplaceCollectionsAfterDuplicateTitleLookup()
     {
         using var database = new SqliteTestDatabase();
