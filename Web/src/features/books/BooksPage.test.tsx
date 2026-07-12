@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { books, paginated } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { BooksPage, defaultColumnPreferences, formatProgress, getVisibleColumns } from './BooksPage'
+import { BooksPage, defaultColumnPreferences, formatProgress, getColumnPopupPosition, getVisibleColumns } from './BooksPage'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -125,6 +125,18 @@ describe('BooksPage', () => {
       { id: 'notes', visible: false },
     ])
     expect(getVisibleColumns(columns, preferences).map((column) => column.id)).toEqual(['title'])
+  })
+
+  it('calculates a predictable columns popup position on desktop and mobile', () => {
+    expect(getColumnPopupPosition({ left: 400, right: 520, bottom: 100 } as DOMRect, 1280, 720)).toEqual({
+      left: '200px',
+      top: '110px',
+    })
+
+    expect(getColumnPopupPosition({ left: 40, right: 180, bottom: 80 } as DOMRect, 390, 844)).toEqual({
+      left: '16px',
+      top: '90px',
+    })
   })
 
   it('formats progress with chapter label and total', () => {
