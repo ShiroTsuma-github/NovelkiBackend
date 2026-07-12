@@ -204,7 +204,7 @@ export function BooksPage() {
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {booksQuery.isFetching && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
@@ -212,8 +212,22 @@ export function BooksPage() {
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
           <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
+        <BooksListFooter
+          activePageGapId={activePageGapId}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          setActivePageGapId={setActivePageGapId}
+          setPageSize={setPageSize}
+          skip={skip}
+          total={total}
+          totalPages={totalPages}
+          visiblePages={visiblePages}
+          onGoToPage={goToPage}
+        />
         {viewMode === 'table' ? (
-          <div className="w-full">
+          <div className="w-full overflow-x-auto pb-24">
             <table className="w-full table-fixed border-collapse text-left text-sm">
               <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -244,69 +258,6 @@ export function BooksPage() {
         ) : (
           <BookCardGrid books={booksQuery.data?.data ?? []} isLoading={booksQuery.isLoading} />
         )}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
-          <div className="flex flex-wrap items-center justify-end gap-3">
-            <label className="flex items-center gap-2">
-              <span>Per page</span>
-              <span className="relative inline-flex">
-                <select
-                  className={`${inputClass} h-10 w-24 appearance-none bg-white pr-9 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
-                  value={pageSize}
-                  onChange={(event) => setPageSize(event.target.value)}
-                >
-                  {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              </span>
-            </label>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {canGoBack ? (
-                <button aria-label="First page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(1)}>
-                  <ChevronsLeft className="h-4 w-4" />
-                </button>
-              ) : null}
-              {canGoBack ? (
-                <button aria-label="Previous page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(currentPage - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-              ) : null}
-              {visiblePages.map((item, index) => item === 'ellipsis'
-                ? (
-                  <PageGapJump
-                    gapId={`ellipsis-${index}`}
-                    isOpen={activePageGapId === `ellipsis-${index}`}
-                    key={`ellipsis-${index}`}
-                    totalPages={totalPages}
-                    onGoToPage={goToPage}
-                    onOpen={() => setActivePageGapId(`ellipsis-${index}`)}
-                    onClose={() => setActivePageGapId((current) => current === `ellipsis-${index}` ? null : current)}
-                  />
-                )
-                : (
-                  <button
-                    aria-current={item === currentPage ? 'page' : undefined}
-                    className={item === currentPage ? compactActivePaginationButtonClass : compactPaginationButtonClass}
-                    key={item}
-                    type="button"
-                    onClick={() => goToPage(item)}
-                  >
-                    {item}
-                  </button>
-                ))}
-              {canGoForward ? (
-                <button aria-label="Next page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(currentPage + 1)}>
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              ) : null}
-              {canGoForward ? (
-                <button aria-label="Last page" className={compactPaginationButtonClass} type="button" onClick={() => goToPage(totalPages)}>
-                  <ChevronsRight className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
       </section>
       <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
       {showBackToTop ? (
@@ -753,7 +704,7 @@ function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boole
   }
 
   return (
-    <div className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 p-4 pb-24 sm:grid-cols-2 xl:grid-cols-4">
       {books.map((book) => (
         <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
           <Link className="grid gap-3" to={`/books/${book.id}`}>
@@ -783,6 +734,102 @@ function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boole
           </Link>
         </article>
       ))}
+    </div>
+  )
+}
+
+function BooksListFooter({
+  activePageGapId,
+  canGoBack,
+  canGoForward,
+  currentPage,
+  pageSize,
+  setActivePageGapId,
+  setPageSize,
+  skip,
+  total,
+  totalPages,
+  visiblePages,
+  onGoToPage,
+}: {
+  activePageGapId: string | null
+  canGoBack: boolean
+  canGoForward: boolean
+  currentPage: number
+  pageSize: number
+  setActivePageGapId: (value: string | null | ((current: string | null) => string | null)) => void
+  setPageSize: (nextPageSize: string) => void
+  skip: number
+  total: number
+  totalPages: number
+  visiblePages: Array<number | 'ellipsis'>
+  onGoToPage: (page: number) => void
+}) {
+  return (
+    <div className="sticky bottom-3 z-20 mx-4 mt-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-sm text-slate-600 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/85">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <label className="flex items-center gap-2">
+            <span>Per page</span>
+            <span className="relative inline-flex">
+              <select
+                className={`${inputClass} h-10 w-24 appearance-none bg-white pr-9 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+                value={pageSize}
+                onChange={(event) => setPageSize(event.target.value)}
+              >
+                {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            </span>
+          </label>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {canGoBack ? (
+              <button aria-label="First page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(1)}>
+                <ChevronsLeft className="h-4 w-4" />
+              </button>
+            ) : null}
+            {canGoBack ? (
+              <button aria-label="Previous page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(currentPage - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            ) : null}
+            {visiblePages.map((item, index) => item === 'ellipsis'
+              ? (
+                <PageGapJump
+                  gapId={`ellipsis-${index}`}
+                  isOpen={activePageGapId === `ellipsis-${index}`}
+                  key={`ellipsis-${index}`}
+                  totalPages={totalPages}
+                  onGoToPage={onGoToPage}
+                  onOpen={() => setActivePageGapId(`ellipsis-${index}`)}
+                  onClose={() => setActivePageGapId((current) => current === `ellipsis-${index}` ? null : current)}
+                />
+              )
+              : (
+                <button
+                  aria-current={item === currentPage ? 'page' : undefined}
+                  className={item === currentPage ? compactActivePaginationButtonClass : compactPaginationButtonClass}
+                  key={item}
+                  type="button"
+                  onClick={() => onGoToPage(item)}
+                >
+                  {item}
+                </button>
+              ))}
+            {canGoForward ? (
+              <button aria-label="Next page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(currentPage + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            ) : null}
+            {canGoForward ? (
+              <button aria-label="Last page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(totalPages)}>
+                <ChevronsRight className="h-4 w-4" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
