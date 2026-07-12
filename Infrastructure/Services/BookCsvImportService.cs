@@ -329,6 +329,13 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var statusNames = await _context.Statuses.AsNoTracking()
             .Select(s => s.Name)
             .ToListAsync(cancellationToken);
+        session.AvailableContentTypes = types
+            .Select(type => type.Name)
+            .OrderBy(name => name)
+            .ToArray();
+        session.AvailableStatuses = statusNames
+            .OrderBy(name => name)
+            .ToArray();
         var validTypes = typeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var validStatuses = statusNames.Select(MappingExtensions.NormalizeName).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var existingKeys = await _context.Books.AsNoTracking()
@@ -365,12 +372,12 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             if (normalizedContentType == null || !validTypes.Contains(normalizedContentType))
             {
-                AddFieldError(row, "contentType", "Content type is required and must exist.");
+                AddFieldError(row, "contentType", $"Content type is required and must exist. Allowed values: {string.Join(", ", types.Select(type => type.Name))}.");
             }
 
             if (normalizedStatus == null || !validStatuses.Contains(normalizedStatus))
             {
-                AddFieldError(row, "status", "Status is required and must exist.");
+                AddFieldError(row, "status", $"Status is required and must exist. Allowed values: {string.Join(", ", statusNames)}.");
             }
 
             var totalChapters = ParseDecimal(row, row.TotalChapters, "totalChapters", nameof(row.TotalChapters));
@@ -470,6 +477,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
             ValidRows = session.Rows.Count(row => row.Errors.Count == 0),
             InvalidRows = session.Rows.Count(row => row.Errors.Count > 0),
             CanFinalize = session.Rows.Count > 0 && session.Rows.All(row => row.Errors.Count == 0),
+            AvailableContentTypes = session.AvailableContentTypes,
+            AvailableStatuses = session.AvailableStatuses,
             Rows = session.Rows
                 .OrderBy(row => row.LineNumber)
                 .Select(row => new BookImportRowDto
@@ -632,6 +641,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
         public Guid SessionId { get; init; }
         public Guid OwnerId { get; init; }
         public string FileName { get; init; } = string.Empty;
+        public IReadOnlyCollection<string> AvailableContentTypes { get; set; } = Array.Empty<string>();
+        public IReadOnlyCollection<string> AvailableStatuses { get; set; } = Array.Empty<string>();
         public List<ImportRow> Rows { get; } = [];
     }
 
