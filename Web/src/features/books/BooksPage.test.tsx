@@ -48,6 +48,18 @@ describe('BooksPage', () => {
     expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toBeInTheDocument()
   })
 
+  it('shows rating overlays only on cards with a rating', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+
+    expect(screen.getAllByText('9')).toHaveLength(1)
+  })
+
   it('updates query params and refetches when sorting by title', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()

@@ -555,12 +555,19 @@ function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boole
       {books.map((book) => (
         <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
           <Link className="grid gap-3" to={`/books/${book.id}`}>
-            <BookCoverArtwork
-              className="w-full"
-              cover={book.cover}
-              emptyLabel="No cover"
-              title={book.primaryTitle}
-            />
+            <div className="relative">
+              <BookCoverArtwork
+                className="w-full"
+                cover={book.cover}
+                emptyLabel="No cover"
+                title={book.primaryTitle}
+              />
+              {book.rating != null ? (
+                <span className="absolute right-3 top-3 inline-flex min-h-8 min-w-8 items-center justify-center rounded-full bg-amber-400/95 px-2.5 text-xs font-bold text-slate-950 shadow-lg">
+                  {book.rating}
+                </span>
+              ) : null}
+            </div>
             <div className="grid gap-1">
               <h2 className="line-clamp-2 text-base font-semibold text-slate-950">{book.primaryTitle}</h2>
               <p className="text-sm text-slate-500">{book.author ?? 'Unknown author'}</p>
