@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
-import type { BookDto, BookLinkDto } from '@/api/types'
+import type { BookDto, BookLinkDto, BookProgressHistoryDto } from '@/api/types'
 import { HttpError } from '@/api/http'
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
@@ -99,6 +99,7 @@ export function BookDetailsPage() {
   const coverHint = !book.cover?.imageUrl
     ? [`Status: ${displayCoverStatus}`, displayCoverFailure].filter(Boolean).join('\n')
     : undefined
+  const progressHistory = getProgressHistoryWithDeltas(book.progressHistory)
 
   const descriptionStyle: CSSProperties | undefined = !descriptionExpanded
     ? {
@@ -251,11 +252,20 @@ export function BookDetailsPage() {
         </section>
         <Panel title="Changelog">
           <div className="grid gap-3">
-            {book.progressHistory.length ? book.progressHistory.map((entry) => (
+            {progressHistory.length ? progressHistory.map((entry) => (
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" key={entry.id}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-slate-950">
-                    {entry.chapterLabel || entry.chapterNumber || 'Updated progress'}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-semibold text-slate-950">
+                      {entry.chapterLabel || entry.chapterNumber || 'Updated progress'}
+                    </div>
+                    {entry.delta != null ? (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${entry.delta > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}
+                      >
+                        {entry.delta > 0 ? `+${entry.delta}` : entry.delta}
+                      </span>
+                    ) : null}
                   </div>
                   <div className="text-xs text-slate-500">{formatDate(entry.changedAt)}</div>
                 </div>
@@ -293,6 +303,26 @@ export function BookDetailsPage() {
       />
     </>
   )
+}
+
+export function getProgressHistoryWithDeltas(entries: BookProgressHistoryDto[]) {
+  const sorted = [...entries].sort((left, right) => (
+    new Date(right.changedAt).getTime() - new Date(left.changedAt).getTime()
+  ))
+
+  return sorted.map((entry, index) => {
+    const previousEntry = sorted[index + 1]
+    const currentChapterNumber = entry.chapterNumber
+    const previousChapterNumber = previousEntry?.chapterNumber
+    const delta = currentChapterNumber != null && previousChapterNumber != null
+      ? currentChapterNumber - previousChapterNumber
+      : null
+
+    return {
+      ...entry,
+      delta: delta && delta !== 0 ? delta : null,
+    }
+  })
 }
 
 function ProgressBar({ book }: { book: BookDto }) {
