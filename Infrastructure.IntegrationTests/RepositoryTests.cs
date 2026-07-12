@@ -125,7 +125,10 @@ public class RepositoryTests
         await using var context = database.CreateContext();
         var apple = await TestData.AddBookAsync(context, database.UserId, "apple");
         var bananaLower = await TestData.AddBookAsync(context, database.UserId, "banana");
-        var bananaUpper = await TestData.AddBookAsync(context, database.UserId, "Banana");
+        var bananaUpper = TestData.Book(database.UserId, "Banana");
+        bananaUpper.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        context.Books.Add(bananaUpper);
+        await context.SaveChangesAsync();
         var zebra = await TestData.AddBookAsync(context, database.UserId, "Zebra");
         var repository = new BookRepository(context);
 
@@ -134,6 +137,35 @@ public class RepositoryTests
 
         Assert.Equal([apple.Id, bananaUpper.Id, bananaLower.Id, zebra.Id], ascending.Select(book => book.Id));
         Assert.Equal([zebra.Id, bananaLower.Id, bananaUpper.Id, apple.Id], descending.Select(book => book.Id));
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSortStatusAndTypeByDomainOrder()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var novelReading = await TestData.AddBookAsync(context, database.UserId, "Novel Reading");
+        var mangaCompleted = await TestData.AddBookAsync(context, database.UserId, "Manga Completed");
+        var manhwaPlanToRead = await TestData.AddBookAsync(context, database.UserId, "Manhwa Plan To Read");
+
+        mangaCompleted.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        mangaCompleted.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        manhwaPlanToRead.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+        manhwaPlanToRead.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000003");
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var repository = new BookRepository(context);
+
+        var typeAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "type", "asc", CancellationToken.None)).ToList();
+        var typeDescending = (await repository.GetAllAsync(database.UserId, 0, 10, "type", "desc", CancellationToken.None)).ToList();
+        var statusAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "status", "asc", CancellationToken.None)).ToList();
+        var statusDescending = (await repository.GetAllAsync(database.UserId, 0, 10, "status", "desc", CancellationToken.None)).ToList();
+
+        Assert.Equal([novelReading.Id, mangaCompleted.Id, manhwaPlanToRead.Id], typeAscending.Select(book => book.Id));
+        Assert.Equal([manhwaPlanToRead.Id, mangaCompleted.Id, novelReading.Id], typeDescending.Select(book => book.Id));
+        Assert.Equal([novelReading.Id, mangaCompleted.Id, manhwaPlanToRead.Id], statusAscending.Select(book => book.Id));
+        Assert.Equal([manhwaPlanToRead.Id, mangaCompleted.Id, novelReading.Id], statusDescending.Select(book => book.Id));
     }
 
     [Fact]

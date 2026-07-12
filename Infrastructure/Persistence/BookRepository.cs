@@ -316,11 +316,23 @@ public class BookRepository : IBookRepository
                 ? query.OrderByDescending(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle),
             "status" => descending
-                ? query.OrderByDescending(b => b.Status.Name).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.Status.Name).ThenBy(b => b.PrimaryTitle),
+                ? query.OrderByDescending(b => b.Status.SortOrder).ThenByDescending(b => b.PrimaryTitle).ThenByDescending(b => b.Id)
+                : query.OrderBy(b => b.Status.SortOrder).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
             "type" => descending
-                ? query.OrderByDescending(b => b.ContentType.Name).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.ContentType.Name).ThenBy(b => b.PrimaryTitle),
+                ? query.OrderByDescending(b =>
+                    b.ContentType.Slug == "novel" ? 10 :
+                    b.ContentType.Slug == "manga" ? 20 :
+                    b.ContentType.Slug == "manhwa" ? 30 :
+                    b.ContentType.Slug == "manhua" ? 40 :
+                    b.ContentType.Slug == "other" ? 50 : 999
+                ).ThenByDescending(b => b.PrimaryTitle).ThenByDescending(b => b.Id)
+                : query.OrderBy(b =>
+                    b.ContentType.Slug == "novel" ? 10 :
+                    b.ContentType.Slug == "manga" ? 20 :
+                    b.ContentType.Slug == "manhwa" ? 30 :
+                    b.ContentType.Slug == "manhua" ? 40 :
+                    b.ContentType.Slug == "other" ? 50 : 999
+                ).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
             "progress" => descending
                 ? query.OrderByDescending(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle),
