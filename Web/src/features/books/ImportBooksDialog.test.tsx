@@ -115,6 +115,29 @@ describe('ImportBooksDialog', () => {
     clickSpy.mockRestore()
   })
 
+  it('keeps row actions visible for long invalid row titles', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithLongTitle)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    const title = await screen.findByTitle(importSessionWithLongTitle.rows[0].primaryTitle!)
+    expect(title).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /collapse/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /revalidate row/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /remove row/i })).toBeInTheDocument()
+  })
+
   it('marks import row fields with field errors', async () => {
     vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
 
@@ -171,6 +194,16 @@ const importSessionWithFieldErrors: BookImportSessionDto = {
       fieldErrors: {
         contentType: ['Content type is required and must exist.'],
       },
+    },
+  ],
+}
+
+const importSessionWithLongTitle: BookImportSessionDto = {
+  ...importSessionWithFieldErrors,
+  rows: [
+    {
+      ...importSessionWithFieldErrors.rows[0],
+      primaryTitle: 'A Very Long Imported Book Title That Should Stay Inside Its Header Without Pushing The Action Buttons Below Or Off The Right Edge',
     },
   ],
 }

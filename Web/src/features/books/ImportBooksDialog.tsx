@@ -409,20 +409,22 @@ function ImportRowEditor({
 
   return (
       <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="grid gap-1">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid min-w-0 flex-1 gap-1">
           <button className="inline-flex items-center gap-2 text-left text-sm font-semibold text-amber-300" type="button" onClick={onToggle}>
             <AlertCircle className="h-4 w-4" />
             Line {row.lineNumber}
           </button>
-          <div className="text-sm text-slate-200">
-            {row.primaryTitle?.trim() || 'Untitled row'}
+          <div className="max-w-full text-sm text-slate-200" title={row.primaryTitle?.trim() || 'Untitled row'}>
+            <span className="block max-w-full truncate md:line-clamp-2 md:whitespace-normal">
+              {row.primaryTitle?.trim() || 'Untitled row'}
+            </span>
           </div>
-          <div className="line-clamp-2 text-xs text-slate-400">
+          <div className="line-clamp-2 max-w-full text-xs text-slate-400">
             {row.errors.join(' ')}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <button className={secondaryButtonClass} type="button" onClick={onToggle}>
             {expanded ? 'Collapse' : 'Edit row'}
           </button>
