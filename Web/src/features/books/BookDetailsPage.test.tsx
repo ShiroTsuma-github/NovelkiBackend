@@ -140,7 +140,7 @@ describe('BookDetailsPage', () => {
     const panel = dialog.firstElementChild
 
     expect(screen.getByRole('heading', { name: /delete book/i })).toHaveClass('text-slate-950')
-    expect(within(dialog).getByText('Lord of Mysteries')).toHaveClass('text-slate-900')
+    expect(within(dialog).getByText('Lord of Mysteries')).toHaveClass('text-slate-950')
     expect(panel).toHaveClass('bg-white')
   })
 })

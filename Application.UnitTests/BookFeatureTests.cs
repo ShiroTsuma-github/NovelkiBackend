@@ -2,6 +2,7 @@ using Application.Common;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Features.BookFeatures.Commands;
+using Application.Features.BookFeatures.Queries.GetBook;
 using Application.Features.BookFeatures.Validators;
 using Domain.Associations;
 using Domain.Entities;
@@ -292,6 +293,50 @@ public class BookFeatureTests
         Assert.Equal(11, book.CurrentChapterNumber);
     }
 
+    [Fact]
+    public async Task GetBookSummary_ShouldMapRepositoryAggregateIntoDto()
+    {
+        var bookRepository = new FakeBookRepository
+        {
+            Summary = new Domain.Models.BookSummarySnapshot(
+                4,
+                3,
+                8.333333333,
+                900,
+                3,
+                [
+                    new Domain.Models.BookStatusCountSnapshot("Reading", 2),
+                    new Domain.Models.BookStatusCountSnapshot("Completed", 2),
+                ],
+                [
+                    new Domain.Models.BookTypeSummarySnapshot("Novel", 3, 900),
+                ],
+                [
+                    new Domain.Models.BookGenreCountSnapshot("Fantasy", 2),
+                ],
+                [
+                    new Domain.Models.BookRatingCountSnapshot(8, 1),
+                    new Domain.Models.BookRatingCountSnapshot(9, 2),
+                ])
+        };
+        var handler = new GetBookSummaryHandler(bookRepository, new FakeUser());
+
+        var result = await handler.Handle(new GetBookSummaryQuery("author:Toika"), CancellationToken.None);
+
+        Assert.Equal(4, result.TotalBooks);
+        Assert.Equal(3, result.RatedBooks);
+        Assert.Equal(1, result.UnratedBooks);
+        Assert.Equal(8.333333333, result.AverageRating);
+        Assert.Equal(900, result.CurrentChapters);
+        Assert.Equal(3, result.BooksWithKnownCurrentChapter);
+        Assert.Equal(1, result.BooksWithoutKnownCurrentChapter);
+        Assert.Equal(2, result.StatusCounts.Count);
+        Assert.Equal("Reading", result.StatusCounts[0].Status);
+        Assert.Equal("Novel", result.TypeCounts[0].Type);
+        Assert.Equal("Fantasy", result.GenreCounts[0].Genre);
+        Assert.Equal(9, result.RatingCounts[1].Rating);
+    }
+
     private static Fixture CreateFixture()
     {
         var bookRepository = new FakeBookRepository();
@@ -360,6 +405,7 @@ public class BookFeatureTests
     {
         public Book? LastBook { get; private set; }
         public bool Saved { get; private set; }
+        public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
 
         public void Seed(Book book)
         {
@@ -389,6 +435,8 @@ public class BookFeatureTests
         }
         public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook == null ? 0 : 1);
         public Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(Summary);
+        public Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy, string? currentSortDirection, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public Task ReplaceEditableCollectionsAsync(
             Guid bookId,
             IEnumerable<BookTitle> titles,

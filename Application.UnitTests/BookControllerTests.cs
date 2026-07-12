@@ -165,8 +165,51 @@ public class BookControllerTests
         Assert.Contains("primaryTitle,author,contentType,status,currentChapterNumber,currentChapterLabel,totalChapters,rating,priority,genres,tags,notes", csv);
         Assert.Contains("\"Alpha, Book\",Toika,Novel,Reading", csv);
         Assert.Contains("\"Line 1\nLine 2\"", csv);
-        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 1, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
-        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 2, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 1, "author:Toika", "title", "asc", false), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 2, "author:Toika", "title", "asc", false), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSummary_ShouldReturnMediatorSummary()
+    {
+        var expected = new BookSummaryDto
+        {
+            TotalBooks = 3,
+            RatedBooks = 2,
+            UnratedBooks = 1,
+            AverageRating = 8.5,
+            CurrentChapters = 480,
+            BooksWithKnownCurrentChapter = 2,
+            BooksWithoutKnownCurrentChapter = 1,
+            StatusCounts =
+            [
+                new BookSummaryStatusCountDto { Status = "Reading", Count = 2 },
+                new BookSummaryStatusCountDto { Status = "Completed", Count = 1 },
+            ],
+            TypeCounts =
+            [
+                new BookSummaryTypeCountDto { Type = "Novel", BookCount = 3, CurrentChapters = 480 },
+            ],
+            GenreCounts =
+            [
+                new BookSummaryGenreCountDto { Genre = "Fantasy", BookCount = 2 },
+            ],
+            RatingCounts =
+            [
+                new BookSummaryRatingCountDto { Rating = 8, BookCount = 1 },
+                new BookSummaryRatingCountDto { Rating = 9, BookCount = 1 },
+            ],
+        };
+        var mediator = new Mock<IMediator>();
+        mediator
+            .Setup(mock => mock.Send(new GetBookSummaryQuery("author:Toika"), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.GetSummary(new GetBookSummaryQuery("author:Toika"));
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(expected, ok.Value);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 namespace Infrastructure.Persistence;
 
 using Application.Common;
+using Domain.Models;
 using System.Linq.Expressions;
 using FluentValidation;
 
@@ -145,6 +146,137 @@ public class BookRepository : IBookRepository
     {
         return ApplyCriteria(_context.Books, criteria)
             .CountAsync(cancellationToken);
+    }
+
+    public async Task<BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
+    {
+        var query = _context.Books
+            .AsNoTracking()
+            .Where(book => book.OwnerId == ownerId);
+        if (criteria.HasFilters)
+        {
+            query = ApplyCriteria(query, criteria);
+        }
+
+        var totalBooks = await query.CountAsync(cancellationToken);
+        var ratedBooks = await query.CountAsync(book => book.Rating != null, cancellationToken);
+        var averageRating = ratedBooks == 0
+            ? null
+            : await query
+                .Where(book => book.Rating != null)
+                .Select(book => (double?)book.Rating)
+                .AverageAsync(cancellationToken);
+        var currentChapters = await query
+            .Where(book => book.CurrentChapterNumber != null)
+            .Select(book => book.CurrentChapterNumber ?? 0)
+            .SumAsync(cancellationToken);
+        var booksWithKnownCurrentChapter = await query.CountAsync(book => book.CurrentChapterNumber != null, cancellationToken);
+        var statusCountRows = await query
+            .Select(book => book.Status.Name)
+            .GroupBy(status => status)
+            .Select(group => new
+            {
+                Status = group.Key,
+                Count = group.Count(),
+            })
+            .OrderByDescending(group => group.Count)
+            .ThenBy(group => group.Status)
+            .ToListAsync(cancellationToken);
+        var statusCounts = statusCountRows
+            .Select(group => new BookStatusCountSnapshot(group.Status, group.Count))
+            .ToList();
+        var typeCountRows = await query
+            .GroupBy(book => book.ContentType.Name)
+            .Select(group => new
+            {
+                Type = group.Key,
+                BookCount = group.Count(),
+                CurrentChapters = group.Sum(book => book.CurrentChapterNumber ?? 0),
+            })
+            .OrderByDescending(group => group.BookCount)
+            .ThenBy(group => group.Type)
+            .ToListAsync(cancellationToken);
+        var typeCounts = typeCountRows
+            .Select(group => new BookTypeSummarySnapshot(group.Type, group.BookCount, group.CurrentChapters))
+            .ToList();
+        var genreCountRows = await query
+            .SelectMany(book => book.BookGenres.Select(bookGenre => bookGenre.Genre.Name))
+            .GroupBy(genre => genre)
+            .Select(group => new
+            {
+                Genre = group.Key,
+                BookCount = group.Count(),
+            })
+            .OrderByDescending(group => group.BookCount)
+            .ThenBy(group => group.Genre)
+            .ToListAsync(cancellationToken);
+        var genreCounts = genreCountRows
+            .Select(group => new BookGenreCountSnapshot(group.Genre, group.BookCount))
+            .ToList();
+        var ratingCountRows = await query
+            .Where(book => book.Rating != null)
+            .GroupBy(book => book.Rating!.Value)
+            .Select(group => new
+            {
+                Rating = group.Key,
+                BookCount = group.Count(),
+            })
+            .OrderBy(group => group.Rating)
+            .ToListAsync(cancellationToken);
+        var ratingCounts = ratingCountRows
+            .Select(group => new BookRatingCountSnapshot(group.Rating, group.BookCount))
+            .ToList();
+
+        return new BookSummarySnapshot(
+            totalBooks,
+            ratedBooks,
+            averageRating,
+            currentChapters,
+            booksWithKnownCurrentChapter,
+            statusCounts,
+            typeCounts,
+            genreCounts,
+            ratingCounts);
+    }
+
+    public async Task<string?> GetNextCycleSortDirectionAsync(
+        Guid ownerId,
+        BookSearchCriteria criteria,
+        string sortBy,
+        string? currentSortDirection,
+        CancellationToken cancellationToken)
+    {
+        var query = IncludeDetails(_context.Books).Where(b => b.OwnerId == ownerId);
+        if (criteria.HasFilters)
+        {
+            query = ApplyCriteria(query, criteria);
+        }
+
+        var normalizedSort = NormalizeSort(sortBy);
+        var orderedAvailableNames = normalizedSort switch
+        {
+            "status" => await GetOrderedAvailableNamesAsync(
+                query.Select(book => book.Status.Name),
+                _context.Statuses.AsNoTracking().OrderBy(status => status.Id.ToString()).Select(status => status.Name),
+                cancellationToken),
+            "type" => await GetOrderedAvailableNamesAsync(
+                query.Select(book => book.ContentType.Name),
+                _context.ContentTypes.AsNoTracking().OrderBy(type => type.Id.ToString()).Select(type => type.Name),
+                cancellationToken),
+            _ => []
+        };
+
+        if (orderedAvailableNames.Count == 0)
+        {
+            return null;
+        }
+
+        var normalizedCurrent = NormalizeCycleValue(currentSortDirection);
+        var currentIndex = normalizedCurrent == null
+            ? -1
+            : orderedAvailableNames.FindIndex(name => string.Equals(NormalizeCycleValue(name), normalizedCurrent, StringComparison.Ordinal));
+        var nextIndex = (currentIndex + 1 + orderedAvailableNames.Count) % orderedAvailableNames.Count;
+        return orderedAvailableNames[nextIndex];
     }
 
     public async Task<bool> UpdateProgressAsync(
@@ -298,61 +430,68 @@ public class BookRepository : IBookRepository
             return sorted.Skip(skip).Take(take).ToList();
         }
 
-        return await ApplySorting(query, sortBy, sortDirection)
+        return await (await ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
             .Skip(skip)
             .Take(take)
             .ToListAsync(cancellationToken);
     }
 
-    private static IQueryable<Book> ApplySorting(IQueryable<Book> query, string? sortBy, string? sortDirection)
+    private async Task<IQueryable<Book>> ApplySortingAsync(
+        IQueryable<Book> query,
+        string? sortBy,
+        string? sortDirection,
+        CancellationToken cancellationToken)
     {
         var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
-        return NormalizeSort(sortBy) switch
+        switch (NormalizeSort(sortBy))
         {
-            "title" => descending
+            case "title":
+                return descending
                 ? query.OrderByDescending(b => b.NormalizedPrimaryTitle).ThenByDescending(b => b.PrimaryTitle).ThenByDescending(b => b.Id)
-                : query.OrderBy(b => b.NormalizedPrimaryTitle).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
-            "author" => descending
+                : query.OrderBy(b => b.NormalizedPrimaryTitle).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id);
+            case "author":
+                return descending
                 ? query.OrderByDescending(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle),
-            "status" => descending
-                ? query.OrderByDescending(b => b.Status.SortOrder).ThenByDescending(b => b.PrimaryTitle).ThenByDescending(b => b.Id)
-                : query.OrderBy(b => b.Status.SortOrder).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
-            "type" => descending
-                ? query.OrderByDescending(b =>
-                    b.ContentType.Slug == "novel" ? 10 :
-                    b.ContentType.Slug == "manga" ? 20 :
-                    b.ContentType.Slug == "manhwa" ? 30 :
-                    b.ContentType.Slug == "manhua" ? 40 :
-                    b.ContentType.Slug == "other" ? 50 : 999
-                ).ThenByDescending(b => b.PrimaryTitle).ThenByDescending(b => b.Id)
-                : query.OrderBy(b =>
-                    b.ContentType.Slug == "novel" ? 10 :
-                    b.ContentType.Slug == "manga" ? 20 :
-                    b.ContentType.Slug == "manhwa" ? 30 :
-                    b.ContentType.Slug == "manhua" ? 40 :
-                    b.ContentType.Slug == "other" ? 50 : 999
-                ).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
-            "progress" => descending
+                : query.OrderBy(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle);
+            case "status":
+                return ApplyNamedCycleOrder(
+                    query,
+                    await _context.Statuses.AsNoTracking().OrderBy(status => status.Id.ToString()).Select(status => status.Name).ToListAsync(cancellationToken),
+                    sortDirection,
+                    book => book.Status.Name);
+            case "type":
+                return ApplyNamedCycleOrder(
+                    query,
+                    await _context.ContentTypes.AsNoTracking().OrderBy(type => type.Id.ToString()).Select(type => type.Name).ToListAsync(cancellationToken),
+                    sortDirection,
+                    book => book.ContentType.Name);
+            case "progress":
+                return descending
                 ? query.OrderByDescending(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle),
-            "rating" => descending
+                : query.OrderBy(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle);
+            case "rating":
+                return descending
                 ? query.OrderBy(b => b.Rating == null).ThenByDescending(b => b.Rating).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.Rating == null).ThenBy(b => b.Rating).ThenBy(b => b.PrimaryTitle),
-            "priority" => descending
+                : query.OrderBy(b => b.Rating == null).ThenBy(b => b.Rating).ThenBy(b => b.PrimaryTitle);
+            case "priority":
+                return descending
                 ? query.OrderByDescending(b => b.Priority).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.Priority).ThenBy(b => b.PrimaryTitle),
-            "owner" => descending
+                : query.OrderBy(b => b.Priority).ThenBy(b => b.PrimaryTitle);
+            case "owner":
+                return descending
                 ? query.OrderByDescending(b => b.OwnerId).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.OwnerId).ThenBy(b => b.PrimaryTitle),
-            "created" => descending
+                : query.OrderBy(b => b.OwnerId).ThenBy(b => b.PrimaryTitle);
+            case "created":
+                return descending
                 ? query.OrderByDescending(b => b.Created).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.Created).ThenBy(b => b.PrimaryTitle),
-            "lastmodified" => descending
+                : query.OrderBy(b => b.Created).ThenBy(b => b.PrimaryTitle);
+            case "lastmodified":
+                return descending
                 ? query.OrderByDescending(b => b.LastModified).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.LastModified).ThenBy(b => b.PrimaryTitle),
-            _ => query.OrderByDescending(b => b.LastModified).ThenBy(b => b.PrimaryTitle)
-        };
+                : query.OrderBy(b => b.LastModified).ThenBy(b => b.PrimaryTitle);
+            default:
+                return query.OrderByDescending(b => b.LastModified).ThenBy(b => b.PrimaryTitle);
+        }
     }
 
     private static string NormalizeSort(string? sortBy)
@@ -377,6 +516,63 @@ public class BookRepository : IBookRepository
     {
         var normalizedSort = NormalizeSort(sortBy);
         return normalizedSort is "created" or "lastmodified";
+    }
+
+    private static IQueryable<Book> ApplyNamedCycleOrder(
+        IQueryable<Book> query,
+        IReadOnlyList<string> orderedNames,
+        string? startName,
+        Expression<Func<Book, string>> keySelector)
+    {
+        if (orderedNames.Count == 0)
+        {
+            return query.OrderBy(b => b.PrimaryTitle).ThenBy(b => b.Id);
+        }
+
+        var orderedNameArray = orderedNames.ToArray();
+        var normalizedStartName = NormalizeCycleValue(startName);
+        var startIndex = normalizedStartName == null
+            ? -1
+            : Array.FindIndex(
+                orderedNameArray,
+                name => string.Equals(NormalizeCycleValue(name), normalizedStartName, StringComparison.Ordinal));
+        if (startIndex < 0)
+        {
+            startIndex = 0;
+        }
+
+        var rotatedNames = orderedNameArray.Skip(startIndex).Concat(orderedNameArray.Take(startIndex)).ToArray();
+        var parameter = keySelector.Parameters[0];
+        Expression body = Expression.Constant(rotatedNames.Length);
+        for (var index = rotatedNames.Length - 1; index >= 0; index--)
+        {
+            body = Expression.Condition(
+                Expression.Equal(keySelector.Body, Expression.Constant(rotatedNames[index])),
+                Expression.Constant(index),
+                body);
+        }
+
+        var rankSelector = Expression.Lambda<Func<Book, int>>(body, parameter);
+        return query.OrderBy(rankSelector).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id);
+    }
+
+    private static async Task<List<string>> GetOrderedAvailableNamesAsync(
+        IQueryable<string> valuesQuery,
+        IQueryable<string> orderedNamesQuery,
+        CancellationToken cancellationToken)
+    {
+        var availableNames = (await valuesQuery.Distinct().ToListAsync(cancellationToken))
+            .Select(NormalizeCycleValue)
+            .Where(name => name != null)
+            .ToHashSet(StringComparer.Ordinal);
+        return (await orderedNamesQuery.ToListAsync(cancellationToken))
+            .Where(name => availableNames.Contains(NormalizeCycleValue(name)!))
+            .ToList();
+    }
+
+    private static string? NormalizeCycleValue(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : MappingExtensions.NormalizeName(value);
     }
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)

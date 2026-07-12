@@ -29,7 +29,11 @@ public class TypeRepository : ITypeRepository
 
     public async Task<IEnumerable<ContentType>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
     {
-        return await _context.ContentTypes.OrderBy(t => t.Name).Skip(Skip).Take(Take).ToListAsync(cancellationToken);
+        return await _context.ContentTypes
+            .OrderBy(t => t.Id.ToString())
+            .Skip(Skip)
+            .Take(Take)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<ContentType?> GetByIdAsync(Guid id, CancellationToken cancellationToken)

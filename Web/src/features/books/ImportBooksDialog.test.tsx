@@ -194,7 +194,7 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(3)
+    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(2)
 
     const typeInput = screen.getByLabelText(/^Type/)
     const titleInput = screen.getByLabelText(/^Title/)
@@ -220,10 +220,38 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findByText('Suggestions: Novel, Manga')).toBeInTheDocument()
-    expect(screen.getByText('Suggestions: Reading, Completed')).toBeInTheDocument()
-    expect(screen.getByLabelText(/^Type/)).toHaveAttribute('list', 'import-type-options')
-    expect(screen.getByLabelText(/^Status/)).toHaveAttribute('list', 'import-status-options')
+    const typeInput = await screen.findByRole('combobox', { name: /^Type/ })
+    const statusInput = screen.getByRole('combobox', { name: /^Status/ })
+
+    fireEvent.focus(typeInput)
+    expect(await screen.findByRole('listbox')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Novel' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Manga' })).toBeInTheDocument()
+
+    fireEvent.focus(statusInput)
+    expect(screen.getByRole('button', { name: 'Reading' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Completed' })).toBeInTheDocument()
+  })
+
+  it('does not repeat field error text under the inputs', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(2)
+    expect(screen.queryByText('Suggestions: Novel, Manga')).not.toBeInTheDocument()
+    expect(screen.queryByText('Suggestions: Reading, Completed')).not.toBeInTheDocument()
   })
 })
 

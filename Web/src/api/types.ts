@@ -65,6 +65,41 @@ export type BookDto = {
   links: BookLinkDto[]
 }
 
+export type BookSummaryDto = {
+  totalBooks: number
+  ratedBooks: number
+  unratedBooks: number
+  averageRating?: number | null
+  currentChapters: number
+  booksWithKnownCurrentChapter: number
+  booksWithoutKnownCurrentChapter: number
+  statusCounts: BookSummaryStatusCountDto[]
+  typeCounts: BookSummaryTypeCountDto[]
+  genreCounts: BookSummaryGenreCountDto[]
+  ratingCounts: BookSummaryRatingCountDto[]
+}
+
+export type BookSummaryStatusCountDto = {
+  status: string
+  count: number
+}
+
+export type BookSummaryTypeCountDto = {
+  type: string
+  bookCount: number
+  currentChapters: number
+}
+
+export type BookSummaryGenreCountDto = {
+  genre: string
+  bookCount: number
+}
+
+export type BookSummaryRatingCountDto = {
+  rating: number
+  bookCount: number
+}
+
 export type AdminBookDto = BookDto & {
   ownerId: string
 }
@@ -162,6 +197,8 @@ export type BookImportSessionDto = {
   validRows: number
   invalidRows: number
   canFinalize: boolean
+  availableContentTypes: string[]
+  availableStatuses: string[]
   rows: BookImportRowDto[]
 }
 

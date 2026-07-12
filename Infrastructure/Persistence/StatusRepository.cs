@@ -30,7 +30,11 @@ public class StatusRepository : IStatusRepository
 
     public async Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
     {
-        return await _context.Statuses.Skip(Skip).Take(Take).ToListAsync(cancellationToken);
+        return await _context.Statuses
+            .OrderBy(s => s.Id.ToString())
+            .Skip(Skip)
+            .Take(Take)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken)

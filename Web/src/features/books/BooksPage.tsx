@@ -1,10 +1,11 @@
-import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronsUpDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronsUpDown, Download, Edit, Eye, LayoutGrid, List, Plus, RefreshCw, Search, Settings2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Bar, BarChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
-import type { BookDto, BookImportFinalizeResult } from '@/api/types'
+import type { BookDto, BookImportFinalizeResult, BookSummaryDto, BookSummaryTypeCountDto } from '@/api/types'
 import {
   buttonClass,
   inputClass,
@@ -16,13 +17,17 @@ import { ImportBooksDialog } from './ImportBooksDialog'
 const pageSizeOptions = [20, 50, 100, 500]
 const cardsPerRowOptions = [2, 3, 4, 5, 6, 7, 8] as const
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
+const bookCardFieldsStorageKey = 'novelki.books.card-fields.v1'
 const bookLayoutStorageKey = 'novelki.books.layout.v1'
 const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
+const summaryReadingTimeStorageKey = 'novelki.books.summary.time-per-chapter.v1'
 const columnPopupWidthPx = 320
 const columnPopupEdgeGapPx = 16
 const columnPopupVerticalGapPx = 10
 const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
-type SortDirection = 'asc' | 'desc'
+const summaryChartColors = ['#0f766e', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#65a30d']
+type SortDirection = string
+type SummaryTabId = 'status' | 'types' | 'ratings' | 'genres' | 'time'
 export type BookViewMode = 'table' | 'cards'
 export type ColumnPreference = { id: string; visible: boolean }
 export type ColumnDefinition<T> = {
@@ -54,13 +59,26 @@ const bookColumns: ColumnDefinition<BookDto>[] = [
   { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => truncate(book.description) },
 ]
 
+const bookCardFields: ColumnDefinition<BookDto>[] = [
+  { id: 'title', label: 'Title', defaultVisible: true, render: (book) => <span>{book.primaryTitle}</span> },
+  { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, render: (book) => <span>{formatList(book.alternativeTitles)}</span> },
+  { id: 'author', label: 'Author', defaultVisible: true, render: (book) => <span>{book.author ?? 'Unknown author'}</span> },
+  { id: 'status', label: 'Status', defaultVisible: true, render: (book) => <span>{book.status}</span> },
+  { id: 'type', label: 'Type', defaultVisible: false, render: (book) => <span>{book.contentType}</span> },
+  { id: 'progress', label: 'Progress', defaultVisible: true, render: (book) => <span>{formatProgress(book)}</span> },
+  { id: 'rating', label: 'Rating', defaultVisible: true, render: (book) => <span>{book.rating ?? '-'}</span> },
+]
+
 export function BooksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const queryClient = useQueryClient()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(bookColumnsStorageKey, bookColumns)
+  const [cardFieldPreferences, setCardFieldPreferences] = useColumnPreferences(bookCardFieldsStorageKey, bookCardFields)
   const [viewMode, setViewMode] = useViewMode(bookLayoutStorageKey)
   const [cardsPerRow, setCardsPerRow] = useCardsPerRow(cardsPerRowStorageKey)
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [showGoDown, setShowGoDown] = useState(false)
   const [activePageGapId, setActivePageGapId] = useState<string | null>(null)
@@ -71,10 +89,43 @@ export function BooksPage() {
   const sortDirection = readSortDirection(searchParams)
   const query = searchParams.get('query') ?? ''
   const visibleColumns = getVisibleColumns(bookColumns, columnPreferences)
+  const visibleCardFields = getVisibleColumns(bookCardFields, cardFieldPreferences)
   const booksQuery = useQuery({
     queryKey: ['books', skip, pageSize, query, sortBy, sortDirection],
     queryFn: () => api.getBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
     placeholderData: keepPreviousData,
+    staleTime: 30_000,
+  })
+  const summaryQuery = useQuery({
+    queryKey: ['books-summary', query],
+    queryFn: () => api.getBooksSummary({ query }),
+    enabled: summaryOpen,
+    staleTime: 30_000,
+  })
+  const cycleSortMutation = useMutation({
+    mutationFn: ({ nextSortBy, currentSortDirection }: { nextSortBy: string; currentSortDirection: string | null }) => (
+      api.getBooks({
+        skip,
+        take: pageSize,
+        query,
+        sortBy: nextSortBy,
+        sortDirection: currentSortDirection ?? undefined,
+        advanceCycle: true,
+      })
+    ),
+    onSuccess: (result, variables) => {
+      const resolvedSortDirection = getCyclicSortDirectionFromResult(result.data, variables.nextSortBy) ?? variables.currentSortDirection ?? sortDirection
+      queryClient.setQueryData(
+        ['books', skip, pageSize, query, variables.nextSortBy, resolvedSortDirection],
+        result,
+      )
+
+      const next = new URLSearchParams(searchParams)
+      next.set('sortBy', variables.nextSortBy)
+      next.set('sortDirection', resolvedSortDirection)
+      next.delete('skip')
+      setSearchParams(next)
+    },
   })
   const exportMutation = useMutation({
     mutationFn: () => api.downloadBooksExport({ query, sortBy, sortDirection }),
@@ -118,11 +169,16 @@ export function BooksPage() {
   }
 
   function setSort(nextSortBy: string) {
+    if (isCyclicSort(nextSortBy)) {
+      cycleSortMutation.mutate({
+        nextSortBy,
+        currentSortDirection: sortBy === nextSortBy ? sortDirection : null,
+      })
+      return
+    }
+
     const next = new URLSearchParams(searchParams)
-    const defaultDirection = nextSortBy === 'lastModified' || nextSortBy === 'created' ? 'desc' : 'asc'
-    const nextDirection = sortBy === nextSortBy
-      ? sortDirection === 'asc' ? 'desc' : 'asc'
-      : defaultDirection
+    const nextDirection = getNextSortDirection(nextSortBy, sortBy, sortDirection)
     next.set('sortBy', nextSortBy)
     next.set('sortDirection', nextDirection)
     next.delete('skip')
@@ -135,6 +191,12 @@ export function BooksPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(totalPages, Math.floor(skip / pageSize) + 1)
   const visiblePages = getVisiblePageNumbers(currentPage, totalPages)
+  const settingsColumns = viewMode === 'cards' ? bookCardFields : bookColumns
+  const settingsPreferences = viewMode === 'cards' ? cardFieldPreferences : columnPreferences
+  const setSettingsPreferences = viewMode === 'cards' ? setCardFieldPreferences : setColumnPreferences
+  const settingsTitle = viewMode === 'cards' ? 'Visible card fields' : 'Visible columns'
+  const settingsDescription = viewMode === 'cards' ? 'Choose which book fields appear on cards.' : 'Change table order and visibility.'
+  const allowSettingsReorder = viewMode === 'table'
 
   useEffect(() => {
     function updateScrollShortcutVisibility() {
@@ -204,6 +266,16 @@ export function BooksPage() {
           <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button
+            aria-controls="books-summary-panel"
+            aria-expanded={summaryOpen}
+            className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`}
+            type="button"
+            onClick={() => setSummaryOpen((current) => !current)}
+          >
+            <span>Summary</span>
+            <ChevronDown className={`h-4 w-4 transition ${summaryOpen ? 'rotate-180' : ''}`} />
+          </button>
           <button className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`} disabled={exportMutation.isPending} type="button" onClick={() => exportMutation.mutate()}>
             <Download className="h-4 w-4" />
             {exportMutation.isPending ? 'Exporting...' : 'Export filtered CSV'}
@@ -238,16 +310,32 @@ export function BooksPage() {
         </section>
       ) : null}
 
+      {summaryOpen ? (
+        <BookSummaryPanel
+          id="books-summary-panel"
+          isError={summaryQuery.isError}
+          isLoading={summaryQuery.isLoading}
+          summary={summaryQuery.data}
+        />
+      ) : null}
+
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
       <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
-          {booksQuery.isFetching && !booksQuery.isLoading ? (
+          {(booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
           ) : null}
           {viewMode === 'cards' ? <CardsPerRowControl value={cardsPerRow} onChange={setCardsPerRow} /> : null}
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
-          <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
+          <ColumnSettingsPopup
+            allowReorder={allowSettingsReorder}
+            columns={settingsColumns}
+            description={settingsDescription}
+            preferences={settingsPreferences}
+            title={settingsTitle}
+            onChange={setSettingsPreferences}
+          />
         </div>
         {viewMode === 'table' ? (
           <div className="w-full overflow-x-auto">
@@ -258,6 +346,7 @@ export function BooksPage() {
                     <ColumnHeader
                       activeDirection={column.sortBy === sortBy ? sortDirection : null}
                       column={column}
+                      isCyclic={column.sortBy === 'status' || column.sortBy === 'type'}
                       key={column.id}
                       onSort={setSort}
                     />
@@ -279,7 +368,12 @@ export function BooksPage() {
             </table>
           </div>
         ) : (
-          <BookCardGrid books={booksQuery.data?.data ?? []} cardsPerRow={cardsPerRow} isLoading={booksQuery.isLoading} />
+          <BookCardGrid
+            books={booksQuery.data?.data ?? []}
+            cardsPerRow={cardsPerRow}
+            fields={visibleCardFields}
+            isLoading={booksQuery.isLoading}
+          />
         )}
         <BooksListFooter
           activePageGapId={activePageGapId}
@@ -515,13 +609,398 @@ export function BookAdvancedSearch({
   )
 }
 
+function BookSummaryPanel({
+  id,
+  isError,
+  isLoading,
+  summary,
+}: {
+  id: string
+  isError: boolean
+  isLoading: boolean
+  summary: BookSummaryDto | undefined
+}) {
+  const [activeTab, setActiveTab] = useState<SummaryTabId>('status')
+  const [minutesPerType, setMinutesPerType] = useState<Record<string, number>>(() => readSummaryReadingTimes(summaryReadingTimeStorageKey))
+
+  useEffect(() => {
+    const knownTypes = new Set(summary?.typeCounts.map((type) => type.type) ?? [])
+    if (!knownTypes.size) {
+      return
+    }
+
+    setMinutesPerType((current) => {
+      const next = { ...current }
+      let changed = false
+      for (const type of knownTypes) {
+        if (!(type in next)) {
+          next[type] = 5
+          changed = true
+        }
+      }
+
+      if (changed) {
+        window.localStorage.setItem(summaryReadingTimeStorageKey, JSON.stringify(next))
+      }
+
+      return changed ? next : current
+    })
+  }, [summary?.typeCounts])
+
+  if (isLoading) {
+    return (
+      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-950">Library summary</h2>
+          <p className="text-sm text-slate-500">Loading summary...</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (isError) {
+    return (
+      <section className="grid gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 shadow-sm" id={id}>
+        <div>
+          <h2 className="text-sm font-semibold text-rose-950">Library summary</h2>
+          <p className="text-sm text-rose-800">Could not load summary.</p>
+        </div>
+      </section>
+    )
+  }
+
+  if (!summary) {
+    return null
+  }
+
+  const statusChartData = summary.statusCounts.map((status) => ({ label: status.status, value: status.count }))
+  const ratingChartData = [
+    ...summary.ratingCounts.map((rating) => ({ label: String(rating.rating), value: rating.bookCount })),
+    ...(summary.unratedBooks > 0 ? [{ label: 'Unrated', value: summary.unratedBooks }] : []),
+  ]
+  const genreChartData = summary.genreCounts.map((genre) => ({ label: genre.genre, value: genre.bookCount }))
+  const estimatedReading = getEstimatedReadingTime(summary.typeCounts, minutesPerType)
+
+  return (
+    <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+      <div>
+        <h2 className="text-sm font-semibold text-slate-950">Library summary</h2>
+        <p className="text-sm text-slate-500">Aggregated from all books matching the current filters.</p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <SummaryMetricCard label="Total books" value={String(summary.totalBooks)} />
+        <SummaryMetricCard label="Rated" value={String(summary.ratedBooks)} />
+        <SummaryMetricCard label="Unrated" value={String(summary.unratedBooks)} />
+        <SummaryMetricCard label="Average rating" value={formatAverageRating(summary.averageRating)} />
+        <SummaryMetricCard label="Current chapters" value={formatChapterCount(summary.currentChapters)} />
+      </div>
+      {summary.totalBooks === 0 ? (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          No books match the current filters.
+        </div>
+      ) : (
+        <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap gap-2">
+            {([
+              { id: 'status', label: 'Status' },
+              { id: 'types', label: 'Types' },
+              { id: 'ratings', label: 'Ratings' },
+              { id: 'genres', label: 'Genres' },
+              { id: 'time', label: 'Time' },
+            ] as const).map((tab) => (
+              <button
+                aria-pressed={activeTab === tab.id}
+                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${activeTab === tab.id ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:text-slate-950'}`}
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+          {activeTab === 'status' ? (
+            <SummaryTabLayout
+              chart={<SummaryPieChart data={statusChartData} valueLabel="books" />}
+              details={<SummaryCountList items={summary.statusCounts.map((status) => ({ label: status.status, value: String(status.count) }))} />}
+              title="Status distribution"
+            />
+          ) : null}
+          {activeTab === 'types' ? (
+            <SummaryTabLayout
+              chart={<SummaryTypeBarChart data={summary.typeCounts} />}
+              details={<SummaryTypeDetails items={summary.typeCounts} />}
+              title="Book types and current chapters"
+            />
+          ) : null}
+          {activeTab === 'ratings' ? (
+            <SummaryTabLayout
+              chart={<SummaryRatingsBarChart data={ratingChartData} />}
+              details={<SummaryCountList items={ratingChartData.map((rating) => ({ label: rating.label, value: String(rating.value) }))} />}
+              title="Rating spread"
+            />
+          ) : null}
+          {activeTab === 'genres' ? (
+            <SummaryTabLayout
+              chart={<SummaryPieChart data={genreChartData} valueLabel="books" />}
+              details={<SummaryCountList items={summary.genreCounts.map((genre) => ({ label: genre.genre, value: String(genre.bookCount) }))} />}
+              title="Genre distribution"
+            />
+          ) : null}
+          {activeTab === 'time' ? (
+            <SummaryTabLayout
+              chart={<SummaryTimeBarChart data={estimatedReading.byType} />}
+              details={(
+                <SummaryTimeDetails
+                  booksWithKnownCurrentChapter={summary.booksWithKnownCurrentChapter}
+                  booksWithoutKnownCurrentChapter={summary.booksWithoutKnownCurrentChapter}
+                  minutesPerType={minutesPerType}
+                  currentChapters={summary.currentChapters}
+                  totalHours={estimatedReading.totalHours}
+                  typeCounts={summary.typeCounts}
+                  onMinutesChange={(type, next) => {
+                    setMinutesPerType((current) => {
+                      const normalized = Number.isFinite(next) ? Math.max(0, next) : 0
+                      const updated = { ...current, [type]: normalized }
+                      window.localStorage.setItem(summaryReadingTimeStorageKey, JSON.stringify(updated))
+                      return updated
+                    })
+                  }}
+                />
+              )}
+              title="Estimated reading time"
+            />
+          ) : null}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function SummaryMetricCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+      <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div>
+    </div>
+  )
+}
+
+function SummaryTabLayout({
+  chart,
+  details,
+  title,
+}: {
+  chart: ReactNode
+  details: ReactNode
+  title: string
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)]">
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 text-sm font-semibold text-slate-950">{title}</div>
+        {chart}
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4">
+        {details}
+      </div>
+    </div>
+  )
+}
+
+function SummaryPieChart({ data, valueLabel }: { data: Array<{ label: string; value: number }>; valueLabel: string }) {
+  if (!data.length) {
+    return <div className="flex h-72 items-center justify-center text-sm text-slate-500">No data for this tab.</div>
+  }
+
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer>
+        <PieChart>
+          <Pie
+            data={data}
+            dataKey="value"
+            innerRadius={64}
+            nameKey="label"
+            outerRadius={104}
+            paddingAngle={2}
+          >
+            {data.map((entry, index) => (
+              <Cell fill={summaryChartColors[index % summaryChartColors.length]} key={entry.label} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value, name) => [`${Number(value ?? 0)} ${valueLabel}`, String(name ?? '')]} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function SummaryTypeBarChart({ data }: { data: BookSummaryTypeCountDto[] }) {
+  if (!data.length) {
+    return <div className="flex h-72 items-center justify-center text-sm text-slate-500">No data for this tab.</div>
+  }
+
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer>
+        <BarChart data={data}>
+          <XAxis dataKey="type" tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+          <Tooltip formatter={(value, _name, item) => [`${formatChapterCount(Number(value ?? 0))} chapters`, String(item.payload.type ?? '')]} />
+          <Legend />
+          <Bar dataKey="currentChapters" fill="#0f766e" name="Current chapters" radius={[8, 8, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function SummaryRatingsBarChart({ data }: { data: Array<{ label: string; value: number }> }) {
+  if (!data.length) {
+    return <div className="flex h-72 items-center justify-center text-sm text-slate-500">No data for this tab.</div>
+  }
+
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer>
+        <BarChart data={data}>
+          <XAxis dataKey="label" tickLine={false} axisLine={false} />
+          <YAxis allowDecimals={false} tickLine={false} axisLine={false} />
+          <Tooltip formatter={(value, _name, item) => [`${Number(value ?? 0)} books`, `Rating ${String(item.payload.label)}`]} />
+          <Legend />
+          <Bar dataKey="value" fill="#7c3aed" name="Books" radius={[8, 8, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function SummaryTimeBarChart({ data }: { data: Array<{ type: string; hours: number }> }) {
+  if (!data.length) {
+    return <div className="flex h-72 items-center justify-center text-sm text-slate-500">No known chapter counts yet.</div>
+  }
+
+  return (
+    <div className="h-72 w-full">
+      <ResponsiveContainer>
+        <BarChart data={data}>
+          <XAxis dataKey="type" tickLine={false} axisLine={false} />
+          <YAxis tickLine={false} axisLine={false} />
+          <Tooltip formatter={(value) => [`${Number(value ?? 0).toFixed(1)} h`, 'Estimated time']} />
+          <Legend />
+          <Bar dataKey="hours" fill="#2563eb" name="Estimated hours" radius={[8, 8, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function SummaryCountList({ items }: { items: Array<{ label: string; value: string }> }) {
+  if (!items.length) {
+    return <div className="text-sm text-slate-500">No data for this tab.</div>
+  }
+
+  return (
+    <div className="grid gap-2">
+      {items.map((item) => (
+        <div className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm" key={item.label}>
+          <span className="font-medium text-slate-700">{item.label}</span>
+          <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{item.value}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SummaryTypeDetails({ items }: { items: BookSummaryTypeCountDto[] }) {
+  if (!items.length) {
+    return <div className="text-sm text-slate-500">No type data for this filter.</div>
+  }
+
+  return (
+    <div className="grid gap-2">
+      {items.map((item) => (
+        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3" key={item.type}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-semibold text-slate-900">{item.type}</div>
+            <div className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{item.bookCount} books</div>
+          </div>
+          <div className="mt-2 text-sm text-slate-600">Current chapters: {formatChapterCount(item.currentChapters)}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SummaryTimeDetails({
+  booksWithKnownCurrentChapter,
+  booksWithoutKnownCurrentChapter,
+  minutesPerType,
+  currentChapters,
+  totalHours,
+  typeCounts,
+  onMinutesChange,
+}: {
+  booksWithKnownCurrentChapter: number
+  booksWithoutKnownCurrentChapter: number
+  minutesPerType: Record<string, number>
+  currentChapters: number
+  totalHours: number
+  typeCounts: BookSummaryTypeCountDto[]
+  onMinutesChange: (type: string, next: number) => void
+}) {
+  return (
+    <div className="grid gap-3">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="text-sm font-semibold text-slate-950">Estimated total</div>
+        <div className="mt-1 text-2xl font-semibold text-slate-950">{formatHours(totalHours)}</div>
+        <div className="mt-2 text-sm text-slate-600">
+          {formatDays(totalHours)} and {formatMonths(totalHours)} based on {formatChapterCount(currentChapters)} current chapters.
+        </div>
+        <div className="text-sm text-slate-500">
+          Books with current chapter: {booksWithKnownCurrentChapter}. Missing current chapter: {booksWithoutKnownCurrentChapter}
+        </div>
+      </div>
+      <div className="grid gap-2">
+        {typeCounts.map((type) => (
+          <label className="grid gap-2 rounded-md border border-slate-200 bg-white p-3" key={type.type}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold text-slate-900">{type.type}</span>
+              <span className="text-sm text-slate-500">{formatChapterCount(type.currentChapters)} current chapters</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                className={`${inputClass} h-10 w-28`}
+                min="0"
+                step="1"
+                type="number"
+                value={minutesPerType[type.type] ?? 5}
+                onChange={(event) => onMinutesChange(type.type, Number(event.target.value))}
+              />
+              <span className="text-sm text-slate-600">minutes per chapter</span>
+            </div>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function ColumnSettingsPopup<T>({
+  allowReorder = true,
   columns,
+  description,
   preferences,
+  title,
   onChange,
 }: {
+  allowReorder?: boolean
   columns: ColumnDefinition<T>[]
+  description?: string
   preferences: ColumnPreference[]
+  title?: string
   onChange: (preferences: ColumnPreference[]) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -608,8 +1087,8 @@ export function ColumnSettingsPopup<T>({
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
             <div>
-              <div className="text-sm font-semibold text-slate-950">Visible columns</div>
-              <div className="text-xs font-normal text-slate-500">Change table order and visibility.</div>
+              <div className="text-sm font-semibold text-slate-950">{title}</div>
+              <div className="text-xs font-normal text-slate-500">{description}</div>
             </div>
             <button className="text-xs font-semibold text-slate-500 hover:text-slate-950" type="button" onClick={resetColumns}>Reset</button>
           </div>
@@ -632,10 +1111,12 @@ export function ColumnSettingsPopup<T>({
                   </span>
                   {column.label}
                 </button>
-                <div className="flex shrink-0 gap-1">
-                  <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === 0} type="button" onClick={() => moveColumn(preference.id, -1)}>Up</button>
-                  <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === preferences.length - 1} type="button" onClick={() => moveColumn(preference.id, 1)}>Down</button>
-                </div>
+                {allowReorder ? (
+                  <div className="flex shrink-0 gap-1">
+                    <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === 0} type="button" onClick={() => moveColumn(preference.id, -1)}>Up</button>
+                    <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === preferences.length - 1} type="button" onClick={() => moveColumn(preference.id, 1)}>Down</button>
+                  </div>
+                ) : null}
               </div>
             )
           })}
@@ -736,14 +1217,22 @@ function readColumnPreferences<T>(storageKey: string, columns: ColumnDefinition<
 
 export function ColumnHeader<T>({
   activeDirection,
+  isCyclic = false,
   column,
   onSort,
 }: {
-  activeDirection: SortDirection | null
+  activeDirection: string | null
+  isCyclic?: boolean
   column: ColumnDefinition<T>
   onSort: (sortBy: string) => void
 }) {
-  const Icon = activeDirection === 'asc' ? ArrowUp : activeDirection === 'desc' ? ArrowDown : ChevronsUpDown
+  const Icon = isCyclic && activeDirection
+    ? RefreshCw
+    : activeDirection === 'asc'
+    ? ArrowUp
+    : activeDirection === 'desc'
+      ? ArrowDown
+      : ChevronsUpDown
 
   if (!column.sortBy) {
     return <th className={`${column.widthClass ?? ''} px-4 py-3`}>{column.label}</th>
@@ -786,10 +1275,12 @@ function BookRow({ book, columns }: { book: BookDto; columns: ColumnDefinition<B
 function BookCardGrid({
   books,
   cardsPerRow,
+  fields,
   isLoading,
 }: {
   books: BookDto[]
   cardsPerRow: number
+  fields: ColumnDefinition<BookDto>[]
   isLoading: boolean
 }) {
   if (isLoading) {
@@ -799,6 +1290,20 @@ function BookCardGrid({
   if (!books.length) {
     return <div className="px-4 py-8 text-center text-slate-500">No books match the current filters.</div>
   }
+
+  const cardText = getCardTextSizeClasses(cardsPerRow)
+  const showTitle = hasCardField(fields, 'title')
+  const showAlternativeTitles = hasCardField(fields, 'alternativeTitles')
+  const showAuthor = hasCardField(fields, 'author')
+  const showProgress = hasCardField(fields, 'progress')
+  const showType = hasCardField(fields, 'type')
+  const cardDetailsClass = getCardDetailRowClass({
+    showAlternativeTitles,
+    showAuthor,
+    showProgress,
+    showTitle,
+    showType,
+  })
 
   return (
     <div className={`grid gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
@@ -812,27 +1317,116 @@ function BookCardGrid({
                 emptyLabel="No cover"
                 title={book.primaryTitle}
               />
-              {book.rating != null ? (
+              {hasCardField(fields, 'rating') && book.rating != null ? (
                 <span
                   className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold shadow-lg ${getRatingBadgeClass(book.rating)}`}
                 >
                   {book.rating}
                 </span>
               ) : null}
-              <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-lg ${getStatusBadgeClass(book.status)}`}>
-                <span className="truncate">{book.status}</span>
-              </span>
+              {hasCardField(fields, 'status') ? (
+                <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-lg ${getStatusBadgeClass(book.status)}`}>
+                  <span className="truncate">{book.status}</span>
+                </span>
+              ) : null}
             </div>
-            <div className="grid gap-1">
-              <h2 className="line-clamp-2 text-base font-semibold text-slate-950">{book.primaryTitle}</h2>
-              <p className="text-sm text-slate-500">{book.author ?? 'Unknown author'}</p>
-              <p className="text-sm font-medium text-slate-700">{formatProgress(book)}</p>
+            <div className={`grid gap-1 ${cardDetailsClass}`}>
+              {showTitle ? (
+                <div className="min-h-10">
+                  <h2 className={`line-clamp-2 font-semibold text-slate-950 ${cardText.title}`}>{book.primaryTitle}</h2>
+                </div>
+              ) : null}
+              {showAlternativeTitles ? (
+                <div className="min-h-10">
+                  <p className={`line-clamp-2 text-slate-500 ${cardText.meta}`}>{formatList(book.alternativeTitles)}</p>
+                </div>
+              ) : null}
+              {showAuthor ? (
+                <div className="min-h-6">
+                  <p className={`truncate text-slate-500 ${cardText.meta}`}>{book.author ?? 'Unknown author'}</p>
+                </div>
+              ) : null}
+              {showProgress || showType ? (
+                <div className="flex min-h-7 items-end justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    {showProgress ? (
+                      <p className={`truncate font-medium text-slate-700 ${cardText.meta}`}>{formatProgress(book)}</p>
+                    ) : null}
+                  </div>
+                  <div className="shrink-0 text-right">
+                    {showType ? (
+                      <p className={`font-semibold italic tracking-wide text-slate-700 ${cardText.meta}`}>{book.contentType}</p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </Link>
         </article>
       ))}
     </div>
   )
+}
+
+function hasCardField(fields: ColumnDefinition<BookDto>[], id: string) {
+  return fields.some((field) => field.id === id)
+}
+
+export function getCardTextSizeClasses(cardsPerRow: number) {
+  const normalized = normalizeCardsPerRow(cardsPerRow)
+
+  if (normalized <= 4) {
+    return {
+      title: 'text-lg',
+      meta: 'text-base',
+    }
+  }
+
+  if (normalized <= 6) {
+    return {
+      title: 'text-base',
+      meta: 'text-sm',
+    }
+  }
+
+  return {
+    title: 'text-sm',
+    meta: 'text-xs',
+  }
+}
+
+export function getCardDetailRowClass({
+  showAlternativeTitles,
+  showAuthor,
+  showProgress,
+  showTitle,
+  showType,
+}: {
+  showAlternativeTitles: boolean
+  showAuthor: boolean
+  showProgress: boolean
+  showTitle: boolean
+  showType: boolean
+}) {
+  const rows: string[] = []
+
+  if (showTitle) {
+    rows.push('minmax(0,2.5rem)')
+  }
+
+  if (showAlternativeTitles) {
+    rows.push('minmax(0,2.5rem)')
+  }
+
+  if (showAuthor) {
+    rows.push('minmax(0,1.5rem)')
+  }
+
+  if (showProgress || showType) {
+    rows.push('minmax(0,1.75rem)')
+  }
+
+  return rows.length ? `grid-rows-[${rows.join('_')}]` : ''
 }
 
 function BooksListFooter({
@@ -961,8 +1555,52 @@ export function readCardsPerRow(storageKey: string) {
   return normalizeCardsPerRow(stored)
 }
 
+function readSummaryReadingTimes(storageKey: string) {
+  const stored = window.localStorage.getItem(storageKey)
+  if (!stored) {
+    return {}
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Record<string, number>
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, number] => typeof entry[0] === 'string' && Number.isFinite(entry[1])),
+    )
+  } catch {
+    return {}
+  }
+}
+
 function readSortDirection(searchParams: URLSearchParams): SortDirection {
-  return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
+  return searchParams.get('sortDirection') ?? 'desc'
+}
+
+function getNextSortDirection(
+  nextSortBy: string,
+  currentSortBy: string,
+  currentSortDirection: string,
+) {
+  const defaultDirection = nextSortBy === 'lastModified' || nextSortBy === 'created' ? 'desc' : 'asc'
+  return currentSortBy === nextSortBy
+    ? currentSortDirection === 'asc' ? 'desc' : 'asc'
+    : defaultDirection
+}
+
+function isCyclicSort(sortBy: string) {
+  return sortBy === 'status' || sortBy === 'type'
+}
+
+function getCyclicSortDirectionFromResult(books: BookDto[], sortBy: string) {
+  const firstBook = books[0]
+  if (!firstBook) {
+    return null
+  }
+
+  return sortBy === 'status'
+    ? firstBook.status
+    : sortBy === 'type'
+      ? firstBook.contentType
+      : null
 }
 
 function normalizeCardsPerRow(value: number) {
@@ -1046,6 +1684,48 @@ export function formatProgress(book: BookDto) {
     return '-'
   }
   return `${current ?? '?'}${book.totalChapters ? ` / ${book.totalChapters}` : ''}`
+}
+
+export function formatAverageRating(value?: number | null) {
+  return value == null ? '-' : value.toFixed(1)
+}
+
+export function formatChapterCount(value?: number | null) {
+  if (value == null) {
+    return '-'
+  }
+
+  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+}
+
+function formatHours(value: number) {
+  return `${value.toFixed(1)} h`
+}
+
+function formatDays(value: number) {
+  return `${(value / 24).toFixed(1)} days`
+}
+
+function formatMonths(value: number) {
+  return `${(value / (24 * 30)).toFixed(1)} months`
+}
+
+function getEstimatedReadingTime(typeCounts: BookSummaryTypeCountDto[], minutesPerType: Record<string, number>) {
+  const byType = typeCounts
+    .filter((type) => type.currentChapters > 0)
+    .map((type) => {
+      const minutes = (minutesPerType[type.type] ?? 5) * type.currentChapters
+      return {
+        type: type.type,
+        hours: minutes / 60,
+      }
+    })
+  const totalHours = byType.reduce((sum, item) => sum + item.hours, 0)
+
+  return {
+    byType,
+    totalHours,
+  }
 }
 
 export function formatDate(value?: string | null) {

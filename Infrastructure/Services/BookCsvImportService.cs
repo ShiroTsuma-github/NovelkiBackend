@@ -323,18 +323,18 @@ public sealed class BookCsvImportService : IBookCsvImportService
     {
         var types = await _context.ContentTypes.AsNoTracking()
             .Select(t => new { t.Id, t.Name })
+            .OrderBy(t => t.Id.ToString())
             .ToListAsync(cancellationToken);
         var typeNames = types.Select(t => MappingExtensions.NormalizeName(t.Name)).ToList();
         var typeIdsByName = types.ToDictionary(t => MappingExtensions.NormalizeName(t.Name), t => t.Id);
         var statusNames = await _context.Statuses.AsNoTracking()
+            .OrderBy(s => s.Id.ToString())
             .Select(s => s.Name)
             .ToListAsync(cancellationToken);
         session.AvailableContentTypes = types
             .Select(type => type.Name)
-            .OrderBy(name => name)
             .ToArray();
         session.AvailableStatuses = statusNames
-            .OrderBy(name => name)
             .ToArray();
         var validTypes = typeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
         var validStatuses = statusNames.Select(MappingExtensions.NormalizeName).ToHashSet(StringComparer.OrdinalIgnoreCase);
