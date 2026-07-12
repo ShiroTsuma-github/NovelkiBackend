@@ -23,6 +23,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
   const [allowInvalidRowAutoExpand, setAllowInvalidRowAutoExpand] = useState(true)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
+  const [dropzoneActive, setDropzoneActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const invalidRows = useMemo(() => session?.rows.filter((row) => !row.isValid) ?? [], [session])
 
@@ -78,6 +79,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       setExpandedRowId(null)
       setAllowInvalidRowAutoExpand(true)
       setConfirmCancelOpen(false)
+      setDropzoneActive(false)
     }
   }, [open])
 
@@ -111,12 +113,28 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       return
     }
 
+    handleSelectedFile(file)
+  }
+
+  function handleSelectedFile(file: File) {
     if (!file.name.toLowerCase().endsWith('.csv')) {
       toast.error('Choose a .csv file.')
       return
     }
 
     createSessionMutation.mutate(file)
+  }
+
+  function handleDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setDropzoneActive(false)
+
+    const file = event.dataTransfer.files?.[0]
+    if (!file) {
+      return
+    }
+
+    handleSelectedFile(file)
   }
 
   function handleDismiss() {
@@ -181,7 +199,27 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
         <input accept=".csv,text/csv" className="hidden" ref={fileInputRef} type="file" onChange={handleFileSelection} />
 
         {!session ? (
-          <div className="grid gap-4 rounded-2xl border border-dashed border-slate-700 bg-slate-900 p-8 text-center">
+          <div
+            className={`grid gap-4 rounded-2xl border border-dashed p-8 text-center transition ${dropzoneActive ? 'border-cyan-400 bg-slate-900/80 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border-slate-700 bg-slate-900'}`}
+            onDragEnter={(event) => {
+              event.preventDefault()
+              setDropzoneActive(true)
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault()
+              if (event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                return
+              }
+              setDropzoneActive(false)
+            }}
+            onDragOver={(event) => {
+              event.preventDefault()
+              if (!dropzoneActive) {
+                setDropzoneActive(true)
+              }
+            }}
+            onDrop={handleDrop}
+          >
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white">
               {createSessionMutation.isPending ? <LoaderCircle className="h-6 w-6 animate-spin" /> : <FileUp className="h-6 w-6" />}
             </div>
@@ -189,7 +227,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               <div className="text-base font-semibold text-slate-50">
                 {createSessionMutation.isPending ? 'Parsing CSV draft...' : 'Choose a CSV file'}
               </div>
-              <div className="text-sm text-slate-400">Nothing is written to the database until you press final save.</div>
+              <div className="text-sm text-slate-400">Drop a CSV here or use file selection. Nothing is written to the database until you press final save.</div>
             </div>
             <div className="flex justify-center">
               <button className={buttonClass} disabled={createSessionMutation.isPending} type="button" onClick={openFilePicker}>

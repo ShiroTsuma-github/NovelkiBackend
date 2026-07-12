@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import type { BookImportSessionDto } from '@/api/types'
+import { toast } from 'sonner'
 import { renderWithProviders } from '@/test/render'
 import { ImportBooksDialog } from './ImportBooksDialog'
 
@@ -31,6 +32,45 @@ vi.mock('sonner', () => ({
 }))
 
 describe('ImportBooksDialog', () => {
+  it('creates an import session when a csv file is dropped into the dialog', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const dropzone = screen.getByText(/drop a csv here or use file selection/i).closest('div')
+    expect(dropzone).not.toBeNull()
+
+    fireEvent.drop(dropzone!, {
+      dataTransfer: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    await waitFor(() => {
+      expect(api.createBookImportSession).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('rejects dropped files that are not csv', async () => {
+    renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const dropzone = screen.getByText(/drop a csv here or use file selection/i).closest('div')
+    expect(dropzone).not.toBeNull()
+
+    fireEvent.drop(dropzone!, {
+      dataTransfer: {
+        files: [new File(['not,csv'], 'books.txt', { type: 'text/plain' })],
+      },
+    })
+
+    expect(api.createBookImportSession).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledWith('Choose a .csv file.')
+  })
+
   it('asks for confirmation before dismissing an active import session', async () => {
     vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
 
