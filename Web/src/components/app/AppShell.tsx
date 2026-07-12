@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    'inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition',
+    'inline-flex items-center gap-2.5 rounded-md pl-3.5 pr-4 py-2 text-sm font-medium transition',
     isActive
       ? 'bg-cyan-500 text-slate-950'
       : 'text-slate-300 hover:bg-slate-800 hover:text-slate-50',
@@ -34,7 +34,7 @@ export function AppShell() {
             </div>
           </div>
           <nav className="hidden items-center gap-2 md:flex">
-            <NavLink className={navLinkClass} to="/books">
+            <NavLink className={navLinkClass} end to="/books">
               <Search className="h-4 w-4" />
               Books
             </NavLink>
@@ -50,7 +50,7 @@ export function AppShell() {
             ) : null}
           </nav>
           <button
-            className="inline-flex items-center gap-2 rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
+            className="inline-flex items-center gap-2.5 rounded-md border border-slate-700 bg-slate-900 pl-3.5 pr-4 py-2 text-sm font-medium text-slate-200 hover:bg-slate-800"
             type="button"
             onClick={handleLogout}
           >
