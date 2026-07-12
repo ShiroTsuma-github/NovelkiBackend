@@ -563,10 +563,15 @@ function BookCardGrid({ books, isLoading }: { books: BookDto[]; isLoading: boole
                 title={book.primaryTitle}
               />
               {book.rating != null ? (
-                <span className="absolute right-3 top-3 inline-flex min-h-8 min-w-8 items-center justify-center rounded-full bg-amber-400/95 px-2.5 text-xs font-bold text-slate-950 shadow-lg">
+                <span
+                  className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold shadow-lg ${getRatingBadgeClass(book.rating)}`}
+                >
                   {book.rating}
                 </span>
               ) : null}
+              <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-lg ${getStatusBadgeClass(book.status)}`}>
+                <span className="truncate">{book.status}</span>
+              </span>
             </div>
             <div className="grid gap-1">
               <h2 className="line-clamp-2 text-base font-semibold text-slate-950">{book.primaryTitle}</h2>
@@ -607,6 +612,43 @@ function readPageSize(searchParams: URLSearchParams) {
 
 function readSortDirection(searchParams: URLSearchParams): SortDirection {
   return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
+}
+
+function getRatingBadgeClass(rating: number) {
+  if (rating <= 2) {
+    return 'bg-rose-600/95 text-white'
+  }
+  if (rating <= 4) {
+    return 'bg-orange-500/95 text-white'
+  }
+  if (rating <= 6) {
+    return 'bg-amber-400/95 text-slate-950'
+  }
+  if (rating <= 8) {
+    return 'bg-lime-500/95 text-slate-950'
+  }
+  return 'bg-emerald-500/95 text-white'
+}
+
+function getStatusBadgeClass(status: string) {
+  const normalized = status.trim().toLowerCase()
+  if (normalized === 'reading') {
+    return 'border-emerald-200 bg-emerald-50/95 text-emerald-700'
+  }
+  if (normalized === 'completed') {
+    return 'border-cyan-200 bg-cyan-50/95 text-cyan-700'
+  }
+  if (normalized === 'plan to read') {
+    return 'border-amber-200 bg-amber-50/95 text-amber-700'
+  }
+  if (normalized === 'on hold') {
+    return 'border-orange-200 bg-orange-50/95 text-orange-700'
+  }
+  if (normalized === 'dropped') {
+    return 'border-rose-200 bg-rose-50/95 text-rose-700'
+  }
+
+  return 'border-slate-200 bg-slate-100/95 text-slate-700'
 }
 
 export function formatProgress(book: BookDto) {
