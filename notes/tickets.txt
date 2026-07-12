@@ -1,0 +1,485 @@
+# Ticket list from `improvements-structured.md`
+
+Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny komponent, opis problemu i kryteria akceptacji. Tickety nie powinny byc laczone w ogolne zadania typu "napraw bledy".
+
+!!!Kazdy ticket  ma byc jako osobny commit  w historii!!!
+!!!Skonczone tickety maja zostac przeniesione na koniec do poprawnej sekcji!!!
+!!!Kazdy ticket ma zawierac testy. Testy maja uwzledniac  mozliwe edge case!!!
+
+Concept tickety:
+1. Przy uploadzie okladki zmiana na jpg/najlepszy format dla przegladarki (rozmiar i jakosc) oraz utworzenie downscaled wersji do card view
+2. import discard all invalid button
+3. w summary importu lista tytulow poprawnie zaimportowanych ksiazek zamiast od razu zamykac
+4. security /  pen  test
+5. czy w liscie ksiazek potrzebujemy  pullowac kazde progressHistory, linki, wszystkie tagi? raczej nie.  Ustalic co  jest potrzebne do detali ksiazki a co main page i odpowiednio dostosowac response  (zwlaszcza ze query  i tak  idzie do backend, wiec nie  potrzebuje miec wszystkiego w przegladarce)
+6. refaktor kodu backend z tech debtu (wymaga dodania wiecej test coverage, zeby zapobiec regresji. Najlepiej przed regresja na testach od api poleciec)
+7. refaktor frontendu, gwarantujac ze finalny front nie zmieni w zaden sposob z wygladem
+8. przebudowanie frontendu stylistycznie z uzyciem konkretnych guidelineow
+
+
+## Auth
+
+## Book Form And Validation
+
+### NB-010 - Dodaj parser tagow ze spacjami, cudzyslowami i podwojna spacja
+-- SKIP FOR NOW -- THE TICKET IS IN CONSIDERATION PHASE AND CAN'T BE IMPLEMENTED AS IT IS
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BookFormPage.tsx`, `TagChipSelect`, `ChipBox`
+- Problem: tag tworzy sie tylko po `Enter` albo kliknieciu sugestii. Brakuje oczekiwanego modelu wpisywania opartego o spacje, cudzyslowy i podwojna spacje.
+- Zakres: zaimplementowac parsing tag inputu zgodny z oczekiwaniem produktu, w tym obsluge fraz w cudzyslowie i zamiane separatorow na docelowy zapis tagu.
+- Akceptacja: pojedyncza spacja tworzy separator tylko poza cudzyslowem; fraza w cudzyslowie moze zostac jednym tagiem; podwojna spacja ma jawnie zdefiniowane zachowanie; istniejace sugestie i usuwanie tagow dalej dzialaja.
+
+## Progress
+
+## Covers And Delivery
+
+## Import CSV
+
+### NB-022 - Dodaj sugestie poprawnych Type i Status w imporcie
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `Infrastructure/Services/BookCsvImportService.cs`
+- Problem: przy blednym `type` albo `status` uzytkownik dostaje tylko tekst typu `must exist`, bez listy dozwolonych wartosci.
+- Zakres: dostarczyc do frontendu dostepne typy/statusy i pokazac je jako select/autocomplete w edytorze wiersza.
+- Akceptacja: pole `Type` oferuje istniejace typy; pole `Status` oferuje istniejace statusy; wpis reczny dalej mozna poprawic i revalidate; blad pokazuje oczekiwana wartosc albo liste sugestii.
+
+## Books List, Search And Cards
+
+### NB-027 - Ustabilizuj sortowanie po tytule
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`
+- Problem: sortowanie po `Title` malejaco zglasza dziwny porzadek. Kod sortuje po surowym `PrimaryTitle`, wiec wynik moze zalezec od kolacji, wielkosci liter i danych.
+- Zakres: zreprodukowac przypadek, a potem ustalic deterministyczne sortowanie tytulu, najlepiej case-insensitive i z tie-breakerem.
+- Akceptacja: sort asc i desc daje odwrotne, stabilne porzadki dla tej samej probki danych; wielkosc liter nie powoduje zaskakujacego grupowania; test repozytorium pokrywa kilka tytulow o roznych pierwszych literach.
+
+### NB-036 - Dodaj eksport listy ksiazek
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `BooksPage.tsx`, `Web/src/api/client.ts`, endpoint API eksportu
+- Problem: UI ma import CSV, ale nie ma eksportu listy ksiazek.
+- Zakres: dodac eksport aktualnej listy albo calej biblioteki do CSV, z jasno zdefiniowanym zachowaniem wzgledem filtrow i sortowania.
+- Akceptacja: przycisk eksportu jest dostepny obok importu lub w toolbarze; eksport respektuje aktualny query/sort albo UI jasno komunikuje zakres; plik zawiera podstawowe pola ksiazki i poprawne naglowki CSV.
+
+### NB-038 - Dodaj osobny panel opcji dla cards view
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `ColumnSettingsPopup`, `BookCardGrid`
+- Problem: po przelaczeniu na cards popup nadal jest zorientowany na kolumny tabeli i nie daje ustawien dla karty.
+- Zakres: przygotowac osobne preferencje cards view, np. pokazywanie alternate titles, tags, genres, author, progress, rating i status.
+- Akceptacja: w trybie table widac ustawienia kolumn; w trybie cards widac ustawienia elementow karty; preferencje zapisuja sie w localStorage osobno; zmiana opcji od razu zmienia karty.
+
+### NB-040 - Sortuj Type i Status wedlug domenowego porzadku
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`, seed danych status/type
+- Problem: sortowanie po `Type` i `Status` jest alfabetyczne, a oczekiwany jest domenowy porzadek cykliczny.
+- Zakres: uzyc `SortOrder` albo jawnej kolejnosci domenowej dla statusow i typow; zdefiniowac zachowanie asc/desc.
+- Akceptacja: sort statusu nie zalezy od alfabetu; sort type nie zalezy od alfabetu; asc i desc sa deterministyczne; test pokrywa przynajmniej kilka statusow i typow.
+
+### NB-041 - Dodaj dashboard summary biblioteki
+
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, API agregatow jesli potrzebne
+- Problem: lista ksiazek nie pokazuje agregatow typu liczba per type/status, przeczytane i laczny czas czytania.
+- Zakres: dodac sekcje summary z licznikami per type, per status, liczba completed/read i przyblizonym lacznym czasem czytania.
+- Akceptacja: summary laduje sie razem z lista albo przez osobny endpoint; wartosci sa zgodne z aktualna biblioteka uzytkownika; brak danych pokazuje pusty stan; sekcja nie zaslania glownej pracy z lista.
+
+### NB-042 - Dodaj wykresy trendow biblioteki
+
+- Typ: `Feature gap`
+- Priorytet: `P4`
+- Komponent: dashboard/lista ksiazek, API agregatow czasowych
+- Problem: brakuje rozkladow month/per-month i trendow increase over time wspomnianych w backlogu.
+- Zakres: po summary counters dodac wykresy miesieczne i wzrost biblioteki/progresu w czasie.
+- Akceptacja: wykres pokazuje dane per month; brak danych ma czytelny pusty stan; obliczenia sa po stronie API albo jednoznacznie po stronie klienta; zadanie moze bazowac na NB-041.
+
+## Navigation And Global UI
+
+### NB-043 - Dopracuj spacing gornych akcji i aktywny stan nawigacji
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: globalny layout/nawigacja, przyciski na gorze listy ksiazek
+- Problem: padding po prawej stronie gornych guzikow jest za maly, a `Add` jest wizualnie podswietlone razem z `Books`, co jest mylace.
+- Zakres: skorygowac padding przyciskow z ikonami i stan aktywny nawigacji dla `/books` oraz `/books/new`.
+- Akceptacja: ikony i tekst maja rowny oddech po lewej/prawej; aktywny stan jednoznacznie pokazuje aktualna podstrone; wejscie na add book nie wyglada jak rownoczesnie aktywne dwa glowne miejsca, jesli produkt tego nie oczekuje.
+
+## Verification Tickets
+
+### NB-044 - Zweryfikuj kontrast tytulu w dialogu usuwania ksiazki
+
+- Typ: `Investigation`
+- Priorytet: `P4`
+- Komponent: `Web/src/features/books/BookDetailsPage.tsx`, `DeleteBookDialog`
+- Problem: feedback mowi, ze tytul usuwanej ksiazki ma kolor taki jak tlo, ale aktualny kod ustawia biale tlo i `text-slate-900`.
+- Zakres: odtworzyc przypadek na aktualnym UI, przegladarkach i motywach; dopiero po potwierdzeniu zrobic konkretny fix kontrastu.
+- Akceptacja: wynik reprodukcji jest opisany w tickecie albo komentarzu; jesli problem istnieje, tytul ma kontrast zgodny z reszta dialogu; jesli nie istnieje, ticket zamyka sie jako unreproducible z notatka o sprawdzonej wersji.
+
+### NB-045 - Zweryfikuj konkretny przypadek dziwnego sortowania po tytule
+
+- Typ: `Investigation`
+- Priorytet: `P4`
+- Komponent: `BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`, baza danych testowa
+- Problem: feedback wskazuje, ze przy sortowaniu od tylu pierwsze sa tytuly na `u` i `p`, ale bez probki danych nie wiadomo, czy to blad sortowania, kolacji, czy oczekiwany porzadek dla aktualnych danych.
+- Zakres: zebrac probke danych i screenshot/URL query, odtworzyc sort, a wynik podpiac pod NB-027 albo zamknac jako brak bledu.
+- Akceptacja: istnieje minimalna probka danych reprodukujaca objaw albo jednoznaczna notatka, ze obecny sort dziala poprawnie; jesli potwierdzone, NB-027 dostaje konkretne dane testowe.
+
+## SKONCZONE
+
+### DONE NB-008 - Ujednolic format bledow w formularzu ksiazki
+
+- Typ: `UX/UI`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BookFormPage.tsx`, `Web/src/components/app/FormField.tsx`, `Web/src/features/books/bookFormSchema.ts`
+- Problem: czesc bledow jest tekstem pod polem, a czesc natywnym dymkiem inputa liczbowego. Inline error moze przesuwac sasiednie pola w gridzie.
+- Zakres: walidacje liczb przeniesc do kontrolowanego formatu bledow pod polem; zapewnic stabilna wysokosc wierszy formularza albo rezerwacje miejsca na blad.
+- Akceptacja: blad `current chapter > total chapters` i blad typu `Value must be a number` maja ten sam styl; sasiednie pola nie skacza w dol po pojawieniu sie bledu; natywne dymki przegladarki nie sa podstawowym mechanizmem informacji.
+- Commit: `45030df fix: unify book form numeric validation feedback`
+
+### DONE NB-009 - Zmien semantyke `Total chapters = 0`
+
+- Typ: `UX/UI`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BookFormPage.tsx`, `Web/src/features/books/bookFormSchema.ts`, backend validators dla create/update
+- Problem: formularz dopuszcza `0` jako total chapters, mimo ze domenowo wyglada to jak brak danych albo wartosc niepoprawna.
+- Zakres: zdecydowac semantyke i wdrozyc ja konsekwentnie. Rekomendacja: puste pole oznacza `null`, a wpisana wartosc musi byc dodatnia.
+- Akceptacja: `0` w `Total chapters` blokuje zapis z komunikatem; puste pole zapisuje `null`; dodatnie wartosci przechodza; update progresu korzysta z tej samej interpretacji total chapters.
+- Commit: `cc7990a fix: treat zero total chapters as missing`
+
+### DONE NB-016 - Dodaj kontrolowana strategie cache dla obrazow okladek
+
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BookCoverSection.tsx`, `useResolvedCoverImage`
+- Problem: obrazy sa pobierane przez `fetch` i zamieniane na `blob:` URL bez jawnej warstwy cache po stronie klienta.
+- Zakres: zdecydowac i wdrozyc cache dla resolved cover images, np. przez React Query, Cache API albo stabilne object URL lifecycle.
+- Akceptacja: ponowne wejscie na liste/detale nie pobiera niezmienionej okladki bez potrzeby; object URL sa zwalniane; zmiana okladki invaliduje stary obraz.
+- Commit: `ce58b0e feat: cache resolved cover images`
+
+### DONE NB-001 - Pokaz bledy rejestracji przy konkretnych polach
+
+- Typ: `UX/UI`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/auth/RegisterPage.tsx`, `Application/Features/AccountFeatures/Validators/RegisterUserValidator.cs`, `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`
+- Problem: formularz rejestracji pokazuje tylko toast z pierwszym/ogolnym bledem. Uzytkownik nie widzi, czy problem dotyczy emaila, hasla, czy nazwy uzytkownika.
+- Zakres: dodac lokalna walidacje formularza, pokazac bledy pod polami, zmapowac backendowe `errors` na `username`, `email` i `password`, oraz dodac checkliste zasad hasla zgodna z backendem.
+- Akceptacja: niepoprawny email pokazuje blad pod polem email; za slabe haslo pokazuje komplet niespelnionych zasad hasla; konflikt username/email nadal pokazuje czytelny blad przy odpowiednim polu lub formularzu; toast nie jest jedynym miejscem informacji o bledzie.
+- Commit: `236567b fix: show registration field errors`
+
+### DONE NB-020 - Zwroc bledy importu jako mapa field-to-errors
+
+- Typ: `Feature gap`
+- Priorytet: `P1`
+- Komponent: `Application/Common/DTOs/Book/BookImportDtos.cs`, `Infrastructure/Services/BookCsvImportService.cs`, API importu
+- Problem: `BookImportRowDto` ma tylko `errors: string[]`, wiec frontend nie wie, ktore pole jest bledne.
+- Zakres: rozszerzyc DTO o strukture `fieldErrors`, zachowujac kompatybilnosc z ogolna lista bledow jesli potrzebna.
+- Akceptacja: dla blednego typu odpowiedz zawiera blad przy `contentType`; dla blednego statusu przy `status`; dla tytulu przy `primaryTitle`; stare podsumowanie bledow nadal moze byc wyswietlane.
+- Commit: `5c83305 feat: return csv import field errors`
+
+### DONE NB-021 - Oznacz niepoprawne pola w edytorze importu
+
+- Typ: `UX/UI`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `ImportRowEditor`, `LabeledInput`, `LabeledTextarea`
+- Problem: edytor wiersza pokazuje liste bledow, ale nie oznacza konkretnych inputow.
+- Zakres: na podstawie `fieldErrors` ustawic czerwone obramowanie, komunikat przy polu i dostepny stan bledu.
+- Akceptacja: pole z bledem ma czerwone obramowanie; komunikat jest widoczny pod polem; poprawione i ponownie zwalidowane pole traci blad; lista ogolna nadal pomaga przy skanowaniu.
+- Commit: `d805218 fix: mark invalid import fields`
+
+### DONE NB-012 - Zapisuj komentarz progresu nawet bez zmiany chaptera
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Web/src/features/books/ProgressDialog.tsx`, `Application/Features/BookFeatures/Commands/UpdateBook.cs`, `Infrastructure/Persistence/BookRepository.cs`
+- Problem: gdy uzytkownik poda ten sam chapter i nowy komentarz, backend zwraca sukces, ale nie dodaje wpisu historii, wiec komentarz przepada.
+- Zakres: traktowac zmiane komentarza jako powod do utworzenia `BookProgressHistory` albo jawnie blokowac taki zapis przed wyslaniem.
+- Akceptacja: komentarz przy tym samym chapterze pojawia sie w changelogu; toast sukcesu oznacza realnie zapisany wpis albo realnie zaktualizowany stan; przypadek pustego no-op nie udaje zmiany.
+- Commit: `2293b5d fix: save progress comments without chapter change`
+
+### DONE NB-013 - Zweryfikuj walidacje numeru chaptera w update progress
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Web/src/features/books/ProgressDialog.tsx`, `Application/Features/BookFeatures/Commands/UpdateBook.cs`, `Infrastructure/Persistence/BookRepository.cs`
+- Problem: dialog progresu pozwala wpisac wartosci typu `e`, ujemne liczby i nie wymusza integera, a backend sprawdza glownie `current <= total`.
+- Zakres: dodac frontendowa i backendowa walidacje nieujemnosci, liczbowosci i dopuszczalnego formatu chapter number.
+- Akceptacja: `e`, `-1`, `1e9` jesli nieakceptowane domenowo, oraz wartosci niezgodne z integer/decimal policy nie sa zapisywane; API zwraca `400`, nie `500`; komunikat bledu jest widoczny przy polu.
+- Commit: `31b6c54 fix: validate progress chapter input`
+
+### DONE NB-014 - Dodaj limity dlugosci dla progress label i comment
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Web/src/features/books/ProgressDialog.tsx`, `Application/Features/BookFeatures/Commands/UpdateBook.cs`, `Infrastructure/Contexts/ApplicationDbContext.cs`
+- Problem: za dlugi `chapter label` moze skonczyc sie bledem bazy `500`, a brak limitu dla komentarza pozwala zawiesic przegladarke skrajnie duzym inputem.
+- Zakres: dodac `maxLength` w UI, walidator backendowy dla `CurrentChapterLabel` i `Comment`, oraz spojny komunikat bledu.
+- Akceptacja: label ponad 100 znakow blokuje zapis z `400`; komentarz ma jawny limit produktu; wklejenie bardzo dlugiego tekstu nie powoduje zawieszenia UI; backend nie zwraca `500` dla przekroczonego limitu.
+- Commit: `c3789f4 fix: limit progress label and comment length`
+
+### DONE NB-002 - Odrzuc whitespace-only primary title w formularzu ksiazki
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Web/src/features/books/bookFormSchema.ts`, `Web/src/features/books/BookFormPage.tsx`
+- Problem: `primaryTitle` zlozony z samych spacji przechodzi frontendowa walidacje, bo schema sprawdza `min(1)` bez `trim()`.
+- Zakres: walidowac tytul po `trim()`, wyswietlac blad pod polem i nie wysylac requestu dla wartosci whitespace-only.
+- Akceptacja: tytul `"   "` blokuje zapis na create i edit; blad jest widoczny przy polu `Primary title`; poprawny tytul z przypadkowymi spacjami na brzegach zapisuje sie bez dodatkowych spacji.
+- Commit: `263c463 fix: reject blank book titles in form`
+
+### DONE NB-003 - Odrzuc whitespace-only primary title po stronie backendu
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Application/Features/BookFeatures/Validators/CreateBookCommandValidator.cs`, `Application/Features/BookFeatures/Commands/CreateBook.cs`, `Application/Features/BookFeatures/Commands/UpdateBook.cs`
+- Problem: backend waliduje `NotEmpty()` przed obcieciem spacji, a handler przycina dopiero pozniej. Request z tytulem z samych spacji moze ominac walidacje semantyczna.
+- Zakres: walidowac `PrimaryTitle` po `Trim()`, utrzymac limit dlugosci, znormalizowac zachowanie create i update.
+- Akceptacja: API zwraca `400` dla whitespace-only title; create i update maja ten sam komunikat walidacyjny; poprawny tytul jest zapisywany po obcieciu spacji z brzegow.
+- Commit: `473ca07 fix: reject blank book titles in backend`
+
+### DONE NB-006 - Ukryj wewnetrzne ID w komunikacie o duplikacie ksiazki
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Domain/Exceptions/EntityAlreadyExistsException.cs`, `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`
+- Problem: konflikt duplikatu ksiazki zwraca komunikat z wewnetrznym ID, ktore nie jest uzyteczne dla zwyklego uzytkownika.
+- Zakres: zmienic detail dla `EntityAlreadyExistsException<Book, Guid>` na komunikat uzytkowy bez ID; logi moga dalej zawierac ID.
+- Akceptacja: API conflict dla duplikatu ksiazki nie pokazuje GUID w `detail`; UI nadal pokazuje czytelny blad; log diagnostyczny zachowuje informacje potrzebne developerowi.
+- Commit: `970cc14 fix: hide duplicate book internal id`
+
+### DONE NB-004 - Zwij nadmiarowe whitespace w nazwach identyfikujacych
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Application/Common/MappingExtensions.cs`, `Application/Features/BookFeatures/Commands/CreateBook.cs`, `Application/Features/BookFeatures/Commands/UpdateBook.cs`
+- Problem: `NormalizeName()` robi tylko `Trim().ToUpperInvariant()`, przez co `er gen` i `er     gen` sa traktowane jako rozne wartosci przy porownaniach i unikalnosci.
+- Zakres: dodac wspolna normalizacje, ktora obcina brzegi i zwija wiele bialych znakow wewnatrz do pojedynczej spacji dla tytulow, autorow, tagow i innych nazw identyfikujacych.
+- Akceptacja: lookup i unikalnosc traktuje wielokrotne spacje jak pojedyncza spacje; normalizacja jest uzyta przez create/update ksiazki; testy jednostkowe pokrywaja przynajmniej tytul i autora.
+- Commit: `8a15f46 fix: normalize internal whitespace in names`
+
+### DONE NB-005 - Zastosuj taka sama normalizacje whitespace w imporcie CSV
+
+- Typ: `Bug`
+- Priorytet: `P1`
+- Komponent: `Infrastructure/Services/BookCsvImportService.cs`
+- Problem: import CSV moze zapisac lub walidowac teksty inaczej niz reczny formularz, szczegolnie dla tytulow, autorow, typow i statusow z nadmiarowymi spacjami.
+- Zakres: uzyc tej samej logiki trim/whitespace-collapse co w aplikacji dla pol identyfikujacych importowanego wiersza.
+- Akceptacja: import `er     gen` trafia do tej samej normalizacji co formularz; duplikaty w imporcie wykrywaja wartosci rozniace sie tylko liczba spacji; pola opcjonalne whitespace-only przechodza do `null`, jesli domenowo sa nullable.
+- Commit: `1f3333f fix: normalize whitespace in csv import`
+
+### DONE NB-007 - Waliduj typ pliku okladki po wyborze pliku
+
+- Typ: `UX/UI`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BookFormPage.tsx`
+- Problem: `accept="image/jpeg,image/png,image/webp"` tylko podpowiada file pickerowi. Nietypowy format nadal moze trafic do dalszej obslugi.
+- Zakres: po wybraniu pliku sprawdzic MIME type i/lub rozszerzenie, pokazac blad dla niedozwolonego formatu i nie tworzyc draft cover.
+- Akceptacja: `.gif`, `.bmp`, `.svg` i pliki bez poprawnego typu sa odrzucane; `.jpg`, `.jpeg`, `.png`, `.webp` sa akceptowane; uzytkownik dostaje czytelny komunikat bez wyslania requestu.
+- Commit: `41be59b fix: validate cover upload file type`
+
+### DONE NB-046 - Waliduj cover URL po pobranym obrazie, nie po rozszerzeniu URL
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Infrastructure/BookCovers/BookCoverRemoteImageService.cs`, `Infrastructure/BookCovers/BookCoverStorageValidation.cs`, `Application.UnitTests/BookCoverTests.cs`
+- Problem: URL okladki moze nie miec rozszerzenia obrazu albo miec mylace rozszerzenie. Walidacja nie moze opierac sie na sciezce URL, bo `cover.txt` moze zwrocic poprawny JPEG, a `cover.jpg` moze zwrocic HTML.
+- Zakres: utrzymac walidacje absolute HTTP/HTTPS URL, pobierac obraz i akceptowac tylko faktyczny JPEG/PNG/WebP na podstawie magic bytes albo MIME z odpowiedzi, bez zaufania do rozszerzenia URL.
+- Akceptacja: URL z nietypowym rozszerzeniem, ktory zwraca poprawny obraz, przechodzi; URL `.jpg`, ktory zwraca HTML/tekst, jest odrzucony; testy regresyjne pokrywaja oba przypadki.
+- Commit: `2808606 test: cover url content validation`
+
+### DONE NB-037 - Dodaj alias `rating:` do parsera wyszukiwania
+
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Application/Common/BookSearchQueryParser.cs`, `Web/src/features/books/BooksPage.tsx`
+- Problem: parser obsluguje `rating>=8` i `rating=8`, ale nie traktuje `rating:8` jako aliasu.
+- Zakres: dodac semantyke `rating:<value>` jako rownowazna filtrowi ratingu i zaktualizowac tekst pomocy w UI.
+- Akceptacja: `rating:8` zwraca ksiazki z ratingiem 8 zgodnie z ustalona semantyka; nie psuje `rating>=`, `rating<=`, `rating=`; help text pokazuje wspierany format.
+- Commit: `73eb3c8 feat: support rating colon search alias`
+
+### DONE NB-033 - Ostyluj selector Per page bez natywnego przebarwienia
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`
+- Problem: prawa strona natywnego `<select>` dla `Per page` zmienia kolor na domyslny styl przegladarki przy hoverze.
+- Zakres: dodac spojne stylowanie selecta, np. `appearance-none` i wlasna ikone strzalki.
+- Akceptacja: hover nie pokazuje domyslnego jasnego obszaru po prawej stronie; kontrolka nadal jest dostepna z klawiatury; wyglad pasuje do reszty inputow.
+- Commit: `2627158 style: normalize per page select`
+
+### DONE NB-032 - Wyrownaj rozmiar przycisku Columns z toggle widoku
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `ViewModeToggle`, `ColumnSettingsPopup`
+- Problem: `Columns` wyglada optycznie na mniejszy niz sasiedni toggle `Table/Cards`.
+- Zakres: ujednolic wysokosc, padding, font i border z kontrolkami toolbaru.
+- Akceptacja: `Columns` ma taka sama wysokosc optyczna jak toggle widoku; hover/focus wyglada spojnie; zmiana nie psuje adminowego uzycia `ColumnSettingsPopup`, jesli komponent jest wspoldzielony.
+- Commit: `a4c06a3 style: align columns button size`
+
+### DONE NB-011 - Dodaj link zrodla okladki dopiero po zapisaniu okladki
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BookFormPage.tsx`
+- Problem: `storeDraftUrl()` dopisuje URL do `Links` juz na etapie draftu, zanim ksiazka i okladka zostana zapisane.
+- Zakres: przeniesc dopisywanie linku zrodla do sciezki po udanym `setBookCoverFromUrl` albo po udanym create/update z okladka.
+- Akceptacja: samo wybranie cover URL nie modyfikuje `Links`; po udanym zapisie okladki link pojawia sie raz; nieudany zapis okladki nie dopisuje linku.
+- Commit: `5f355fe fix: add cover source link only after successful save`
+
+### DONE NB-018 - Pozwol zostawic wszystkie bledne rekordy zwiniete
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`
+- Problem: efekt automatycznie ustawia `expandedRowId` na pierwszy invalid row, gdy aktualnie nic nie jest rozwiniete.
+- Zakres: rozroznic stan inicjalnego auto-open od swiadomego collapse przez uzytkownika.
+- Akceptacja: po kliknieciu `Collapse` pierwszy invalid row zostaje zwiniety; inne zwijane rekordy nie powoduje powrotu do pierwszego; po nowej sesji importu pierwszy invalid row moze nadal otworzyc sie automatycznie.
+- Commit: `0156327 fix: keep import rows collapsed after manual close`
+
+### DONE NB-019 - Potwierdz anulowanie sesji importu przy dismiss modala
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`
+- Problem: klikniecie poza modal od razu czysci stan i wywoluje `cancelBookImport`.
+- Zakres: dodac confirmation step dla zamykania aktywnej sesji importu, szczegolnie gdy sa poprawiane wiersze.
+- Akceptacja: klik poza modalem z aktywna sesja pokazuje potwierdzenie; `Cancel import` wywoluje backend cancel; `Keep editing` wraca do sesji; zamkniecie pustego modala bez sesji nadal jest szybkie.
+- Commit: `f7caef2 fix: confirm before cancelling csv import session`
+
+### DONE NB-023 - Utnij dlugi tytul w naglowku wiersza importu
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `ImportRowEditor`
+- Problem: bardzo dlugi tytul w naglowku invalid row potrafi wypchnac akcje w dol.
+- Zakres: nadac tytulowi kontener z `truncate`/line clamp i zabezpieczyc layout akcji.
+- Akceptacja: dlugi tytul pokazuje `...` albo maksymalnie dwie linie; przyciski `Collapse`, `Revalidate row`, `Remove row` pozostaja w czytelnym miejscu; pelny tytul jest dostepny w `title` albo innym nieinwazyjnym sposobie.
+- Commit: `679e34c style: constrain long import row titles`
+
+### DONE NB-024 - Dopracuj scrollbar listy importu
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, CSS dla `.import-rows-scroll`
+- Problem: scrollbar listy importu wymaga korekty polozenia/stylu przy prawej krawedzi.
+- Zakres: dopasowac padding, gutter i wyglad scrollbara do ciemnego modala.
+- Akceptacja: scrollbar nie nachodzi na tresc wiersza; prawa krawedz wyglada spojnie z panelem; przewijanie Virtuoso nadal dziala plynnie.
+- Commit: `c880a59 style: refine csv import scrollbar spacing`
+
+### DONE NB-025 - Dodaj pobieranie template CSV importu
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: API importu, `Web/src/api/client.ts`, `Web/src/features/books/ImportBooksDialog.tsx`
+- Problem: uzytkownik nie ma gotowego wzorcowego CSV z poprawnymi kolumnami i formatem.
+- Zakres: dodac endpoint albo statyczny asset template, klienta API i przycisk pobrania w modalu importu.
+- Akceptacja: modal importu ma akcje `Download template`; plik zawiera wymagane kolumny `primaryTitle`, `contentType`, `status` i opcjonalne kolumny wspierane przez import; format pliku przechodzi przez parser importu bez bledow strukturalnych.
+- Commit: `dc68c0f feat: add csv import template download`
+
+### DONE NB-026 - Dodaj drag and drop dla pliku CSV
+
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`
+- Problem: startowy ekran importu obsluguje tylko klik w `Select file`.
+- Zakres: dodac dropzone z obsluga `dragenter`, `dragover`, `dragleave`, `drop` i walidacja `.csv`.
+- Akceptacja: przeciagniecie pliku CSV tworzy sesje importu; przeciagniecie nie-CSV pokazuje blad; dropzone ma czytelny stan hover/focus; input file nadal dziala.
+- Commit: `e044bdb feat: add csv import drag and drop`
+
+### DONE NB-030 - Dodaj przycisk back to top na liscie ksiazek
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`
+- Problem: przy dlugich listach nie ma szybkiego powrotu na gore.
+- Zakres: dodac przycisk przewijania do gory widoczny po zejsciu nizej na stronie.
+- Akceptacja: przycisk pojawia sie dopiero po przewinieciu; klik przewija do topu listy albo strony; nie koliduje z footerem, modalami i widokiem mobilnym.
+- Commit: `14d16d2 feat: add books list back to top button`
+
+### DONE NB-034 - Dodaj rating overlay na kartach ksiazek
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `BookCardGrid`, `BookCoverArtwork`
+- Problem: cards view nie pokazuje ratingu na okladce.
+- Zakres: pokazac rating jako badge overlay w prawym gornym rogu karty/okladki.
+- Akceptacja: rating widoczny na kartach z wartoscia; brak ratingu nie pokazuje mylacego badge; overlay nie zaslania tytulu ani akcji; wyglad dziala z roznymi okladkami.
+- Commit: `ffb8c9a style: add rating overlays to book cards`
+
+### DONE NB-035 - Dodaj status pill overlay na kartach ksiazek
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `BookCardGrid`, `BookCoverArtwork`
+- Problem: cards view nie pokazuje statusu jako pill w prawym dolnym rogu.
+- Zakres: pokazac status jako pill overlay na karcie, z kolorami zgodnymi z detalami ksiazki.
+- Akceptacja: status widoczny w prawym dolnym rogu; dlugi status nie wychodzi poza karte; badge ma kontrast na jasnych i ciemnych okladkach.
+- Commit: `2fd00ef style: add status overlays to book cards`
+
+### DONE NB-039 - Dodaj wybor liczby kart w rzedzie od 2 do 8
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `BookCardGrid`
+- Problem: cards view ma sztywna siatke `sm:grid-cols-2 xl:grid-cols-4`.
+- Zakres: dodac kontrolke gestosci siatki i zastosowac ja do grid layoutu.
+- Akceptacja: uzytkownik moze wybrac 2, 3, 4, 5, 6, 7 albo 8 kart w rzedzie na desktopie; ustawienie zapisuje sie lokalnie; mobile zachowuje czytelny layout i nie wymusza 8 kolumn.
+- Commit: `67ef8c0 feat: add cards per row preference`
+
+### DONE NB-031 - Dopracuj padding i polozenie popupu Columns
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `ColumnSettingsPopup`
+- Problem: popup `Columns` ma niespojny padding i polozenie wzgledem reszty toolbaru.
+- Zakres: dopasowac spacing listy kolumn, sekcje naglowka i pozycjonowanie panelu.
+- Akceptacja: panel otwiera sie w przewidywalnym miejscu; `Visible columns` ma wlasciwy odstep; lista przelacznikow ma spojny rytm z reszta UI; panel miesci sie w viewport.
+- Commit: `815ec7e style: refine columns popup spacing and position`
+
+### DONE NB-029 - Zrob footer listy sticky przy dlugich wynikach
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BooksPage.tsx`
+- Problem: przy `take=500` dolny pasek paginacji jest zbyt daleko od aktualnego kontekstu pracy.
+- Zakres: zrobic dolny pasek listy sticky albo dodac rownowazne zachowanie, ktore utrzymuje nawigacje pod reka.
+- Akceptacja: przy dlugiej liscie kontrolki paginacji/per page sa dostepne bez przewijania na sam dol; sticky element nie zaslania ostatniego wiersza; dziala w trybie table i cards.
+- Commit: `0b84ece feat: keep books list footer controls sticky`
+
+### DONE NB-028 - Dodaj paginacje z numerami stron i szybkim skokiem
+
+- Typ: `UX/UI`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`
+- Problem: lista ksiazek ma tylko `Previous` i `Next`, bez numerow stron ani szybkiego skoku.
+- Zakres: dodac obecna strone, pobliskie numery, pierwsza/ostatnia strone i mechanizm skoku.
+- Akceptacja: uzytkownik widzi aktualna strone; moze przejsc na konkretna pobliska strone; moze przejsc do pierwszej i ostatniej; query params `skip`/`take` pozostaja zrodlem stanu.
+- Commit: `5c6b66d feat: add numbered books pagination controls`
+
+### DONE NB-015 - Pokaz delte chaptera w historii progresu
+
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/books/BookDetailsPage.tsx`
+- Problem: changelog pokazuje stan progresu, ale nie pokazuje roznicy wzgledem poprzedniego wpisu.
+- Zakres: obliczyc delte dla kolejnych wpisow z liczbowym `chapterNumber` i pokazac ja w gornej linii wpisu historii.
+- Akceptacja: wzrost pokazuje `+N` na zielono; spadek pokazuje `-N` na czerwono; brak poprzedniej liczby albo brak liczby nie pokazuje delty; sortowanie historii dalej daje poprawne pary porownania.
+- Commit: `6ad6d78 feat: show progress history chapter deltas`
+
+### DONE NB-017 - Wlacz kompresje odpowiedzi HTTP
+
+- Typ: `Feature gap`
+- Priorytet: `P3`
+- Komponent: `Api/Program.cs`, konfiguracja API albo reverse proxy
+- Problem: startup API nie konfiguruje gzip/brotli, mimo ze API i frontend zwracaja payloady, ktore moga byc kompresowane.
+- Zakres: wlaczyc response compression w aplikacji albo jasno skonfigurowac ja w warstwie hostingu.
+- Akceptacja: odpowiedzi JSON i statyczne assety sa kompresowane dla klientow z `Accept-Encoding`; nie kompresujemy typow, dla ktorych to ryzykowne lub bez sensu; lokalny smoke test potwierdza naglowek `Content-Encoding`.
+- Commit: `1253b4c feat: enable api response compression`
