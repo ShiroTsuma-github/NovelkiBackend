@@ -1,5 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronsUpDown, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
+import { keepPreviousData, useMutation, useQuery } from '@tanstack/react-query'
+import { ArrowDown, ArrowUp, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronsUpDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Settings2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -74,6 +74,23 @@ export function BooksPage() {
     queryKey: ['books', skip, pageSize, query, sortBy, sortDirection],
     queryFn: () => api.getBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
     placeholderData: keepPreviousData,
+  })
+  const exportMutation = useMutation({
+    mutationFn: () => api.downloadBooksExport({ query, sortBy, sortDirection }),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'books-export.csv'
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Export ready.')
+    },
+    onError: () => {
+      toast.error('Could not export books.')
+    },
   })
   function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
@@ -186,6 +203,10 @@ export function BooksPage() {
           <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <button className={secondaryButtonClass} disabled={exportMutation.isPending} type="button" onClick={() => exportMutation.mutate()}>
+            <Download className="h-4 w-4" />
+            {exportMutation.isPending ? 'Exporting...' : 'Export filtered CSV'}
+          </button>
           <button className={secondaryButtonClass} type="button" onClick={() => setImportDialogOpen(true)}>
             <Upload className="h-4 w-4" />
             Import CSV
@@ -440,12 +461,13 @@ function PageGapJump({
         ...
       </button>
       {isOpen ? (
-        <div className="absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+        <div className="absolute bottom-full left-1/2 z-40 mb-2 w-32 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
           <input
+            autoFocus
             aria-invalid={!isValid && value.length > 0 ? 'true' : undefined}
             data-gap-id={gapId}
             aria-label="Page number"
-            className={`${inputClass} h-10 w-24 bg-white text-center ${!isValid && value.length > 0 ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+            className={`${inputClass} h-10 w-full bg-white text-center ${!isValid && value.length > 0 ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
             inputMode="numeric"
             max={totalPages}
             min={1}

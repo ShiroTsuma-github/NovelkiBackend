@@ -122,6 +122,20 @@ public class BookController : ControllerBase
         return File(bytes, "text/csv; charset=utf-8", "book-import-template.csv");
     }
 
+    [HttpGet("export")]
+    [Authorize]
+    public async Task<IActionResult> ExportBooks([FromQuery] string? query, [FromQuery] string? sortBy, [FromQuery] string? sortDirection)
+    {
+        var firstPage = await _mediator.Send(new GetAllBooksQuery(0, 1, query, sortBy, sortDirection));
+        var allBooks = firstPage.Total > 0
+            ? await _mediator.Send(new GetAllBooksQuery(0, firstPage.Total, query, sortBy, sortDirection))
+            : firstPage;
+
+        var csv = BookExportCsv.Build(allBooks.Data);
+        var bytes = Encoding.UTF8.GetBytes(csv);
+        return File(bytes, "text/csv; charset=utf-8", "books-export.csv");
+    }
+
     [HttpGet("import/sessions/{sessionId:guid}")]
     [Authorize]
     public async Task<IActionResult> GetImportSession(Guid sessionId, CancellationToken cancellationToken)
@@ -247,3 +261,53 @@ public class BookController : ControllerBase
 }
 
 public sealed record SetBookCoverFromUrlRequest(string ImageUrl);
+
+public static class BookExportCsv
+{
+    public static string Build(IReadOnlyCollection<BookDto> books)
+    {
+        var rows = new List<string>
+        {
+            string.Join(',',
+                "primaryTitle",
+                "author",
+                "contentType",
+                "status",
+                "currentChapterNumber",
+                "currentChapterLabel",
+                "totalChapters",
+                "rating",
+                "priority",
+                "genres",
+                "tags",
+                "notes")
+        };
+
+        rows.AddRange(books.Select(book => string.Join(',',
+            Escape(book.PrimaryTitle),
+            Escape(book.Author),
+            Escape(book.ContentType),
+            Escape(book.Status),
+            Escape(book.CurrentChapterNumber),
+            Escape(book.CurrentChapterLabel),
+            Escape(book.TotalChapters),
+            Escape(book.Rating),
+            Escape(book.Priority),
+            Escape(string.Join("; ", book.Genres)),
+            Escape(string.Join("; ", book.Tags)),
+            Escape(book.Notes))));
+
+        return string.Join(Environment.NewLine, rows) + Environment.NewLine;
+    }
+
+    private static string Escape(object? value)
+    {
+        var text = value?.ToString() ?? string.Empty;
+        if (!text.Contains(',') && !text.Contains('"') && !text.Contains('\n') && !text.Contains('\r'))
+        {
+            return text;
+        }
+
+        return $"\"{text.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
+    }
+}
