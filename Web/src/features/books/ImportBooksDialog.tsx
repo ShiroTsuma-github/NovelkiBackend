@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
-import { AlertCircle, FileUp, LoaderCircle, Save, Trash2, Upload, X } from 'lucide-react'
+import { AlertCircle, Download, FileUp, LoaderCircle, Save, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { toast } from 'sonner'
@@ -48,6 +48,23 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
 
   const cancelMutation = useMutation({
     mutationFn: (sessionId: string) => api.cancelBookImport(sessionId),
+  })
+
+  const templateMutation = useMutation({
+    mutationFn: () => api.downloadBookImportTemplate(),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'book-import-template.csv'
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not download CSV template.')
+    },
   })
 
   useEffect(() => {
@@ -118,9 +135,20 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             <h2 className="text-lg font-semibold text-slate-50">Import books from CSV</h2>
             <p className="text-sm text-slate-400">Upload a file, fix invalid rows, then finalize to save books to your library.</p>
           </div>
-          <button className="rounded-full border border-slate-700 p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" type="button" onClick={handleDismiss}>
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              className={secondaryButtonClass}
+              disabled={templateMutation.isPending}
+              type="button"
+              onClick={() => templateMutation.mutate()}
+            >
+              <Download className="h-4 w-4" />
+              {templateMutation.isPending ? 'Downloading...' : 'Download template'}
+            </button>
+            <button className="rounded-full border border-slate-700 p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" type="button" onClick={handleDismiss}>
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <input accept=".csv,text/csv" className="hidden" ref={fileInputRef} type="file" onChange={handleFileSelection} />

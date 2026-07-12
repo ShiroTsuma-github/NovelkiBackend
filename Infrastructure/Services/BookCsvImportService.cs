@@ -13,6 +13,22 @@ using System.Globalization;
 public sealed class BookCsvImportService : IBookCsvImportService
 {
     private static readonly string[] RequiredColumns = ["primaryTitle", "contentType", "status"];
+    private static readonly string[] TemplateColumns =
+    [
+        "primaryTitle",
+        "authorName",
+        "contentType",
+        "status",
+        "tags",
+        "totalChapters",
+        "currentChapterNumber",
+        "currentChapterLabel",
+        "rating",
+        "priority",
+        "description",
+        "notes",
+        "rawImportedLine"
+    ];
     private static readonly ConcurrentDictionary<Guid, ImportSession> Sessions = new();
 
     private readonly ApplicationDbContext _context;
@@ -30,6 +46,11 @@ public sealed class BookCsvImportService : IBookCsvImportService
         _bookCoverQueue = bookCoverQueue;
         _cacheInvalidator = cacheInvalidator;
         _user = user;
+    }
+
+    public string CreateTemplate()
+    {
+        return string.Join(',', TemplateColumns) + Environment.NewLine;
     }
 
     public async Task<BookImportSessionDto> CreateSessionAsync(Stream csvStream, string fileName, CancellationToken cancellationToken)
