@@ -105,7 +105,8 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
             .MaximumLength(300);
 
         RuleFor(totalChapters)
-            .GreaterThanOrEqualTo(0)
+            .GreaterThan(0)
+            .WithMessage("Total chapters must be greater than 0.")
             .When(x => totalChaptersValue(x).HasValue);
 
         RuleFor(currentChapterNumber)

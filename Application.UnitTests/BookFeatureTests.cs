@@ -188,6 +188,18 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public void CreateBookValidator_ShouldRejectZeroTotalChapters()
+    {
+        var validator = new CreateBookCommandValidator();
+        var command = ValidCreateCommand() with { TotalChapters = 0 };
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "TotalChapters" && e.ErrorMessage == "Total chapters must be greater than 0.");
+    }
+
+    [Fact]
     public void CreateBookValidator_ShouldRejectWhitespaceOnlyPrimaryTitle()
     {
         var validator = new CreateBookCommandValidator();
@@ -256,6 +268,28 @@ public class BookFeatureTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterLabel" && e.ErrorMessage == "Chapter label must be 100 characters or fewer.");
         Assert.Contains(result.Errors, e => e.PropertyName == "Comment" && e.ErrorMessage == "Comment must be 1000 characters or fewer.");
+    }
+
+    [Fact]
+    public async Task UpdateProgress_ShouldIgnoreLegacyZeroTotalChapters()
+    {
+        var fixture = CreateFixture();
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Old Title",
+            NormalizedPrimaryTitle = "OLD TITLE",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId,
+            TotalChapters = 0
+        };
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookProgressHandler(fixture.BookRepository, new FakeBookListCacheInvalidator(), new FakeUser());
+
+        await handler.Handle(new UpdateBookProgressCommand(book.Id, 11, "11", null), CancellationToken.None);
+
+        Assert.Equal(11, book.CurrentChapterNumber);
     }
 
     private static Fixture CreateFixture()
@@ -402,6 +436,36 @@ public class BookFeatureTests
             }
 
             return Task.CompletedTask;
+        }
+
+        public Task<bool> UpdateProgressAsync(
+            Guid id,
+            Guid ownerId,
+            decimal? currentChapterNumber,
+            string? currentChapterLabel,
+            string? comment,
+            CancellationToken cancellationToken)
+        {
+            if (LastBook == null || LastBook.Id != id || LastBook.OwnerId != ownerId)
+            {
+                throw new EntityNotFoundException<Book, Guid>(id);
+            }
+
+            LastBook.CurrentChapterNumber = currentChapterNumber;
+            LastBook.CurrentChapterLabel = currentChapterLabel;
+            if (currentChapterNumber.HasValue || !string.IsNullOrWhiteSpace(currentChapterLabel) || !string.IsNullOrWhiteSpace(comment))
+            {
+                LastBook.ProgressHistory.Add(new BookProgressHistory
+                {
+                    BookId = id,
+                    ChapterNumber = currentChapterNumber,
+                    ChapterLabel = currentChapterLabel,
+                    Comment = comment
+                });
+            }
+
+            Saved = true;
+            return Task.FromResult(true);
         }
 
         public Task SaveAsync(CancellationToken cancellationToken)
