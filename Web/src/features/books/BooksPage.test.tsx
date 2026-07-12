@@ -9,12 +9,14 @@ import { BooksPage, defaultColumnPreferences, formatProgress, getColumnPopupPosi
 vi.mock('@/api/client', () => ({
   api: {
     getBooks: vi.fn(),
+    downloadBooksExport: vi.fn(),
   },
 }))
 
 vi.mock('sonner', () => ({
   toast: {
     success: vi.fn(),
+    error: vi.fn(),
   },
 }))
 
@@ -46,6 +48,33 @@ describe('BooksPage', () => {
 
     expect(window.localStorage.getItem('novelki.books.layout.v1')).toBe('cards')
     expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toBeInTheDocument()
+  })
+
+  it('exports the current filtered and sorted books to csv', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.downloadBooksExport).mockResolvedValue(new Blob(['csv'], { type: 'text/csv' }))
+    const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:books-export')
+    const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=author%3AToika&sortBy=title&sortDirection=asc' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /export filtered csv/i }))
+
+    await waitFor(() => expect(api.downloadBooksExport).toHaveBeenCalledWith({
+      query: 'author:Toika',
+      sortBy: 'title',
+      sortDirection: 'asc',
+    }))
+    expect(clickSpy).toHaveBeenCalledTimes(1)
+    expect(createObjectUrl).toHaveBeenCalledTimes(1)
+    expect(revokeObjectUrl).toHaveBeenCalledWith('blob:books-export')
+
+    createObjectUrl.mockRestore()
+    revokeObjectUrl.mockRestore()
+    clickSpy.mockRestore()
   })
 
   it('lets the user change cards per row and persists the preference', async () => {
@@ -197,6 +226,23 @@ describe('BooksPage', () => {
 
     expect(jumpInput).toHaveAttribute('aria-invalid', 'true')
     expect(api.getBooks).toHaveBeenCalledTimes(1)
+  })
+
+  it('focuses the page jump input immediately after opening the gap popover', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue({
+      skip: 0,
+      take: 20,
+      total: 220,
+      data: books,
+    })
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /jump between pages/i }))
+
+    expect(screen.getByRole('textbox', { name: /page number/i })).toHaveFocus()
   })
 
   it('keeps only one page gap popover open at a time', async () => {

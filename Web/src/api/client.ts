@@ -62,6 +62,8 @@ export const api = {
   },
   downloadBookImportTemplate: () =>
     apiBlobRequest('/book/import/template'),
+  downloadBooksExport: (params: { query?: string; sortBy?: string; sortDirection?: string }) =>
+    apiBlobRequest(`/book/export${toQueryString(params)}`),
   getBookImportSession: (sessionId: string) =>
     apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}`),
   updateBookImportRow: (sessionId: string, rowId: string, request: BookImportRowUpdateRequest) =>

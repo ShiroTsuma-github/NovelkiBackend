@@ -1,14 +1,16 @@
+using System.Text;
 using Api.Controllers;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Features.BookFeatures.Commands;
+using Application.Features.BookFeatures.Queries.GetBook;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using System.Text;
 
 namespace Application.UnitTests;
 
@@ -124,6 +126,60 @@ public class BookControllerTests
         Assert.Equal("cover.jpg", file.FileDownloadName);
     }
 
+    [Fact]
+    public async Task ExportBooks_ShouldReturnCsvForCurrentQueryAndSort()
+    {
+        var mediator = new Mock<IMediator>();
+        var importService = new Mock<IBookCsvImportService>();
+        var logger = new Mock<ILogger<BookController>>();
+        var firstPage = new PaginatedResult<BookDto>
+        {
+            Skip = 0,
+            Take = 1,
+            Total = 2,
+            Data = [Book("Placeholder")]
+        };
+        var fullPage = new PaginatedResult<BookDto>
+        {
+            Skip = 0,
+            Take = 2,
+            Total = 2,
+            Data =
+            [
+                Book("Alpha, Book", author: "Toika", notes: "Line 1\nLine 2"),
+                Book("Beta", tags: ["favorite", "mystery"]),
+            ]
+        };
+        mediator
+            .SetupSequence(mock => mock.Send(It.IsAny<GetAllBooksQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(firstPage)
+            .ReturnsAsync(fullPage);
+        var controller = new BookController(mediator.Object, importService.Object, logger.Object);
+
+        var result = await controller.ExportBooks("author:Toika", "title", "asc");
+
+        var file = Assert.IsType<FileContentResult>(result);
+        var csv = Encoding.UTF8.GetString(file.FileContents);
+
+        Assert.Equal("books-export.csv", file.FileDownloadName);
+        Assert.Contains("primaryTitle,author,contentType,status,currentChapterNumber,currentChapterLabel,totalChapters,rating,priority,genres,tags,notes", csv);
+        Assert.Contains("\"Alpha, Book\",Toika,Novel,Reading", csv);
+        Assert.Contains("\"Line 1\nLine 2\"", csv);
+        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 1, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 2, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void BookExportCsv_ShouldEscapeSpecialCharacters()
+    {
+        var csv = BookExportCsv.Build([
+            Book("Alpha \"Quoted\"", notes: "A,B"),
+        ]);
+
+        Assert.Contains("\"Alpha \"\"Quoted\"\"\"", csv);
+        Assert.Contains("\"A,B\"", csv);
+    }
+
     private static BookController CreateController(IMediator? mediator = null, IBookCsvImportService? importService = null)
     {
         return new BookController(
@@ -140,6 +196,33 @@ public class BookControllerTests
         {
             Headers = new HeaderDictionary(),
             ContentType = contentType
+        };
+    }
+
+    private static BookDto Book(
+        string title,
+        string? author = null,
+        string contentType = "Novel",
+        string status = "Reading",
+        IEnumerable<string>? genres = null,
+        IEnumerable<string>? tags = null,
+        string? notes = null)
+    {
+        return new BookDto
+        {
+            Id = Guid.NewGuid(),
+            Created = DateTimeOffset.Parse("2026-01-01T00:00:00Z"),
+            LastModified = DateTimeOffset.Parse("2026-01-02T00:00:00Z"),
+            PrimaryTitle = title,
+            AlternativeTitles = [],
+            Author = author,
+            ContentType = contentType,
+            Status = status,
+            ProgressHistory = [],
+            Genres = genres?.ToList() ?? [],
+            Tags = tags?.ToList() ?? [],
+            Links = [],
+            Notes = notes,
         };
     }
 
