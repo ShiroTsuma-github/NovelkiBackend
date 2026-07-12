@@ -310,8 +310,8 @@ public class BookRepository : IBookRepository
         return NormalizeSort(sortBy) switch
         {
             "title" => descending
-                ? query.OrderByDescending(b => b.PrimaryTitle).ThenBy(b => b.Id)
-                : query.OrderBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
+                ? query.OrderByDescending(b => b.NormalizedPrimaryTitle).ThenByDescending(b => b.PrimaryTitle).ThenByDescending(b => b.Id)
+                : query.OrderBy(b => b.NormalizedPrimaryTitle).ThenBy(b => b.PrimaryTitle).ThenBy(b => b.Id),
             "author" => descending
                 ? query.OrderByDescending(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle)
                 : query.OrderBy(b => b.Author != null ? b.Author.PrimaryName : "").ThenBy(b => b.PrimaryTitle),
