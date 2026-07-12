@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
-import type { BookCoverDto } from '@/api/types'
+import type { BookCoverDto, BookMutationRequest } from '@/api/types'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
@@ -149,6 +149,19 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
     return api.uploadBookCover(bookId, cover.file)
   }
 
+  async function saveBookWithCoverSourceLink(
+    bookId: string,
+    request: BookMutationRequest,
+    savedCover: BookCoverDto | null,
+  ) {
+    const requestWithCoverSource = appendCoverSourceLink(request, savedCover)
+    if (requestWithCoverSource === request) {
+      return
+    }
+
+    await (admin ? api.updateAdminBook(bookId, requestWithCoverSource) : api.updateBook(bookId, requestWithCoverSource))
+  }
+
   function replaceDraftCover(next: DraftCoverState) {
     setDraftCover((current) => {
       if (current?.kind === 'file') {
@@ -184,19 +197,6 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
     setCoverUrlInput('')
   }
 
-  function syncCoverLinkInForm(cover?: BookCoverDto | null) {
-    const sourceUrl = cover?.originalImageUrl?.trim()
-    if (!sourceUrl) {
-      return
-    }
-
-    const current = form.getValues('linksText') ?? ''
-    const next = appendUniqueLine(current, sourceUrl)
-    if (next !== current) {
-      form.setValue('linksText', next, { shouldDirty: true, shouldValidate: true })
-    }
-  }
-
   function storeDraftFile(file: File) {
     if (!isAllowedCoverFile(file)) {
       toast.error('Choose a JPG, PNG, or WebP image.')
@@ -212,7 +212,6 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   function storeDraftUrl(imageUrl: string) {
     setExistingCoverChange({ kind: 'keep' })
     replaceDraftCover({ kind: 'url', imageUrl, previewUrl: imageUrl })
-    syncCoverLinkInForm({ originalImageUrl: imageUrl } as BookCoverDto)
     closeCoverDialog()
     toast.success('Cover URL ready. It will be saved with the book.')
   }
@@ -235,7 +234,8 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
         let coverError: string | null = null
         try {
           if (draftCover) {
-            await saveCover(created.id, draftCover)
+            const savedCover = await saveCover(created.id, draftCover)
+            await saveBookWithCoverSourceLink(created.id, request, savedCover)
           }
         } catch (error) {
           coverError = error instanceof HttpError ? error.apiError.detail : error instanceof Error ? error.message : 'Failed to save cover.'
@@ -248,7 +248,8 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       let coverError: string | null = null
       try {
         if (draftCover) {
-          await saveCover(id!, draftCover)
+          const savedCover = await saveCover(id!, draftCover)
+          await saveBookWithCoverSourceLink(id!, request, savedCover)
         } else if (existingCoverChange.kind === 'remove') {
           await api.deleteBookCover(id!)
         }
@@ -864,6 +865,36 @@ function appendUniqueLine(value: string, nextLine: string) {
   }
 
   return lines.length ? `${lines.join('\n')}\n${trimmedLine}` : trimmedLine
+}
+
+function appendCoverSourceLink(request: BookMutationRequest, cover?: BookCoverDto | null) {
+  const sourceUrl = cover?.originalImageUrl?.trim()
+  if (!sourceUrl) {
+    return request
+  }
+
+  const nextLinks = appendUniqueLine(
+    request.links.map((link) => link.url).join('\n'),
+    sourceUrl,
+  )
+    .split('\n')
+    .map((url) => url.trim())
+    .filter(Boolean)
+
+  if (nextLinks.length === request.links.length) {
+    return request
+  }
+
+  return {
+    ...request,
+    links: nextLinks.map((url) => ({
+      url,
+      label: null,
+      sourceType: 'Other',
+      isPrimary: false,
+      lastReadHere: false,
+    })),
+  }
 }
 
 function splitComma(value: string) {
