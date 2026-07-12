@@ -21,6 +21,7 @@ const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
 const columnPopupWidthPx = 320
 const columnPopupEdgeGapPx = 16
 const columnPopupVerticalGapPx = 10
+const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
 type SortDirection = 'asc' | 'desc'
 export type BookViewMode = 'table' | 'cards'
 export type ColumnPreference = { id: string; visible: boolean }
@@ -203,15 +204,15 @@ export function BooksPage() {
           <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className={secondaryButtonClass} disabled={exportMutation.isPending} type="button" onClick={() => exportMutation.mutate()}>
+          <button className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`} disabled={exportMutation.isPending} type="button" onClick={() => exportMutation.mutate()}>
             <Download className="h-4 w-4" />
             {exportMutation.isPending ? 'Exporting...' : 'Export filtered CSV'}
           </button>
-          <button className={secondaryButtonClass} type="button" onClick={() => setImportDialogOpen(true)}>
+          <button className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`} type="button" onClick={() => setImportDialogOpen(true)}>
             <Upload className="h-4 w-4" />
             Import CSV
           </button>
-          <Link className={buttonClass} to="/books/new">
+          <Link className={`${buttonClass} ${topActionButtonSpacingClass}`} to="/books/new">
             <Plus className="h-4 w-4" />
             Add book
           </Link>

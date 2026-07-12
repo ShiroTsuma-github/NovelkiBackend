@@ -50,6 +50,17 @@ describe('BooksPage', () => {
     expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toBeInTheDocument()
   })
 
+  it('keeps top action buttons with balanced icon spacing', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    expect(screen.getByRole('button', { name: /export filtered csv/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
+    expect(screen.getByRole('button', { name: /import csv/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
+    expect(screen.getByRole('link', { name: /add book/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
+  })
+
   it('exports the current filtered and sorted books to csv', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     vi.mocked(api.downloadBooksExport).mockResolvedValue(new Blob(['csv'], { type: 'text/csv' }))
