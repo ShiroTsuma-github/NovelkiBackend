@@ -157,22 +157,24 @@ describe('BooksPage', () => {
     }))
   })
 
-  it('keeps the list footer sticky in table and cards view', async () => {
+  it('renders the list footer after table and cards content without sticky spacing', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()
 
     const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
-    let stickyFooter = container.querySelector('.sticky.bottom-3')
-    expect(stickyFooter).toHaveTextContent('Per page')
-    expect(container.querySelector('.overflow-x-auto.pb-24')).toBeTruthy()
+    let footer = container.querySelector('section > .border-t.border-slate-200.bg-white')
+    expect(footer).toHaveTextContent('Per page')
+    expect(container.querySelector('.overflow-x-auto.pb-24')).toBeFalsy()
+    expect(container.querySelector('section > .sticky.bottom-0')).toBeFalsy()
 
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
-    stickyFooter = container.querySelector('.sticky.bottom-3')
-    expect(stickyFooter).toHaveTextContent('Per page')
-    expect(container.querySelector('.grid.gap-4.p-4.pb-24')).toBeTruthy()
+    footer = container.querySelector('section > .border-t.border-slate-200.bg-white')
+    expect(footer).toHaveTextContent('Per page')
+    expect(container.querySelector('.grid.gap-4.p-4.pb-24')).toBeFalsy()
+    expect(container.querySelector('section > .sticky.bottom-0')).toBeFalsy()
   })
 
   it('keeps the page jump popover open for invalid page numbers', async () => {
@@ -249,24 +251,30 @@ describe('BooksPage', () => {
     scrollTo.mockRestore()
   })
 
-  it('shows a back to top button after scrolling and scrolls to the top on click', async () => {
+  it('shows scroll shortcut buttons and scrolls to the top or bottom on click', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 2400 })
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 })
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
     expect(screen.queryByRole('button', { name: /back to top/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /go to bottom/i })).toBeInTheDocument()
 
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 640 })
     window.dispatchEvent(new Event('scroll'))
 
-    const button = await screen.findByRole('button', { name: /back to top/i })
-    await user.click(button)
+    const backToTopButton = await screen.findByRole('button', { name: /back to top/i })
+    const goToBottomButton = screen.getByRole('button', { name: /go to bottom/i })
+    await user.click(backToTopButton)
+    await user.click(goToBottomButton)
 
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' })
+    expect(scrollTo).toHaveBeenCalledWith({ top: 2400, behavior: 'smooth' })
     scrollTo.mockRestore()
   })
 

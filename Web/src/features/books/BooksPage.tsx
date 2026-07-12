@@ -61,6 +61,7 @@ export function BooksPage() {
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [showGoDown, setShowGoDown] = useState(false)
   const [activePageGapId, setActivePageGapId] = useState<string | null>(null)
   const pendingBottomAnchorRef = useRef<number | null>(null)
   const skip = Number(searchParams.get('skip') ?? 0)
@@ -118,13 +119,19 @@ export function BooksPage() {
   const visiblePages = getVisiblePageNumbers(currentPage, totalPages)
 
   useEffect(() => {
-    function updateBackToTopVisibility() {
+    function updateScrollShortcutVisibility() {
+      const distanceFromBottom = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight)
       setShowBackToTop(window.scrollY > 480)
+      setShowGoDown(distanceFromBottom > 480)
     }
 
-    updateBackToTopVisibility()
-    window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
-    return () => window.removeEventListener('scroll', updateBackToTopVisibility)
+    updateScrollShortcutVisibility()
+    window.addEventListener('scroll', updateScrollShortcutVisibility, { passive: true })
+    window.addEventListener('resize', updateScrollShortcutVisibility)
+    return () => {
+      window.removeEventListener('scroll', updateScrollShortcutVisibility)
+      window.removeEventListener('resize', updateScrollShortcutVisibility)
+    }
   }, [])
 
   useEffect(() => {
@@ -149,6 +156,10 @@ export function BooksPage() {
 
   function scrollBackToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function scrollToPageBottom() {
+    window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })
   }
 
   function goToPage(page: number) {
@@ -216,22 +227,8 @@ export function BooksPage() {
           <ViewModeToggle value={viewMode} onChange={setViewMode} />
           <ColumnSettingsPopup columns={bookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
-        <BooksListFooter
-          activePageGapId={activePageGapId}
-          canGoBack={canGoBack}
-          canGoForward={canGoForward}
-          currentPage={currentPage}
-          pageSize={pageSize}
-          setActivePageGapId={setActivePageGapId}
-          setPageSize={setPageSize}
-          skip={skip}
-          total={total}
-          totalPages={totalPages}
-          visiblePages={visiblePages}
-          onGoToPage={goToPage}
-        />
         {viewMode === 'table' ? (
-          <div className="w-full overflow-x-auto pb-24">
+          <div className="w-full overflow-x-auto">
             <table className="w-full table-fixed border-collapse text-left text-sm">
               <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -262,17 +259,45 @@ export function BooksPage() {
         ) : (
           <BookCardGrid books={booksQuery.data?.data ?? []} cardsPerRow={cardsPerRow} isLoading={booksQuery.isLoading} />
         )}
+        <BooksListFooter
+          activePageGapId={activePageGapId}
+          canGoBack={canGoBack}
+          canGoForward={canGoForward}
+          currentPage={currentPage}
+          pageSize={pageSize}
+          setActivePageGapId={setActivePageGapId}
+          setPageSize={setPageSize}
+          skip={skip}
+          total={total}
+          totalPages={totalPages}
+          visiblePages={visiblePages}
+          onGoToPage={goToPage}
+        />
       </section>
       <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
-      {showBackToTop ? (
-        <button
-          aria-label="Back to top"
-          className="fixed bottom-6 right-6 z-40 inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
-          type="button"
-          onClick={scrollBackToTop}
-        >
-          <ArrowUp className="h-4 w-4" />
-        </button>
+      {showBackToTop || showGoDown ? (
+        <div className="fixed bottom-6 right-6 z-40 flex flex-col gap-2">
+          {showBackToTop ? (
+            <button
+              aria-label="Back to top"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+              type="button"
+              onClick={scrollBackToTop}
+            >
+              <ArrowUp className="h-4 w-4" />
+            </button>
+          ) : null}
+          {showGoDown ? (
+            <button
+              aria-label="Go to bottom"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+              type="button"
+              onClick={scrollToPageBottom}
+            >
+              <ArrowDown className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )
@@ -753,7 +778,7 @@ function BookCardGrid({
   }
 
   return (
-    <div className={`grid gap-4 p-4 pb-24 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
+    <div className={`grid gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
         <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
           <Link className="grid gap-3" to={`/books/${book.id}`}>
@@ -815,7 +840,7 @@ function BooksListFooter({
   onGoToPage: (page: number) => void
 }) {
   return (
-    <div className="sticky bottom-3 z-20 mx-4 mt-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 text-sm text-slate-600 shadow-lg backdrop-blur supports-[backdrop-filter]:bg-white/85">
+    <div className="border-t border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
         <div className="flex flex-wrap items-center justify-end gap-3">
