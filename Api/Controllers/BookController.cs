@@ -51,6 +51,14 @@ public class BookController : ControllerBase
         return Ok(books);
     }
 
+    [HttpGet("summary")]
+    [Authorize]
+    public async Task<IActionResult> GetSummary([FromQuery] GetBookSummaryQuery query)
+    {
+        var summary = await _mediator.Send(query);
+        return Ok(summary);
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)

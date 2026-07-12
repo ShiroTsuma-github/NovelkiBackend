@@ -1,5 +1,7 @@
 namespace Domain.Repositories;
 
+using Domain.Models;
+
 public interface IBookRepository
 {
     Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken);
@@ -23,6 +25,12 @@ public interface IBookRepository
     Task<int> GetCountAsync(CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken);
     Task<int> GetSearchCountAsync(BookSearchCriteria criteria, CancellationToken cancellationToken) => throw new NotSupportedException();
+    Task<BookSummarySnapshot> GetSummaryAsync(Guid ownerId, CancellationToken cancellationToken)
+        => GetSummaryAsync(ownerId, BookSearchCriteria.Empty, cancellationToken);
+    Task<BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
+        => throw new NotSupportedException();
+    Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy, string? currentSortDirection, CancellationToken cancellationToken)
+        => throw new NotSupportedException();
     Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber, string? currentChapterLabel, string? comment, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task<decimal?> GetTotalChaptersAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => throw new NotSupportedException();
     Task ReplaceEditableCollectionsAsync(

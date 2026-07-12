@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
-import { AlertCircle, Download, FileUp, LoaderCircle, Save, Trash2, Upload, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { AlertCircle, ChevronDown, Download, FileUp, LoaderCircle, Save, Trash2, Upload, X } from 'lucide-react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
@@ -542,25 +542,107 @@ function LabeledInput({
   onChange: (value: string) => void
 }) {
   const errorMessage = error.join(' ')
-  const suggestionsId = suggestions.length ? `import-${label.toLowerCase().replaceAll(/\s+/g, '-')}-options` : undefined
+  const listboxId = useId()
+  const containerRef = useRef<HTMLLabelElement | null>(null)
+  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [open, setOpen] = useState(false)
+  const normalizedValue = value.trim().toLowerCase()
+  const matchingSuggestions = suggestions.filter((suggestion) => suggestion.toLowerCase().includes(normalizedValue))
+  const hasExactSuggestionMatch = suggestions.some((suggestion) => suggestion.toLowerCase() === normalizedValue)
+  const filteredSuggestions = normalizedValue.length > 0 && matchingSuggestions.length > 0 && !hasExactSuggestionMatch
+    ? matchingSuggestions
+    : suggestions
+
+  useEffect(() => {
+    if (!suggestions.length || !open) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [open, suggestions.length])
+
+  const showSuggestions = suggestions.length > 0 && open && filteredSuggestions.length > 0
+  const closeSuggestions = () => setOpen(false)
+  const openSuggestions = () => {
+    if (suggestions.length > 0) {
+      setOpen(true)
+    }
+  }
+  const selectSuggestion = (suggestion: string) => {
+    onChange(suggestion)
+    setOpen(false)
+    inputRef.current?.focus()
+  }
 
   return (
-    <label className="grid gap-1 text-sm">
+    <label ref={containerRef} className="grid gap-1 text-sm">
       <span className="font-medium text-slate-300">{label}</span>
-      <input
-        aria-invalid={errorMessage ? 'true' : undefined}
-        list={suggestionsId}
-        className={`${inputClass} ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {suggestionsId ? (
-        <datalist id={suggestionsId}>
-          {suggestions.map((suggestion) => <option key={suggestion} value={suggestion} />)}
-        </datalist>
-      ) : null}
-      {suggestions.length ? <span className="text-xs text-slate-500">Suggestions: {suggestions.join(', ')}</span> : null}
-      {errorMessage ? <span className="text-xs text-rose-300">{errorMessage}</span> : null}
+      <div className="relative">
+        <input
+          ref={inputRef}
+          aria-controls={showSuggestions ? listboxId : undefined}
+          aria-expanded={suggestions.length > 0 ? open : undefined}
+          aria-autocomplete={suggestions.length > 0 ? 'list' : undefined}
+          aria-invalid={errorMessage ? 'true' : undefined}
+          className={`${inputClass} ${suggestions.length > 0 ? 'pr-10' : ''} ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+          role={suggestions.length > 0 ? 'combobox' : undefined}
+          value={value}
+          onBlur={(event) => {
+            if (!containerRef.current?.contains(event.relatedTarget as Node | null)) {
+              closeSuggestions()
+            }
+          }}
+          onChange={(event) => {
+            onChange(event.target.value)
+            openSuggestions()
+          }}
+          onFocus={openSuggestions}
+        />
+        {suggestions.length > 0 ? (
+          <button
+            aria-label={`Show ${label.toLowerCase()} suggestions`}
+            className="absolute inset-y-0 right-0 inline-flex w-10 items-center justify-center text-slate-400 transition hover:text-slate-200"
+            type="button"
+            onClick={() => {
+              if (open) {
+                closeSuggestions()
+                return
+              }
+
+              inputRef.current?.focus()
+              openSuggestions()
+            }}
+          >
+            <ChevronDown className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} />
+          </button>
+        ) : null}
+        {showSuggestions ? (
+          <div
+            className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-md border border-slate-700 bg-slate-900 shadow-xl"
+            id={listboxId}
+            role="listbox"
+          >
+            {filteredSuggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                className={`block w-full px-3 py-2 text-left text-sm transition hover:bg-slate-800 hover:text-slate-50 ${suggestion === value ? 'bg-slate-800 text-slate-50' : 'text-slate-200'}`}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectSuggestion(suggestion)}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        ) : null}
+      </div>
     </label>
   )
 }
@@ -577,7 +659,6 @@ function LabeledTextarea({ error = [], label, value, onChange }: { error?: strin
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />
-      {errorMessage ? <span className="text-xs text-rose-300">{errorMessage}</span> : null}
     </label>
   )
 }

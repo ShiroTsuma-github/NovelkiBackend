@@ -6,6 +6,7 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 !!!Skonczone tickety maja zostac przeniesione na koniec do poprawnej sekcji!!!
 !!!Kazdy ticket ma zawierac testy. Testy maja uwzledniac  mozliwe edge case!!!
 
+
 Concept tickety:
 1. Przy uploadzie okladki zmiana na jpg/najlepszy format dla przegladarki (rozmiar i jakosc) oraz utworzenie downscaled wersji do card view
 2. import discard all invalid button
@@ -14,21 +15,12 @@ Concept tickety:
 5. czy w liscie ksiazek potrzebujemy  pullowac kazde progressHistory, linki, wszystkie tagi? raczej nie.  Ustalic co  jest potrzebne do detali ksiazki a co main page i odpowiednio dostosowac response  (zwlaszcza ze query  i tak  idzie do backend, wiec nie  potrzebuje miec wszystkiego w przegladarce)
 6. refaktor kodu backend z tech debtu (wymaga dodania wiecej test coverage, zeby zapobiec regresji. Najlepiej przed regresja na testach od api poleciec)
 7. refaktor frontendu, gwarantujac ze finalny front nie zmieni w zaden sposob z wygladem
-8. przebudowanie frontendu stylistycznie z uzyciem konkretnych guidelineow
+8. przebudowanie frontendu stylistycznie z uzyciem konkretnych guidelineow (nie dawac wszystko rounded)
 
 
 ## Auth
 
 ## Book Form And Validation
-
-### NB-010 - Dodaj parser tagow ze spacjami, cudzyslowami i podwojna spacja
--- SKIP FOR NOW -- THE TICKET IS IN CONSIDERATION PHASE AND CAN'T BE IMPLEMENTED AS IT IS
-- Typ: `Feature gap`
-- Priorytet: `P3`
-- Komponent: `Web/src/features/books/BookFormPage.tsx`, `TagChipSelect`, `ChipBox`
-- Problem: tag tworzy sie tylko po `Enter` albo kliknieciu sugestii. Brakuje oczekiwanego modelu wpisywania opartego o spacje, cudzyslowy i podwojna spacje.
-- Zakres: zaimplementowac parsing tag inputu zgodny z oczekiwaniem produktu, w tym obsluge fraz w cudzyslowie i zamiane separatorow na docelowy zapis tagu.
-- Akceptacja: pojedyncza spacja tworzy separator tylko poza cudzyslowem; fraza w cudzyslowie moze zostac jednym tagiem; podwojna spacja ma jawnie zdefiniowane zachowanie; istniejace sugestie i usuwanie tagow dalej dzialaja.
 
 ## Progress
 

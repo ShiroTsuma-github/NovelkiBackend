@@ -459,7 +459,7 @@ function DeleteBookDialog({
         <div className="grid gap-2">
           <h2 className="text-lg font-semibold text-slate-950">Delete book</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Are you sure you want to delete <span className="font-semibold text-slate-900">{title}</span>? This cannot be undone.
+            Are you sure you want to delete <span className="font-semibold text-slate-950">{title}</span>? This cannot be undone.
           </p>
         </div>
         <div className="flex justify-end gap-2">

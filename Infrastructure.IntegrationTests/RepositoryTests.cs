@@ -156,16 +156,80 @@ public class RepositoryTests
         context.ChangeTracker.Clear();
 
         var repository = new BookRepository(context);
+        const string novelTypeName = "Novel";
+        const string mangaTypeName = "Manga";
+        const string readingStatusName = "Reading";
+        const string completedStatusName = "Completed";
 
-        var typeAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "type", "asc", CancellationToken.None)).ToList();
-        var typeDescending = (await repository.GetAllAsync(database.UserId, 0, 10, "type", "desc", CancellationToken.None)).ToList();
-        var statusAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "status", "asc", CancellationToken.None)).ToList();
-        var statusDescending = (await repository.GetAllAsync(database.UserId, 0, 10, "status", "desc", CancellationToken.None)).ToList();
+        var typeAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "type", novelTypeName, CancellationToken.None)).ToList();
+        var typeRotated = (await repository.GetAllAsync(database.UserId, 0, 10, "type", mangaTypeName, CancellationToken.None)).ToList();
+        var statusAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "status", readingStatusName, CancellationToken.None)).ToList();
+        var statusRotated = (await repository.GetAllAsync(database.UserId, 0, 10, "status", completedStatusName, CancellationToken.None)).ToList();
 
         Assert.Equal([novelReading.Id, mangaCompleted.Id, manhwaPlanToRead.Id], typeAscending.Select(book => book.Id));
-        Assert.Equal([manhwaPlanToRead.Id, mangaCompleted.Id, novelReading.Id], typeDescending.Select(book => book.Id));
+        Assert.Equal([mangaCompleted.Id, manhwaPlanToRead.Id, novelReading.Id], typeRotated.Select(book => book.Id));
         Assert.Equal([novelReading.Id, mangaCompleted.Id, manhwaPlanToRead.Id], statusAscending.Select(book => book.Id));
-        Assert.Equal([manhwaPlanToRead.Id, mangaCompleted.Id, novelReading.Id], statusDescending.Select(book => book.Id));
+        Assert.Equal([mangaCompleted.Id, manhwaPlanToRead.Id, novelReading.Id], statusRotated.Select(book => book.Id));
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldResolveNextCycleDirectionUsingOnlyAvailableValues()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var novelReading = await TestData.AddBookAsync(context, database.UserId, "Novel Reading");
+        var mangaCompleted = await TestData.AddBookAsync(context, database.UserId, "Manga Completed");
+
+        mangaCompleted.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        mangaCompleted.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        await context.SaveChangesAsync();
+
+        var repository = new BookRepository(context);
+        const string missingTypeName = "Manhwa";
+        const string missingStatusName = "Plan To Read";
+
+        var nextType = await repository.GetNextCycleSortDirectionAsync(database.UserId, BookSearchCriteria.Empty, "type", missingTypeName, CancellationToken.None);
+        var nextStatus = await repository.GetNextCycleSortDirectionAsync(database.UserId, BookSearchCriteria.Empty, "status", missingStatusName, CancellationToken.None);
+
+        Assert.Equal("Novel", nextType);
+        Assert.Equal("Reading", nextStatus);
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldBuildSummaryForFilteredOwnerBooks()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var reading = await TestData.AddBookAsync(context, database.UserId, "Reading Rated");
+        var completed = await TestData.AddBookAsync(context, database.UserId, "Completed Rated");
+        var unrated = await TestData.AddBookAsync(context, database.UserId, "Reading Unrated");
+
+        reading.Rating = 9;
+        completed.Rating = 7;
+        completed.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        unrated.Rating = null;
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+
+        var repository = new BookRepository(context);
+        var criteria = new BookSearchCriteria(
+            Array.Empty<string>(),
+            Array.Empty<BookSearchFieldFilter>(),
+            [new BookSearchNumberFilter(BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, 1)]);
+
+        var summary = await repository.GetSummaryAsync(database.UserId, criteria, CancellationToken.None);
+
+        Assert.Equal(2, summary.TotalBooks);
+        Assert.Equal(2, summary.RatedBooks);
+        Assert.Equal(8.0, summary.AverageRating);
+        Assert.Equal(0, summary.CurrentChapters);
+        Assert.Equal(0, summary.BooksWithKnownCurrentChapter);
+        Assert.Equal(["Completed", "Reading"], summary.StatusCounts.Select(item => item.Status));
+        Assert.Equal([1, 1], summary.StatusCounts.Select(item => item.Count));
+        Assert.Equal("Novel", summary.TypeCounts[0].Type);
+        Assert.Equal(2, summary.TypeCounts[0].BookCount);
+        Assert.Empty(summary.GenreCounts);
+        Assert.Equal([7, 9], summary.RatingCounts.Select(item => item.Rating));
     }
 
     [Fact]
@@ -204,6 +268,21 @@ public class RepositoryTests
         Assert.Single(savedBook.BookGenres);
         Assert.Single(savedBook.BookTags);
         Assert.Contains(savedBook.Titles, t => t.Title == "Updated Title");
+    }
+
+    [Fact]
+    public async Task DictionaryRepositories_ShouldReturnDomainOrderedStatusesAndTypes()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var statusRepository = new StatusRepository(context);
+        var typeRepository = new TypeRepository(context);
+
+        var statuses = (await statusRepository.GetAllAsync(0, 20, CancellationToken.None)).Select(status => status.Name).ToArray();
+        var types = (await typeRepository.GetAllAsync(0, 20, CancellationToken.None)).Select(type => type.Name).ToArray();
+
+        Assert.Equal(["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"], statuses);
+        Assert.Equal(["Novel", "Manga", "Manhwa", "Manhua", "Other"], types);
     }
 
     [Fact]

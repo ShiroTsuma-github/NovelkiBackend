@@ -11,6 +11,7 @@ import type {
   BookMutationRequest,
   DictionaryMutationRequest,
   DictionaryDto,
+  BookSummaryDto,
   LoginRequest,
   PaginatedResult,
   RegisterRequest,
@@ -45,8 +46,10 @@ export const api = {
       body: request,
       token: null,
     }),
-  getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
+  getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string; advanceCycle?: boolean }) =>
     apiRequest<PaginatedResult<BookDto>>(`/book${toQueryString(params)}`),
+  getBooksSummary: (params: { query?: string }) =>
+    apiRequest<BookSummaryDto>(`/book/summary${toQueryString(params)}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),
   getAdminBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
     apiRequest<PaginatedResult<AdminBookDto>>(`/admin/books${toQueryString(params)}`),

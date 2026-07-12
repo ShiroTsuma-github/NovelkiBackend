@@ -7,7 +7,8 @@ public record GetAllBooksQuery(
     int Take = 100,
     string? Query = null,
     string? SortBy = "lastModified",
-    string? SortDirection = "desc") : IRequest<PaginatedResult<BookDto>>;
+    string? SortDirection = "desc",
+    bool AdvanceCycle = false) : IRequest<PaginatedResult<BookDto>>;
 
 public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedResult<BookDto>>
 {
@@ -25,16 +26,19 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
     public async Task<PaginatedResult<BookDto>> Handle(GetAllBooksQuery request, CancellationToken cancellationToken)
     {
         var ownerId = _user.RequiredId;
-        var cached = await _cache.GetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, request.SortDirection, cancellationToken);
+        var criteria = BookSearchQueryParser.Parse(request.Query);
+        var effectiveSortDirection = request.AdvanceCycle && IsCyclicSort(request.SortBy)
+            ? await _repository.GetNextCycleSortDirectionAsync(ownerId, criteria, request.SortBy!, request.SortDirection, cancellationToken)
+            : request.SortDirection;
+        var cached = await _cache.GetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, effectiveSortDirection, cancellationToken);
         if (cached != null)
         {
             return cached;
         }
 
-        var criteria = BookSearchQueryParser.Parse(request.Query);
         var books = criteria.HasFilters
-            ? await _repository.SearchAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
-            : await _repository.GetAllAsync(ownerId, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
+            ? await _repository.SearchAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken)
+            : await _repository.GetAllAsync(ownerId, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken);
         var total = criteria.HasFilters
             ? await _repository.GetSearchCountAsync(ownerId, criteria, cancellationToken)
             : await _repository.GetCountAsync(ownerId, cancellationToken);
@@ -45,7 +49,12 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
             Total = total,
             Data = books.Select(b => b.ToDto()).ToList()
         };
-        await _cache.SetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, request.SortDirection, result, cancellationToken);
+        await _cache.SetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, effectiveSortDirection, result, cancellationToken);
         return result;
+    }
+
+    private static bool IsCyclicSort(string? sortBy)
+    {
+        return sortBy?.Trim().ToLowerInvariant() is "status" or "type" or "contenttype";
     }
 }

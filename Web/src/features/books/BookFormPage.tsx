@@ -68,6 +68,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
   const authorName = form.watch('authorName') ?? ''
   const primaryTitle = form.watch('primaryTitle') ?? ''
+  const currentChapterNumber = form.watch('currentChapterNumber') ?? ''
+  const totalChapters = form.watch('totalChapters') ?? ''
+  const priority = form.watch('priority') ?? ''
   const selectedGenreIds = form.watch('genreIds')
   const selectedTags = splitComma(form.watch('tagsText'))
   const selectedType = typesQuery.data?.data.find((type) => type.id === form.watch('contentTypeId'))
@@ -183,6 +186,20 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
   function setSelectedTags(value: string[]) {
     form.setValue('tagsText', value.join(', '), { shouldDirty: true, shouldValidate: true })
+  }
+
+  function setNumericFieldValue(
+    field: 'currentChapterNumber' | 'totalChapters',
+    rawValue: string,
+  ) {
+    form.setValue(field, sanitizeDecimalInput(rawValue), { shouldDirty: true, shouldValidate: true })
+  }
+
+  function setIntegerFieldValue(
+    field: 'priority',
+    rawValue: string,
+  ) {
+    form.setValue(field, sanitizeIntegerInput(rawValue), { shouldDirty: true, shouldValidate: true })
   }
 
   function openCoverDialog() {
@@ -460,7 +477,10 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                         aria-invalid={errors.currentChapterNumber ? 'true' : undefined}
                         className={inputClass}
                         inputMode="decimal"
-                        {...form.register('currentChapterNumber')}
+                        name="currentChapterNumber"
+                        value={currentChapterNumber}
+                        onBlur={() => void form.trigger('currentChapterNumber')}
+                        onChange={(event) => setNumericFieldValue('currentChapterNumber', event.target.value)}
                       />
                     </FormField>
                       <FormField error={errors.currentChapterLabel?.message} label="Label">
@@ -472,7 +492,10 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                         aria-invalid={errors.totalChapters ? 'true' : undefined}
                         className={inputClass}
                         inputMode="decimal"
-                        {...form.register('totalChapters')}
+                        name="totalChapters"
+                        value={totalChapters}
+                        onBlur={() => void form.trigger('totalChapters')}
+                        onChange={(event) => setNumericFieldValue('totalChapters', event.target.value)}
                       />
                     </FormField>
                     </div>
@@ -483,7 +506,10 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                           aria-invalid={errors.priority ? 'true' : undefined}
                           className={inputClass}
                           inputMode="numeric"
-                          {...form.register('priority')}
+                          name="priority"
+                          value={priority}
+                          onBlur={() => void form.trigger('priority')}
+                          onChange={(event) => setIntegerFieldValue('priority', event.target.value)}
                         />
                       </FormField>
                       <FormField error={errors.rating?.message} label="Rating">
@@ -565,6 +591,18 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
 function normalizeAuthorName(value: string) {
   return value.trim().toLocaleUpperCase()
+}
+
+function sanitizeDecimalInput(value: string) {
+  const trimmedLeadingWhitespace = value.replace(/^\s+/, '')
+  const digitsAndDotsOnly = trimmedLeadingWhitespace.replace(/[^\d.]/g, '')
+  const [integerPart = '', ...fractionParts] = digitsAndDotsOnly.split('.')
+  const fraction = fractionParts.join('')
+  return fractionParts.length > 0 ? `${integerPart}.${fraction}` : integerPart
+}
+
+function sanitizeIntegerInput(value: string) {
+  return value.replace(/\D/g, '')
 }
 
 function isAllowedCoverFile(file: File) {

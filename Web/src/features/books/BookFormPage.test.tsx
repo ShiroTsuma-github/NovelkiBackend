@@ -87,4 +87,36 @@ describe('BookFormPage', () => {
     await waitFor(() => expect(api.createBook).toHaveBeenCalled())
     expect(vi.mocked(api.createBook).mock.calls[0][0].totalChapters).toBeNull()
   })
+
+  it('blocks non-numeric characters in number fields while typing', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+
+    const currentChapterInput = screen.getByLabelText('Current chapter')
+    const totalChaptersInput = screen.getByLabelText('Total chapters')
+    const priorityInput = screen.getByLabelText('Priority 1-5')
+
+    await user.type(currentChapterInput, '12e-3abc')
+    await user.type(totalChaptersInput, '4..5x')
+    await user.type(priorityInput, '2-4a')
+
+    expect(currentChapterInput).toHaveValue('123')
+    expect(totalChaptersInput).toHaveValue('4.5')
+    expect(priorityInput).toHaveValue('24')
+  })
+
+  it('renders type and status options in domain order', async () => {
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+
+    const [typeSelect, statusSelect] = screen.getAllByRole('combobox')
+    const typeOptions = typeSelect.querySelectorAll('option')
+    const statusOptions = statusSelect.querySelectorAll('option')
+
+    expect(Array.from(typeOptions).map((option) => option.textContent)).toEqual(['Novel', 'Manga'])
+    expect(Array.from(statusOptions).map((option) => option.textContent)).toEqual(['Reading', 'Completed'])
+  })
 })
