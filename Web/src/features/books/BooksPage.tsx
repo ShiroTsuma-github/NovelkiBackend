@@ -58,6 +58,7 @@ export function BooksPage() {
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
+  const [pageJumpValue, setPageJumpValue] = useState('')
   const skip = Number(searchParams.get('skip') ?? 0)
   const pageSize = readPageSize(searchParams)
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
@@ -108,6 +109,9 @@ export function BooksPage() {
   const total = booksQuery.data?.total ?? 0
   const canGoBack = skip > 0
   const canGoForward = skip + pageSize < total
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
+  const currentPage = Math.min(totalPages, Math.floor(skip / pageSize) + 1)
+  const visiblePages = getVisiblePageNumbers(currentPage, totalPages)
 
   useEffect(() => {
     function updateBackToTopVisibility() {
@@ -118,6 +122,10 @@ export function BooksPage() {
     window.addEventListener('scroll', updateBackToTopVisibility, { passive: true })
     return () => window.removeEventListener('scroll', updateBackToTopVisibility)
   }, [])
+
+  useEffect(() => {
+    setPageJumpValue(String(currentPage))
+  }, [currentPage])
   
   function handleImportComplete(result: BookImportFinalizeResult) {
     setLastImportResult(result)
@@ -127,6 +135,20 @@ export function BooksPage() {
 
   function scrollBackToTop() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function goToPage(page: number) {
+    const nextPage = Math.min(Math.max(1, page), totalPages)
+    setSkip((nextPage - 1) * pageSize)
+  }
+
+  function submitPageJump() {
+    const parsed = Number(pageJumpValue)
+    if (!Number.isFinite(parsed)) {
+      return
+    }
+
+    goToPage(parsed)
   }
 
   return (
@@ -211,7 +233,7 @@ export function BooksPage() {
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
           <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3">
             <label className="flex items-center gap-2">
               <span>Per page</span>
               <span className="relative inline-flex">
@@ -224,6 +246,32 @@ export function BooksPage() {
                 </select>
                 <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               </span>
+            </label>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button className={secondaryButtonClass} disabled={currentPage === 1} type="button" onClick={() => goToPage(1)}>First</button>
+              {visiblePages.map((page) => (
+                <button
+                  aria-current={page === currentPage ? 'page' : undefined}
+                  className={page === currentPage ? buttonClass : secondaryButtonClass}
+                  key={page}
+                  type="button"
+                  onClick={() => goToPage(page)}
+                >
+                  {page}
+                </button>
+              ))}
+              <button className={secondaryButtonClass} disabled={currentPage === totalPages} type="button" onClick={() => goToPage(totalPages)}>Last</button>
+            </div>
+            <label className="flex items-center gap-2">
+              <span>Jump to</span>
+              <input
+                aria-label="Jump to page"
+                className={`${inputClass} h-10 w-20 bg-white`}
+                inputMode="numeric"
+                value={pageJumpValue}
+                onChange={(event) => setPageJumpValue(event.target.value.replace(/[^\d]/g, ''))}
+              />
+              <button className={secondaryButtonClass} type="button" onClick={submitPageJump}>Go</button>
             </label>
             <button className={secondaryButtonClass} disabled={!canGoBack} type="button" onClick={() => setSkip(skip - pageSize)}>Previous</button>
             <button className={secondaryButtonClass} disabled={!canGoForward} type="button" onClick={() => setSkip(skip + pageSize)}>Next</button>
@@ -626,6 +674,16 @@ function readPageSize(searchParams: URLSearchParams) {
 
 function readSortDirection(searchParams: URLSearchParams): SortDirection {
   return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
+}
+
+function getVisiblePageNumbers(currentPage: number, totalPages: number) {
+  const start = Math.max(1, currentPage - 1)
+  const end = Math.min(totalPages, currentPage + 1)
+  const pages = []
+  for (let page = start; page <= end; page += 1) {
+    pages.push(page)
+  }
+  return pages
 }
 
 function getRatingBadgeClass(rating: number) {

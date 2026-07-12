@@ -92,6 +92,46 @@ describe('BooksPage', () => {
     }))
   })
 
+  it('shows page numbers and supports jumping to a specific page', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue({
+      skip: 0,
+      take: 20,
+      total: 120,
+      data: books,
+    })
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    expect(screen.getByRole('button', { name: '1' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: '2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /last/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: '2' }))
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith({
+      skip: 20,
+      take: 20,
+      query: '',
+      sortBy: 'lastModified',
+      sortDirection: 'desc',
+    }))
+
+    const jumpInput = screen.getByRole('textbox', { name: /jump to page/i })
+    await user.clear(jumpInput)
+    await user.type(jumpInput, '999')
+    await user.click(screen.getByRole('button', { name: /^go$/i }))
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith({
+      skip: 100,
+      take: 20,
+      query: '',
+      sortBy: 'lastModified',
+      sortDirection: 'desc',
+    }))
+  })
+
   it('shows a back to top button after scrolling and scrolls to the top on click', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()
