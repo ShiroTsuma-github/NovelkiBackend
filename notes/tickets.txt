@@ -36,34 +36,7 @@ Concept tickety:
 
 ## Import CSV
 
-### NB-022 - Dodaj sugestie poprawnych Type i Status w imporcie
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `Infrastructure/Services/BookCsvImportService.cs`
-- Problem: przy blednym `type` albo `status` uzytkownik dostaje tylko tekst typu `must exist`, bez listy dozwolonych wartosci.
-- Zakres: dostarczyc do frontendu dostepne typy/statusy i pokazac je jako select/autocomplete w edytorze wiersza.
-- Akceptacja: pole `Type` oferuje istniejace typy; pole `Status` oferuje istniejace statusy; wpis reczny dalej mozna poprawic i revalidate; blad pokazuje oczekiwana wartosc albo liste sugestii.
-
 ## Books List, Search And Cards
-
-### NB-027 - Ustabilizuj sortowanie po tytule
-
-- Typ: `Bug`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`
-- Problem: sortowanie po `Title` malejaco zglasza dziwny porzadek. Kod sortuje po surowym `PrimaryTitle`, wiec wynik moze zalezec od kolacji, wielkosci liter i danych.
-- Zakres: zreprodukowac przypadek, a potem ustalic deterministyczne sortowanie tytulu, najlepiej case-insensitive i z tie-breakerem.
-- Akceptacja: sort asc i desc daje odwrotne, stabilne porzadki dla tej samej probki danych; wielkosc liter nie powoduje zaskakujacego grupowania; test repozytorium pokrywa kilka tytulow o roznych pierwszych literach.
-
-### NB-036 - Dodaj eksport listy ksiazek
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `BooksPage.tsx`, `Web/src/api/client.ts`, endpoint API eksportu
-- Problem: UI ma import CSV, ale nie ma eksportu listy ksiazek.
-- Zakres: dodac eksport aktualnej listy albo calej biblioteki do CSV, z jasno zdefiniowanym zachowaniem wzgledem filtrow i sortowania.
-- Akceptacja: przycisk eksportu jest dostepny obok importu lub w toolbarze; eksport respektuje aktualny query/sort albo UI jasno komunikuje zakres; plik zawiera podstawowe pola ksiazki i poprawne naglowki CSV.
 
 ### NB-038 - Dodaj osobny panel opcji dla cards view
 
@@ -133,6 +106,36 @@ Concept tickety:
 - Akceptacja: istnieje minimalna probka danych reprodukujaca objaw albo jednoznaczna notatka, ze obecny sort dziala poprawnie; jesli potwierdzone, NB-027 dostaje konkretne dane testowe.
 
 ## SKONCZONE
+
+### DONE NB-022 - Dodaj sugestie poprawnych Type i Status w imporcie
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `Infrastructure/Services/BookCsvImportService.cs`
+- Problem: przy blednym `type` albo `status` uzytkownik dostaje tylko tekst typu `must exist`, bez listy dozwolonych wartosci.
+- Zakres: dostarczyc do frontendu dostepne typy/statusy i pokazac je jako select/autocomplete w edytorze wiersza.
+- Akceptacja: pole `Type` oferuje istniejace typy; pole `Status` oferuje istniejace statusy; wpis reczny dalej mozna poprawic i revalidate; blad pokazuje oczekiwana wartosc albo liste sugestii.
+- Commit: `ee3a731 feat: suggest import types and statuses`
+
+### DONE NB-027 - Ustabilizuj sortowanie po tytule
+
+- Typ: `Bug`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`
+- Problem: sortowanie po `Title` malejaco zglasza dziwny porzadek. Kod sortuje po surowym `PrimaryTitle`, wiec wynik moze zalezec od kolacji, wielkosci liter i danych.
+- Zakres: zreprodukowac przypadek, a potem ustalic deterministyczne sortowanie tytulu, najlepiej case-insensitive i z tie-breakerem.
+- Akceptacja: sort asc i desc daje odwrotne, stabilne porzadki dla tej samej probki danych; wielkosc liter nie powoduje zaskakujacego grupowania; test repozytorium pokrywa kilka tytulow o roznych pierwszych literach.
+- Commit: `ea824a2 fix: stabilize book title sorting`
+
+### DONE NB-036 - Dodaj eksport listy ksiazek
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `BooksPage.tsx`, `Web/src/api/client.ts`, endpoint API eksportu
+- Problem: UI ma import CSV, ale nie ma eksportu listy ksiazek.
+- Zakres: dodac eksport aktualnej listy albo calej biblioteki do CSV, z jasno zdefiniowanym zachowaniem wzgledem filtrow i sortowania.
+- Akceptacja: przycisk eksportu jest dostepny obok importu lub w toolbarze; eksport respektuje aktualny query/sort albo UI jasno komunikuje zakres; plik zawiera podstawowe pola ksiazki i poprawne naglowki CSV.
+- Commit: `68808e9 feat: export filtered books as csv`
 
 ### DONE NB-008 - Ujednolic format bledow w formularzu ksiazki
 
