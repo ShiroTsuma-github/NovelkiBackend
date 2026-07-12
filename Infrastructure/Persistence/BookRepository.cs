@@ -165,7 +165,7 @@ public class BookRepository : IBookRepository
         var progressChanged = book.CurrentChapterNumber != currentChapterNumber ||
                               book.CurrentChapterLabel != currentChapterLabel;
         var hasComment = !string.IsNullOrWhiteSpace(comment);
-        if (book.TotalChapters.HasValue && currentChapterNumber.HasValue && currentChapterNumber > book.TotalChapters)
+        if (book.TotalChapters.HasValue && book.TotalChapters > 0 && currentChapterNumber.HasValue && currentChapterNumber > book.TotalChapters)
         {
             throw new ValidationException("Current chapter cannot be greater than total chapters.");
         }

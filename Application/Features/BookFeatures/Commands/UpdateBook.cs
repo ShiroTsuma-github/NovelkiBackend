@@ -254,7 +254,7 @@ public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressComma
     {
         var book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
-        if (book.TotalChapters.HasValue && request.CurrentChapterNumber.HasValue && request.CurrentChapterNumber > book.TotalChapters)
+        if (book.TotalChapters.HasValue && book.TotalChapters > 0 && request.CurrentChapterNumber.HasValue && request.CurrentChapterNumber > book.TotalChapters)
         {
             throw new ValidationException("Current chapter cannot be greater than total chapters.");
         }

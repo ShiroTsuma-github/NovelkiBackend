@@ -6,6 +6,11 @@ const optionalNumberString = z
   .refine((value) => !value.trim() || !Number.isNaN(Number(value)), 'Value must be a number.')
   .refine((value) => !value.trim() || Number(value) >= 0, 'Value cannot be negative.')
 
+const optionalPositiveNumberString = optionalNumberString.refine(
+  (value) => !value.trim() || Number(value) > 0,
+  'Total chapters must be greater than 0.',
+)
+
 const optionalIntegerString = optionalNumberString.refine(
   (value) => !value.trim() || Number.isInteger(Number(value)),
   'Value must be an integer.',
@@ -21,7 +26,7 @@ export const bookFormSchema = z
     genreIds: z.array(z.string()),
     alternativeTitlesText: z.string(),
     tagsText: z.string(),
-    totalChapters: optionalNumberString,
+    totalChapters: optionalPositiveNumberString,
     currentChapterNumber: optionalNumberString,
     currentChapterLabel: z.string().max(100).optional(),
     rating: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 10), 'Rating must be between 1 and 10.'),
@@ -85,7 +90,7 @@ export function defaultBookFormValues(book?: BookDto): BookFormValues {
     genreIds: [],
     alternativeTitlesText: book?.alternativeTitles.join('\n') ?? '',
     tagsText: book?.tags.join(', ') ?? '',
-    totalChapters: book?.totalChapters?.toString() ?? '',
+    totalChapters: book?.totalChapters != null && book.totalChapters > 0 ? book.totalChapters.toString() : '',
     currentChapterNumber: book?.currentChapterNumber?.toString() ?? '',
     currentChapterLabel: book?.currentChapterLabel ?? '',
     rating: book?.rating?.toString() ?? '',
