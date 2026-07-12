@@ -31,6 +31,66 @@ vi.mock('sonner', () => ({
 }))
 
 describe('ImportBooksDialog', () => {
+  it('asks for confirmation before dismissing an active import session', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    const onClose = vi.fn()
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={onClose} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    await screen.findByText('Line 2')
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }))
+
+    expect(screen.getByRole('heading', { name: /cancel import\?/i })).toBeInTheDocument()
+    expect(api.cancelBookImport).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /keep editing/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: /cancel import\?/i })).not.toBeInTheDocument()
+    })
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('cancels the import session after confirmation', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+    vi.mocked(api.cancelBookImport).mockResolvedValue(undefined)
+
+    const onClose = vi.fn()
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={onClose} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    await screen.findByText('Line 2')
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }))
+    fireEvent.click(screen.getByRole('button', { name: /cancel import/i }))
+
+    await waitFor(() => {
+      expect(api.cancelBookImport).toHaveBeenCalledWith('session-1')
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('downloads the CSV template from the import dialog', async () => {
     const createObjectUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:template')
     const revokeObjectUrl = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})

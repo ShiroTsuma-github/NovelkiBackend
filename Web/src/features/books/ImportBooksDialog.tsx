@@ -18,6 +18,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
   const [allowInvalidRowAutoExpand, setAllowInvalidRowAutoExpand] = useState(true)
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const invalidRows = useMemo(() => session?.rows.filter((row) => !row.isValid) ?? [], [session])
 
@@ -72,6 +73,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       setSession(null)
       setExpandedRowId(null)
       setAllowInvalidRowAutoExpand(true)
+      setConfirmCancelOpen(false)
     }
   }, [open])
 
@@ -114,12 +116,33 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   }
 
   function handleDismiss() {
-    const sessionId = session?.sessionId
-    setSession(null)
-    if (sessionId) {
-      cancelMutation.mutate(sessionId)
+    if (session?.sessionId) {
+      setConfirmCancelOpen(true)
+      return
     }
+
     onClose()
+  }
+
+  function handleConfirmCancelImport() {
+    if (!session?.sessionId) {
+      setConfirmCancelOpen(false)
+      onClose()
+      return
+    }
+
+    cancelMutation.mutate(session.sessionId, {
+      onSuccess: () => {
+        setConfirmCancelOpen(false)
+        setSession(null)
+        setExpandedRowId(null)
+        setAllowInvalidRowAutoExpand(true)
+        onClose()
+      },
+      onError: (error) => {
+        toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not cancel import.')
+      },
+    })
   }
 
   return (
@@ -249,6 +272,59 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             </div>
           </>
         )}
+      </div>
+      <CancelImportConfirmDialog
+        open={confirmCancelOpen}
+        pending={cancelMutation.isPending}
+        onCancel={() => setConfirmCancelOpen(false)}
+        onConfirm={handleConfirmCancelImport}
+      />
+    </div>
+  )
+}
+
+function CancelImportConfirmDialog({
+  open,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean
+  pending: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  if (!open) {
+    return null
+  }
+
+  return (
+    <div
+      aria-modal="true"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+      role="dialog"
+      onClick={pending ? undefined : onCancel}
+    >
+      <div className="grid w-full max-w-md gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="grid gap-2">
+          <h2 className="text-lg font-semibold text-slate-50">Cancel import?</h2>
+          <p className="text-sm leading-6 text-slate-300">
+            Closing now will discard this import session and remove your in-progress row fixes.
+          </p>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button className={secondaryButtonClass} disabled={pending} type="button" onClick={onCancel}>
+            Keep editing
+          </button>
+          <button
+            className="inline-flex min-h-10 items-center justify-center rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+            disabled={pending}
+            type="button"
+            onClick={onConfirm}
+          >
+            {pending ? 'Cancelling...' : 'Cancel import'}
+          </button>
+        </div>
       </div>
     </div>
   )
