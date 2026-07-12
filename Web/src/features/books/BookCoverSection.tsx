@@ -27,46 +27,122 @@ type CoverLightboxProps = {
   onClose: () => void
 }
 
+const COVER_CACHE_TTL_MS = 60_000
+
+type CoverCacheEntry = {
+  blobUrl: string | null
+  promise: Promise<string | null> | null
+  refs: number
+  cleanupTimer: ReturnType<typeof setTimeout> | null
+}
+
+const coverImageCache = new Map<string, CoverCacheEntry>()
+
 export function useResolvedCoverImage(cover?: BookCoverDto | null) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
-    let objectUrl: string | null = null
+    const cacheKey = getCoverCacheKey(cover)
 
-    async function loadImage() {
-      if (!cover?.imageUrl) {
-        setBlobUrl(null)
-        return
-      }
-
-      const apiOrigin = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
-      const token = getStoredSession()?.accessToken
-      const response = await fetch(`${apiOrigin}${cover.imageUrl}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      })
-      if (!response.ok) {
-        setBlobUrl(null)
-        return
-      }
-
-      objectUrl = URL.createObjectURL(await response.blob())
-      if (active) {
-        setBlobUrl(objectUrl)
-      }
+    if (!cacheKey) {
+      setBlobUrl(null)
+      return
     }
 
-    loadImage()
+    const entry = acquireCoverCacheEntry(cacheKey)
+    setBlobUrl(entry.blobUrl)
+
+    if (!entry.promise && !entry.blobUrl) {
+      entry.promise = fetchCoverBlobUrl(cover!.imageUrl!)
+        .then((nextBlobUrl) => {
+          entry.blobUrl = nextBlobUrl
+          return nextBlobUrl
+        })
+        .finally(() => {
+          entry.promise = null
+        })
+    }
+
+    entry.promise?.then((nextBlobUrl) => {
+      if (active) {
+        setBlobUrl(nextBlobUrl)
+      }
+    })
 
     return () => {
       active = false
-      if (objectUrl) {
-        URL.revokeObjectURL(objectUrl)
-      }
+      releaseCoverCacheEntry(cacheKey)
     }
   }, [cover?.imageUrl, cover?.lastAttemptAt])
 
   return blobUrl
+}
+
+function getCoverCacheKey(cover?: BookCoverDto | null) {
+  if (!cover?.imageUrl) {
+    return null
+  }
+
+  return `${cover.imageUrl}::${cover.lastAttemptAt ?? ''}`
+}
+
+function acquireCoverCacheEntry(cacheKey: string) {
+  const existing = coverImageCache.get(cacheKey)
+  if (existing) {
+    existing.refs += 1
+    if (existing.cleanupTimer) {
+      clearTimeout(existing.cleanupTimer)
+      existing.cleanupTimer = null
+    }
+    return existing
+  }
+
+  const created: CoverCacheEntry = {
+    blobUrl: null,
+    promise: null,
+    refs: 1,
+    cleanupTimer: null,
+  }
+  coverImageCache.set(cacheKey, created)
+  return created
+}
+
+function releaseCoverCacheEntry(cacheKey: string) {
+  const entry = coverImageCache.get(cacheKey)
+  if (!entry) {
+    return
+  }
+
+  entry.refs = Math.max(0, entry.refs - 1)
+  if (entry.refs > 0 || entry.cleanupTimer) {
+    return
+  }
+
+  entry.cleanupTimer = setTimeout(() => {
+    const current = coverImageCache.get(cacheKey)
+    if (!current || current.refs > 0) {
+      return
+    }
+
+    if (current.blobUrl) {
+      URL.revokeObjectURL(current.blobUrl)
+    }
+    coverImageCache.delete(cacheKey)
+  }, COVER_CACHE_TTL_MS)
+}
+
+async function fetchCoverBlobUrl(imageUrl: string) {
+  const apiOrigin = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
+  const token = getStoredSession()?.accessToken
+  const response = await fetch(`${apiOrigin}${imageUrl}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  })
+  if (!response.ok) {
+    return null
+  }
+
+  return URL.createObjectURL(await response.blob())
 }
 
 export function BookCoverArtwork({
