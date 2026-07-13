@@ -150,6 +150,108 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task UpdateBook_ShouldAllowAdminScopeToUpdateBookOwnedByAnotherUser()
+    {
+        var fixture = CreateFixture();
+        var otherOwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = otherOwnerId,
+            PrimaryTitle = "Other Owner Book",
+            NormalizedPrimaryTitle = "OTHER OWNER BOOK",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId
+        };
+        book.Titles.Add("Other Owner Book".ToPrimaryTitle());
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookHandler(
+            fixture.BookRepository,
+            fixture.AuthorRepository,
+            new FakeTypeRepository(),
+            new FakeStatusRepository(),
+            new FakeGenreRepository(),
+            new FakeTagRepository(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+        var command = new UpdateBookCommand(
+            book.Id,
+            "Admin Updated",
+            ContentTypeId,
+            StatusId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)
+        {
+            AdminScope = true
+        };
+
+        await handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal("Admin Updated", book.PrimaryTitle);
+        Assert.Equal(otherOwnerId, book.OwnerId);
+        Assert.True(fixture.BookRepository.Saved);
+    }
+
+    [Fact]
+    public async Task UpdateBook_ShouldRejectNonAdminScopeForBookOwnedByAnotherUser()
+    {
+        var fixture = CreateFixture();
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            PrimaryTitle = "Other Owner Book",
+            NormalizedPrimaryTitle = "OTHER OWNER BOOK",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId
+        };
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookHandler(
+            fixture.BookRepository,
+            fixture.AuthorRepository,
+            new FakeTypeRepository(),
+            new FakeStatusRepository(),
+            new FakeGenreRepository(),
+            new FakeTagRepository(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+        var command = new UpdateBookCommand(
+            book.Id,
+            "User Updated",
+            ContentTypeId,
+            StatusId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(() =>
+            handler.Handle(command, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task UpdateProgress_ShouldRejectChapterGreaterThanTotal()
     {
         var fixture = CreateFixture();
@@ -422,7 +524,9 @@ public class BookFeatureTests
         public Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
         public Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
         public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
+        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id ? LastBook : null);
         public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
+        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => GetByIdAsync(id, cancellationToken);
         public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
         {
             var normalized = MappingExtensions.NormalizeName(name);

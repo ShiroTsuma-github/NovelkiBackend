@@ -222,6 +222,44 @@ public class BookCoverTests
         Assert.Equal(book.Id, queue.QueuedBookId);
     }
 
+    [Fact]
+    public async Task DeleteBookCover_ShouldRemoveCoverLinkStorageAndInvalidateCache()
+    {
+        var book = CreateBook(new BookCover
+        {
+            BookId = BookId,
+            Status = BookCoverStatus.Uploaded,
+            Source = BookCoverSource.ManualUrl,
+            StoragePath = "owner/book.jpg",
+            ThumbnailStoragePath = "owner/book.thumb.jpg",
+            OriginalImageUrl = "https://example.com/cover.jpg"
+        });
+        book.Links.Add(new BookLink
+        {
+            Url = "https://example.com/cover.jpg",
+            SourceType = "Cover",
+            Label = "ManualUrl"
+        });
+        var repository = new FakeBookRepository(book);
+        var coverRepository = new FakeBookCoverRepository();
+        var storage = new FakeCoverStorage();
+        var cacheInvalidator = new FakeBookListCacheInvalidator();
+        var handler = new DeleteBookCoverHandler(
+            repository,
+            coverRepository,
+            storage,
+            cacheInvalidator,
+            new FakeUser());
+
+        await handler.Handle(new DeleteBookCoverCommand(book.Id), CancellationToken.None);
+
+        Assert.Null(book.Cover);
+        Assert.Empty(book.Links);
+        Assert.True(coverRepository.Saved);
+        Assert.Equal(["owner/book.jpg", "owner/book.thumb.jpg"], storage.DeletedPaths);
+        Assert.Equal(book.OwnerId, cacheInvalidator.InvalidatedOwnerId);
+    }
+
     private static Book CreateBook(BookCover? cover = null, bool hasCover = true)
     {
         return new Book
@@ -411,11 +449,19 @@ public class BookCoverTests
 
     private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
     {
-        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Guid? InvalidatedOwnerId { get; private set; }
+
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            InvalidatedOwnerId = ownerId;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeCoverStorage : IBookCoverStorage
     {
+        public List<string> DeletedPaths { get; } = [];
+
         public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
         {
             return Task.FromResult(new BookCoverStoredFiles(
@@ -424,7 +470,15 @@ public class BookCoverTests
         }
 
         public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) => Task.FromResult<Stream>(new MemoryStream());
-        public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
+        {
+            if (storagePath != null)
+            {
+                DeletedPaths.Add(storagePath);
+            }
+
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeRemoteImageService : IBookCoverRemoteImageService
