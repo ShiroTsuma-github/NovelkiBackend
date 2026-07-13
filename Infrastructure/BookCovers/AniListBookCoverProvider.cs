@@ -38,7 +38,7 @@ public sealed class AniListBookCoverProvider : IBookCoverProvider
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            var media = TryGetProperty(document.RootElement, "data", "Page", "media");
+            var media = BookCoverJson.TryGetProperty(document.RootElement, "data", "Page", "media");
             if (media == null || media.Value.ValueKind != JsonValueKind.Array)
             {
                 continue;
@@ -46,8 +46,8 @@ public sealed class AniListBookCoverProvider : IBookCoverProvider
 
             foreach (var item in media.Value.EnumerateArray())
             {
-                var imageUrl = TryGetString(item, "coverImage", "extraLarge")
-                    ?? TryGetString(item, "coverImage", "large");
+                var imageUrl = BookCoverJson.TryGetString(item, "coverImage", "extraLarge")
+                    ?? BookCoverJson.TryGetString(item, "coverImage", "large");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.AniList, imageUrl);
@@ -58,31 +58,4 @@ public sealed class AniListBookCoverProvider : IBookCoverProvider
         return null;
     }
 
-    private static JsonElement? TryGetProperty(JsonElement element, params string[] path)
-    {
-        var current = element;
-        foreach (var part in path)
-        {
-            if (!current.TryGetProperty(part, out current))
-            {
-                return null;
-            }
-        }
-
-        return current;
-    }
-
-    private static string? TryGetString(JsonElement element, params string[] path)
-    {
-        var current = element;
-        foreach (var part in path)
-        {
-            if (!current.TryGetProperty(part, out current))
-            {
-                return null;
-            }
-        }
-
-        return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
-    }
 }

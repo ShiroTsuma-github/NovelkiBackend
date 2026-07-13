@@ -30,12 +30,12 @@ public sealed class GoogleBooksCoverProvider : IBookCoverProvider
 
             foreach (var item in items.EnumerateArray())
             {
-                var imageUrl = TryGetString(item, "volumeInfo", "imageLinks", "extraLarge")
-                    ?? TryGetString(item, "volumeInfo", "imageLinks", "large")
-                    ?? TryGetString(item, "volumeInfo", "imageLinks", "medium")
-                    ?? TryGetString(item, "volumeInfo", "imageLinks", "small")
-                    ?? TryGetString(item, "volumeInfo", "imageLinks", "thumbnail")
-                    ?? TryGetString(item, "volumeInfo", "imageLinks", "smallThumbnail");
+                var imageUrl = BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "extraLarge")
+                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "large")
+                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "medium")
+                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "small")
+                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "thumbnail")
+                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "smallThumbnail");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.GoogleBooks, imageUrl.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase));
@@ -46,17 +46,4 @@ public sealed class GoogleBooksCoverProvider : IBookCoverProvider
         return null;
     }
 
-    private static string? TryGetString(JsonElement element, params string[] path)
-    {
-        var current = element;
-        foreach (var part in path)
-        {
-            if (!current.TryGetProperty(part, out current))
-            {
-                return null;
-            }
-        }
-
-        return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
-    }
 }

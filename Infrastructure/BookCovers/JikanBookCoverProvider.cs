@@ -30,8 +30,8 @@ public sealed class JikanBookCoverProvider : IBookCoverProvider
 
             foreach (var item in data.EnumerateArray())
             {
-                var imageUrl = TryGetString(item, "images", "jpg", "large_image_url")
-                    ?? TryGetString(item, "images", "jpg", "image_url");
+                var imageUrl = BookCoverJson.TryGetString(item, "images", "jpg", "large_image_url")
+                    ?? BookCoverJson.TryGetString(item, "images", "jpg", "image_url");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.Jikan, imageUrl);
@@ -42,17 +42,4 @@ public sealed class JikanBookCoverProvider : IBookCoverProvider
         return null;
     }
 
-    private static string? TryGetString(JsonElement element, params string[] path)
-    {
-        var current = element;
-        foreach (var part in path)
-        {
-            if (!current.TryGetProperty(part, out current))
-            {
-                return null;
-            }
-        }
-
-        return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
-    }
 }
