@@ -176,6 +176,67 @@ public class BookCoverTests
     }
 
     [Fact]
+    public async Task UploadBookCover_ShouldStoreManualUploadAndInvalidateCache()
+    {
+        var book = CreateBook(new BookCover
+        {
+            BookId = BookId,
+            Status = BookCoverStatus.Found,
+            StoragePath = "owner/old.jpg",
+            ThumbnailStoragePath = "owner/old.thumb.jpg"
+        });
+        var repository = new FakeBookRepository(book);
+        var coverRepository = new FakeBookCoverRepository();
+        var storage = new FakeCoverStorage();
+        var cacheInvalidator = new FakeBookListCacheInvalidator();
+        var handler = new UploadBookCoverHandler(
+            repository,
+            coverRepository,
+            storage,
+            cacheInvalidator,
+            new FakeUser());
+
+        await using var content = new MemoryStream([1, 2, 3]);
+        var dto = await handler.Handle(new UploadBookCoverCommand(book.Id, content, "cover.png", "image/png", content.Length), CancellationToken.None);
+
+        Assert.Equal("Uploaded", dto.Status);
+        Assert.Equal("ManualUpload", dto.Source);
+        Assert.Equal("owner/book.jpg", book.Cover!.StoragePath);
+        Assert.Equal(["owner/old.jpg", "owner/old.thumb.jpg"], storage.DeletedPaths);
+        Assert.True(repository.Saved);
+        Assert.Equal(book.OwnerId, cacheInvalidator.InvalidatedOwnerId);
+    }
+
+    [Fact]
+    public async Task UploadBookCover_ShouldRejectEmptyContent()
+    {
+        var handler = new UploadBookCoverHandler(
+            new FakeBookRepository(CreateBook()),
+            new FakeBookCoverRepository(),
+            new FakeCoverStorage(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+
+        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            handler.Handle(new UploadBookCoverCommand(BookId, new MemoryStream(), "cover.jpg", "image/jpeg", 0), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SetBookCoverFromUrl_ShouldRejectInvalidUrl()
+    {
+        var handler = new SetBookCoverFromUrlHandler(
+            new FakeBookRepository(CreateBook()),
+            new FakeBookCoverRepository(),
+            new FakeCoverStorage(),
+            new FakeRemoteImageService(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+
+        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            handler.Handle(new SetBookCoverFromUrlCommand(BookId, "file:///tmp/cover.jpg"), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task SetBookCoverFromUrl_ShouldAddCover_WhenBookHasNoCoverRow()
     {
         var book = CreateBook(hasCover: false);
@@ -308,6 +369,44 @@ public class BookCoverTests
     }
 
     [Fact]
+    public async Task RefreshBookCover_ShouldResetExistingCoverDeleteFilesAndInvalidateCache()
+    {
+        var book = CreateBook(new BookCover
+        {
+            BookId = BookId,
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.GoogleBooks,
+            StoragePath = "owner/current.jpg",
+            ThumbnailStoragePath = "owner/current.thumb.jpg",
+            OriginalImageUrl = "https://example.com/current.jpg",
+            FailureReason = "old"
+        });
+        var repository = new FakeBookRepository(book);
+        var coverRepository = new FakeBookCoverRepository();
+        var queue = new FakeBookCoverQueue();
+        var storage = new FakeCoverStorage();
+        var cacheInvalidator = new FakeBookListCacheInvalidator();
+        var handler = new RefreshBookCoverHandler(
+            repository,
+            coverRepository,
+            queue,
+            storage,
+            cacheInvalidator,
+            new FakeUser());
+
+        var dto = await handler.Handle(new RefreshBookCoverCommand(book.Id), CancellationToken.None);
+
+        Assert.Equal("Pending", dto.Status);
+        Assert.Null(book.Cover!.StoragePath);
+        Assert.Null(book.Cover.OriginalImageUrl);
+        Assert.Equal(["owner/current.jpg", "owner/current.thumb.jpg"], storage.DeletedPaths);
+        Assert.True(repository.Saved);
+        Assert.False(coverRepository.Added);
+        Assert.Equal(book.Id, queue.QueuedBookId);
+        Assert.Equal(book.OwnerId, cacheInvalidator.InvalidatedOwnerId);
+    }
+
+    [Fact]
     public async Task DeleteBookCover_ShouldRemoveCoverLinkStorageAndInvalidateCache()
     {
         var book = CreateBook(new BookCover
@@ -343,6 +442,66 @@ public class BookCoverTests
         Assert.True(coverRepository.Saved);
         Assert.Equal(["owner/book.jpg", "owner/book.thumb.jpg"], storage.DeletedPaths);
         Assert.Equal(book.OwnerId, cacheInvalidator.InvalidatedOwnerId);
+    }
+
+    [Fact]
+    public async Task DeleteBookCover_ShouldReturnWhenBookHasNoCover()
+    {
+        var book = CreateBook(hasCover: false);
+        var coverRepository = new FakeBookCoverRepository();
+        var storage = new FakeCoverStorage();
+        var cacheInvalidator = new FakeBookListCacheInvalidator();
+        var handler = new DeleteBookCoverHandler(
+            new FakeBookRepository(book),
+            coverRepository,
+            storage,
+            cacheInvalidator,
+            new FakeUser());
+
+        await handler.Handle(new DeleteBookCoverCommand(book.Id), CancellationToken.None);
+
+        Assert.False(coverRepository.Saved);
+        Assert.Empty(storage.DeletedPaths);
+        Assert.Null(cacheInvalidator.InvalidatedOwnerId);
+    }
+
+    [Fact]
+    public async Task GetBookCoverFileHandlers_ShouldReturnOriginalAndThumbnailFiles()
+    {
+        var cover = new BookCover
+        {
+            BookId = BookId,
+            StoragePath = "owner/book.jpg",
+            MimeType = "image/jpeg",
+            ThumbnailStoragePath = "owner/book.thumb.webp",
+            ThumbnailMimeType = "image/webp"
+        };
+        var coverRepository = new FakeBookCoverRepository { Cover = cover };
+        var storage = new FakeCoverStorage();
+        var originalHandler = new GetBookCoverFileHandler(coverRepository, storage, new FakeUser());
+        var thumbnailHandler = new GetBookCoverThumbnailFileHandler(coverRepository, storage, new FakeUser());
+
+        var original = await originalHandler.Handle(new GetBookCoverFileQuery(BookId), CancellationToken.None);
+        var thumbnail = await thumbnailHandler.Handle(new GetBookCoverThumbnailFileQuery(BookId), CancellationToken.None);
+
+        Assert.Equal("image/jpeg", original.MimeType);
+        Assert.Equal($"{BookId}.jpg", original.FileName);
+        Assert.Equal("image/webp", thumbnail.MimeType);
+        Assert.Equal($"{BookId}.thumb.webp", thumbnail.FileName);
+    }
+
+    [Fact]
+    public async Task GetBookCoverFileHandlers_ShouldRejectMissingStorageMetadata()
+    {
+        var coverRepository = new FakeBookCoverRepository { Cover = new BookCover { BookId = BookId } };
+        var storage = new FakeCoverStorage();
+        var originalHandler = new GetBookCoverFileHandler(coverRepository, storage, new FakeUser());
+        var thumbnailHandler = new GetBookCoverThumbnailFileHandler(coverRepository, storage, new FakeUser());
+
+        await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<BookCover, Guid>>(() =>
+            originalHandler.Handle(new GetBookCoverFileQuery(BookId), CancellationToken.None));
+        await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<BookCover, Guid>>(() =>
+            thumbnailHandler.Handle(new GetBookCoverThumbnailFileQuery(BookId), CancellationToken.None));
     }
 
     private static Book CreateBook(BookCover? cover = null, bool hasCover = true)
@@ -505,11 +664,12 @@ public class BookCoverTests
 
     private sealed class FakeBookCoverRepository : IBookCoverRepository
     {
+        public BookCover? Cover { get; init; }
         public bool Saved { get; private set; }
         public bool Added { get; private set; }
 
-        public Task<BookCover?> GetByBookIdAsync(Guid bookId, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<BookCover?>(null);
-        public Task<BookCover?> GetByBookIdAsync(Guid bookId, CancellationToken cancellationToken) => Task.FromResult<BookCover?>(null);
+        public Task<BookCover?> GetByBookIdAsync(Guid bookId, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(Cover);
+        public Task<BookCover?> GetByBookIdAsync(Guid bookId, CancellationToken cancellationToken) => Task.FromResult(Cover);
         public Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyCollection<BookCover>>(Array.Empty<BookCover>());
         public Task AddAsync(BookCover cover, CancellationToken cancellationToken)
         {
