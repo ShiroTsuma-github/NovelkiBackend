@@ -41,9 +41,15 @@ static class DependencyInjection
                         .AllowAnyHeader()
                         .AllowAnyMethod();
                 }
-                else
+                else if (builder.Environment.IsDevelopment())
                 {
                     policy.AllowAnyOrigin()
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                }
+                else
+                {
+                    policy.SetIsOriginAllowed(_ => false)
                         .AllowAnyHeader()
                         .AllowAnyMethod();
                 }

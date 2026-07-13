@@ -54,6 +54,7 @@ app.UseSerilogRequestLogging(options =>
 });
 
 app.UseResponseCompression();
+app.UseSecurityHeaders();
 app.UseErrorHandlingMiddleware();
 
 if (app.Environment.IsDevelopment())

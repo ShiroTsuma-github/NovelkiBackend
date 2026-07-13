@@ -34,7 +34,10 @@ describe('BookCoverSection', () => {
       open: vi.fn(async (cacheName: string) => {
         cacheNames.push(cacheName)
         return {
+          add: vi.fn(async () => undefined),
+          addAll: vi.fn(async () => undefined),
           match: vi.fn(async (request: Request) => cacheEntries.get(request.url)?.clone() ?? undefined),
+          matchAll: vi.fn(async () => []),
           put: vi.fn(async (request: Request, response: Response) => {
             cacheEntries.set(request.url, response.clone())
           }),
