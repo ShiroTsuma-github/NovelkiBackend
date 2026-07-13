@@ -13,15 +13,13 @@ public record GetAllBooksQuery(
 
 public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedResult<BookListItemDto>>
 {
-    private readonly IBookRepository _bookRepository;
-    private readonly IBookListReadRepository _repository;
+    private readonly IBookListQueryService _queryService;
     private readonly IBookListCache _cache;
     private readonly IUser _user;
 
-    public GetBooksQueryHandler(IBookRepository bookRepository, IBookListReadRepository repository, IBookListCache cache, IUser user)
+    public GetBooksQueryHandler(IBookListQueryService queryService, IBookListCache cache, IUser user)
     {
-        _bookRepository = bookRepository;
-        _repository = repository;
+        _queryService = queryService;
         _cache = cache;
         _user = user;
     }
@@ -31,7 +29,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
         var ownerId = _user.RequiredId;
         var criteria = BookSearchQueryParser.Parse(request.Query);
         var effectiveSortDirection = request.AdvanceCycle && IsCyclicSort(request.SortBy)
-            ? await _bookRepository.GetNextCycleSortDirectionAsync(ownerId, criteria, request.SortBy!, request.SortDirection, cancellationToken)
+            ? await _queryService.GetNextCycleSortDirectionAsync(ownerId, criteria, request.SortBy!, request.SortDirection, cancellationToken)
             : request.SortDirection;
         var cached = await _cache.GetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, effectiveSortDirection, cancellationToken);
         if (cached != null)
@@ -39,12 +37,8 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
             return cached;
         }
 
-        var books = criteria.HasFilters
-            ? await _repository.SearchListAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken)
-            : await _repository.GetAllListAsync(ownerId, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken);
-        var total = criteria.HasFilters
-            ? await _bookRepository.GetSearchCountAsync(ownerId, criteria, cancellationToken)
-            : await _bookRepository.GetCountAsync(ownerId, cancellationToken);
+        var books = await _queryService.GetBooksAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken);
+        var total = await _queryService.GetBookCountAsync(ownerId, criteria, cancellationToken);
         var result = new PaginatedResult<BookListItemDto>
         {
             Skip = request.Skip,
@@ -71,12 +65,12 @@ public record GetAllBooksForExportQuery(
 
 public sealed class GetBooksForExportQueryHandler : IRequestHandler<GetAllBooksForExportQuery, PaginatedResult<BookDto>>
 {
-    private readonly IBookRepository _repository;
+    private readonly IBookExportQueryService _queryService;
     private readonly IUser _user;
 
-    public GetBooksForExportQueryHandler(IBookRepository repository, IUser user)
+    public GetBooksForExportQueryHandler(IBookExportQueryService queryService, IUser user)
     {
-        _repository = repository;
+        _queryService = queryService;
         _user = user;
     }
 
@@ -84,19 +78,6 @@ public sealed class GetBooksForExportQueryHandler : IRequestHandler<GetAllBooksF
     {
         var ownerId = _user.RequiredId;
         var criteria = BookSearchQueryParser.Parse(request.Query);
-        var books = criteria.HasFilters
-            ? await _repository.SearchAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
-            : await _repository.GetAllAsync(ownerId, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
-        var total = criteria.HasFilters
-            ? await _repository.GetSearchCountAsync(ownerId, criteria, cancellationToken)
-            : await _repository.GetCountAsync(ownerId, cancellationToken);
-
-        return new PaginatedResult<BookDto>
-        {
-            Skip = request.Skip,
-            Take = request.Take,
-            Total = total,
-            Data = books.Select(b => b.ToDto()).ToList()
-        };
+        return await _queryService.GetBooksForExportAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
     }
 }

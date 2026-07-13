@@ -46,7 +46,10 @@ public static class DependencyInjection
             });
         }
         builder.Services.AddScoped<IBookRepository, BookRepository>();
-        builder.Services.AddScoped<IBookListReadRepository, BookRepository>();
+        builder.Services.AddScoped<BookReadQueryService>();
+        builder.Services.AddScoped<IBookListQueryService>(provider => provider.GetRequiredService<BookReadQueryService>());
+        builder.Services.AddScoped<IBookExportQueryService>(provider => provider.GetRequiredService<BookReadQueryService>());
+        builder.Services.AddScoped<IBookSummaryQueryService>(provider => provider.GetRequiredService<BookReadQueryService>());
         builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
         builder.Services.AddScoped<IGenreRepository, GenreRepository>();
         builder.Services.AddScoped<IStatusRepository, StatusRepository>();
