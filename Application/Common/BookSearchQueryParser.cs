@@ -22,6 +22,9 @@ public static class BookSearchQueryParser
         ["priority"] = BookSearchNumberField.Priority,
         ["current"] = BookSearchNumberField.CurrentChapter,
         ["currentChapter"] = BookSearchNumberField.CurrentChapter,
+        ["progress"] = BookSearchNumberField.CurrentChapter,
+        ["chapter"] = BookSearchNumberField.TotalChapters,
+        ["chapters"] = BookSearchNumberField.TotalChapters,
         ["total"] = BookSearchNumberField.TotalChapters,
         ["totalChapters"] = BookSearchNumberField.TotalChapters
     };

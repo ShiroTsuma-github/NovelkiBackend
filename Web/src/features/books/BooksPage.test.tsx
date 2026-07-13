@@ -52,6 +52,8 @@ describe('BooksPage', () => {
     expect(screen.getByPlaceholderText(/rating:>=8/i)).toBeInTheDocument()
     expect(screen.getByText('rating:>=8')).toBeInTheDocument()
     expect(screen.getByText('rating:8')).toBeInTheDocument()
+    expect(screen.getByText('progress:>=50')).toBeInTheDocument()
+    expect(screen.getByText('chapters:<200')).toBeInTheDocument()
   })
 
   it('switches to cards view and persists the preference', async () => {
@@ -290,6 +292,27 @@ describe('BooksPage', () => {
       take: 20,
       query: '',
       sortBy: 'title',
+      sortDirection: 'asc',
+    })))
+  })
+
+  it('sorts by total chapters from the table column', async () => {
+    window.localStorage.setItem('novelki.books.columns.v1', JSON.stringify([
+      { id: 'totalChapters', visible: true },
+    ]))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /chapters/i }))
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({
+      skip: 0,
+      take: 20,
+      query: '',
+      sortBy: 'chapters',
       sortDirection: 'asc',
     })))
   })
