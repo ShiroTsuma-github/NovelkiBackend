@@ -13,6 +13,7 @@ vi.mock('@/api/client', () => ({
     downloadBookImportTemplate: vi.fn(),
     updateBookImportRow: vi.fn(),
     deleteBookImportRow: vi.fn(),
+    deleteInvalidBookImportRows: vi.fn(),
     finalizeBookImport: vi.fn(),
     cancelBookImport: vi.fn(),
   },
@@ -253,6 +254,35 @@ describe('ImportBooksDialog', () => {
     expect(screen.queryByText('Suggestions: Novel, Manga')).not.toBeInTheDocument()
     expect(screen.queryByText('Suggestions: Reading, Completed')).not.toBeInTheDocument()
   })
+
+  it('discards all invalid rows and keeps valid rows in session summary', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithMixedRows)
+    vi.mocked(api.deleteInvalidBookImportRows).mockResolvedValue(importSessionAfterDiscardInvalid)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    expect(await screen.findByRole('button', { name: /discard all invalid/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /discard all invalid/i }))
+
+    await waitFor(() => {
+      expect(api.deleteInvalidBookImportRows).toHaveBeenCalledWith('session-mixed')
+    })
+
+    expect(screen.queryByRole('button', { name: /discard all invalid/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /finalize import/i })).toBeEnabled()
+    expect(screen.getByText('All rows are valid')).toBeInTheDocument()
+  })
 })
 
 const importSessionWithFieldErrors: BookImportSessionDto = {
@@ -298,4 +328,51 @@ const importSessionWithLongTitle: BookImportSessionDto = {
       primaryTitle: 'A Very Long Imported Book Title That Should Stay Inside Its Header Without Pushing The Action Buttons Below Or Off The Right Edge',
     },
   ],
+}
+
+const importSessionWithMixedRows: BookImportSessionDto = {
+  sessionId: 'session-mixed',
+  fileName: 'books.csv',
+  totalRows: 2,
+  validRows: 1,
+  invalidRows: 1,
+  canFinalize: false,
+  availableContentTypes: ['Novel', 'Manga'],
+  availableStatuses: ['Reading', 'Completed'],
+  rows: [
+    {
+      rowId: 'row-valid',
+      lineNumber: 2,
+      isValid: true,
+      primaryTitle: 'Valid book',
+      authorName: null,
+      contentType: 'Novel',
+      status: 'Reading',
+      tags: null,
+      totalChapters: null,
+      currentChapterNumber: null,
+      currentChapterLabel: null,
+      rating: null,
+      priority: null,
+      description: null,
+      notes: null,
+      rawImportedLine: null,
+      errors: [],
+      fieldErrors: {},
+    },
+    {
+      ...importSessionWithFieldErrors.rows[0],
+      rowId: 'row-invalid',
+      lineNumber: 3,
+    },
+  ],
+}
+
+const importSessionAfterDiscardInvalid: BookImportSessionDto = {
+  ...importSessionWithMixedRows,
+  totalRows: 1,
+  validRows: 1,
+  invalidRows: 0,
+  canFinalize: true,
+  rows: [importSessionWithMixedRows.rows[0]],
 }

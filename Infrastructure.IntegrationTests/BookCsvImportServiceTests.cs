@@ -261,6 +261,52 @@ Existing Book,Novel,Reading
     }
 
     [Fact]
+    public async Task DeleteInvalidRowsAsync_ShouldRemoveOnlyInvalidRows()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+
+        using var stream = CreateCsv("""
+primaryTitle,contentType,status,totalChapters,currentChapterNumber
+Valid Book,Novel,Reading,12,10
+Invalid Book,Novel,Reading,10,11
+""");
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+
+        var updatedSession = await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
+
+        Assert.Equal(1, updatedSession.TotalRows);
+        Assert.Equal(1, updatedSession.ValidRows);
+        Assert.Equal(0, updatedSession.InvalidRows);
+        Assert.True(updatedSession.CanFinalize);
+        Assert.Equal("Valid Book", Assert.Single(updatedSession.Rows).PrimaryTitle);
+    }
+
+    [Fact]
+    public async Task DeleteInvalidRowsAsync_ShouldKeepSessionUnchangedWhenThereAreNoInvalidRows()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+
+        using var stream = CreateCsv("""
+primaryTitle,contentType,status,totalChapters,currentChapterNumber
+Valid Book,Novel,Reading,12,10
+""");
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+
+        var updatedSession = await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
+
+        Assert.Equal(1, updatedSession.TotalRows);
+        Assert.Equal(1, updatedSession.ValidRows);
+        Assert.Equal(0, updatedSession.InvalidRows);
+        Assert.True(updatedSession.CanFinalize);
+    }
+
+    [Fact]
     public async Task CancelAsync_ShouldExpireSession()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());

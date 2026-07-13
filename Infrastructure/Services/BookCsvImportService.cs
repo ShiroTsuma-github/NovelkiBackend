@@ -192,6 +192,14 @@ public sealed class BookCsvImportService : IBookCsvImportService
         return ToDto(session);
     }
 
+    public async Task<BookImportSessionDto> DeleteInvalidRowsAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        session.Rows.RemoveAll(item => item.Errors.Count > 0);
+        await RevalidateSessionAsync(session, cancellationToken);
+        return ToDto(session);
+    }
+
     public async Task<BookImportFinalizeResultDto> FinalizeAsync(Guid sessionId, CancellationToken cancellationToken)
     {
         var session = GetOwnedSession(sessionId);

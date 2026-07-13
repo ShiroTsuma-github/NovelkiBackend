@@ -56,6 +56,19 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     mutationFn: (sessionId: string) => api.cancelBookImport(sessionId),
   })
 
+  const deleteInvalidRowsMutation = useMutation({
+    mutationFn: (sessionId: string) => api.deleteInvalidBookImportRows(sessionId),
+    onSuccess: (nextSession) => {
+      setSession(nextSession)
+      setAllowInvalidRowAutoExpand(true)
+      setExpandedRowId(nextSession.rows.find((row) => !row.isValid)?.rowId ?? null)
+      toast.success('Invalid rows removed.')
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not remove invalid rows.')
+    },
+  })
+
   const templateMutation = useMutation({
     mutationFn: () => api.downloadBookImportTemplate(),
     onSuccess: (blob) => {
@@ -260,7 +273,18 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
 
             <div className="h-[min(60vh,44rem)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
               {invalidRows.length ? (
-                <div className="h-full min-h-0">
+                <div className="grid h-full min-h-0 gap-3">
+                  <div className="flex justify-end">
+                    <button
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                      disabled={deleteInvalidRowsMutation.isPending}
+                      type="button"
+                      onClick={() => deleteInvalidRowsMutation.mutate(session.sessionId)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      {deleteInvalidRowsMutation.isPending ? 'Removing invalid...' : 'Discard all invalid'}
+                    </button>
+                  </div>
                   <Virtuoso
                     className="import-rows-scroll"
                     components={{ Scroller: ImportRowsScroller }}

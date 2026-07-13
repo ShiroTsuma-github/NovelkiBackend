@@ -10,7 +10,7 @@ using System.Text;
 
 [ApiController]
 [Route("api/v1/book")]
-public class BookController : ControllerBase
+public partial class BookController : ControllerBase
 {
     private readonly IMediator _mediator;
     private readonly IBookCsvImportService _bookCsvImportService;
@@ -134,9 +134,9 @@ public class BookController : ControllerBase
     [Authorize]
     public async Task<IActionResult> ExportBooks([FromQuery] string? query, [FromQuery] string? sortBy, [FromQuery] string? sortDirection)
     {
-        var firstPage = await _mediator.Send(new GetAllBooksQuery(0, 1, query, sortBy, sortDirection));
+        var firstPage = await _mediator.Send(new GetAllBooksForExportQuery(0, 1, query, sortBy, sortDirection));
         var allBooks = firstPage.Total > 0
-            ? await _mediator.Send(new GetAllBooksQuery(0, firstPage.Total, query, sortBy, sortDirection))
+            ? await _mediator.Send(new GetAllBooksForExportQuery(0, firstPage.Total, query, sortBy, sortDirection))
             : firstPage;
 
         var csv = BookExportCsv.Build(allBooks.Data);
@@ -165,6 +165,14 @@ public class BookController : ControllerBase
     public async Task<IActionResult> DeleteImportRow(Guid sessionId, Guid rowId, CancellationToken cancellationToken)
     {
         var result = await _bookCsvImportService.DeleteRowAsync(sessionId, rowId, cancellationToken);
+        return Ok(result);
+    }
+
+    [HttpDelete("import/sessions/{sessionId:guid}/rows/invalid")]
+    [Authorize]
+    public async Task<IActionResult> DeleteInvalidImportRows(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var result = await _bookCsvImportService.DeleteInvalidRowsAsync(sessionId, cancellationToken);
         return Ok(result);
     }
 
@@ -254,6 +262,7 @@ public class BookController : ControllerBase
     public async Task<IActionResult> GetCoverFile(Guid id)
     {
         var result = await _mediator.Send(new GetBookCoverFileQuery(id));
+        ApplyCoverCacheHeaders();
 
         return File(result.Content, result.MimeType, result.FileName);
     }
@@ -263,6 +272,7 @@ public class BookController : ControllerBase
     public async Task<IActionResult> GetCoverThumbnail(Guid id)
     {
         var result = await _mediator.Send(new GetBookCoverThumbnailFileQuery(id));
+        ApplyCoverCacheHeaders();
 
         return File(result.Content, result.MimeType, result.FileName);
     }
@@ -278,6 +288,15 @@ public class BookController : ControllerBase
 }
 
 public sealed record SetBookCoverFromUrlRequest(string ImageUrl);
+
+partial class BookController
+{
+    private void ApplyCoverCacheHeaders()
+    {
+        Response.Headers.CacheControl = "private, max-age=2592000, immutable";
+        Response.Headers.Vary = "Authorization";
+    }
+}
 
 public static class BookExportCsv
 {

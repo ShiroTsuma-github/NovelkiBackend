@@ -84,6 +84,32 @@ public class BookControllerTests
     }
 
     [Fact]
+    public async Task DeleteInvalidImportRows_ShouldReturnUpdatedSession()
+    {
+        var sessionId = Guid.NewGuid();
+        var expected = new BookImportSessionDto
+        {
+            SessionId = sessionId,
+            FileName = "books.csv",
+            TotalRows = 1,
+            ValidRows = 1,
+            InvalidRows = 0,
+            CanFinalize = true,
+            Rows = Array.Empty<BookImportRowDto>()
+        };
+        var importService = new Mock<IBookCsvImportService>();
+        importService
+            .Setup(service => service.DeleteInvalidRowsAsync(sessionId, CancellationToken.None))
+            .ReturnsAsync(expected);
+        var controller = CreateController(importService: importService.Object);
+
+        var result = await controller.DeleteInvalidImportRows(sessionId, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(expected, ok.Value);
+    }
+
+    [Fact]
     public async Task UploadCover_ShouldRejectMissingFile()
     {
         var controller = CreateController();
@@ -124,6 +150,8 @@ public class BookControllerTests
         var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("image/jpeg", file.ContentType);
         Assert.Equal("cover.jpg", file.FileDownloadName);
+        Assert.Equal("private, max-age=2592000, immutable", controller.Response.Headers.CacheControl);
+        Assert.Equal("Authorization", controller.Response.Headers.Vary);
     }
 
     [Fact]
@@ -144,6 +172,8 @@ public class BookControllerTests
         var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("image/jpeg", file.ContentType);
         Assert.Equal("cover.thumb.jpg", file.FileDownloadName);
+        Assert.Equal("private, max-age=2592000, immutable", controller.Response.Headers.CacheControl);
+        Assert.Equal("Authorization", controller.Response.Headers.Vary);
     }
 
     [Fact]
@@ -171,7 +201,7 @@ public class BookControllerTests
             ]
         };
         mediator
-            .SetupSequence(mock => mock.Send(It.IsAny<GetAllBooksQuery>(), It.IsAny<CancellationToken>()))
+            .SetupSequence(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(firstPage)
             .ReturnsAsync(fullPage);
         var controller = new BookController(mediator.Object, importService.Object, logger.Object);
@@ -185,8 +215,8 @@ public class BookControllerTests
         Assert.Contains("primaryTitle,author,contentType,status,currentChapterNumber,currentChapterLabel,totalChapters,rating,priority,genres,tags,notes", csv);
         Assert.Contains("\"Alpha, Book\",Toika,Novel,Reading", csv);
         Assert.Contains("\"Line 1\nLine 2\"", csv);
-        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 1, "author:Toika", "title", "asc", false), It.IsAny<CancellationToken>()), Times.Once);
-        mediator.Verify(mock => mock.Send(new GetAllBooksQuery(0, 2, "author:Toika", "title", "asc", false), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(new GetAllBooksForExportQuery(0, 1, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(new GetAllBooksForExportQuery(0, 2, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -248,7 +278,13 @@ public class BookControllerTests
         return new BookController(
             mediator ?? Mock.Of<IMediator>(),
             importService ?? Mock.Of<IBookCsvImportService>(),
-            NullLogger<BookController>.Instance);
+            NullLogger<BookController>.Instance)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext()
+            }
+        };
     }
 
     private static IFormFile CreateFormFile(string content, string fileName, string contentType = "text/csv")
