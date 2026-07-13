@@ -227,6 +227,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var skipped = 0;
         var errors = new List<string>();
         var createdBookIds = new List<Guid>();
+        var importedBooks = new List<BookImportFinalizedBookDto>();
 
         foreach (var row in session.Rows)
         {
@@ -297,6 +298,15 @@ public sealed class BookCsvImportService : IBookCsvImportService
             _context.Books.Add(book);
             existingKeys.Add(importKey);
             createdBookIds.Add(book.Id);
+            importedBooks.Add(new BookImportFinalizedBookDto
+            {
+                PrimaryTitle = book.PrimaryTitle,
+                ContentType = row.ContentType!,
+                Status = row.Status!,
+                CurrentChapterNumber = book.CurrentChapterNumber,
+                CurrentChapterLabel = book.CurrentChapterLabel,
+                TotalChapters = book.TotalChapters
+            });
             imported++;
         }
 
@@ -316,6 +326,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         {
             ImportedCount = imported,
             SkippedCount = skipped,
+            ImportedBooks = importedBooks,
             Errors = errors
         };
     }

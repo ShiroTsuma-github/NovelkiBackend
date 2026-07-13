@@ -12,6 +12,7 @@ import {
   secondaryButtonClass,
 } from '@/components/app/FormField'
 import { BookCoverArtwork } from './BookCoverSection'
+import { formatProgress } from './bookProgress'
 import {
   BookListFooter,
   getNextSortDirection,
@@ -21,6 +22,8 @@ import {
   useBookListUrlState,
 } from './BookListShared'
 import { ImportBooksDialog } from './ImportBooksDialog'
+
+export { formatProgress } from './bookProgress'
 
 const cardsPerRowOptions = [2, 3, 4, 5, 6, 7, 8] as const
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
@@ -1340,17 +1343,6 @@ function getStatusBadgeClass(status: string) {
   }
 
   return 'border-slate-700/80 bg-slate-300/95 text-slate-950'
-}
-
-export function formatProgress(book: BookListItemDto) {
-  const isCompleted = book.status.trim().toLowerCase() === 'completed'
-  const current = isCompleted && book.currentChapterNumber != null
-    ? book.currentChapterNumber
-    : book.currentChapterLabel || book.currentChapterNumber
-  if (!current && !book.totalChapters) {
-    return '-'
-  }
-  return `${current ?? '?'}${book.totalChapters ? ` / ${book.totalChapters}` : ''}`
 }
 
 export function formatAverageRating(value?: number | null) {

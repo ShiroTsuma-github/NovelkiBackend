@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
-import type { BookImportSessionDto } from '@/api/types'
+import type { BookImportFinalizeResult, BookImportSessionDto } from '@/api/types'
 import { toast } from 'sonner'
 import { renderWithProviders } from '@/test/render'
 import { ImportBooksDialog } from './ImportBooksDialog'
@@ -289,6 +289,89 @@ describe('ImportBooksDialog', () => {
     expect(screen.getByRole('button', { name: /finalize import/i })).toBeEnabled()
     expect(screen.getByText('All rows are valid')).toBeInTheDocument()
   })
+
+  it('shows imported titles with type and list-formatted progress after finalizing', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionAfterDiscardInvalid)
+    vi.mocked(api.finalizeBookImport).mockResolvedValue(importFinalizeFullSuccess)
+    const onClose = vi.fn()
+    const onImported = vi.fn()
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={onClose} onImported={onImported} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    expect(await screen.findByText('All rows are valid')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /finalize import/i }))
+
+    expect(await screen.findByText('Imported books')).toBeInTheDocument()
+    expect(screen.getByText('Imported')).toBeInTheDocument()
+    expect(screen.getByText('Skipped')).toBeInTheDocument()
+    expect(screen.getByText('The Novel')).toBeInTheDocument()
+    expect(screen.getByText('Novel')).toBeInTheDocument()
+    expect(screen.getByText('Progress: 49 / 200')).toBeInTheDocument()
+    expect(onImported).toHaveBeenCalledWith(importFinalizeFullSuccess)
+    expect(onClose).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }))
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps partial finalize messages visible on the success screen', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionAfterDiscardInvalid)
+    vi.mocked(api.finalizeBookImport).mockResolvedValue(importFinalizePartialSuccess)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: /finalize import/i }))
+
+    expect(await screen.findByText('Partial import messages')).toBeInTheDocument()
+    expect(screen.getByText("Line 3: title 'Existing Book' already exists for content type 'Novel'.")).toBeInTheDocument()
+    expect(screen.getByText('Skipped')).toBeInTheDocument()
+  })
+
+  it('shows an empty imported list when finalize imports zero books', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionAfterDiscardInvalid)
+    vi.mocked(api.finalizeBookImport).mockResolvedValue(importFinalizeEmptySuccess)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: /finalize import/i }))
+
+    expect(await screen.findByText('No books were imported.')).toBeInTheDocument()
+    expect(screen.getByText('Skipped')).toBeInTheDocument()
+  })
 })
 
 const importSessionWithFieldErrors: BookImportSessionDto = {
@@ -381,4 +464,34 @@ const importSessionAfterDiscardInvalid: BookImportSessionDto = {
   invalidRows: 0,
   canFinalize: true,
   rows: [importSessionWithMixedRows.rows[0]],
+}
+
+const importFinalizeFullSuccess: BookImportFinalizeResult = {
+  importedCount: 1,
+  skippedCount: 0,
+  importedBooks: [
+    {
+      primaryTitle: 'The Novel',
+      contentType: 'Novel',
+      status: 'Reading',
+      currentChapterNumber: 49,
+      currentChapterLabel: 'Progress: 49',
+      totalChapters: 200,
+    },
+  ],
+  errors: [],
+}
+
+const importFinalizePartialSuccess: BookImportFinalizeResult = {
+  importedCount: 1,
+  skippedCount: 1,
+  importedBooks: importFinalizeFullSuccess.importedBooks,
+  errors: ["Line 3: title 'Existing Book' already exists for content type 'Novel'."],
+}
+
+const importFinalizeEmptySuccess: BookImportFinalizeResult = {
+  importedCount: 0,
+  skippedCount: 1,
+  importedBooks: [],
+  errors: ["Line 2: title 'Existing Book' already exists for content type 'Novel'."],
 }
