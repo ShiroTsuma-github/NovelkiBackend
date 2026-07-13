@@ -13,5 +13,6 @@ public static class DependencyInjection
             cfg.RegisterServicesFromAssembly(typeof(CreateBookCommand).Assembly));
         builder.Services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
         builder.Services.AddScoped(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        builder.Services.AddSingleton<IBookCsvExportService, BookCsvExportService>();
     }
 }

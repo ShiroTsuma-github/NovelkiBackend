@@ -150,6 +150,108 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task UpdateBook_ShouldAllowAdminScopeToUpdateBookOwnedByAnotherUser()
+    {
+        var fixture = CreateFixture();
+        var otherOwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = otherOwnerId,
+            PrimaryTitle = "Other Owner Book",
+            NormalizedPrimaryTitle = "OTHER OWNER BOOK",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId
+        };
+        book.Titles.Add("Other Owner Book".ToPrimaryTitle());
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookHandler(
+            fixture.BookRepository,
+            fixture.AuthorRepository,
+            new FakeTypeRepository(),
+            new FakeStatusRepository(),
+            new FakeGenreRepository(),
+            new FakeTagRepository(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+        var command = new UpdateBookCommand(
+            book.Id,
+            "Admin Updated",
+            ContentTypeId,
+            StatusId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null)
+        {
+            AdminScope = true
+        };
+
+        await handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal("Admin Updated", book.PrimaryTitle);
+        Assert.Equal(otherOwnerId, book.OwnerId);
+        Assert.True(fixture.BookRepository.Saved);
+    }
+
+    [Fact]
+    public async Task UpdateBook_ShouldRejectNonAdminScopeForBookOwnedByAnotherUser()
+    {
+        var fixture = CreateFixture();
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+            PrimaryTitle = "Other Owner Book",
+            NormalizedPrimaryTitle = "OTHER OWNER BOOK",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId
+        };
+        fixture.BookRepository.Seed(book);
+        var handler = new UpdateBookHandler(
+            fixture.BookRepository,
+            fixture.AuthorRepository,
+            new FakeTypeRepository(),
+            new FakeStatusRepository(),
+            new FakeGenreRepository(),
+            new FakeTagRepository(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+        var command = new UpdateBookCommand(
+            book.Id,
+            "User Updated",
+            ContentTypeId,
+            StatusId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null);
+
+        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(() =>
+            handler.Handle(command, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task UpdateProgress_ShouldRejectChapterGreaterThanTotal()
     {
         var fixture = CreateFixture();
@@ -243,6 +345,65 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public void CreateBookValidator_ShouldRejectOverlongScalarFields()
+    {
+        var validator = new CreateBookCommandValidator();
+        var command = ValidCreateCommand(authorName: new string('a', 301)) with
+        {
+            PrimaryTitle = new string('t', 501),
+            CurrentChapterLabel = new string('c', 101),
+            Description = new string('d', 4001),
+            Notes = new string('n', 4001),
+            RawImportedLine = new string('r', 4001)
+        };
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title must be 500 characters or fewer.");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AuthorName");
+        Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterLabel");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Description");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Notes");
+        Assert.Contains(result.Errors, e => e.PropertyName == "RawImportedLine");
+    }
+
+    [Fact]
+    public void CreateBookValidator_ShouldRejectInvalidAlternativeTitlesTagsAndLinks()
+    {
+        var validator = new CreateBookCommandValidator();
+        var command = ValidCreateCommand(
+            alternativeTitles:
+            [
+                new BookTitleInput(" ", "pl", "Manual"),
+                new BookTitleInput(new string('t', 501), new string('l', 11), new string('s', 51))
+            ],
+            tags: [" ", new string('x', 101)],
+            links:
+            [
+                new BookLinkInput(""),
+                new BookLinkInput("ftp://example.com/cover.jpg", new string('l', 201), ""),
+                new BookLinkInput(new string('h', 2001), "label", new string('s', 51))
+            ]);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[0].Title");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[1].Title");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[1].Language");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[1].Source");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Tags[0]");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Tags[1]");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[0].Url");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[1].Url");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[1].Label");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[1].SourceType");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[2].Url");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[2].SourceType");
+    }
+
+    [Fact]
     public void UpdateBookProgressValidator_ShouldRejectNegativeChapterNumber()
     {
         var validator = new UpdateBookProgressCommandValidator();
@@ -296,7 +457,7 @@ public class BookFeatureTests
     [Fact]
     public async Task GetBookSummary_ShouldMapRepositoryAggregateIntoDto()
     {
-        var bookRepository = new FakeBookRepository
+        var summaryQueryService = new FakeBookSummaryQueryService
         {
             Summary = new Domain.Models.BookSummarySnapshot(
                 4,
@@ -319,7 +480,7 @@ public class BookFeatureTests
                     new Domain.Models.BookRatingCountSnapshot(9, 2),
                 ])
         };
-        var handler = new GetBookSummaryHandler(bookRepository, new FakeUser());
+        var handler = new GetBookSummaryHandler(summaryQueryService, new FakeUser());
 
         var result = await handler.Handle(new GetBookSummaryQuery("author:Toika"), CancellationToken.None);
 
@@ -405,7 +566,6 @@ public class BookFeatureTests
     {
         public Book? LastBook { get; private set; }
         public bool Saved { get; private set; }
-        public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
 
         public void Seed(Book book)
         {
@@ -419,10 +579,10 @@ public class BookFeatureTests
         }
 
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
-        public Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
         public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
+        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id ? LastBook : null);
         public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
+        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => GetByIdAsync(id, cancellationToken);
         public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
         {
             var normalized = MappingExtensions.NormalizeName(name);
@@ -434,9 +594,6 @@ public class BookFeatureTests
             return Task.FromResult(match ? LastBook : null);
         }
         public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook == null ? 0 : 1);
-        public Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(Summary);
-        public Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy, string? currentSortDirection, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public Task ReplaceEditableCollectionsAsync(
             Guid bookId,
             IEnumerable<BookTitle> titles,
@@ -537,6 +694,16 @@ public class BookFeatureTests
     private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
     {
         public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeBookSummaryQueryService : IBookSummaryQueryService
+    {
+        public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
+
+        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Summary);
+        }
     }
 
     private sealed class FakeAuthorRepository : IAuthorRepository

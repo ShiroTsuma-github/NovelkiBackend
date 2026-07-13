@@ -2,6 +2,7 @@ using Application.Common;
 using Domain.Associations;
 using Domain.Entities;
 using Domain.Repositories;
+using Infrastructure.Contexts;
 using Infrastructure.IntegrationTests.TestSupport;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,45 @@ namespace Infrastructure.IntegrationTests;
 
 public class RepositoryTests
 {
+    private static BookReadQueryService CreateReadQueryService(ApplicationDbContext context)
+    {
+        var criteriaApplier = new BookSearchCriteriaApplier(context);
+        var sortBuilder = new BookSortBuilder(context);
+        var projectionQuery = new BookListProjectionQuery(context, sortBuilder);
+        return new BookReadQueryService(context, criteriaApplier, sortBuilder, projectionQuery);
+    }
+
+    private static BookSummaryQueryService CreateSummaryQueryService(ApplicationDbContext context)
+    {
+        return new BookSummaryQueryService(context, new BookSearchCriteriaApplier(context));
+    }
+
+    private static BookExportQueryService CreateExportQueryService(ApplicationDbContext context)
+    {
+        var criteriaApplier = new BookSearchCriteriaApplier(context);
+        return new BookExportQueryService(context, criteriaApplier, new BookSortBuilder(context));
+    }
+
+    [Fact]
+    public async Task BookCsvDatasetSeeder_ShouldLoadLargeBalancedDataset()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+
+        Assert.True(snapshot.BookCount >= 500);
+        BookCsvDatasetSeeder.AssertBalancedTypeDistribution(snapshot);
+        BookCsvDatasetSeeder.AssertBalancedStatusDistribution(snapshot);
+        Assert.True(snapshot.BooksWithGenres >= snapshot.BookCount * 9 / 10);
+        Assert.True(snapshot.PreservedTaggedBooks > 0);
+        Assert.True(snapshot.PreservedRatedBooks > 0);
+        Assert.True(snapshot.PreservedProgressBooks >= snapshot.BookCount * 9 / 10);
+        Assert.Contains(snapshot.Samples, sample => sample.Tags.Count > 0);
+        Assert.Contains(snapshot.Samples, sample => sample.Rating != null);
+        Assert.Contains(snapshot.Samples, sample => sample.CurrentChapterNumber != null);
+    }
+
     [Fact]
     public async Task BookRepository_ShouldScopeListAndGetByOwner()
     {
@@ -17,16 +57,18 @@ public class RepositoryTests
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("33333333-3333-3333-3333-333333333333");
         context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
-        await TestData.AddBookAsync(context, database.UserId, "Mine");
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
         await TestData.AddBookAsync(context, otherOwnerId, "Other");
         var repository = new BookRepository(context);
+        var queryService = CreateReadQueryService(context);
 
-        var books = (await repository.GetAllAsync(database.UserId, 0, 10, CancellationToken.None)).ToList();
-        var count = await repository.GetCountAsync(database.UserId, CancellationToken.None);
+        var books = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 25, null, null, CancellationToken.None)).ToList();
+        var count = await queryService.GetBookCountAsync(database.UserId, BookSearchCriteria.Empty, CancellationToken.None);
         var otherBook = await repository.GetByNameAsync("Other", database.UserId, Guid.Parse("10000000-0000-0000-0000-000000000001"), CancellationToken.None);
 
-        Assert.Single(books);
-        Assert.Equal(1, count);
+        Assert.Equal(25, books.Count);
+        Assert.Equal(snapshot.BookCount, count);
+        Assert.DoesNotContain(books, book => book.PrimaryTitle == "Other");
         Assert.Null(otherBook);
     }
 
@@ -54,27 +96,63 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldSupportCountsAdminLookupAddDeleteAndProgress()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("66666666-6666-6666-6666-666666666666");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "other-progress", NormalizedUserName = "OTHER-PROGRESS" });
+        await context.SaveChangesAsync();
+        var repository = new BookRepository(context);
+        var book = TestData.Book(database.UserId, "Repository Path");
+        book.TotalChapters = 20;
+
+        await repository.AddAsync(book, CancellationToken.None);
+        await TestData.AddBookAsync(context, otherOwnerId, "Other Owner Path");
+
+        Assert.Equal(1, await repository.GetCountAsync(database.UserId, CancellationToken.None));
+        Assert.Equal(2, await repository.GetCountAsync(CancellationToken.None));
+        Assert.NotNull(await repository.GetByIdAsync(book.Id, CancellationToken.None));
+        Assert.NotNull(await repository.GetForUpdateAsync(book.Id, database.UserId, CancellationToken.None));
+        Assert.NotNull(await repository.GetForUpdateAsync(book.Id, CancellationToken.None));
+        Assert.Equal(20, await repository.GetTotalChaptersAsync(book.Id, database.UserId, CancellationToken.None));
+        Assert.False(await repository.UpdateProgressAsync(Guid.NewGuid(), database.UserId, 1, "1", null, CancellationToken.None));
+        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            repository.UpdateProgressAsync(book.Id, database.UserId, 21, "21", null, CancellationToken.None));
+
+        Assert.True(await repository.UpdateProgressAsync(book.Id, database.UserId, 10, "10", null, CancellationToken.None));
+        Assert.True(await repository.UpdateProgressAsync(book.Id, database.UserId, 10, "10", "note", CancellationToken.None));
+        Assert.Equal(2, await context.BookProgressHistory.CountAsync(history => history.BookId == book.Id));
+        await repository.DeleteAsync(Guid.NewGuid(), database.UserId, CancellationToken.None);
+        await repository.DeleteAsync(book.Id, database.UserId, CancellationToken.None);
+
+        Assert.Equal(0, await repository.GetCountAsync(database.UserId, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchByCustomCriteria()
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var matching = await TestData.AddBookWithRelationsAsync(context, database.UserId);
-        matching.Rating = 9;
-        matching.CurrentChapterNumber = 42;
-        await TestData.AddBookAsync(context, database.UserId, "Unrelated Title");
-        await context.SaveChangesAsync();
-        var repository = new BookRepository(context);
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var sample = snapshot.WithTagAndRating;
+        var queryService = CreateReadQueryService(context);
         var criteria = new BookSearchCriteria(
-            new[] { "returnee" },
-            new[] { new BookSearchFieldFilter(BookSearchField.Tag, "favorite"), new BookSearchFieldFilter(BookSearchField.Author, "toi") },
-            new[] { new BookSearchNumberFilter(BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, 8) });
+            Array.Empty<string>(),
+            [new BookSearchFieldFilter(BookSearchField.Tag, sample.Tags[0])],
+            [new BookSearchNumberFilter(BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, sample.Rating!.Value)]);
 
-        var books = (await repository.SearchAsync(database.UserId, criteria, 0, 10, CancellationToken.None)).ToList();
-        var count = await repository.GetSearchCountAsync(database.UserId, criteria, CancellationToken.None);
+        var books = (await queryService.GetBooksAsync(database.UserId, criteria, 0, snapshot.BookCount, null, null, CancellationToken.None)).ToList();
+        var count = await queryService.GetBookCountAsync(database.UserId, criteria, CancellationToken.None);
 
-        Assert.Single(books);
-        Assert.Equal(matching.Id, books[0].Id);
-        Assert.Equal(1, count);
+        Assert.NotEmpty(books);
+        Assert.Equal(books.Count, count);
+        Assert.Contains(books, book => book.Id == sample.Id);
+        Assert.All(books, book =>
+        {
+            Assert.True(book.TagsCount > 0);
+            Assert.True(book.Rating >= sample.Rating);
+        });
     }
 
     [Fact]
@@ -82,18 +160,18 @@ public class RepositoryTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var matching = await TestData.AddBookAsync(context, database.UserId, "I Shall Seal the Heavens");
-        await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
-        var repository = new BookRepository(context);
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var sample = snapshot.Any;
+        var queryService = CreateReadQueryService(context);
+        var prefix = sample.PrimaryTitle[..Math.Min(5, sample.PrimaryTitle.Length)];
         var criteria = new BookSearchCriteria(
             Array.Empty<string>(),
-            new[] { new BookSearchFieldFilter(BookSearchField.Title, "i sha*") },
+            [new BookSearchFieldFilter(BookSearchField.Title, $"{prefix}*")],
             Array.Empty<BookSearchNumberFilter>());
 
-        var books = (await repository.SearchAsync(database.UserId, criteria, 0, 10, CancellationToken.None)).ToList();
+        var books = (await queryService.GetBooksAsync(database.UserId, criteria, 0, snapshot.BookCount, null, null, CancellationToken.None)).ToList();
 
-        Assert.Single(books);
-        Assert.Equal(matching.Id, books[0].Id);
+        Assert.Contains(books, book => book.Id == sample.Id);
     }
 
     [Fact]
@@ -101,23 +179,136 @@ public class RepositoryTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var matching = await TestData.AddBookAsync(context, database.UserId, "Long Runner");
-        matching.CurrentChapterNumber = 75;
-        matching.TotalChapters = 150;
-        var tooShort = await TestData.AddBookAsync(context, database.UserId, "Short Runner");
-        tooShort.CurrentChapterNumber = 75;
-        tooShort.TotalChapters = 90;
-        var tooEarly = await TestData.AddBookAsync(context, database.UserId, "Early Runner");
-        tooEarly.CurrentChapterNumber = 20;
-        tooEarly.TotalChapters = 150;
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var sample = snapshot.WithTotalChapters;
+        var queryService = CreateReadQueryService(context);
+        var criteria = BookSearchQueryParser.Parse($"progress:>={sample.CurrentChapterNumber} chapters:>={sample.TotalChapters}");
+
+        var books = (await queryService.GetBooksAsync(database.UserId, criteria, 0, snapshot.BookCount, null, null, CancellationToken.None)).ToList();
+
+        Assert.Contains(books, book => book.Id == sample.Id);
+        Assert.All(books, book =>
+        {
+            Assert.True(book.CurrentChapterNumber >= sample.CurrentChapterNumber);
+            Assert.True(book.TotalChapters >= sample.TotalChapters);
+        });
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var first = snapshot.Any;
+        var tagged = snapshot.WithTag;
+        var queryService = CreateReadQueryService(context);
+        var titleCriteria = new BookSearchCriteria(
+            Array.Empty<string>(),
+            [new BookSearchFieldFilter(BookSearchField.Title, [first.PrimaryTitle, tagged.PrimaryTitle])],
+            Array.Empty<BookSearchNumberFilter>());
+
+        var titleOr = (await queryService.GetBooksAsync(
+            database.UserId,
+            titleCriteria,
+            0,
+            snapshot.BookCount,
+            "title",
+            "asc",
+            CancellationToken.None)).ToList();
+        var relationMatch = (await queryService.GetBooksAsync(
+            database.UserId,
+            new BookSearchCriteria(
+                Array.Empty<string>(),
+                [new BookSearchFieldFilter(BookSearchField.Genre, tagged.Genres[0]), new BookSearchFieldFilter(BookSearchField.Tag, tagged.Tags[0])],
+                Array.Empty<BookSearchNumberFilter>()),
+            0,
+            snapshot.BookCount,
+            null,
+            null,
+            CancellationToken.None)).ToList();
+        var dictionaryMatch = (await queryService.GetBooksAsync(
+            database.UserId,
+            new BookSearchCriteria(
+                Array.Empty<string>(),
+                [new BookSearchFieldFilter(BookSearchField.Status, first.Status), new BookSearchFieldFilter(BookSearchField.Type, first.ContentType)],
+                Array.Empty<BookSearchNumberFilter>()),
+            0,
+            snapshot.BookCount,
+            null,
+            null,
+            CancellationToken.None)).ToList();
+
+        Assert.Contains(titleOr, book => book.Id == first.Id);
+        Assert.Contains(titleOr, book => book.Id == tagged.Id);
+        Assert.Contains(relationMatch, book => book.Id == tagged.Id);
+        Assert.All(relationMatch, book =>
+        {
+            Assert.True(book.GenresCount > 0);
+            Assert.True(book.TagsCount > 0);
+        });
+        Assert.Contains(dictionaryMatch, book => book.Id == first.Id);
+        Assert.All(dictionaryMatch, book =>
+        {
+            Assert.Equal(first.Status, book.Status);
+            Assert.Equal(first.ContentType, book.ContentType);
+        });
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldApplyAllNumericSearchOperators()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var low = await TestData.AddBookAsync(context, database.UserId, "Low");
+        low.Rating = 3;
+        low.Priority = 1;
+        low.CurrentChapterNumber = 10;
+        low.TotalChapters = 50;
+        var mid = await TestData.AddBookAsync(context, database.UserId, "Mid");
+        mid.Rating = 5;
+        mid.Priority = 2;
+        mid.CurrentChapterNumber = 20;
+        mid.TotalChapters = 100;
+        var high = await TestData.AddBookAsync(context, database.UserId, "High");
+        high.Rating = 8;
+        high.Priority = 4;
+        high.CurrentChapterNumber = 40;
+        high.TotalChapters = 200;
+        var unknown = await TestData.AddBookAsync(context, database.UserId, "Unknown");
+        unknown.Rating = null;
+        unknown.Priority = null;
+        unknown.CurrentChapterNumber = null;
+        unknown.TotalChapters = null;
         await context.SaveChangesAsync();
-        var repository = new BookRepository(context);
-        var criteria = BookSearchQueryParser.Parse("progress:>=50 chapters:>=100");
+        context.ChangeTracker.Clear();
+        var queryService = CreateReadQueryService(context);
 
-        var books = (await repository.SearchAsync(database.UserId, criteria, 0, 10, CancellationToken.None)).ToList();
+        async Task<Guid[]> FindIds(string query)
+        {
+            var books = await queryService.GetBooksAsync(database.UserId, BookSearchQueryParser.Parse(query), 0, 10, "title", "asc", CancellationToken.None);
+            return books.Select(book => book.Id).ToArray();
+        }
 
-        Assert.Single(books);
-        Assert.Equal(matching.Id, books[0].Id);
+        async Task<Guid[]> FindIdsByNumber(BookSearchNumberField field, BookSearchOperator op, decimal value)
+        {
+            var criteria = new BookSearchCriteria(
+                Array.Empty<string>(),
+                Array.Empty<BookSearchFieldFilter>(),
+                [new BookSearchNumberFilter(field, op, value)]);
+            var books = await queryService.GetBooksAsync(database.UserId, criteria, 0, 10, "title", "asc", CancellationToken.None);
+            return books.Select(book => book.Id).ToArray();
+        }
+
+        Assert.Equal([high.Id], await FindIdsByNumber(BookSearchNumberField.Rating, BookSearchOperator.GreaterThan, 5));
+        Assert.Equal([mid.Id], await FindIdsByNumber(BookSearchNumberField.CurrentChapter, BookSearchOperator.Equal, 20));
+        Assert.Equal([low.Id, mid.Id], await FindIdsByNumber(BookSearchNumberField.Rating, BookSearchOperator.LessThanOrEqual, 5));
+        Assert.Equal([low.Id], await FindIdsByNumber(BookSearchNumberField.Priority, BookSearchOperator.LessThan, 2));
+        Assert.Equal([high.Id, mid.Id], await FindIdsByNumber(BookSearchNumberField.Priority, BookSearchOperator.GreaterThanOrEqual, 2));
+        Assert.Equal([high.Id], await FindIdsByNumber(BookSearchNumberField.CurrentChapter, BookSearchOperator.GreaterThan, 20));
+        Assert.Equal([low.Id, mid.Id], await FindIdsByNumber(BookSearchNumberField.CurrentChapter, BookSearchOperator.LessThanOrEqual, 20));
+        Assert.Equal([high.Id], await FindIds("total:>100"));
+        Assert.Equal([low.Id, mid.Id], await FindIds("chapters:<=100"));
     }
 
     [Fact]
@@ -125,21 +316,20 @@ public class RepositoryTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var older = await TestData.AddBookAsync(context, database.UserId, "Older");
-        var newer = await TestData.AddBookAsync(context, database.UserId, "Newer");
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var newer = snapshot.Samples[^1];
         var olderTimestamp = DateTimeOffset.Parse("2026-07-01T10:00:00+00:00");
         var newerTimestamp = DateTimeOffset.Parse("2026-07-02T10:00:00+00:00");
         await context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET LastModified = {olderTimestamp} WHERE Id = {older.Id}");
+            $"UPDATE Books SET LastModified = {olderTimestamp} WHERE OwnerId = {database.UserId}");
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE Books SET LastModified = {newerTimestamp} WHERE Id = {newer.Id}");
         context.ChangeTracker.Clear();
-        var repository = new BookRepository(context);
+        var queryService = CreateReadQueryService(context);
 
-        var books = (await repository.GetAllAsync(database.UserId, 0, 10, CancellationToken.None)).ToList();
+        var books = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, null, null, CancellationToken.None)).ToList();
 
         Assert.Equal(newer.Id, books[0].Id);
-        Assert.Equal(older.Id, books[1].Id);
     }
 
     [Fact]
@@ -154,10 +344,10 @@ public class RepositoryTests
         context.Books.Add(bananaUpper);
         await context.SaveChangesAsync();
         var zebra = await TestData.AddBookAsync(context, database.UserId, "Zebra");
-        var repository = new BookRepository(context);
+        var queryService = CreateReadQueryService(context);
 
-        var ascending = (await repository.GetAllAsync(database.UserId, 0, 10, "title", "asc", CancellationToken.None)).ToList();
-        var descending = (await repository.GetAllAsync(database.UserId, 0, 10, "title", "desc", CancellationToken.None)).ToList();
+        var ascending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+        var descending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "title", "desc", CancellationToken.None)).ToList();
 
         Assert.Equal([apple.Id, bananaUpper.Id, bananaLower.Id, zebra.Id], ascending.Select(book => book.Id));
         Assert.Equal([zebra.Id, bananaLower.Id, bananaUpper.Id, apple.Id], descending.Select(book => book.Id));
@@ -168,19 +358,59 @@ public class RepositoryTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var shortBook = await TestData.AddBookAsync(context, database.UserId, "Short");
-        var longBook = await TestData.AddBookAsync(context, database.UserId, "Long");
-        shortBook.TotalChapters = 20;
-        longBook.TotalChapters = 200;
-        await context.SaveChangesAsync();
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var queryService = CreateReadQueryService(context);
+        var criteria = BookSearchQueryParser.Parse("chapters:>=0");
+
+        var ascending = (await queryService.GetBooksAsync(database.UserId, criteria, 0, snapshot.BookCount, "chapters", "asc", CancellationToken.None)).ToList();
+        var descending = (await queryService.GetBooksAsync(database.UserId, criteria, 0, snapshot.BookCount, "chapters", "desc", CancellationToken.None)).ToList();
+        var expectedAscending = snapshot.Samples
+            .Where(sample => sample.TotalChapters != null)
+            .OrderBy(sample => sample.TotalChapters)
+            .ThenBy(sample => sample.PrimaryTitle)
+            .Select(sample => sample.Id)
+            .ToArray();
+        var expectedDescending = snapshot.Samples
+            .Where(sample => sample.TotalChapters != null)
+            .OrderByDescending(sample => sample.TotalChapters)
+            .ThenBy(sample => sample.PrimaryTitle)
+            .Select(sample => sample.Id)
+            .ToArray();
+
+        Assert.Equal(expectedAscending, ascending.Select(book => book.Id));
+        Assert.Equal(expectedDescending, descending.Select(book => book.Id));
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSortByNumericOwnerAndDateFields()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "other-sort", NormalizedUserName = "OTHER-SORT" });
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var other = await TestData.AddBookAsync(context, otherOwnerId, "Other");
+        var oldest = snapshot.Samples[^1];
+        await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE Books SET Created = {DateTimeOffset.Parse("2026-07-02T00:00:00+00:00")} WHERE OwnerId = {database.UserId}");
+        await context.Database.ExecuteSqlInterpolatedAsync($"UPDATE Books SET Created = {DateTimeOffset.Parse("2026-07-01T00:00:00+00:00")} WHERE Id = {oldest.Id}");
         context.ChangeTracker.Clear();
-        var repository = new BookRepository(context);
+        var queryService = CreateReadQueryService(context);
+        var ratingCriteria = BookSearchQueryParser.Parse("rating:>=0");
 
-        var ascending = (await repository.GetAllAsync(database.UserId, 0, 10, "chapters", "asc", CancellationToken.None)).ToList();
-        var descending = (await repository.GetAllAsync(database.UserId, 0, 10, "chapters", "desc", CancellationToken.None)).ToList();
+        var ratingAsc = (await queryService.GetBooksAsync(database.UserId, ratingCriteria, 0, 10, "rating", "asc", CancellationToken.None)).ToList();
+        var ratingDesc = (await queryService.GetBooksAsync(database.UserId, ratingCriteria, 0, 10, "rating", "desc", CancellationToken.None)).ToList();
+        var priorityAsc = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "priority", "asc", CancellationToken.None)).ToList();
+        var progressDesc = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "progress", "desc", CancellationToken.None)).ToList();
+        var createdAsc = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "created", "asc", CancellationToken.None)).ToList();
+        var ownerDesc = (await queryService.GetAdminBooksAsync(BookSearchCriteria.Empty, 0, 10, "owner", "desc", CancellationToken.None)).ToList();
 
-        Assert.Equal([shortBook.Id, longBook.Id], ascending.Select(book => book.Id));
-        Assert.Equal([longBook.Id, shortBook.Id], descending.Select(book => book.Id));
+        Assert.Equal(snapshot.Samples.Where(sample => sample.Rating != null).Min(sample => sample.Rating), ratingAsc[0].Rating);
+        Assert.Equal(snapshot.Samples.Where(sample => sample.Rating != null).Max(sample => sample.Rating), ratingDesc[0].Rating);
+        Assert.Null(priorityAsc[0].Priority);
+        Assert.Equal(snapshot.Samples.Max(sample => sample.CurrentChapterNumber), progressDesc[0].CurrentChapterNumber);
+        Assert.Equal(oldest.Id, createdAsc[0].Id);
+        Assert.Equal(otherOwnerId, ownerDesc[0].OwnerId);
+        Assert.Contains(ownerDesc, book => book.Id == other.Id);
     }
 
     [Fact]
@@ -199,16 +429,16 @@ public class RepositoryTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var repository = new BookRepository(context);
+        var queryService = CreateReadQueryService(context);
         const string novelTypeName = "Novel";
         const string mangaTypeName = "Manga";
         const string readingStatusName = "Reading";
         const string completedStatusName = "Completed";
 
-        var typeAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "type", novelTypeName, CancellationToken.None)).ToList();
-        var typeRotated = (await repository.GetAllAsync(database.UserId, 0, 10, "type", mangaTypeName, CancellationToken.None)).ToList();
-        var statusAscending = (await repository.GetAllAsync(database.UserId, 0, 10, "status", readingStatusName, CancellationToken.None)).ToList();
-        var statusRotated = (await repository.GetAllAsync(database.UserId, 0, 10, "status", completedStatusName, CancellationToken.None)).ToList();
+        var typeAscending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "type", novelTypeName, CancellationToken.None)).ToList();
+        var typeRotated = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "type", mangaTypeName, CancellationToken.None)).ToList();
+        var statusAscending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "status", readingStatusName, CancellationToken.None)).ToList();
+        var statusRotated = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "status", completedStatusName, CancellationToken.None)).ToList();
 
         Assert.Equal([novelReading.Id, mangaCompleted.Id, manhwaPlanToRead.Id], typeAscending.Select(book => book.Id));
         Assert.Equal([mangaCompleted.Id, manhwaPlanToRead.Id, novelReading.Id], typeRotated.Select(book => book.Id));
@@ -228,12 +458,12 @@ public class RepositoryTests
         mangaCompleted.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
         await context.SaveChangesAsync();
 
-        var repository = new BookRepository(context);
+        var queryService = CreateReadQueryService(context);
         const string missingTypeName = "Manhwa";
         const string missingStatusName = "Plan To Read";
 
-        var nextType = await repository.GetNextCycleSortDirectionAsync(database.UserId, BookSearchCriteria.Empty, "type", missingTypeName, CancellationToken.None);
-        var nextStatus = await repository.GetNextCycleSortDirectionAsync(database.UserId, BookSearchCriteria.Empty, "status", missingStatusName, CancellationToken.None);
+        var nextType = await queryService.GetNextCycleSortDirectionAsync(database.UserId, BookSearchCriteria.Empty, "type", missingTypeName, CancellationToken.None);
+        var nextStatus = await queryService.GetNextCycleSortDirectionAsync(database.UserId, BookSearchCriteria.Empty, "status", missingStatusName, CancellationToken.None);
 
         Assert.Equal("Novel", nextType);
         Assert.Equal("Reading", nextStatus);
@@ -244,36 +474,39 @@ public class RepositoryTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var reading = await TestData.AddBookAsync(context, database.UserId, "Reading Rated");
-        var completed = await TestData.AddBookAsync(context, database.UserId, "Completed Rated");
-        var unrated = await TestData.AddBookAsync(context, database.UserId, "Reading Unrated");
+        await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
 
-        reading.Rating = 9;
-        completed.Rating = 7;
-        completed.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
-        unrated.Rating = null;
-        await context.SaveChangesAsync();
-        context.ChangeTracker.Clear();
-
-        var repository = new BookRepository(context);
+        var queryService = CreateSummaryQueryService(context);
         var criteria = new BookSearchCriteria(
             Array.Empty<string>(),
             Array.Empty<BookSearchFieldFilter>(),
             [new BookSearchNumberFilter(BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, 1)]);
 
-        var summary = await repository.GetSummaryAsync(database.UserId, criteria, CancellationToken.None);
+        var summary = await queryService.GetSummaryAsync(database.UserId, criteria, CancellationToken.None);
+        var expectedBooks = await context.Books
+            .AsNoTracking()
+            .Include(book => book.Status)
+            .Include(book => book.ContentType)
+            .Include(book => book.BookGenres)
+                .ThenInclude(bookGenre => bookGenre.Genre)
+            .Where(book => book.OwnerId == database.UserId && book.Rating >= 1)
+            .ToListAsync();
 
-        Assert.Equal(2, summary.TotalBooks);
-        Assert.Equal(2, summary.RatedBooks);
-        Assert.Equal(8.0, summary.AverageRating);
-        Assert.Equal(0, summary.CurrentChapters);
-        Assert.Equal(0, summary.BooksWithKnownCurrentChapter);
-        Assert.Equal(["Completed", "Reading"], summary.StatusCounts.Select(item => item.Status));
-        Assert.Equal([1, 1], summary.StatusCounts.Select(item => item.Count));
-        Assert.Equal("Novel", summary.TypeCounts[0].Type);
-        Assert.Equal(2, summary.TypeCounts[0].BookCount);
-        Assert.Empty(summary.GenreCounts);
-        Assert.Equal([7, 9], summary.RatingCounts.Select(item => item.Rating));
+        Assert.Equal(expectedBooks.Count, summary.TotalBooks);
+        Assert.Equal(expectedBooks.Count(book => book.Rating != null), summary.RatedBooks);
+        Assert.Equal(expectedBooks.Average(book => book.Rating), summary.AverageRating);
+        Assert.Equal(expectedBooks.Sum(book => book.CurrentChapterNumber ?? 0), summary.CurrentChapters);
+        Assert.Equal(expectedBooks.Count(book => book.CurrentChapterNumber != null), summary.BooksWithKnownCurrentChapter);
+        Assert.Equal(
+            expectedBooks.GroupBy(book => book.Status.Name).OrderByDescending(group => group.Count()).ThenBy(group => group.Key).Select(group => group.Key),
+            summary.StatusCounts.Select(item => item.Status));
+        Assert.Equal(
+            expectedBooks.GroupBy(book => book.ContentType.Name).OrderByDescending(group => group.Count()).ThenBy(group => group.Key).Select(group => group.Key),
+            summary.TypeCounts.Select(item => item.Type));
+        Assert.NotEmpty(summary.GenreCounts);
+        Assert.Equal(
+            expectedBooks.Where(book => book.Rating != null).GroupBy(book => book.Rating!.Value).OrderBy(group => group.Key).Select(group => group.Key),
+            summary.RatingCounts.Select(item => item.Rating));
     }
 
     [Fact]
@@ -289,15 +522,15 @@ public class RepositoryTests
             NormalizedUserName = "OTHER-ADMIN-SEARCH"
         });
 
-        var firstMatch = await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
-        var secondMatch = await TestData.AddBookAsync(context, otherOwnerId, "Lord of the Secrets");
-        await TestData.AddBookAsync(context, database.UserId, "Shadow Slave");
-        var repository = new BookRepository(context);
-        var criteria = BookSearchQueryParser.Parse("title:Lord");
+        await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var firstMatch = await TestData.AddBookAsync(context, database.UserId, "AAAA Admin Dataset Match");
+        var secondMatch = await TestData.AddBookAsync(context, otherOwnerId, "AAAB Admin Dataset Match");
+        var queryService = CreateReadQueryService(context);
+        var criteria = BookSearchQueryParser.Parse("title:\"Admin Dataset Match\"");
 
-        var firstPage = (await repository.SearchAdminListAsync(criteria, 0, 1, "title", "asc", CancellationToken.None)).ToList();
-        var secondPage = (await repository.SearchAdminListAsync(criteria, 1, 1, "title", "asc", CancellationToken.None)).ToList();
-        var count = await repository.GetSearchCountAsync(criteria, CancellationToken.None);
+        var firstPage = (await queryService.GetAdminBooksAsync(criteria, 0, 1, "title", "asc", CancellationToken.None)).ToList();
+        var secondPage = (await queryService.GetAdminBooksAsync(criteria, 1, 1, "title", "asc", CancellationToken.None)).ToList();
+        var count = await queryService.GetAdminBookCountAsync(criteria, CancellationToken.None);
 
         Assert.Equal(2, count);
         Assert.Single(firstPage);
@@ -307,19 +540,106 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldProjectUserAndAdminListsWithSharedBookFields()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var sample = snapshot.WithNotes;
+        const string sentinelTitle = "CSV Projection Sentinel";
+        var book = await context.Books
+            .Include(book => book.Cover)
+            .Include(book => book.Titles)
+            .FirstAsync(book => book.Id == sample.Id);
+        book.PrimaryTitle = sentinelTitle;
+        book.NormalizedPrimaryTitle = MappingExtensions.NormalizeName(sentinelTitle);
+        var primaryTitle = book.Titles.Single(title => title.IsPrimary);
+        primaryTitle.Title = sentinelTitle;
+        primaryTitle.NormalizedTitle = MappingExtensions.NormalizeName(sentinelTitle);
+        book.Description = new string('d', 100);
+        book.Notes = new string('n', 100);
+        book.Cover!.ThumbnailStoragePath = "11111111111111111111111111111111/example.thumb.jpg";
+        book.Cover.StoragePath = "11111111111111111111111111111111/example.jpg";
+        book.Cover.Status = BookCoverStatus.Found;
+        book.Cover.ThumbnailMimeType = "image/jpeg";
+        book.Cover.LastAttemptAt = DateTimeOffset.Parse("2026-07-13T10:15:30+00:00");
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var queryService = CreateReadQueryService(context);
+        var criteria = new BookSearchCriteria(
+            Array.Empty<string>(),
+            [new BookSearchFieldFilter(BookSearchField.Title, sentinelTitle)],
+            Array.Empty<BookSearchNumberFilter>());
+
+        var userList = (await queryService.GetBooksAsync(database.UserId, criteria, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+        var adminList = (await queryService.GetAdminBooksAsync(criteria, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+
+        var userItem = Assert.Single(userList);
+        var adminItem = Assert.Single(adminList);
+        Assert.Equal(userItem.Id, adminItem.Id);
+        Assert.Equal(userItem.PrimaryTitle, adminItem.PrimaryTitle);
+        Assert.Equal(userItem.Description, adminItem.Description);
+        Assert.Equal(userItem.Notes, adminItem.Notes);
+        Assert.Equal(userItem.AlternativeTitles, adminItem.AlternativeTitles);
+        Assert.Equal(userItem.Genres, adminItem.Genres);
+        Assert.Equal(userItem.Tags, adminItem.Tags);
+        Assert.Equal(userItem.Cover!.ImageUrl, adminItem.Cover!.ImageUrl);
+        Assert.Equal(userItem.Cover.ThumbnailImageUrl, adminItem.Cover.ThumbnailImageUrl);
+        Assert.Contains($"/api/v1/book/{book.Id}/cover/file?v=", userItem.Cover.ImageUrl);
+        Assert.Contains($"/api/v1/book/{book.Id}/cover/thumbnail?v=", userItem.Cover.ThumbnailImageUrl);
+        Assert.Equal(database.UserId, adminItem.OwnerId);
+        Assert.False(string.IsNullOrWhiteSpace(adminItem.OwnerUsername));
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldReturnNoAdminSearchResultsForMissingQuery()
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
-        var repository = new BookRepository(context);
-        var criteria = BookSearchQueryParser.Parse("title:Missing");
+        await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var queryService = CreateReadQueryService(context);
+        var criteria = BookSearchQueryParser.Parse("title:__missing_csv_dataset_query__");
 
-        var results = (await repository.SearchAdminListAsync(criteria, 0, 10, "title", "asc", CancellationToken.None)).ToList();
-        var count = await repository.GetSearchCountAsync(criteria, CancellationToken.None);
+        var results = (await queryService.GetAdminBooksAsync(criteria, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+        var count = await queryService.GetAdminBookCountAsync(criteria, CancellationToken.None);
 
         Assert.Empty(results);
         Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task BookExportQueryService_ShouldReturnFilteredSortedDetailedDtos()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
+        var sample = snapshot.WithTagAndRating;
+        const string sentinelTitle = "CSV Export Sentinel";
+        var matching = await context.Books
+            .Include(book => book.Titles)
+            .FirstAsync(book => book.Id == sample.Id);
+        matching.PrimaryTitle = sentinelTitle;
+        matching.NormalizedPrimaryTitle = MappingExtensions.NormalizeName(sentinelTitle);
+        var primaryTitle = matching.Titles.Single(title => title.IsPrimary);
+        primaryTitle.Title = sentinelTitle;
+        primaryTitle.NormalizedTitle = MappingExtensions.NormalizeName(sentinelTitle);
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var queryService = CreateExportQueryService(context);
+        var criteria = new BookSearchCriteria(
+            Array.Empty<string>(),
+            [new BookSearchFieldFilter(BookSearchField.Title, sentinelTitle), new BookSearchFieldFilter(BookSearchField.Tag, sample.Tags[0])],
+            [new BookSearchNumberFilter(BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, sample.Rating!.Value)]);
+
+        var result = await queryService.GetBooksForExportAsync(database.UserId, criteria, 0, 10, "title", "asc", CancellationToken.None);
+
+        var book = Assert.Single(result.Data);
+        Assert.Equal(1, result.Total);
+        Assert.Equal(sentinelTitle, book.PrimaryTitle);
+        Assert.Equal(sample.Notes, book.Notes);
+        Assert.Equal(sample.CurrentChapterNumber, book.CurrentChapterNumber);
+        Assert.Contains(sample.Tags[0], book.Tags);
+        Assert.NotNull(book.Cover);
     }
 
     [Fact]

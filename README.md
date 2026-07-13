@@ -281,12 +281,20 @@ Uruchomienie:
 dotnet test NovelkiBackend.sln -c Release --no-restore
 ```
 
+Raport coverage z HTML:
+
+```powershell
+.\tools\coverage.ps1
+```
+
+Skrypt uruchamia testy z `coverage.runsettings`, generuje HTML w `artifacts/coverage/html/index.html` i zapisuje krotki raport najnizszego pokrycia w `artifacts/coverage/least-covered-files.txt`.
+
 Struktura:
 
 - `Application.UnitTests` - szybkie testy jednostkowe bez bazy: walidatory account, flow handlerow `Genre`, tworzenie ksiazki z aliasami tytulow/autorem/tagami/linkami/progresem, update progresu, autocomplete autorow i tagow, mapowania DTO.
 - `Infrastructure.IntegrationTests` - SQLite in-memory z prawdziwym EF Core: seed slownikow systemowych, audit fields, unikalnosc autorow/tagow, multi-tenant scope tagow i ksiazek, kaskady, restrict FK autora, eager loading repozytorium ksiazek, wyszukiwanie aliasow autora, paginacja/count gatunkow.
 
-Stan po ostatniej weryfikacji: 27 testow, wszystkie zielone (`15` unit + `12` integration). Kazdy nowy feature powinien miec test jednostkowy albo integracyjny; dla zachowan zaleznych od EF/relacji uzywamy SQLite in-memory zamiast providera `InMemory`.
+Stan po ostatniej weryfikacji: 238 testow, wszystkie zielone (`164` unit + `74` integration). Kazdy nowy feature powinien miec test jednostkowy albo integracyjny; dla zachowan zaleznych od EF/relacji uzywamy SQLite in-memory zamiast providera `InMemory`.
 
 ## Znane miejsca wymagajace uwagi
 
