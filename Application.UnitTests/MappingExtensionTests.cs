@@ -97,54 +97,6 @@ public class MappingExtensionTests
     }
 
     [Fact]
-    public void BookToListItemDto_ShouldMapPreviewCollectionsAndCounts()
-    {
-        var book = new Book
-        {
-            Created = DateTimeOffset.Parse("2026-07-01T10:00:00Z"),
-            LastModified = DateTimeOffset.Parse("2026-07-02T10:00:00Z"),
-            PrimaryTitle = "Everyone Else is a Returnee",
-            NormalizedPrimaryTitle = "EVERYONE ELSE IS A RETURNEE",
-            Description = new string('a', 120),
-            Notes = new string('b', 120),
-            ContentType = new ContentType { Name = "Novel", Slug = "novel" },
-            Status = new Status { Name = "Reading", Slug = "reading" }
-        };
-        book.Titles.Add("Everyone Else is a Returnee".ToPrimaryTitle());
-        foreach (var title in new[] { "Alt 1", "Alt 2", "Alt 3", "Alt 4", "Alt 5" })
-        {
-            book.Titles.Add(new BookTitle { Title = title, NormalizedTitle = title.ToUpperInvariant() });
-        }
-
-        foreach (var genreName in new[] { "Fantasy", "Drama", "Action", "Adventure", "Comedy" })
-        {
-            book.BookGenres.Add(new BookGenre { Book = book, Genre = new Genre { Name = genreName, NormalizedName = genreName.ToUpperInvariant() } });
-        }
-
-        foreach (var tagName in new[] { "favorite", "slow-burn", "portal", "funny", "long" })
-        {
-            book.BookTags.Add(new BookTag { Book = book, Tag = new Tag { OwnerId = Guid.NewGuid(), Name = tagName, NormalizedName = tagName.ToUpperInvariant() } });
-        }
-
-        book.Links.Add(new BookLink { Url = "https://example.com/1", SourceType = "Primary" });
-        book.Links.Add(new BookLink { Url = "https://example.com/2", SourceType = "Mirror" });
-
-        var dto = book.ToListItemDto();
-
-        Assert.Equal(4, dto.AlternativeTitles.Count);
-        Assert.Equal(5, dto.AlternativeTitlesCount);
-        Assert.Equal(4, dto.Genres.Count);
-        Assert.Equal(5, dto.GenresCount);
-        Assert.Equal(4, dto.Tags.Count);
-        Assert.Equal(5, dto.TagsCount);
-        Assert.Equal(2, dto.LinksCount);
-        Assert.Equal(80, dto.Description!.Length);
-        Assert.EndsWith("...", dto.Description);
-        Assert.Equal(80, dto.Notes!.Length);
-        Assert.EndsWith("...", dto.Notes);
-    }
-
-    [Fact]
     public void AuthorToDto_ShouldMapAliases()
     {
         var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };

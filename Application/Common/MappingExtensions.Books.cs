@@ -7,161 +7,23 @@ public static partial class MappingExtensions
 {
     public static BookDto ToDto(this Book source)
     {
-        return new BookDto
+        return MapBookDto(source, new BookDto
         {
-            Id = source.Id,
-            Created = source.Created,
-            LastModified = source.LastModified,
             PrimaryTitle = source.PrimaryTitle,
-            Description = source.Description,
-            AlternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList(),
-            AuthorId = source.AuthorId,
-            Author = source.Author?.PrimaryName,
             ContentType = source.ContentType.Name,
-            Status = source.Status.Name,
-            CurrentChapterNumber = source.CurrentChapterNumber,
-            CurrentChapterLabel = source.CurrentChapterLabel,
-            TotalChapters = source.TotalChapters,
-            Rating = source.Rating,
-            Priority = source.Priority,
-            Notes = source.Notes,
-            ProgressHistory = source.ProgressHistory
-                .OrderByDescending(h => h.ChangedAt)
-                .Select(h => new BookProgressHistoryDto
-                {
-                    Id = h.Id,
-                    ChangedAt = h.ChangedAt,
-                    ChapterNumber = h.ChapterNumber,
-                    ChapterLabel = h.ChapterLabel,
-                    Comment = h.Comment
-                })
-                .ToList(),
-            Cover = source.Cover?.ToDto(source.Id),
-            Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
-            Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
-            Links = source.Links.Select(l => new BookLinkDto
-            {
-                Id = l.Id,
-                Url = l.Url,
-                Label = l.Label,
-                SourceType = l.SourceType,
-                IsPrimary = l.IsPrimary,
-                LastReadHere = l.LastReadHere
-            }).ToList()
-        };
-    }
-
-    public static BookListItemDto ToListItemDto(this Book source)
-    {
-        var alternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList();
-        var genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList();
-        var tags = source.BookTags.Select(bt => bt.Tag.Name).ToList();
-
-        return new BookListItemDto
-        {
-            Id = source.Id,
-            Created = source.Created,
-            LastModified = source.LastModified,
-            PrimaryTitle = source.PrimaryTitle,
-            Description = CreateExcerpt(source.Description),
-            AlternativeTitles = alternativeTitles.Take(4).ToList(),
-            AlternativeTitlesCount = alternativeTitles.Count,
-            Author = source.Author?.PrimaryName,
-            ContentType = source.ContentType.Name,
-            Status = source.Status.Name,
-            CurrentChapterNumber = source.CurrentChapterNumber,
-            CurrentChapterLabel = source.CurrentChapterLabel,
-            TotalChapters = source.TotalChapters,
-            Rating = source.Rating,
-            Priority = source.Priority,
-            Notes = CreateExcerpt(source.Notes),
-            Cover = source.Cover?.ToDto(source.Id),
-            Genres = genres.Take(4).ToList(),
-            GenresCount = genres.Count,
-            Tags = tags.Take(4).ToList(),
-            TagsCount = tags.Count,
-            LinksCount = source.Links.Count
-        };
+            Status = source.Status.Name
+        });
     }
 
     public static AdminBookDto ToAdminDto(this Book source)
     {
-        return new AdminBookDto
+        return MapBookDto(source, new AdminBookDto
         {
-            Id = source.Id,
-            Created = source.Created,
-            LastModified = source.LastModified,
             OwnerId = source.OwnerId,
             PrimaryTitle = source.PrimaryTitle,
-            Description = source.Description,
-            AlternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList(),
-            AuthorId = source.AuthorId,
-            Author = source.Author?.PrimaryName,
             ContentType = source.ContentType.Name,
-            Status = source.Status.Name,
-            CurrentChapterNumber = source.CurrentChapterNumber,
-            CurrentChapterLabel = source.CurrentChapterLabel,
-            TotalChapters = source.TotalChapters,
-            Rating = source.Rating,
-            Priority = source.Priority,
-            Notes = source.Notes,
-            ProgressHistory = source.ProgressHistory
-                .OrderByDescending(h => h.ChangedAt)
-                .Select(h => new BookProgressHistoryDto
-                {
-                    Id = h.Id,
-                    ChangedAt = h.ChangedAt,
-                    ChapterNumber = h.ChapterNumber,
-                    ChapterLabel = h.ChapterLabel,
-                    Comment = h.Comment
-                })
-                .ToList(),
-            Cover = source.Cover?.ToDto(source.Id),
-            Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList(),
-            Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList(),
-            Links = source.Links.Select(l => new BookLinkDto
-            {
-                Id = l.Id,
-                Url = l.Url,
-                Label = l.Label,
-                SourceType = l.SourceType,
-                IsPrimary = l.IsPrimary,
-                LastReadHere = l.LastReadHere
-            }).ToList()
-        };
-    }
-
-    public static AdminBookListItemDto ToAdminListItemDto(this Book source, string? ownerUsername, string? ownerEmail)
-    {
-        var dto = source.ToListItemDto();
-        return new AdminBookListItemDto
-        {
-            Id = dto.Id,
-            Created = dto.Created,
-            LastModified = dto.LastModified,
-            PrimaryTitle = dto.PrimaryTitle,
-            Description = dto.Description,
-            AlternativeTitles = dto.AlternativeTitles,
-            AlternativeTitlesCount = dto.AlternativeTitlesCount,
-            Author = dto.Author,
-            ContentType = dto.ContentType,
-            Status = dto.Status,
-            CurrentChapterNumber = dto.CurrentChapterNumber,
-            CurrentChapterLabel = dto.CurrentChapterLabel,
-            TotalChapters = dto.TotalChapters,
-            Rating = dto.Rating,
-            Priority = dto.Priority,
-            Notes = dto.Notes,
-            Cover = dto.Cover,
-            Genres = dto.Genres,
-            GenresCount = dto.GenresCount,
-            Tags = dto.Tags,
-            TagsCount = dto.TagsCount,
-            LinksCount = dto.LinksCount,
-            OwnerId = source.OwnerId,
-            OwnerUsername = ownerUsername,
-            OwnerEmail = ownerEmail
-        };
+            Status = source.Status.Name
+        });
     }
 
     public static BookTitle ToPrimaryTitle(this string title)
@@ -201,14 +63,49 @@ public static partial class MappingExtensions
         };
     }
 
-    private static string? CreateExcerpt(string? value)
+    private static TBookDto MapBookDto<TBookDto>(Book source, TBookDto destination)
+        where TBookDto : BookDto
     {
-        if (string.IsNullOrWhiteSpace(value))
+        destination.Id = source.Id;
+        destination.Created = source.Created;
+        destination.LastModified = source.LastModified;
+        destination.PrimaryTitle = source.PrimaryTitle;
+        destination.Description = source.Description;
+        destination.AlternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList();
+        destination.AuthorId = source.AuthorId;
+        destination.Author = source.Author?.PrimaryName;
+        destination.ContentType = source.ContentType.Name;
+        destination.Status = source.Status.Name;
+        destination.CurrentChapterNumber = source.CurrentChapterNumber;
+        destination.CurrentChapterLabel = source.CurrentChapterLabel;
+        destination.TotalChapters = source.TotalChapters;
+        destination.Rating = source.Rating;
+        destination.Priority = source.Priority;
+        destination.Notes = source.Notes;
+        destination.ProgressHistory = source.ProgressHistory
+            .OrderByDescending(h => h.ChangedAt)
+            .Select(h => new BookProgressHistoryDto
+            {
+                Id = h.Id,
+                ChangedAt = h.ChangedAt,
+                ChapterNumber = h.ChapterNumber,
+                ChapterLabel = h.ChapterLabel,
+                Comment = h.Comment
+            })
+            .ToList();
+        destination.Cover = source.Cover?.ToDto(source.Id);
+        destination.Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList();
+        destination.Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList();
+        destination.Links = source.Links.Select(l => new BookLinkDto
         {
-            return value;
-        }
+            Id = l.Id,
+            Url = l.Url,
+            Label = l.Label,
+            SourceType = l.SourceType,
+            IsPrimary = l.IsPrimary,
+            LastReadHere = l.LastReadHere
+        }).ToList();
 
-        var collapsed = CollapseWhitespace(value);
-        return collapsed.Length > 80 ? $"{collapsed[..77]}..." : collapsed;
+        return destination;
     }
 }

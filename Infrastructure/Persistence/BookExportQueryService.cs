@@ -35,13 +35,7 @@ public sealed class BookExportQueryService : IBookExportQueryService
         var books = await _sortBuilder.ToSortedPageAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
         var total = await ApplyCriteria(_context.Books.Where(book => book.OwnerId == ownerId), criteria).CountAsync(cancellationToken);
 
-        return new PaginatedResult<BookDto>
-        {
-            Skip = skip,
-            Take = take,
-            Total = total,
-            Data = books.Select(book => book.ToDto()).ToList()
-        };
+        return PaginatedResult<BookDto>.Create(skip, take, total, books.Select(book => book.ToDto()));
     }
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
