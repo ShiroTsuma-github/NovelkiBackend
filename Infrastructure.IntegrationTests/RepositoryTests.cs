@@ -2,6 +2,7 @@ using Application.Common;
 using Domain.Associations;
 using Domain.Entities;
 using Domain.Repositories;
+using Infrastructure.Contexts;
 using Infrastructure.IntegrationTests.TestSupport;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -10,6 +11,19 @@ namespace Infrastructure.IntegrationTests;
 
 public class RepositoryTests
 {
+    private static BookReadQueryService CreateReadQueryService(ApplicationDbContext context)
+    {
+        var criteriaApplier = new BookSearchCriteriaApplier(context);
+        var sortBuilder = new BookSortBuilder(context);
+        var projectionQuery = new BookListProjectionQuery(context, sortBuilder);
+        return new BookReadQueryService(context, criteriaApplier, sortBuilder, projectionQuery);
+    }
+
+    private static BookSummaryQueryService CreateSummaryQueryService(ApplicationDbContext context)
+    {
+        return new BookSummaryQueryService(context, new BookSearchCriteriaApplier(context));
+    }
+
     [Fact]
     public async Task BookRepository_ShouldScopeListAndGetByOwner()
     {
@@ -20,7 +34,7 @@ public class RepositoryTests
         await TestData.AddBookAsync(context, database.UserId, "Mine");
         await TestData.AddBookAsync(context, otherOwnerId, "Other");
         var repository = new BookRepository(context);
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
 
         var books = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, null, null, CancellationToken.None)).ToList();
         var count = await queryService.GetBookCountAsync(database.UserId, BookSearchCriteria.Empty, CancellationToken.None);
@@ -64,7 +78,7 @@ public class RepositoryTests
         matching.CurrentChapterNumber = 42;
         await TestData.AddBookAsync(context, database.UserId, "Unrelated Title");
         await context.SaveChangesAsync();
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         var criteria = new BookSearchCriteria(
             new[] { "returnee" },
             new[] { new BookSearchFieldFilter(BookSearchField.Tag, "favorite"), new BookSearchFieldFilter(BookSearchField.Author, "toi") },
@@ -85,7 +99,7 @@ public class RepositoryTests
         await using var context = database.CreateContext();
         var matching = await TestData.AddBookAsync(context, database.UserId, "I Shall Seal the Heavens");
         await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         var criteria = new BookSearchCriteria(
             Array.Empty<string>(),
             new[] { new BookSearchFieldFilter(BookSearchField.Title, "i sha*") },
@@ -112,7 +126,7 @@ public class RepositoryTests
         tooEarly.CurrentChapterNumber = 20;
         tooEarly.TotalChapters = 150;
         await context.SaveChangesAsync();
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         var criteria = BookSearchQueryParser.Parse("progress:>=50 chapters:>=100");
 
         var books = (await queryService.GetBooksAsync(database.UserId, criteria, 0, 10, null, null, CancellationToken.None)).ToList();
@@ -135,7 +149,7 @@ public class RepositoryTests
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE Books SET LastModified = {newerTimestamp} WHERE Id = {newer.Id}");
         context.ChangeTracker.Clear();
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
 
         var books = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, null, null, CancellationToken.None)).ToList();
 
@@ -155,7 +169,7 @@ public class RepositoryTests
         context.Books.Add(bananaUpper);
         await context.SaveChangesAsync();
         var zebra = await TestData.AddBookAsync(context, database.UserId, "Zebra");
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
 
         var ascending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "title", "asc", CancellationToken.None)).ToList();
         var descending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "title", "desc", CancellationToken.None)).ToList();
@@ -175,7 +189,7 @@ public class RepositoryTests
         longBook.TotalChapters = 200;
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
 
         var ascending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "chapters", "asc", CancellationToken.None)).ToList();
         var descending = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "chapters", "desc", CancellationToken.None)).ToList();
@@ -200,7 +214,7 @@ public class RepositoryTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         const string novelTypeName = "Novel";
         const string mangaTypeName = "Manga";
         const string readingStatusName = "Reading";
@@ -229,7 +243,7 @@ public class RepositoryTests
         mangaCompleted.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
         await context.SaveChangesAsync();
 
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         const string missingTypeName = "Manhwa";
         const string missingStatusName = "Plan To Read";
 
@@ -256,7 +270,7 @@ public class RepositoryTests
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateSummaryQueryService(context);
         var criteria = new BookSearchCriteria(
             Array.Empty<string>(),
             Array.Empty<BookSearchFieldFilter>(),
@@ -293,7 +307,7 @@ public class RepositoryTests
         var firstMatch = await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
         var secondMatch = await TestData.AddBookAsync(context, otherOwnerId, "Lord of the Secrets");
         await TestData.AddBookAsync(context, database.UserId, "Shadow Slave");
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         var criteria = BookSearchQueryParser.Parse("title:Lord");
 
         var firstPage = (await queryService.GetAdminBooksAsync(criteria, 0, 1, "title", "asc", CancellationToken.None)).ToList();
@@ -320,7 +334,7 @@ public class RepositoryTests
         book.Cover.LastAttemptAt = DateTimeOffset.Parse("2026-07-13T10:15:30+00:00");
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
 
         var userList = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, "title", "asc", CancellationToken.None)).ToList();
         var adminList = (await queryService.GetAdminBooksAsync(BookSearchCriteria.Empty, 0, 10, "title", "asc", CancellationToken.None)).ToList();
@@ -348,7 +362,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
-        var queryService = new BookReadQueryService(context);
+        var queryService = CreateReadQueryService(context);
         var criteria = BookSearchQueryParser.Parse("title:Missing");
 
         var results = (await queryService.GetAdminBooksAsync(criteria, 0, 10, "title", "asc", CancellationToken.None)).ToList();
