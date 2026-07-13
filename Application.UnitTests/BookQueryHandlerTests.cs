@@ -2,6 +2,8 @@ using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Common.Models;
 using Application.Features.BookFeatures.Queries.GetBook;
+using Domain.Entities;
+using Domain.Exceptions;
 using Domain.Repositories;
 
 namespace Application.UnitTests;
@@ -76,6 +78,69 @@ public class BookQueryHandlerTests
         Assert.Equal("rating", exportService.SortBy);
         Assert.Equal("desc", exportService.SortDirection);
         Assert.Single(result.Data);
+    }
+
+    [Fact]
+    public async Task GetBook_ShouldReturnMappedBook()
+    {
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Book",
+            NormalizedPrimaryTitle = "BOOK",
+            ContentTypeId = Guid.NewGuid(),
+            ContentType = new ContentType { Id = Guid.NewGuid(), Name = "Novel", Slug = "novel" },
+            StatusId = Guid.NewGuid(),
+            Status = new Status { Id = Guid.NewGuid(), Name = "Reading", Slug = "reading" }
+        };
+        var repository = new FakeSingleBookRepository(book);
+        var handler = new GetBookHandler(repository, new FakeUser());
+
+        var result = await handler.Handle(new GetBookQuery(book.Id), CancellationToken.None);
+
+        Assert.Equal(book.Id, result.Id);
+        Assert.Equal("Book", result.PrimaryTitle);
+    }
+
+    [Fact]
+    public async Task GetBook_ShouldThrowWhenBookDoesNotExist()
+    {
+        var handler = new GetBookHandler(new FakeSingleBookRepository(null), new FakeUser());
+
+        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(() =>
+            handler.Handle(new GetBookQuery(Guid.NewGuid()), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetAdminBook_ShouldReturnMappedAdminBook()
+    {
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Admin Book",
+            NormalizedPrimaryTitle = "ADMIN BOOK",
+            ContentTypeId = Guid.NewGuid(),
+            ContentType = new ContentType { Id = Guid.NewGuid(), Name = "Novel", Slug = "novel" },
+            StatusId = Guid.NewGuid(),
+            Status = new Status { Id = Guid.NewGuid(), Name = "Reading", Slug = "reading" }
+        };
+        var handler = new GetAdminBookHandler(new FakeSingleBookRepository(book));
+
+        var result = await handler.Handle(new GetAdminBookQuery(book.Id), CancellationToken.None);
+
+        Assert.Equal(book.Id, result.Id);
+        Assert.Equal(OwnerId, result.OwnerId);
+    }
+
+    [Fact]
+    public async Task GetAdminBook_ShouldThrowWhenBookDoesNotExist()
+    {
+        var handler = new GetAdminBookHandler(new FakeSingleBookRepository(null));
+
+        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(() =>
+            handler.Handle(new GetAdminBookQuery(Guid.NewGuid()), CancellationToken.None));
     }
 
     private static BookListItemDto ListItem(string title)
@@ -159,5 +224,29 @@ public class BookQueryHandlerTests
             SortDirection = sortDirection;
             return Task.FromResult(PaginatedResult<BookDto>.Create(skip, take, 1, [new BookDto { Id = Guid.NewGuid(), PrimaryTitle = "Export", ContentType = "Novel", Status = "Reading" }]));
         }
+    }
+
+    private sealed class FakeSingleBookRepository : IBookRepository
+    {
+        private readonly Book? _book;
+
+        public FakeSingleBookRepository(Book? book)
+        {
+            _book = book;
+        }
+
+        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(_book?.Id == id && _book.OwnerId == ownerId ? _book : null);
+        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(_book?.Id == id ? _book : null);
+        public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
+        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
+        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(0);
+        public Task<decimal?> GetTotalChaptersAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<decimal?>(null);
+        public Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber, string? currentChapterLabel, string? comment, CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task AddAsync(Book book, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task ReplaceEditableCollectionsAsync(Guid bookId, IEnumerable<BookTitle> titles, IEnumerable<BookLink> links, IEnumerable<Guid> genreIds, IEnumerable<Guid> tagIds, BookProgressHistory? progressHistory, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

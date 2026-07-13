@@ -70,4 +70,32 @@ public class BookSearchQueryParserTests
         Assert.Empty(criteria.Fields);
         Assert.Empty(criteria.Terms);
     }
+
+    [Fact]
+    public void Parse_ShouldReturnEmptyCriteriaForBlankQuery()
+    {
+        var criteria = BookSearchQueryParser.Parse("   ");
+
+        Assert.Same(BookSearchCriteria.Empty, criteria);
+    }
+
+    [Fact]
+    public void Parse_ShouldTreatInvalidFiltersAsTerms()
+    {
+        var criteria = BookSearchQueryParser.Parse("title: rating:bad unknown:value progress:abc");
+
+        Assert.Equal(["title:", "rating:bad", "unknown:value", "progress:abc"], criteria.Terms);
+        Assert.Empty(criteria.Fields);
+        Assert.Empty(criteria.Numbers);
+    }
+
+    [Fact]
+    public void Parse_ShouldContinueFieldValueListAcrossWhitespaceAfterComma()
+    {
+        var criteria = BookSearchQueryParser.Parse("tag:favorite, to-read, 'slow burn'");
+
+        var field = Assert.Single(criteria.Fields);
+        Assert.Equal(BookSearchField.Tag, field.Field);
+        Assert.Equal(["favorite", "to-read", "slow burn"], field.Values);
+    }
 }
