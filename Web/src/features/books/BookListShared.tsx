@@ -31,9 +31,8 @@ export function useBookListUrlState(
 
   function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
-    const normalizedValue = value.trim()
-    if (normalizedValue) {
-      next.set('query', normalizedValue)
+    if (value.trim()) {
+      next.set('query', value)
     } else {
       next.delete('query')
     }

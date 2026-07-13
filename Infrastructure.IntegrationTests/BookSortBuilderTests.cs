@@ -102,4 +102,45 @@ public class BookSortBuilderTests
 
         Assert.Equal([newer.Id, older.Id], sorted);
     }
+
+    [Fact]
+    public async Task ApplySortingAsync_ShouldKeepNullableNumericFieldsLastInBothDirections()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var low = await TestData.AddBookAsync(context, database.UserId, "Low");
+        low.Rating = 3;
+        low.Priority = 1;
+        low.CurrentChapterNumber = 10;
+        low.TotalChapters = 50;
+        var high = await TestData.AddBookAsync(context, database.UserId, "High");
+        high.Rating = 8;
+        high.Priority = 4;
+        high.CurrentChapterNumber = 40;
+        high.TotalChapters = 200;
+        var unknown = await TestData.AddBookAsync(context, database.UserId, "Unknown");
+        unknown.Rating = null;
+        unknown.Priority = null;
+        unknown.CurrentChapterNumber = null;
+        unknown.TotalChapters = null;
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var sortBuilder = new BookSortBuilder(context);
+
+        async Task<Guid[]> SortIds(string sortBy, string sortDirection)
+        {
+            return await (await sortBuilder.ApplySortingAsync(context.Books.AsNoTracking(), sortBy, sortDirection, CancellationToken.None))
+                .Select(book => book.Id)
+                .ToArrayAsync();
+        }
+
+        Assert.Equal([low.Id, high.Id, unknown.Id], await SortIds("rating", "asc"));
+        Assert.Equal([high.Id, low.Id, unknown.Id], await SortIds("rating", "desc"));
+        Assert.Equal([low.Id, high.Id, unknown.Id], await SortIds("priority", "asc"));
+        Assert.Equal([high.Id, low.Id, unknown.Id], await SortIds("priority", "desc"));
+        Assert.Equal([low.Id, high.Id, unknown.Id], await SortIds("progress", "asc"));
+        Assert.Equal([high.Id, low.Id, unknown.Id], await SortIds("progress", "desc"));
+        Assert.Equal([low.Id, high.Id, unknown.Id], await SortIds("chapters", "asc"));
+        Assert.Equal([high.Id, low.Id, unknown.Id], await SortIds("chapters", "desc"));
+    }
 }

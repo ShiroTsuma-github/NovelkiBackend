@@ -26,6 +26,7 @@ public static class BookSearchQueryParser
         ["chapter"] = BookSearchNumberField.TotalChapters,
         ["chapters"] = BookSearchNumberField.TotalChapters,
         ["total"] = BookSearchNumberField.TotalChapters,
+        ["total-chapters"] = BookSearchNumberField.TotalChapters,
         ["totalChapters"] = BookSearchNumberField.TotalChapters
     };
 
@@ -35,6 +36,8 @@ public static class BookSearchQueryParser
         {
             return BookSearchCriteria.Empty;
         }
+
+        query = NormalizeAliases(query);
 
         var terms = new List<string>();
         var fields = new List<BookSearchFieldFilter>();
@@ -250,5 +253,10 @@ public static class BookSearchQueryParser
         }
 
         return value;
+    }
+
+    private static string NormalizeAliases(string query)
+    {
+        return query.Replace("total chapters", "total-chapters", StringComparison.OrdinalIgnoreCase);
     }
 }
