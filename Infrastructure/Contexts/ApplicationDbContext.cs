@@ -102,8 +102,10 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.Source).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.StoragePath).HasMaxLength(500);
+            entity.Property(c => c.ThumbnailStoragePath).HasMaxLength(500);
             entity.Property(c => c.OriginalImageUrl).HasMaxLength(2000);
             entity.Property(c => c.MimeType).HasMaxLength(100);
+            entity.Property(c => c.ThumbnailMimeType).HasMaxLength(100);
             entity.Property(c => c.FailureReason).HasMaxLength(1000);
             entity.HasOne(c => c.Book)
                 .WithOne(b => b.Cover)

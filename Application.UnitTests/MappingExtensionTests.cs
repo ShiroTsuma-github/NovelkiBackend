@@ -62,9 +62,12 @@ public class MappingExtensionTests
             Status = BookCoverStatus.Found,
             Source = BookCoverSource.Jikan,
             StoragePath = "owner/book.jpg",
+            ThumbnailStoragePath = "owner/book.thumb.jpg",
             OriginalImageUrl = "https://cdn.example.com/book.jpg",
             MimeType = "image/jpeg",
-            SizeBytes = 42
+            ThumbnailMimeType = "image/jpeg",
+            SizeBytes = 42,
+            ThumbnailSizeBytes = 21
         };
 
         var dto = book.ToDto();
@@ -86,6 +89,7 @@ public class MappingExtensionTests
         Assert.Equal("Found", dto.Cover.Status);
         Assert.Equal("Jikan", dto.Cover.Source);
         Assert.Equal($"/api/v1/book/{book.Id}/cover/file", dto.Cover.ImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail", dto.Cover.ThumbnailImageUrl);
     }
 
     [Fact]

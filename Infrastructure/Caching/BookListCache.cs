@@ -35,8 +35,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         var key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
         activity?.SetTag("cache.key", key);
 
-        //var cached = await GetAsync<BookDto>(key, cancellationToken);
-        PaginatedResult<BookDto> cached = null;
+        var cached = await GetAsync<BookDto>(key, cancellationToken);
         var hit = cached != null;
         activity?.SetTag("cache.hit", hit);
         _logger.LogInformation(
@@ -66,7 +65,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         var key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
         activity?.SetTag("cache.key", key);
         activity?.SetTag("cache.item_count", value.Data.Count);
-        //await SetAsync(key, value, cancellationToken);
+        await SetAsync(key, value, cancellationToken);
         _logger.LogInformation(
             "Book list cache set. OwnerId={OwnerId} Skip={Skip} Take={Take} SortBy={SortBy} SortDirection={SortDirection} Query={Query} CacheKey={CacheKey} ItemCount={ItemCount}",
             ownerId,

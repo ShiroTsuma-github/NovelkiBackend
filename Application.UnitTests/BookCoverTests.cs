@@ -5,6 +5,8 @@ using Domain.Entities;
 using Domain.Repositories;
 using Infrastructure.BookCovers;
 using Microsoft.Extensions.Options;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -83,6 +85,7 @@ public class BookCoverTests
         Assert.Equal("ManualUrl", dto.Source);
         Assert.Equal("https://example.com/cover.jpg", book.Cover!.OriginalImageUrl);
         Assert.Equal("owner/book.jpg", book.Cover.StoragePath);
+        Assert.Equal("owner/book.thumb.jpg", book.Cover.ThumbnailStoragePath);
         Assert.True(repository.Saved);
         Assert.False(coverRepository.Added);
     }
@@ -116,14 +119,16 @@ public class BookCoverTests
         var storageRoot = CreateTempStorageRoot();
         try
         {
-            var jpegBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10 };
-            var service = CreateRemoteImageService(storageRoot, jpegBytes, "text/plain");
+            var pngBytes = CreateTestPngBytes();
+            var service = CreateRemoteImageService(storageRoot, pngBytes, "text/plain");
 
             var stored = await service.SaveFromUrlAsync(OwnerId, BookId, "https://example.com/not-an-image.txt", CancellationToken.None);
 
-            Assert.Equal("image/jpeg", stored.MimeType);
-            Assert.EndsWith(".jpg", stored.StoragePath);
-            Assert.True(File.Exists(Path.Combine(storageRoot, stored.StoragePath)));
+            Assert.Equal("image/jpeg", stored.Original.MimeType);
+            Assert.EndsWith(".jpg", stored.Original.StoragePath);
+            Assert.EndsWith(".thumb.jpg", stored.Thumbnail.StoragePath);
+            Assert.True(File.Exists(Path.Combine(storageRoot, stored.Original.StoragePath)));
+            Assert.True(File.Exists(Path.Combine(storageRoot, stored.Thumbnail.StoragePath)));
         }
         finally
         {
@@ -196,6 +201,14 @@ public class BookCoverTests
         var client = new HttpClient(new FakeHttpMessageHandler(content, contentType));
 
         return new BookCoverRemoteImageService(new FakeHttpClientFactory(client), storage);
+    }
+
+    private static byte[] CreateTestPngBytes()
+    {
+        using var image = new Image<Rgba32>(2, 3, new Rgba32(255, 0, 0, 128));
+        using var buffer = new MemoryStream();
+        image.SaveAsPng(buffer);
+        return buffer.ToArray();
     }
 
     private static string CreateTempStorageRoot()
@@ -344,9 +357,11 @@ public class BookCoverTests
 
     private sealed class FakeCoverStorage : IBookCoverStorage
     {
-        public Task<BookCoverStoredFile> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
+        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new BookCoverStoredFile("owner/book.jpg", "image/jpeg", 123, null, null));
+            return Task.FromResult(new BookCoverStoredFiles(
+                new BookCoverStoredVariant("owner/book.jpg", "image/jpeg", 123, 900, 1350),
+                new BookCoverStoredVariant("owner/book.thumb.jpg", "image/jpeg", 45, 500, 750)));
         }
 
         public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) => Task.FromResult<Stream>(new MemoryStream());
@@ -355,9 +370,11 @@ public class BookCoverTests
 
     private sealed class FakeRemoteImageService : IBookCoverRemoteImageService
     {
-        public Task<BookCoverStoredFile> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+        public Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new BookCoverStoredFile("owner/book.jpg", "image/jpeg", 123, null, null));
+            return Task.FromResult(new BookCoverStoredFiles(
+                new BookCoverStoredVariant("owner/book.jpg", "image/jpeg", 123, 900, 1350),
+                new BookCoverStoredVariant("owner/book.thumb.jpg", "image/jpeg", 45, 500, 750)));
         }
     }
 

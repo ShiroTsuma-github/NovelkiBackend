@@ -258,6 +258,15 @@ public class BookController : ControllerBase
         return File(result.Content, result.MimeType, result.FileName);
     }
 
+    [HttpGet("{id:guid}/cover/thumbnail")]
+    [Authorize]
+    public async Task<IActionResult> GetCoverThumbnail(Guid id)
+    {
+        var result = await _mediator.Send(new GetBookCoverThumbnailFileQuery(id));
+
+        return File(result.Content, result.MimeType, result.FileName);
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize]
     public async Task<IActionResult> Delete(Guid id)

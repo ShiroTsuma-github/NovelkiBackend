@@ -94,7 +94,7 @@ public class DeleteBookTests
     {
         public string? DeletedPath { get; private set; }
 
-        public Task<BookCoverStoredFile> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken) => throw new NotSupportedException();
         public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) => throw new NotSupportedException();
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)

@@ -118,11 +118,16 @@ export type BookCoverDto = {
   status: string
   source?: string | null
   imageUrl?: string | null
+  thumbnailImageUrl?: string | null
   originalImageUrl?: string | null
   mimeType?: string | null
   sizeBytes?: number | null
   width?: number | null
   height?: number | null
+  thumbnailMimeType?: string | null
+  thumbnailSizeBytes?: number | null
+  thumbnailWidth?: number | null
+  thumbnailHeight?: number | null
   failureReason?: string | null
   lastAttemptAt?: string | null
 }

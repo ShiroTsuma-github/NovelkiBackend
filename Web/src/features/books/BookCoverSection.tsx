@@ -7,6 +7,7 @@ type BookCoverArtworkProps = {
   title: string
   cover?: BookCoverDto | null
   imageUrl?: string | null
+  preferredVariant?: 'full' | 'thumbnail'
   interactive?: boolean
   onClick?: () => void
   onRemove?: () => void
@@ -38,12 +39,12 @@ type CoverCacheEntry = {
 
 const coverImageCache = new Map<string, CoverCacheEntry>()
 
-export function useResolvedCoverImage(cover?: BookCoverDto | null) {
+export function useResolvedCoverImage(cover?: BookCoverDto | null, variant: 'full' | 'thumbnail' = 'full') {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
-    const cacheKey = getCoverCacheKey(cover)
+    const cacheKey = getCoverCacheKey(cover, variant)
 
     if (!cacheKey) {
       setBlobUrl(null)
@@ -54,7 +55,10 @@ export function useResolvedCoverImage(cover?: BookCoverDto | null) {
     setBlobUrl(entry.blobUrl)
 
     if (!entry.promise && !entry.blobUrl) {
-      entry.promise = fetchCoverBlobUrl(cover!.imageUrl!)
+      const targetUrl = variant === 'thumbnail'
+        ? cover!.thumbnailImageUrl ?? cover!.imageUrl!
+        : cover!.imageUrl!
+      entry.promise = fetchCoverBlobUrl(targetUrl)
         .then((nextBlobUrl) => {
           entry.blobUrl = nextBlobUrl
           return nextBlobUrl
@@ -74,17 +78,20 @@ export function useResolvedCoverImage(cover?: BookCoverDto | null) {
       active = false
       releaseCoverCacheEntry(cacheKey)
     }
-  }, [cover?.imageUrl, cover?.lastAttemptAt])
+  }, [cover?.imageUrl, cover?.thumbnailImageUrl, cover?.lastAttemptAt, variant])
 
   return blobUrl
 }
 
-function getCoverCacheKey(cover?: BookCoverDto | null) {
-  if (!cover?.imageUrl) {
+function getCoverCacheKey(cover?: BookCoverDto | null, variant: 'full' | 'thumbnail') {
+  const targetUrl = variant === 'thumbnail'
+    ? cover?.thumbnailImageUrl ?? cover?.imageUrl
+    : cover?.imageUrl
+  if (!targetUrl) {
     return null
   }
 
-  return `${cover.imageUrl}::${cover.lastAttemptAt ?? ''}`
+  return `${variant}::${targetUrl}::${cover?.lastAttemptAt ?? ''}`
 }
 
 function acquireCoverCacheEntry(cacheKey: string) {
@@ -149,6 +156,7 @@ export function BookCoverArtwork({
   title,
   cover,
   imageUrl,
+  preferredVariant = 'full',
   interactive = false,
   onClick,
   onRemove,
@@ -159,7 +167,7 @@ export function BookCoverArtwork({
   emptyActionLabel,
   hoverFooter,
 }: BookCoverArtworkProps) {
-  const blobUrl = useResolvedCoverImage(cover)
+  const blobUrl = useResolvedCoverImage(cover, preferredVariant)
   const resolvedImageUrl = imageUrl ?? blobUrl
   const wrapperClassName = [
     'group relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm',

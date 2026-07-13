@@ -146,12 +146,17 @@ public sealed class BookCoverProcessor
 
             cover.Status = BookCoverStatus.Found;
             cover.Source = candidate.Source;
-            cover.StoragePath = stored.StoragePath;
+            cover.StoragePath = stored.Original.StoragePath;
+            cover.ThumbnailStoragePath = stored.Thumbnail.StoragePath;
             cover.OriginalImageUrl = candidate.ImageUrl;
-            cover.MimeType = stored.MimeType;
-            cover.SizeBytes = stored.SizeBytes;
-            cover.Width = stored.Width;
-            cover.Height = stored.Height;
+            cover.MimeType = stored.Original.MimeType;
+            cover.ThumbnailMimeType = stored.Thumbnail.MimeType;
+            cover.SizeBytes = stored.Original.SizeBytes;
+            cover.ThumbnailSizeBytes = stored.Thumbnail.SizeBytes;
+            cover.Width = stored.Original.Width;
+            cover.Height = stored.Original.Height;
+            cover.ThumbnailWidth = stored.Thumbnail.Width;
+            cover.ThumbnailHeight = stored.Thumbnail.Height;
             cover.FailureReason = null;
             CoverLinkHelper.EnsureCoverSourceLink(cover.Book, candidate.ImageUrl, candidate.Source);
             CoverLinkHelper.TouchBook(cover.Book);

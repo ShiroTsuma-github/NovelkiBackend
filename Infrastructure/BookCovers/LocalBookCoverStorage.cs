@@ -11,24 +11,38 @@ public sealed class LocalBookCoverStorage : IBookCoverStorage
         _options = options.Value;
     }
 
-    public async Task<BookCoverStoredFile> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
+    public async Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
     {
-        var validated = await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, _options.MaxBytes, cancellationToken);
+        var processed = await BookCoverImageProcessor.ProcessAsync(content, contentType, _options.MaxBytes, cancellationToken);
         var directory = Path.Combine(_options.StorageRoot, ownerId.ToString("N"));
         Directory.CreateDirectory(directory);
-        var fullPath = Path.GetFullPath(Path.Combine(directory, $"{bookId:N}{validated.Extension}"));
         var rootPath = Path.GetFullPath(_options.StorageRoot);
-        if (!fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidOperationException("Invalid cover storage path.");
-        }
+        var fullPath = EnsurePathWithinRoot(rootPath, directory, $"{bookId:N}.jpg");
+        var thumbnailPath = EnsurePathWithinRoot(rootPath, directory, $"{bookId:N}.thumb.jpg");
 
         await using (var file = File.Create(fullPath))
         {
-            await file.WriteAsync(validated.Bytes, cancellationToken);
+            await file.WriteAsync(processed.Original.Bytes, cancellationToken);
         }
 
-        return new BookCoverStoredFile(Path.GetRelativePath(_options.StorageRoot, fullPath), validated.MimeType, validated.Bytes.Length, null, null);
+        await using (var file = File.Create(thumbnailPath))
+        {
+            await file.WriteAsync(processed.Thumbnail.Bytes, cancellationToken);
+        }
+
+        return new BookCoverStoredFiles(
+            new BookCoverStoredVariant(
+                Path.GetRelativePath(_options.StorageRoot, fullPath),
+                processed.Original.MimeType,
+                processed.Original.Bytes.Length,
+                processed.Original.Width,
+                processed.Original.Height),
+            new BookCoverStoredVariant(
+                Path.GetRelativePath(_options.StorageRoot, thumbnailPath),
+                processed.Thumbnail.MimeType,
+                processed.Thumbnail.Bytes.Length,
+                processed.Thumbnail.Width,
+                processed.Thumbnail.Height));
     }
 
     public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken)
@@ -60,6 +74,17 @@ public sealed class LocalBookCoverStorage : IBookCoverStorage
     {
         var rootPath = Path.GetFullPath(_options.StorageRoot);
         var fullPath = Path.GetFullPath(Path.Combine(rootPath, storagePath));
+        if (!fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Invalid cover storage path.");
+        }
+
+        return fullPath;
+    }
+
+    private static string EnsurePathWithinRoot(string rootPath, string directory, string fileName)
+    {
+        var fullPath = Path.GetFullPath(Path.Combine(directory, fileName));
         if (!fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException("Invalid cover storage path.");

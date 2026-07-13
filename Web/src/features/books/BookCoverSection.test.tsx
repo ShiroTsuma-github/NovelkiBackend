@@ -12,6 +12,7 @@ const baseCover: BookCoverDto = {
   id: 'cover-1',
   status: 'Ready',
   imageUrl: '/covers/1',
+  thumbnailImageUrl: '/covers/1/thumb',
   lastAttemptAt: '2026-07-12T10:00:00Z',
 }
 
@@ -95,5 +96,17 @@ describe('BookCoverSection', () => {
     })
     expect(fetch).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-2')
+  })
+
+  it('uses the thumbnail url when thumbnail variant is requested', async () => {
+    render(<BookCoverArtwork cover={baseCover} preferredVariant="thumbnail" title="Book cover" />)
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(fetch).toHaveBeenCalledWith('https://api.example.com/covers/1/thumb', expect.anything())
+    expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-1')
   })
 })

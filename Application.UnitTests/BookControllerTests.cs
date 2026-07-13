@@ -127,6 +127,26 @@ public class BookControllerTests
     }
 
     [Fact]
+    public async Task GetCoverThumbnail_ShouldReturnFileResultFromMediator()
+    {
+        var bookId = Guid.NewGuid();
+        var mediator = new Mock<IMediator>();
+        mediator
+            .Setup(m => m.Send(It.Is<GetBookCoverThumbnailFileQuery>(q => q.BookId == bookId), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new BookCoverFileResult(
+                new MemoryStream(Encoding.UTF8.GetBytes("thumb")),
+                "image/jpeg",
+                "cover.thumb.jpg"));
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.GetCoverThumbnail(bookId);
+
+        var file = Assert.IsType<FileStreamResult>(result);
+        Assert.Equal("image/jpeg", file.ContentType);
+        Assert.Equal("cover.thumb.jpg", file.FileDownloadName);
+    }
+
+    [Fact]
     public async Task ExportBooks_ShouldReturnCsvForCurrentQueryAndSort()
     {
         var mediator = new Mock<IMediator>();
