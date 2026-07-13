@@ -25,9 +25,42 @@ public record BookDto
     public IReadOnlyCollection<BookLinkDto> Links { get; set; } = Array.Empty<BookLinkDto>();
 }
 
+public record BookListItemDto
+{
+    public Guid Id { get; set; }
+    public DateTimeOffset Created { get; set; }
+    public DateTimeOffset LastModified { get; set; }
+    public required string PrimaryTitle { get; set; }
+    public string? Description { get; set; }
+    public IReadOnlyCollection<string> AlternativeTitles { get; set; } = Array.Empty<string>();
+    public int AlternativeTitlesCount { get; set; }
+    public string? Author { get; set; }
+    public required string ContentType { get; set; }
+    public required string Status { get; set; }
+    public decimal? CurrentChapterNumber { get; set; }
+    public string? CurrentChapterLabel { get; set; }
+    public decimal? TotalChapters { get; set; }
+    public int? Rating { get; set; }
+    public int? Priority { get; set; }
+    public string? Notes { get; set; }
+    public BookCoverDto? Cover { get; set; }
+    public IReadOnlyCollection<string> Genres { get; set; } = Array.Empty<string>();
+    public int GenresCount { get; set; }
+    public IReadOnlyCollection<string> Tags { get; set; } = Array.Empty<string>();
+    public int TagsCount { get; set; }
+    public int LinksCount { get; set; }
+}
+
 public record AdminBookDto : BookDto
 {
     public Guid OwnerId { get; set; }
+}
+
+public record AdminBookListItemDto : BookListItemDto
+{
+    public Guid OwnerId { get; set; }
+    public string? OwnerUsername { get; set; }
+    public string? OwnerEmail { get; set; }
 }
 
 public record BookLinkDto

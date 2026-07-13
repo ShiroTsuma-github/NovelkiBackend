@@ -206,6 +206,39 @@ public static class MappingExtensions
         };
     }
 
+    public static BookListItemDto ToListItemDto(this Book source)
+    {
+        var alternativeTitles = source.Titles.Where(t => !t.IsPrimary).Select(t => t.Title).ToList();
+        var genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList();
+        var tags = source.BookTags.Select(bt => bt.Tag.Name).ToList();
+
+        return new BookListItemDto
+        {
+            Id = source.Id,
+            Created = source.Created,
+            LastModified = source.LastModified,
+            PrimaryTitle = source.PrimaryTitle,
+            Description = CreateExcerpt(source.Description),
+            AlternativeTitles = alternativeTitles.Take(4).ToList(),
+            AlternativeTitlesCount = alternativeTitles.Count,
+            Author = source.Author?.PrimaryName,
+            ContentType = source.ContentType.Name,
+            Status = source.Status.Name,
+            CurrentChapterNumber = source.CurrentChapterNumber,
+            CurrentChapterLabel = source.CurrentChapterLabel,
+            TotalChapters = source.TotalChapters,
+            Rating = source.Rating,
+            Priority = source.Priority,
+            Notes = CreateExcerpt(source.Notes),
+            Cover = source.Cover?.ToDto(source.Id),
+            Genres = genres.Take(4).ToList(),
+            GenresCount = genres.Count,
+            Tags = tags.Take(4).ToList(),
+            TagsCount = tags.Count,
+            LinksCount = source.Links.Count
+        };
+    }
+
     public static AdminBookDto ToAdminDto(this Book source)
     {
         return new AdminBookDto
@@ -253,15 +286,49 @@ public static class MappingExtensions
         };
     }
 
+    public static AdminBookListItemDto ToAdminListItemDto(this Book source, string? ownerUsername, string? ownerEmail)
+    {
+        var dto = source.ToListItemDto();
+        return new AdminBookListItemDto
+        {
+            Id = dto.Id,
+            Created = dto.Created,
+            LastModified = dto.LastModified,
+            PrimaryTitle = dto.PrimaryTitle,
+            Description = dto.Description,
+            AlternativeTitles = dto.AlternativeTitles,
+            AlternativeTitlesCount = dto.AlternativeTitlesCount,
+            Author = dto.Author,
+            ContentType = dto.ContentType,
+            Status = dto.Status,
+            CurrentChapterNumber = dto.CurrentChapterNumber,
+            CurrentChapterLabel = dto.CurrentChapterLabel,
+            TotalChapters = dto.TotalChapters,
+            Rating = dto.Rating,
+            Priority = dto.Priority,
+            Notes = dto.Notes,
+            Cover = dto.Cover,
+            Genres = dto.Genres,
+            GenresCount = dto.GenresCount,
+            Tags = dto.Tags,
+            TagsCount = dto.TagsCount,
+            LinksCount = dto.LinksCount,
+            OwnerId = source.OwnerId,
+            OwnerUsername = ownerUsername,
+            OwnerEmail = ownerEmail
+        };
+    }
+
     public static BookCoverDto ToDto(this BookCover source, Guid bookId)
     {
+        var version = GetCoverVersion(source).ToUnixTimeMilliseconds();
         return new BookCoverDto
         {
             Id = source.Id,
             Status = source.Status.ToString(),
             Source = source.Source?.ToString(),
-            ImageUrl = source.StoragePath == null ? null : $"/api/v1/book/{bookId}/cover/file",
-            ThumbnailImageUrl = source.ThumbnailStoragePath == null ? null : $"/api/v1/book/{bookId}/cover/thumbnail",
+            ImageUrl = source.StoragePath == null ? null : $"/api/v1/book/{bookId}/cover/file?v={version}",
+            ThumbnailImageUrl = source.ThumbnailStoragePath == null ? null : $"/api/v1/book/{bookId}/cover/thumbnail?v={version}",
             OriginalImageUrl = source.OriginalImageUrl,
             MimeType = source.MimeType,
             SizeBytes = source.SizeBytes,
@@ -274,6 +341,32 @@ public static class MappingExtensions
             FailureReason = source.FailureReason,
             LastAttemptAt = source.LastAttemptAt
         };
+    }
+
+    private static DateTimeOffset GetCoverVersion(BookCover source)
+    {
+        if (source.LastAttemptAt.HasValue)
+        {
+            return source.LastAttemptAt.Value;
+        }
+
+        if (source.LastModified != default)
+        {
+            return source.LastModified;
+        }
+
+        return source.Created != default ? source.Created : DateTimeOffset.UnixEpoch;
+    }
+
+    private static string? CreateExcerpt(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return value;
+        }
+
+        var collapsed = CollapseWhitespace(value);
+        return collapsed.Length > 80 ? $"{collapsed[..77]}..." : collapsed;
     }
 
     public static BookTitle ToPrimaryTitle(this string title)

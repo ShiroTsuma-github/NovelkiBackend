@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
-import type { AdminBookDto, DictionaryMutationRequest } from '@/api/types'
+import type { AdminBookListItemDto, DictionaryMutationRequest } from '@/api/types'
 import { HttpError } from '@/api/http'
 import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import {
@@ -22,10 +22,12 @@ const pageSizeOptions = [20, 50, 100, 500]
 const adminColumnsStorageKey = 'novelki.adminBooks.columns.v1'
 type SortDirection = 'asc' | 'desc'
 
-const adminBookColumns: ColumnDefinition<AdminBookDto>[] = [
+const adminBookColumns: ColumnDefinition<AdminBookListItemDto>[] = [
   { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
   { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-[24%]', render: (book) => <span className="block truncate font-medium text-slate-950">{book.primaryTitle}</span> },
   { id: 'ownerId', label: 'OwnerId', defaultVisible: true, sortBy: 'owner', widthClass: 'w-[15%]', render: (book) => <span className="font-mono text-xs">{book.ownerId}</span> },
+  { id: 'ownerUsername', label: 'Username', defaultVisible: false, widthClass: 'w-[12%]', render: (book) => <span className="block truncate">{book.ownerUsername ?? '-'}</span> },
+  { id: 'ownerEmail', label: 'Email', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => <span className="block truncate">{book.ownerEmail ?? '-'}</span> },
   { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-[11%]', render: (book) => <span className="block truncate">{book.author ?? '-'}</span> },
   { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-20', render: (book) => book.status },
   { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-20', render: (book) => book.contentType },
@@ -36,7 +38,7 @@ const adminBookColumns: ColumnDefinition<AdminBookDto>[] = [
   { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-32', render: (book) => formatDate(book.lastModified || book.created) },
   { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => formatList(book.genres) },
   { id: 'tags', label: 'Tags', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => formatList(book.tags) },
-  { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.links.length },
+  { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.linksCount },
   { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => truncate(book.notes) },
   { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => truncate(book.description) },
 ]
@@ -264,7 +266,7 @@ function DictionaryCreateForm({
   )
 }
 
-function AdminBookRow({ book, columns }: { book: AdminBookDto; columns: ColumnDefinition<AdminBookDto>[] }) {
+function AdminBookRow({ book, columns }: { book: AdminBookListItemDto; columns: ColumnDefinition<AdminBookListItemDto>[] }) {
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50">
       {columns.map((column) => (

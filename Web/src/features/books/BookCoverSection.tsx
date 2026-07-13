@@ -1,7 +1,7 @@
 import { X, ZoomIn } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { API_BASE_URL, getStoredSession } from '@/api/http'
 import type { BookCoverDto } from '@/api/types'
+import { loadCoverBlobUrl } from './coverCache'
 
 type BookCoverArtworkProps = {
   title: string
@@ -58,7 +58,7 @@ export function useResolvedCoverImage(cover?: BookCoverDto | null, variant: 'ful
       const targetUrl = variant === 'thumbnail'
         ? cover!.thumbnailImageUrl ?? cover!.imageUrl!
         : cover!.imageUrl!
-      entry.promise = fetchCoverBlobUrl(targetUrl)
+      entry.promise = loadCoverBlobUrl(targetUrl)
         .then((nextBlobUrl) => {
           entry.blobUrl = nextBlobUrl
           return nextBlobUrl
@@ -137,19 +137,6 @@ function releaseCoverCacheEntry(cacheKey: string) {
     }
     coverImageCache.delete(cacheKey)
   }, COVER_CACHE_TTL_MS)
-}
-
-async function fetchCoverBlobUrl(imageUrl: string) {
-  const apiOrigin = API_BASE_URL.replace(/\/api\/v1\/?$/, '')
-  const token = getStoredSession()?.accessToken
-  const response = await fetch(`${apiOrigin}${imageUrl}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-  })
-  if (!response.ok) {
-    return null
-  }
-
-  return URL.createObjectURL(await response.blob())
 }
 
 export function BookCoverArtwork({

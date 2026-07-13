@@ -2,6 +2,7 @@
 
 using Amazon.Runtime;
 using Amazon.S3;
+using Application.Common.Interfaces;
 using Infrastructure.Authentication;
 using Infrastructure.BookCovers;
 using Infrastructure.Caching;
@@ -45,6 +46,7 @@ public static class DependencyInjection
             });
         }
         builder.Services.AddScoped<IBookRepository, BookRepository>();
+        builder.Services.AddScoped<IBookListReadRepository, BookRepository>();
         builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
         builder.Services.AddScoped<IGenreRepository, GenreRepository>();
         builder.Services.AddScoped<IStatusRepository, StatusRepository>();

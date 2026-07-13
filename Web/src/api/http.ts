@@ -166,6 +166,10 @@ export function getStoredSession(): StoredSession | null {
   }
 }
 
+export function getStoredSessionUserId() {
+  return getStoredSession()?.userId ?? null
+}
+
 export function setStoredSession(session: StoredSession) {
   localStorage.setItem(sessionStorageKey, JSON.stringify(session))
 }

@@ -25,6 +25,7 @@ public class MappingExtensionTests
     [Fact]
     public void BookToDto_ShouldMapDetails()
     {
+        var coverVersion = DateTimeOffset.Parse("2026-07-06T10:00:00Z");
         var author = new Author { PrimaryName = "Toika", NormalizedPrimaryName = "TOIKA" };
         var genre = new Genre { Name = "Fantasy", NormalizedName = "FANTASY" };
         var tag = new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" };
@@ -59,6 +60,8 @@ public class MappingExtensionTests
         });
         book.Cover = new BookCover
         {
+            Created = DateTimeOffset.Parse("2026-07-04T10:00:00Z"),
+            LastModified = DateTimeOffset.Parse("2026-07-05T10:00:00Z"),
             Status = BookCoverStatus.Found,
             Source = BookCoverSource.Jikan,
             StoragePath = "owner/book.jpg",
@@ -67,7 +70,8 @@ public class MappingExtensionTests
             MimeType = "image/jpeg",
             ThumbnailMimeType = "image/jpeg",
             SizeBytes = 42,
-            ThumbnailSizeBytes = 21
+            ThumbnailSizeBytes = 21,
+            LastAttemptAt = coverVersion
         };
 
         var dto = book.ToDto();
@@ -88,8 +92,56 @@ public class MappingExtensionTests
         Assert.NotNull(dto.Cover);
         Assert.Equal("Found", dto.Cover.Status);
         Assert.Equal("Jikan", dto.Cover.Source);
-        Assert.Equal($"/api/v1/book/{book.Id}/cover/file", dto.Cover.ImageUrl);
-        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail", dto.Cover.ThumbnailImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/file?v={coverVersion.ToUnixTimeMilliseconds()}", dto.Cover.ImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail?v={coverVersion.ToUnixTimeMilliseconds()}", dto.Cover.ThumbnailImageUrl);
+    }
+
+    [Fact]
+    public void BookToListItemDto_ShouldMapPreviewCollectionsAndCounts()
+    {
+        var book = new Book
+        {
+            Created = DateTimeOffset.Parse("2026-07-01T10:00:00Z"),
+            LastModified = DateTimeOffset.Parse("2026-07-02T10:00:00Z"),
+            PrimaryTitle = "Everyone Else is a Returnee",
+            NormalizedPrimaryTitle = "EVERYONE ELSE IS A RETURNEE",
+            Description = new string('a', 120),
+            Notes = new string('b', 120),
+            ContentType = new ContentType { Name = "Novel", Slug = "novel" },
+            Status = new Status { Name = "Reading", Slug = "reading" }
+        };
+        book.Titles.Add("Everyone Else is a Returnee".ToPrimaryTitle());
+        foreach (var title in new[] { "Alt 1", "Alt 2", "Alt 3", "Alt 4", "Alt 5" })
+        {
+            book.Titles.Add(new BookTitle { Title = title, NormalizedTitle = title.ToUpperInvariant() });
+        }
+
+        foreach (var genreName in new[] { "Fantasy", "Drama", "Action", "Adventure", "Comedy" })
+        {
+            book.BookGenres.Add(new BookGenre { Book = book, Genre = new Genre { Name = genreName, NormalizedName = genreName.ToUpperInvariant() } });
+        }
+
+        foreach (var tagName in new[] { "favorite", "slow-burn", "portal", "funny", "long" })
+        {
+            book.BookTags.Add(new BookTag { Book = book, Tag = new Tag { OwnerId = Guid.NewGuid(), Name = tagName, NormalizedName = tagName.ToUpperInvariant() } });
+        }
+
+        book.Links.Add(new BookLink { Url = "https://example.com/1", SourceType = "Primary" });
+        book.Links.Add(new BookLink { Url = "https://example.com/2", SourceType = "Mirror" });
+
+        var dto = book.ToListItemDto();
+
+        Assert.Equal(4, dto.AlternativeTitles.Count);
+        Assert.Equal(5, dto.AlternativeTitlesCount);
+        Assert.Equal(4, dto.Genres.Count);
+        Assert.Equal(5, dto.GenresCount);
+        Assert.Equal(4, dto.Tags.Count);
+        Assert.Equal(5, dto.TagsCount);
+        Assert.Equal(2, dto.LinksCount);
+        Assert.Equal(80, dto.Description!.Length);
+        Assert.EndsWith("...", dto.Description);
+        Assert.Equal(80, dto.Notes!.Length);
+        Assert.EndsWith("...", dto.Notes);
     }
 
     [Fact]

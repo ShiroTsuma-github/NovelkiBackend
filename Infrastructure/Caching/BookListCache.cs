@@ -22,7 +22,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         _logger = logger;
     }
 
-    public async Task<PaginatedResult<BookDto>?> GetBooksAsync(
+    public async Task<PaginatedResult<BookListItemDto>?> GetBooksAsync(
         Guid ownerId,
         int skip,
         int take,
@@ -35,7 +35,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         var key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
         activity?.SetTag("cache.key", key);
 
-        var cached = await GetAsync<BookDto>(key, cancellationToken);
+        var cached = await GetAsync<BookListItemDto>(key, cancellationToken);
         var hit = cached != null;
         activity?.SetTag("cache.hit", hit);
         _logger.LogInformation(
@@ -58,7 +58,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         string? query,
         string? sortBy,
         string? sortDirection,
-        PaginatedResult<BookDto> value,
+        PaginatedResult<BookListItemDto> value,
         CancellationToken cancellationToken)
     {
         using var activity = StartCacheActivity("cache.books.set", ownerId, skip, take, query, sortBy, sortDirection);

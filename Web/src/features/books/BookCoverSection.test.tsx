@@ -5,24 +5,48 @@ import { BookCoverArtwork } from './BookCoverSection'
 
 vi.mock('@/api/http', () => ({
   API_BASE_URL: 'https://api.example.com/api/v1',
-  getStoredSession: () => ({ accessToken: 'token-123' }),
+  apiBlobRequest: async (path: string) => {
+    const response = await fetch(`https://api.example.com/api/v1${path}`)
+    return response.blob()
+  },
+  getStoredSession: () => ({ accessToken: 'token-123', userId: 'user-123' }),
+  getStoredSessionUserId: () => 'user-123',
 }))
 
 const baseCover: BookCoverDto = {
   id: 'cover-1',
   status: 'Ready',
-  imageUrl: '/covers/1',
-  thumbnailImageUrl: '/covers/1/thumb',
+  imageUrl: '/api/v1/book/book-1/cover/file?v=2026-07-12T10%3A00%3A00Z',
+  thumbnailImageUrl: '/api/v1/book/book-1/cover/thumbnail?v=2026-07-12T10%3A00%3A00Z',
   lastAttemptAt: '2026-07-12T10:00:00Z',
 }
 
 describe('BookCoverSection', () => {
+  const cacheEntries = new Map<string, Response>()
+  const cacheNames: string[] = []
+
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      blob: async () => new Blob(['cover']),
-    }))
+    cacheEntries.clear()
+    cacheNames.length = 0
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => new Response(new Blob(['cover']), { status: 200 })))
+    vi.stubGlobal('caches', {
+      open: vi.fn(async (cacheName: string) => {
+        cacheNames.push(cacheName)
+        return {
+          match: vi.fn(async (request: Request) => cacheEntries.get(request.url)?.clone() ?? undefined),
+          put: vi.fn(async (request: Request, response: Response) => {
+            cacheEntries.set(request.url, response.clone())
+          }),
+          keys: vi.fn(async () => Array.from(cacheEntries.keys()).map((url) => new Request(new URL(url, window.location.origin).toString()))),
+          delete: vi.fn(async (request: Request) => {
+            const normalizedUrl = new URL(request.url)
+            const relativeUrl = `${normalizedUrl.pathname}${normalizedUrl.search}`
+            return cacheEntries.delete(request.url) || cacheEntries.delete(relativeUrl)
+          }),
+        } satisfies Cache
+      }),
+    })
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:cover-1')
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
   })
@@ -56,6 +80,32 @@ describe('BookCoverSection', () => {
     secondRender.unmount()
   })
 
+  it('reuses Cache Storage after the in-memory ttl expires', async () => {
+    const firstRender = render(<BookCoverArtwork cover={baseCover} title="Book cover" />)
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    firstRender.unmount()
+
+    act(() => {
+      vi.advanceTimersByTime(60_000)
+    })
+
+    vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:cover-from-cache')
+    const secondRender = render(<BookCoverArtwork cover={baseCover} title="Book cover" />)
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(cacheNames).toContain('novelki.covers.v1::user-123')
+    expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-from-cache')
+    secondRender.unmount()
+  })
+
   it('releases cached object urls after the cache ttl elapses', async () => {
     const result = render(<BookCoverArtwork cover={baseCover} title="Book cover" />)
 
@@ -85,7 +135,12 @@ describe('BookCoverSection', () => {
     vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:cover-2')
     rerender(
       <BookCoverArtwork
-        cover={{ ...baseCover, lastAttemptAt: '2026-07-12T10:05:00Z' }}
+        cover={{
+          ...baseCover,
+          imageUrl: '/api/v1/book/book-1/cover/file?v=2026-07-12T10%3A05%3A00Z',
+          thumbnailImageUrl: '/api/v1/book/book-1/cover/thumbnail?v=2026-07-12T10%3A05%3A00Z',
+          lastAttemptAt: '2026-07-12T10:05:00Z',
+        }}
         title="Book cover"
       />,
     )
@@ -96,6 +151,7 @@ describe('BookCoverSection', () => {
     })
     expect(fetch).toHaveBeenCalledTimes(2)
     expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-2')
+    expect(Array.from(cacheEntries.keys())).toEqual(['https://api.example.com/api/v1/book/book-1/cover/file?v=2026-07-12T10%3A05%3A00Z'])
   })
 
   it('uses the thumbnail url when thumbnail variant is requested', async () => {
@@ -106,7 +162,45 @@ describe('BookCoverSection', () => {
       await Promise.resolve()
     })
 
-    expect(fetch).toHaveBeenCalledWith('https://api.example.com/covers/1/thumb', expect.anything())
+    expect(fetch).toHaveBeenCalledWith('https://api.example.com/api/v1/book/book-1/cover/thumbnail?v=2026-07-12T10%3A00%3A00Z')
+    expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-1')
+  })
+
+  it('prunes older cached variants even when existing cache keys are relative urls', async () => {
+    cacheEntries.set('/api/v1/book/book-1/cover/file?v=old', new Response(new Blob(['old']), { status: 200 }))
+
+    render(<BookCoverArtwork cover={baseCover} title="Book cover" />)
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(Array.from(cacheEntries.keys())).toEqual(['https://api.example.com/api/v1/book/book-1/cover/file?v=2026-07-12T10%3A00%3A00Z'])
+  })
+
+  it('loads covers when API_BASE_URL is relative', async () => {
+    vi.resetModules()
+    vi.doMock('@/api/http', () => ({
+      API_BASE_URL: '/api/v1',
+      apiBlobRequest: async (path: string) => {
+        const response = await fetch(`${window.location.origin}/api/v1${path}`)
+        return response.blob()
+      },
+      getStoredSession: () => ({ accessToken: 'token-123', userId: 'user-123' }),
+      getStoredSessionUserId: () => 'user-123',
+    }))
+
+    const { BookCoverArtwork: RelativeBaseArtwork } = await import('./BookCoverSection')
+
+    render(<RelativeBaseArtwork cover={baseCover} title="Book cover" />)
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(fetch).toHaveBeenCalledWith(`${window.location.origin}/api/v1/book/book-1/cover/file?v=2026-07-12T10%3A00%3A00Z`)
     expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-1')
   })
 })

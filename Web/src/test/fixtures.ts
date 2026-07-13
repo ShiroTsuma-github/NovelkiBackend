@@ -1,4 +1,4 @@
-import type { BookDto, DictionaryDto, PaginatedResult, TokenResponse } from '@/api/types'
+import type { BookDto, BookListItemDto, DictionaryDto, PaginatedResult, TokenResponse } from '@/api/types'
 
 export const testSession: TokenResponse = {
   accessToken: createJwt({ role: 'User' }),
@@ -24,7 +24,7 @@ export const genres: DictionaryDto[] = [
   { id: '30000000-0000-0000-0000-000000000002', name: 'Slice of Life' },
 ]
 
-export const books: BookDto[] = [
+export const books: Array<BookDto & BookListItemDto> = [
   {
     id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
     created: '2026-01-01T10:00:00Z',
@@ -44,8 +44,12 @@ export const books: BookDto[] = [
     notes: 'Private note',
     progressHistory: [],
     genres: ['Fantasy'],
+    genresCount: 1,
     tags: ['favorite', 'mystery'],
+    tagsCount: 2,
     links: [],
+    linksCount: 0,
+    alternativeTitlesCount: 1,
   },
   {
     id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
@@ -62,10 +66,39 @@ export const books: BookDto[] = [
     priority: 2,
     progressHistory: [],
     genres: ['Slice of Life'],
+    genresCount: 1,
     tags: ['completed'],
+    tagsCount: 1,
     links: [],
+    linksCount: 0,
+    alternativeTitlesCount: 0,
   },
 ]
+
+export const bookListItems: BookListItemDto[] = books.map((book) => ({
+  id: book.id,
+  created: book.created,
+  lastModified: book.lastModified,
+  primaryTitle: book.primaryTitle,
+  description: book.description ?? null,
+  alternativeTitles: book.alternativeTitles.slice(0, 4),
+  alternativeTitlesCount: book.alternativeTitles.length,
+  author: book.author ?? null,
+  contentType: book.contentType,
+  status: book.status,
+  currentChapterNumber: book.currentChapterNumber ?? null,
+  currentChapterLabel: book.currentChapterLabel ?? null,
+  totalChapters: book.totalChapters ?? null,
+  rating: book.rating ?? null,
+  priority: book.priority ?? null,
+  notes: book.notes ?? null,
+  cover: book.cover ?? null,
+  genres: book.genres.slice(0, 4),
+  genresCount: book.genres.length,
+  tags: book.tags.slice(0, 4),
+  tagsCount: book.tags.length,
+  linksCount: book.links.length,
+}))
 
 export function paginated<T>(data: T[]): PaginatedResult<T> {
   return {
