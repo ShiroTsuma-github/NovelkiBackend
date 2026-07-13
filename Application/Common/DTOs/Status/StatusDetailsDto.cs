@@ -1,12 +1,5 @@
-﻿namespace Application.Common.DTOs.Status;
+namespace Application.Common.DTOs.Status;
 
 using Application.Common.DTOs.Book;
 
-public class StatusDetailsDto
-{
-    public Guid Id { get; set; }
-    public required string Name { get; set; }
-    public string? Description { get; set; }
-    public int BookCount => Books.Count;
-    public ICollection<BookDto> Books { get; set; } = new HashSet<BookDto>();
-}
+public class StatusDetailsDto : BookCollectionDetailsDto;
