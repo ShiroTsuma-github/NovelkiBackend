@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Edit, Plus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -17,10 +17,16 @@ import {
   useColumnPreferences,
   type ColumnDefinition,
 } from '@/features/books/BooksPage'
+import {
+  BookListFooter,
+  getNextSortDirection,
+  ScrollShortcutButtons,
+  useBookListPagination,
+  useBookListScrollShortcuts,
+  useBookListUrlState,
+} from '@/features/books/BookListShared'
 
-const pageSizeOptions = [20, 50, 100, 500]
 const adminColumnsStorageKey = 'novelki.adminBooks.columns.v1'
-type SortDirection = 'asc' | 'desc'
 
 const adminBookColumns: ColumnDefinition<AdminBookListItemDto>[] = [
   { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
@@ -48,17 +54,35 @@ export function AdminPage() {
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(adminColumnsStorageKey, adminBookColumns)
   const [ownerIdToPurge, setOwnerIdToPurge] = useState('')
   const queryClient = useQueryClient()
-  const skip = Number(searchParams.get('skip') ?? 0)
-  const pageSize = readPageSize(searchParams)
-  const sortBy = searchParams.get('sortBy') ?? 'lastModified'
-  const sortDirection = readSortDirection(searchParams)
-  const query = searchParams.get('query') ?? ''
-  const normalizedQuery = query.trim()
+  const {
+    pageSize,
+    query,
+    requestQuery,
+    setPageSize,
+    setSkip,
+    setSort: setSortParams,
+    skip,
+    sortBy,
+    sortDirection,
+    updateQuery,
+  } = useBookListUrlState(searchParams, setSearchParams)
   const visibleColumns = getVisibleColumns(adminBookColumns, columnPreferences)
   const adminBooksQuery = useQuery({
-    queryKey: ['adminBooks', skip, pageSize, normalizedQuery, sortBy, sortDirection],
-    queryFn: () => api.getAdminBooks({ skip, take: pageSize, query: normalizedQuery, sortBy, sortDirection }),
+    queryKey: ['adminBooks', skip, pageSize, requestQuery, sortBy, sortDirection],
+    queryFn: () => api.getAdminBooks({ skip, take: pageSize, query: requestQuery, sortBy, sortDirection }),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
   })
+  const total = adminBooksQuery.data?.total ?? 0
+  const pagination = useBookListPagination({
+    dataLength: adminBooksQuery.data?.data.length ?? 0,
+    isFetching: adminBooksQuery.isFetching,
+    pageSize,
+    setSkip,
+    skip,
+    total,
+  })
+  const scrollShortcuts = useBookListScrollShortcuts()
   const purgeMutation = useMutation({
     mutationFn: (ownerId: string) => api.deleteAdminBooksByOwner(ownerId),
     onSuccess: async (result) => {
@@ -74,44 +98,9 @@ export function AdminPage() {
     },
   })
 
-  function updateQuery(value: string) {
-    const next = new URLSearchParams(searchParams)
-    const normalizedValue = value.trim()
-    if (normalizedValue) {
-      next.set('query', normalizedValue)
-    } else {
-      next.delete('query')
-    }
-    next.delete('skip')
-    setSearchParams(next)
-  }
-
-  function setSkip(nextSkip: number) {
-    const next = new URLSearchParams(searchParams)
-    next.set('skip', String(Math.max(0, nextSkip)))
-    setSearchParams(next)
-  }
-
-  function setPageSize(nextPageSize: string) {
-    const next = new URLSearchParams(searchParams)
-    next.set('take', nextPageSize)
-    next.delete('skip')
-    setSearchParams(next)
-  }
-
   function setSort(nextSortBy: string) {
-    const next = new URLSearchParams(searchParams)
-    const defaultDirection = nextSortBy === 'lastModified' || nextSortBy === 'created' ? 'desc' : 'asc'
-    const nextDirection = sortBy === nextSortBy
-      ? sortDirection === 'asc' ? 'desc' : 'asc'
-      : defaultDirection
-    next.set('sortBy', nextSortBy)
-    next.set('sortDirection', nextDirection)
-    next.delete('skip')
-    setSearchParams(next)
+    setSortParams(nextSortBy, getNextSortDirection(nextSortBy, sortBy, sortDirection))
   }
-
-  const total = adminBooksQuery.data?.total ?? 0
 
   return (
     <div className="grid gap-5">
@@ -174,6 +163,9 @@ export function AdminPage() {
 
       <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
+          {adminBooksQuery.isFetching && !adminBooksQuery.isLoading ? (
+            <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
+          ) : null}
           <ColumnSettingsPopup columns={adminBookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
         <div className="w-full">
@@ -204,20 +196,27 @@ export function AdminPage() {
             </tbody>
           </table>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600">
-          <span>{total ? `${skip + 1}-${Math.min(skip + pageSize, total)} of ${total}` : '0 results'}</span>
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2">
-              <span>Per page</span>
-              <select className={`${inputClass} h-10 w-24`} value={pageSize} onChange={(event) => setPageSize(event.target.value)}>
-                {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
-              </select>
-            </label>
-            <button className={secondaryButtonClass} disabled={skip <= 0} type="button" onClick={() => setSkip(skip - pageSize)}>Previous</button>
-            <button className={secondaryButtonClass} disabled={skip + pageSize >= total} type="button" onClick={() => setSkip(skip + pageSize)}>Next</button>
-          </div>
-        </div>
+        <BookListFooter
+          activePageGapId={pagination.activePageGapId}
+          canGoBack={pagination.canGoBack}
+          canGoForward={pagination.canGoForward}
+          currentPage={pagination.currentPage}
+          pageSize={pageSize}
+          setActivePageGapId={pagination.setActivePageGapId}
+          setPageSize={setPageSize}
+          skip={skip}
+          total={total}
+          totalPages={pagination.totalPages}
+          visiblePages={pagination.visiblePages}
+          onGoToPage={pagination.onGoToPage}
+        />
       </section>
+      <ScrollShortcutButtons
+        showBackToTop={scrollShortcuts.showBackToTop}
+        showGoDown={scrollShortcuts.showGoDown}
+        onBackToTop={scrollShortcuts.scrollBackToTop}
+        onGoDown={scrollShortcuts.scrollToPageBottom}
+      />
     </div>
   )
 }
@@ -285,15 +284,6 @@ function AdminBookRow({ book, columns }: { book: AdminBookListItemDto; columns: 
       </td>
     </tr>
   )
-}
-
-function readPageSize(searchParams: URLSearchParams) {
-  const value = Number(searchParams.get('take') ?? 20)
-  return pageSizeOptions.includes(value) ? value : 20
-}
-
-function readSortDirection(searchParams: URLSearchParams): SortDirection {
-  return searchParams.get('sortDirection') === 'asc' ? 'asc' : 'desc'
 }
 
 function formatList(values: string[]) {
