@@ -12,24 +12,18 @@ public record GetAllAdminBooksQuery(
 
 public class GetAllAdminBooksHandler : IRequestHandler<GetAllAdminBooksQuery, PaginatedResult<AdminBookListItemDto>>
 {
-    private readonly IBookRepository _bookRepository;
-    private readonly IBookListReadRepository _repository;
+    private readonly IBookListQueryService _queryService;
 
-    public GetAllAdminBooksHandler(IBookRepository bookRepository, IBookListReadRepository repository)
+    public GetAllAdminBooksHandler(IBookListQueryService queryService)
     {
-        _bookRepository = bookRepository;
-        _repository = repository;
+        _queryService = queryService;
     }
 
     public async Task<PaginatedResult<AdminBookListItemDto>> Handle(GetAllAdminBooksQuery request, CancellationToken cancellationToken)
     {
         var criteria = BookSearchQueryParser.Parse(request.Query);
-        var books = criteria.HasFilters
-            ? await _repository.SearchAdminListAsync(criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
-            : await _repository.GetAllAdminListAsync(request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
-        var total = criteria.HasFilters
-            ? await _bookRepository.GetSearchCountAsync(criteria, cancellationToken)
-            : await _bookRepository.GetCountAsync(cancellationToken);
+        var books = await _queryService.GetAdminBooksAsync(criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
+        var total = await _queryService.GetAdminBookCountAsync(criteria, cancellationToken);
 
         return new PaginatedResult<AdminBookListItemDto>
         {

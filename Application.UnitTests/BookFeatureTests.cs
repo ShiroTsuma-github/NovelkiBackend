@@ -398,7 +398,7 @@ public class BookFeatureTests
     [Fact]
     public async Task GetBookSummary_ShouldMapRepositoryAggregateIntoDto()
     {
-        var bookRepository = new FakeBookRepository
+        var summaryQueryService = new FakeBookSummaryQueryService
         {
             Summary = new Domain.Models.BookSummarySnapshot(
                 4,
@@ -421,7 +421,7 @@ public class BookFeatureTests
                     new Domain.Models.BookRatingCountSnapshot(9, 2),
                 ])
         };
-        var handler = new GetBookSummaryHandler(bookRepository, new FakeUser());
+        var handler = new GetBookSummaryHandler(summaryQueryService, new FakeUser());
 
         var result = await handler.Handle(new GetBookSummaryQuery("author:Toika"), CancellationToken.None);
 
@@ -507,7 +507,6 @@ public class BookFeatureTests
     {
         public Book? LastBook { get; private set; }
         public bool Saved { get; private set; }
-        public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
 
         public void Seed(Book book)
         {
@@ -521,8 +520,6 @@ public class BookFeatureTests
         }
 
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<IEnumerable<Book>> GetAllAsync(Guid ownerId, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
-        public Task<IEnumerable<Book>> SearchAsync(Guid ownerId, BookSearchCriteria criteria, int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Book>>(Array.Empty<Book>());
         public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
         public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id ? LastBook : null);
         public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
@@ -538,9 +535,6 @@ public class BookFeatureTests
             return Task.FromResult(match ? LastBook : null);
         }
         public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook == null ? 0 : 1);
-        public Task<int> GetSearchCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(Summary);
-        public Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy, string? currentSortDirection, CancellationToken cancellationToken) => Task.FromResult<string?>(null);
         public Task ReplaceEditableCollectionsAsync(
             Guid bookId,
             IEnumerable<BookTitle> titles,
@@ -641,6 +635,16 @@ public class BookFeatureTests
     private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
     {
         public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class FakeBookSummaryQueryService : IBookSummaryQueryService
+    {
+        public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
+
+        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Summary);
+        }
     }
 
     private sealed class FakeAuthorRepository : IAuthorRepository
