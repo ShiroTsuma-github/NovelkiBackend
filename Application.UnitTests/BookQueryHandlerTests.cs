@@ -1,0 +1,163 @@
+using Application.Common.DTOs.Book;
+using Application.Common.Interfaces;
+using Application.Common.Models;
+using Application.Features.BookFeatures.Queries.GetBook;
+using Domain.Repositories;
+
+namespace Application.UnitTests;
+
+public class BookQueryHandlerTests
+{
+    private static readonly Guid OwnerId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+
+    [Fact]
+    public async Task GetBooks_ShouldReturnCachedResultWithoutQueryingService()
+    {
+        var cached = PaginatedResult<BookListItemDto>.Create(0, 10, 1, [ListItem("Cached")]);
+        var cache = new FakeBookListCache { Cached = cached };
+        var service = new FakeBookListQueryService();
+        var handler = new GetBooksQueryHandler(service, cache, new FakeUser());
+
+        var result = await handler.Handle(new GetAllBooksQuery(0, 10, "title:Cached", "title", "asc"), CancellationToken.None);
+
+        Assert.Same(cached, result);
+        Assert.False(service.GetBooksCalled);
+    }
+
+    [Fact]
+    public async Task GetBooks_ShouldAdvanceCyclicSortAndCacheResult()
+    {
+        var cache = new FakeBookListCache();
+        var service = new FakeBookListQueryService
+        {
+            Books = [ListItem("Reading")],
+            Count = 1,
+            NextCycleSortDirection = "Completed"
+        };
+        var handler = new GetBooksQueryHandler(service, cache, new FakeUser());
+
+        var result = await handler.Handle(new GetAllBooksQuery(0, 10, "status:reading", "status", "Reading", AdvanceCycle: true), CancellationToken.None);
+
+        Assert.Single(result.Data);
+        Assert.Equal("Completed", service.SortDirectionUsed);
+        Assert.Equal("Completed", cache.StoredSortDirection);
+        Assert.NotNull(cache.Stored);
+    }
+
+    [Fact]
+    public async Task GetAllAdminBooks_ShouldReturnServicePage()
+    {
+        var service = new FakeBookListQueryService
+        {
+            AdminBooks = [new AdminBookListItemDto { Id = Guid.NewGuid(), PrimaryTitle = "Admin", ContentType = "Novel", Status = "Reading", OwnerId = OwnerId }],
+            AdminCount = 1
+        };
+        var handler = new GetAllAdminBooksHandler(service);
+
+        var result = await handler.Handle(new GetAllAdminBooksQuery(5, 10, "status:reading", "title", "asc"), CancellationToken.None);
+
+        Assert.Equal(5, result.Skip);
+        Assert.Equal(10, result.Take);
+        Assert.Equal(1, result.Total);
+        Assert.Single(result.Data);
+    }
+
+    [Fact]
+    public async Task GetBooksForExport_ShouldPassOwnerCriteriaAndPaging()
+    {
+        var exportService = new FakeBookExportQueryService();
+        var handler = new GetBooksForExportQueryHandler(exportService, new FakeUser());
+
+        var result = await handler.Handle(new GetAllBooksForExportQuery(2, 3, "rating:>=8", "rating", "desc"), CancellationToken.None);
+
+        Assert.Equal(OwnerId, exportService.OwnerId);
+        Assert.Equal(2, exportService.Skip);
+        Assert.Equal(3, exportService.Take);
+        Assert.Equal("rating", exportService.SortBy);
+        Assert.Equal("desc", exportService.SortDirection);
+        Assert.Single(result.Data);
+    }
+
+    private static BookListItemDto ListItem(string title)
+    {
+        return new BookListItemDto
+        {
+            Id = Guid.NewGuid(),
+            PrimaryTitle = title,
+            ContentType = "Novel",
+            Status = "Reading"
+        };
+    }
+
+    private sealed class FakeUser : IUser
+    {
+        public Guid? Id => OwnerId;
+        public Guid RequiredId => OwnerId;
+        public string? Email => "reader@example.com";
+        public string? Username => "reader";
+        public IEnumerable<string> Roles => [];
+        public bool IsAuthenticated => true;
+        public bool Valid => true;
+    }
+
+    private sealed class FakeBookListCache : IBookListCache
+    {
+        public PaginatedResult<BookListItemDto>? Cached { get; init; }
+        public PaginatedResult<BookListItemDto>? Stored { get; private set; }
+        public string? StoredSortDirection { get; private set; }
+
+        public Task<PaginatedResult<BookListItemDto>?> GetBooksAsync(Guid ownerId, int skip, int take, string? query, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Cached);
+        }
+
+        public Task SetBooksAsync(Guid ownerId, int skip, int take, string? query, string? sortBy, string? sortDirection, PaginatedResult<BookListItemDto> value, CancellationToken cancellationToken)
+        {
+            Stored = value;
+            StoredSortDirection = sortDirection;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeBookListQueryService : IBookListQueryService
+    {
+        public IReadOnlyCollection<BookListItemDto> Books { get; init; } = [];
+        public IReadOnlyCollection<AdminBookListItemDto> AdminBooks { get; init; } = [];
+        public int Count { get; init; }
+        public int AdminCount { get; init; }
+        public string? NextCycleSortDirection { get; init; }
+        public string? SortDirectionUsed { get; private set; }
+        public bool GetBooksCalled { get; private set; }
+
+        public Task<IReadOnlyCollection<BookListItemDto>> GetBooksAsync(Guid ownerId, BookSearchCriteria criteria, int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        {
+            GetBooksCalled = true;
+            SortDirectionUsed = sortDirection;
+            return Task.FromResult(Books);
+        }
+
+        public Task<int> GetBookCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(Count);
+        public Task<IReadOnlyCollection<AdminBookListItemDto>> GetAdminBooksAsync(BookSearchCriteria criteria, int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken) => Task.FromResult(AdminBooks);
+        public Task<int> GetAdminBookCountAsync(BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(AdminCount);
+        public Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy, string? currentSortDirection, CancellationToken cancellationToken) => Task.FromResult(NextCycleSortDirection);
+    }
+
+    private sealed class FakeBookExportQueryService : IBookExportQueryService
+    {
+        public Guid OwnerId { get; private set; }
+        public int Skip { get; private set; }
+        public int Take { get; private set; }
+        public string? SortBy { get; private set; }
+        public string? SortDirection { get; private set; }
+
+        public Task<PaginatedResult<BookDto>> GetBooksForExportAsync(Guid ownerId, BookSearchCriteria criteria, int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        {
+            OwnerId = ownerId;
+            Skip = skip;
+            Take = take;
+            SortBy = sortBy;
+            SortDirection = sortDirection;
+            return Task.FromResult(PaginatedResult<BookDto>.Create(skip, take, 1, [new BookDto { Id = Guid.NewGuid(), PrimaryTitle = "Export", ContentType = "Novel", Status = "Reading" }]));
+        }
+    }
+}
