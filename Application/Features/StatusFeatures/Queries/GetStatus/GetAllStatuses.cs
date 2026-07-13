@@ -17,13 +17,7 @@ public class GetAllStatusesQueryHandler : IRequestHandler<GetAllStatusesQuery, P
     {
         var statuses = await _statusRepository.GetAllAsync(request.Skip, request.Take, cancellationToken);
         var total = await _statusRepository.GetCountAsync(cancellationToken);
-        return new PaginatedResult<StatusDto>
-        {
-            Take = request.Take,
-            Skip = request.Skip,
-            Data = statuses.Select(s => s.ToDto()).ToList(),
-            Total = total
-        };
+        return PaginatedResult<StatusDto>.Create(request.Skip, request.Take, total, statuses.Select(s => s.ToDto()));
     }
 }
 

@@ -148,3 +148,4 @@ tools/__pycache__/
 .codex/
 .agents/
 .openai/
+artifacts/coverage/

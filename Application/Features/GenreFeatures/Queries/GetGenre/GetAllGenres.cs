@@ -17,12 +17,6 @@ public class GetAllGenresQueryHandler : IRequestHandler<GetAllGenresQuery, Pagin
     {
         var genres = await _genreRepository.GetAllAsync(request.Skip, request.Take, cancellationToken);
         var total = await _genreRepository.GetCountAsync(cancellationToken);
-        return new PaginatedResult<GenreDto>
-        {
-            Take = request.Take,
-            Skip = request.Skip,
-            Data = genres.Select(g => g.ToDto()).ToList(),
-            Total = total
-        };
+        return PaginatedResult<GenreDto>.Create(request.Skip, request.Take, total, genres.Select(g => g.ToDto()));
     }
 }
