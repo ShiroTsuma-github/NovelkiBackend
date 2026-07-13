@@ -53,10 +53,11 @@ export function AdminPage() {
   const sortBy = searchParams.get('sortBy') ?? 'lastModified'
   const sortDirection = readSortDirection(searchParams)
   const query = searchParams.get('query') ?? ''
+  const normalizedQuery = query.trim()
   const visibleColumns = getVisibleColumns(adminBookColumns, columnPreferences)
   const adminBooksQuery = useQuery({
-    queryKey: ['adminBooks', skip, pageSize, query, sortBy, sortDirection],
-    queryFn: () => api.getAdminBooks({ skip, take: pageSize, query, sortBy, sortDirection }),
+    queryKey: ['adminBooks', skip, pageSize, normalizedQuery, sortBy, sortDirection],
+    queryFn: () => api.getAdminBooks({ skip, take: pageSize, query: normalizedQuery, sortBy, sortDirection }),
   })
   const purgeMutation = useMutation({
     mutationFn: (ownerId: string) => api.deleteAdminBooksByOwner(ownerId),
@@ -75,8 +76,9 @@ export function AdminPage() {
 
   function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
-    if (value) {
-      next.set('query', value)
+    const normalizedValue = value.trim()
+    if (normalizedValue) {
+      next.set('query', normalizedValue)
     } else {
       next.delete('query')
     }

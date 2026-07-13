@@ -233,6 +233,52 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldFilterAdminSearchWithSortingAndPaging()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+        context.Users.Add(new Infrastructure.Identity.User
+        {
+            Id = otherOwnerId,
+            UserName = "other-admin-search",
+            NormalizedUserName = "OTHER-ADMIN-SEARCH"
+        });
+
+        var firstMatch = await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
+        var secondMatch = await TestData.AddBookAsync(context, otherOwnerId, "Lord of the Secrets");
+        await TestData.AddBookAsync(context, database.UserId, "Shadow Slave");
+        var repository = new BookRepository(context);
+        var criteria = BookSearchQueryParser.Parse("title:Lord");
+
+        var firstPage = (await repository.SearchAdminListAsync(criteria, 0, 1, "title", "asc", CancellationToken.None)).ToList();
+        var secondPage = (await repository.SearchAdminListAsync(criteria, 1, 1, "title", "asc", CancellationToken.None)).ToList();
+        var count = await repository.GetSearchCountAsync(criteria, CancellationToken.None);
+
+        Assert.Equal(2, count);
+        Assert.Single(firstPage);
+        Assert.Single(secondPage);
+        Assert.Equal(firstMatch.Id, firstPage[0].Id);
+        Assert.Equal(secondMatch.Id, secondPage[0].Id);
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldReturnNoAdminSearchResultsForMissingQuery()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        await TestData.AddBookAsync(context, database.UserId, "Lord of Mysteries");
+        var repository = new BookRepository(context);
+        var criteria = BookSearchQueryParser.Parse("title:Missing");
+
+        var results = (await repository.SearchAdminListAsync(criteria, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+        var count = await repository.GetSearchCountAsync(criteria, CancellationToken.None);
+
+        Assert.Empty(results);
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldReplaceCollectionsAfterDuplicateTitleLookup()
     {
         using var database = new SqliteTestDatabase();
