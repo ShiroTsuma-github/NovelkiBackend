@@ -23,14 +23,21 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("books")]
-    public async Task<IActionResult> GetBooks([FromQuery] GetAllAdminBooksQuery query)
+    public async Task<IActionResult> GetBooks(
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 100,
+        [FromQuery] string? query = null,
+        [FromQuery] string? sortBy = "lastModified",
+        [FromQuery] string? sortDirection = "desc",
+        CancellationToken cancellationToken = default)
     {
+        var request = new GetAllAdminBooksQuery(skip, take, query, sortBy, sortDirection);
         using var activity = NovelkiTelemetry.ActivitySource.StartActivity("Admin.Book.Search", ActivityKind.Internal);
-        activity?.SetTag("book.query", query.Query);
-        activity?.SetTag("book.sort_by", query.SortBy);
-        activity?.SetTag("book.sort_direction", query.SortDirection);
+        activity?.SetTag("book.query", request.Query);
+        activity?.SetTag("book.sort_by", request.SortBy);
+        activity?.SetTag("book.sort_direction", request.SortDirection);
         NovelkiTelemetry.BookSearchRequests.Add(1);
-        var books = await _mediator.Send(query);
+        var books = await _mediator.Send(request, cancellationToken);
         activity?.SetTag("book.result_count", books.Data.Count);
 
         return Ok(books);
