@@ -174,6 +174,27 @@ describe('AdminPage', () => {
     })))
   })
 
+  it('sorts by total chapters from the admin table column', async () => {
+    window.localStorage.setItem('novelki.adminBooks.columns.v1', JSON.stringify([
+      { id: 'totalChapters', visible: true },
+    ]))
+    vi.mocked(api.getAdminBooks).mockResolvedValue(paginated([createAdminBook()]))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AdminPage />, { route: '/admin' })
+
+    expect(await screen.findByText('Shadow Slave')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /chapters/i }))
+
+    await waitFor(() => expect(api.getAdminBooks).toHaveBeenLastCalledWith(expect.objectContaining({
+      skip: 0,
+      take: 20,
+      query: '',
+      sortBy: 'chapters',
+      sortDirection: 'asc',
+    })))
+  })
+
   it('shows shared scroll shortcut buttons', async () => {
     vi.mocked(api.getAdminBooks).mockResolvedValue(paginated([createAdminBook()]))
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})

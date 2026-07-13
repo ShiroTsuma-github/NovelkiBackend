@@ -97,6 +97,30 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldSearchByProgressAndChaptersAliases()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var matching = await TestData.AddBookAsync(context, database.UserId, "Long Runner");
+        matching.CurrentChapterNumber = 75;
+        matching.TotalChapters = 150;
+        var tooShort = await TestData.AddBookAsync(context, database.UserId, "Short Runner");
+        tooShort.CurrentChapterNumber = 75;
+        tooShort.TotalChapters = 90;
+        var tooEarly = await TestData.AddBookAsync(context, database.UserId, "Early Runner");
+        tooEarly.CurrentChapterNumber = 20;
+        tooEarly.TotalChapters = 150;
+        await context.SaveChangesAsync();
+        var repository = new BookRepository(context);
+        var criteria = BookSearchQueryParser.Parse("progress:>=50 chapters:>=100");
+
+        var books = (await repository.SearchAsync(database.UserId, criteria, 0, 10, CancellationToken.None)).ToList();
+
+        Assert.Single(books);
+        Assert.Equal(matching.Id, books[0].Id);
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSortByLastModifiedDescendingByDefault()
     {
         using var database = new SqliteTestDatabase();
@@ -137,6 +161,26 @@ public class RepositoryTests
 
         Assert.Equal([apple.Id, bananaUpper.Id, bananaLower.Id, zebra.Id], ascending.Select(book => book.Id));
         Assert.Equal([zebra.Id, bananaLower.Id, bananaUpper.Id, apple.Id], descending.Select(book => book.Id));
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSortByTotalChaptersAlias()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var shortBook = await TestData.AddBookAsync(context, database.UserId, "Short");
+        var longBook = await TestData.AddBookAsync(context, database.UserId, "Long");
+        shortBook.TotalChapters = 20;
+        longBook.TotalChapters = 200;
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var repository = new BookRepository(context);
+
+        var ascending = (await repository.GetAllAsync(database.UserId, 0, 10, "chapters", "asc", CancellationToken.None)).ToList();
+        var descending = (await repository.GetAllAsync(database.UserId, 0, 10, "chapters", "desc", CancellationToken.None)).ToList();
+
+        Assert.Equal([shortBook.Id, longBook.Id], ascending.Select(book => book.Id));
+        Assert.Equal([longBook.Id, shortBook.Id], descending.Select(book => book.Id));
     }
 
     [Fact]

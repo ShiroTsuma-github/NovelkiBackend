@@ -661,8 +661,12 @@ public class BookRepository : IBookRepository, IBookListReadRepository
                     book => book.ContentType.Name);
             case "progress":
                 return descending
-                ? query.OrderByDescending(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle)
-                : query.OrderBy(b => b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle);
+                ? query.OrderByDescending(b => (double?)b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle)
+                : query.OrderBy(b => (double?)b.CurrentChapterNumber).ThenBy(b => b.PrimaryTitle);
+            case "chapters":
+                return descending
+                ? query.OrderByDescending(b => (double?)b.TotalChapters).ThenBy(b => b.PrimaryTitle)
+                : query.OrderBy(b => (double?)b.TotalChapters).ThenBy(b => b.PrimaryTitle);
             case "rating":
                 return descending
                 ? query.OrderBy(b => b.Rating == null).ThenByDescending(b => b.Rating).ThenBy(b => b.PrimaryTitle)
@@ -697,6 +701,7 @@ public class BookRepository : IBookRepository, IBookListReadRepository
             "status" => "status",
             "type" or "contenttype" => "type",
             "progress" or "currentchapter" => "progress",
+            "chapter" or "chapters" or "totalchapter" or "totalchapters" => "chapters",
             "rating" => "rating",
             "priority" => "priority",
             "owner" or "ownerid" => "owner",
