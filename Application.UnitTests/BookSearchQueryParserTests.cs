@@ -53,6 +53,8 @@ public class BookSearchQueryParserTests
     [InlineData("progress:>=50", BookSearchNumberField.CurrentChapter, BookSearchOperator.GreaterThanOrEqual, 50)]
     [InlineData("chapter:<200", BookSearchNumberField.TotalChapters, BookSearchOperator.LessThan, 200)]
     [InlineData("chapters:300", BookSearchNumberField.TotalChapters, BookSearchOperator.Equal, 300)]
+    [InlineData("total:<=400", BookSearchNumberField.TotalChapters, BookSearchOperator.LessThanOrEqual, 400)]
+    [InlineData("totalChapters:>500", BookSearchNumberField.TotalChapters, BookSearchOperator.GreaterThan, 500)]
     public void Parse_ShouldTreatColonNumberFiltersWithOperatorsAsNumberFilters(
         string query,
         BookSearchNumberField expectedField,

@@ -7,6 +7,9 @@ export type BookFilters = {
   status: string
   type: string
   ratingMin: string
+  progressMin: string
+  chaptersMax: string
+  totalChapters: string
   priority: string
 }
 
@@ -19,6 +22,9 @@ export const emptyFilters: BookFilters = {
   status: '',
   type: '',
   ratingMin: '',
+  progressMin: '',
+  chaptersMax: '',
+  totalChapters: '',
   priority: '',
 }
 
@@ -31,13 +37,19 @@ export function buildBookQuery(filters: BookFilters) {
   addField(parts, 'genre', filters.genre)
   addField(parts, 'status', filters.status)
   addField(parts, 'type', filters.type)
-  if (filters.ratingMin) {
-    parts.push(`rating>=${filters.ratingMin}`)
-  }
-  if (filters.priority) {
-    parts.push(`priority=${filters.priority}`)
-  }
+  addNumber(parts, 'rating', '>=', filters.ratingMin)
+  addNumber(parts, 'progress', '>=', filters.progressMin)
+  addNumber(parts, 'chapters', '<=', filters.chaptersMax)
+  addNumber(parts, 'totalChapters', null, filters.totalChapters)
+  addNumber(parts, 'priority', null, filters.priority)
   return parts.join(' ')
+}
+
+function addNumber(parts: string[], field: string, operator: string | null, value: string) {
+  const trimmed = value.trim()
+  if (trimmed) {
+    parts.push(`${field}:${operator ?? ''}${trimmed}`)
+  }
 }
 
 function addField(parts: string[], field: string, value: string) {

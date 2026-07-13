@@ -54,6 +54,7 @@ describe('BooksPage', () => {
     expect(screen.getByText('rating:8')).toBeInTheDocument()
     expect(screen.getByText('progress:>=50')).toBeInTheDocument()
     expect(screen.getByText('chapters:<200')).toBeInTheDocument()
+    expect(screen.getByText('total:>500')).toBeInTheDocument()
   })
 
   it('switches to cards view and persists the preference', async () => {
