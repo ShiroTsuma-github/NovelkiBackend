@@ -597,13 +597,13 @@ export function BookAdvancedSearch({
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
         <input
           className={`${inputClass} w-full pl-9`}
-          placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating>=8'}
+          placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating:>=8'}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
       </label>
       <p className="text-xs text-slate-500">
-        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating&gt;=8</code>, <code>rating:8</code>, and wildcard searches like <code>title:i*</code>.
+        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, and wildcard searches like <code>title:i*</code>.
       </p>
     </section>
   )

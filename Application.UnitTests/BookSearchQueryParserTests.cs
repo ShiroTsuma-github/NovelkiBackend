@@ -44,4 +44,25 @@ public class BookSearchQueryParserTests
         Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Priority && f.Operator == BookSearchOperator.Equal && f.Value == 2);
         Assert.Empty(criteria.Fields);
     }
+
+    [Theory]
+    [InlineData("rating:>=8", BookSearchNumberField.Rating, BookSearchOperator.GreaterThanOrEqual, 8)]
+    [InlineData("rating:>8", BookSearchNumberField.Rating, BookSearchOperator.GreaterThan, 8)]
+    [InlineData("priority:<=3", BookSearchNumberField.Priority, BookSearchOperator.LessThanOrEqual, 3)]
+    [InlineData("current:=120", BookSearchNumberField.CurrentChapter, BookSearchOperator.Equal, 120)]
+    public void Parse_ShouldTreatColonNumberFiltersWithOperatorsAsNumberFilters(
+        string query,
+        BookSearchNumberField expectedField,
+        BookSearchOperator expectedOperator,
+        decimal expectedValue)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        var filter = Assert.Single(criteria.Numbers);
+        Assert.Equal(expectedField, filter.Field);
+        Assert.Equal(expectedOperator, filter.Operator);
+        Assert.Equal(expectedValue, filter.Value);
+        Assert.Empty(criteria.Fields);
+        Assert.Empty(criteria.Terms);
+    }
 }

@@ -43,6 +43,17 @@ describe('BooksPage', () => {
     }))
   })
 
+  it('shows the colon-based rating operator syntax in advanced search help', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    expect(screen.getByPlaceholderText(/rating:>=8/i)).toBeInTheDocument()
+    expect(screen.getByText('rating:>=8')).toBeInTheDocument()
+    expect(screen.getByText('rating:8')).toBeInTheDocument()
+  })
+
   it('switches to cards view and persists the preference', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()
