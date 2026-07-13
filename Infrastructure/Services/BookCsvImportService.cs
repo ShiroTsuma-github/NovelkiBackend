@@ -123,24 +123,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 pair => pair.Value < fields.Length ? fields[pair.Value] : string.Empty,
                 StringComparer.OrdinalIgnoreCase);
 
-                session.Rows.Add(new ImportRow
-            {
-                RowId = Guid.NewGuid(),
-                LineNumber = NormalizeLineNumber((int?)parser.LineNumber),
-                PrimaryTitle = CleanName(row, "primaryTitle"),
-                AuthorName = CleanName(row, "authorName"),
-                ContentType = CleanName(row, "contentType"),
-                Status = CleanName(row, "status"),
-                Tags = NormalizeTags(Clean(row, "tags")),
-                TotalChapters = Clean(row, "totalChapters"),
-                CurrentChapterNumber = Clean(row, "currentChapterNumber"),
-                CurrentChapterLabel = Clean(row, "currentChapterLabel"),
-                Rating = Clean(row, "rating"),
-                Priority = Clean(row, "priority"),
-                Description = Clean(row, "description"),
-                Notes = NormalizeNotes(Clean(row, "notes")),
-                RawImportedLine = Clean(row, "rawImportedLine")
-            });
+            session.Rows.Add(CreateRow(row, NormalizeLineNumber((int?)parser.LineNumber)));
         }
 
         await RevalidateSessionAsync(session, cancellationToken);
@@ -161,19 +144,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
             ?? throw new ValidationException("Import row not found.");
 
-        row.PrimaryTitle = NormalizeNameToNull(request.PrimaryTitle);
-        row.AuthorName = NormalizeNameToNull(request.AuthorName);
-        row.ContentType = NormalizeNameToNull(request.ContentType);
-        row.Status = NormalizeNameToNull(request.Status);
-        row.Tags = NormalizeTags(request.Tags);
-        row.TotalChapters = TrimToNull(request.TotalChapters);
-        row.CurrentChapterNumber = TrimToNull(request.CurrentChapterNumber);
-        row.CurrentChapterLabel = TrimToNull(request.CurrentChapterLabel);
-        row.Rating = TrimToNull(request.Rating);
-        row.Priority = TrimToNull(request.Priority);
-        row.Description = TrimToNull(request.Description);
-        row.Notes = NormalizeNotes(request.Notes);
-        row.RawImportedLine = TrimToNull(request.RawImportedLine);
+        ApplyRequest(row, request);
 
         await RevalidateSessionAsync(session, cancellationToken);
         return ToDto(session);
@@ -367,19 +338,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             row.Errors.Clear();
             row.FieldErrors.Clear();
 
-            row.PrimaryTitle = NormalizeNameToNull(row.PrimaryTitle);
-            row.AuthorName = NormalizeNameToNull(row.AuthorName);
-            row.ContentType = NormalizeNameToNull(row.ContentType);
-            row.Status = NormalizeNameToNull(row.Status);
-            row.Tags = NormalizeTags(row.Tags);
-            row.TotalChapters = TrimToNull(row.TotalChapters);
-            row.CurrentChapterNumber = TrimToNull(row.CurrentChapterNumber);
-            row.CurrentChapterLabel = TrimToNull(row.CurrentChapterLabel);
-            row.Rating = TrimToNull(row.Rating);
-            row.Priority = TrimToNull(row.Priority);
-            row.Description = TrimToNull(row.Description);
-            row.Notes = NormalizeNotes(row.Notes);
-            row.RawImportedLine = TrimToNull(row.RawImportedLine);
+            NormalizeRow(row);
 
             if (string.IsNullOrWhiteSpace(row.PrimaryTitle))
             {
@@ -484,6 +443,63 @@ public sealed class BookCsvImportService : IBookCsvImportService
         authorMap[normalized] = author;
         _context.Authors.Add(author);
         return author;
+    }
+
+    private static ImportRow CreateRow(IReadOnlyDictionary<string, string> values, int lineNumber)
+    {
+        return new ImportRow
+        {
+            RowId = Guid.NewGuid(),
+            LineNumber = lineNumber,
+            PrimaryTitle = CleanName(values, "primaryTitle"),
+            AuthorName = CleanName(values, "authorName"),
+            ContentType = CleanName(values, "contentType"),
+            Status = CleanName(values, "status"),
+            Tags = NormalizeTags(Clean(values, "tags")),
+            TotalChapters = Clean(values, "totalChapters"),
+            CurrentChapterNumber = Clean(values, "currentChapterNumber"),
+            CurrentChapterLabel = Clean(values, "currentChapterLabel"),
+            Rating = Clean(values, "rating"),
+            Priority = Clean(values, "priority"),
+            Description = Clean(values, "description"),
+            Notes = NormalizeNotes(Clean(values, "notes")),
+            RawImportedLine = Clean(values, "rawImportedLine")
+        };
+    }
+
+    private static void ApplyRequest(ImportRow row, UpdateBookImportRowRequest request)
+    {
+        row.PrimaryTitle = request.PrimaryTitle;
+        row.AuthorName = request.AuthorName;
+        row.ContentType = request.ContentType;
+        row.Status = request.Status;
+        row.Tags = request.Tags;
+        row.TotalChapters = request.TotalChapters;
+        row.CurrentChapterNumber = request.CurrentChapterNumber;
+        row.CurrentChapterLabel = request.CurrentChapterLabel;
+        row.Rating = request.Rating;
+        row.Priority = request.Priority;
+        row.Description = request.Description;
+        row.Notes = request.Notes;
+        row.RawImportedLine = request.RawImportedLine;
+        NormalizeRow(row);
+    }
+
+    private static void NormalizeRow(ImportRow row)
+    {
+        row.PrimaryTitle = NormalizeNameToNull(row.PrimaryTitle);
+        row.AuthorName = NormalizeNameToNull(row.AuthorName);
+        row.ContentType = NormalizeNameToNull(row.ContentType);
+        row.Status = NormalizeNameToNull(row.Status);
+        row.Tags = NormalizeTags(row.Tags);
+        row.TotalChapters = TrimToNull(row.TotalChapters);
+        row.CurrentChapterNumber = TrimToNull(row.CurrentChapterNumber);
+        row.CurrentChapterLabel = TrimToNull(row.CurrentChapterLabel);
+        row.Rating = TrimToNull(row.Rating);
+        row.Priority = TrimToNull(row.Priority);
+        row.Description = TrimToNull(row.Description);
+        row.Notes = NormalizeNotes(row.Notes);
+        row.RawImportedLine = TrimToNull(row.RawImportedLine);
     }
 
     private static BookImportSessionDto ToDto(ImportSession session)
