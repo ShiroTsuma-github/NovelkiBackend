@@ -181,6 +181,7 @@ public class BookControllerTests
     {
         var mediator = new Mock<IMediator>();
         var importService = new Mock<IBookCsvImportService>();
+        var exportService = new Mock<IBookCsvExportService>();
         var logger = new Mock<ILogger<BookController>>();
         var firstPage = new PaginatedResult<BookDto>
         {
@@ -204,7 +205,10 @@ public class BookControllerTests
             .SetupSequence(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(firstPage)
             .ReturnsAsync(fullPage);
-        var controller = new BookController(mediator.Object, importService.Object, logger.Object);
+        exportService
+            .Setup(service => service.Build(fullPage.Data))
+            .Returns("exported,csv\n");
+        var controller = new BookController(mediator.Object, importService.Object, exportService.Object, logger.Object);
 
         var result = await controller.ExportBooks("author:Toika", "title", "asc");
 
@@ -212,11 +216,10 @@ public class BookControllerTests
         var csv = Encoding.UTF8.GetString(file.FileContents);
 
         Assert.Equal("books-export.csv", file.FileDownloadName);
-        Assert.Contains("primaryTitle,author,contentType,status,currentChapterNumber,currentChapterLabel,totalChapters,rating,priority,genres,tags,notes", csv);
-        Assert.Contains("\"Alpha, Book\",Toika,Novel,Reading", csv);
-        Assert.Contains("\"Line 1\nLine 2\"", csv);
+        Assert.Equal("exported,csv\n", csv);
         mediator.Verify(mock => mock.Send(new GetAllBooksForExportQuery(0, 1, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
         mediator.Verify(mock => mock.Send(new GetAllBooksForExportQuery(0, 2, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
+        exportService.Verify(service => service.Build(fullPage.Data), Times.Once);
     }
 
     [Fact]
@@ -262,35 +265,15 @@ public class BookControllerTests
         Assert.Same(expected, ok.Value);
     }
 
-    [Fact]
-    public void BookExportCsv_ShouldEscapeSpecialCharacters()
-    {
-        var csv = BookExportCsv.Build([
-            Book("Alpha \"Quoted\"", notes: "A,B"),
-        ]);
-
-        Assert.Contains("\"Alpha \"\"Quoted\"\"\"", csv);
-        Assert.Contains("\"A,B\"", csv);
-    }
-
-    [Fact]
-    public void BookExportCsv_ShouldNeutralizeSpreadsheetFormulas()
-    {
-        var csv = BookExportCsv.Build([
-            Book("=HYPERLINK(\"https://evil.example\")", author: "+cmd", tags: ["@tag"], notes: "-payload"),
-        ]);
-
-        Assert.Contains("'=HYPERLINK", csv);
-        Assert.Contains("'+cmd", csv);
-        Assert.Contains("'@tag", csv);
-        Assert.Contains("'-payload", csv);
-    }
-
-    private static BookController CreateController(IMediator? mediator = null, IBookCsvImportService? importService = null)
+    private static BookController CreateController(
+        IMediator? mediator = null,
+        IBookCsvImportService? importService = null,
+        IBookCsvExportService? exportService = null)
     {
         return new BookController(
             mediator ?? Mock.Of<IMediator>(),
             importService ?? Mock.Of<IBookCsvImportService>(),
+            exportService ?? Mock.Of<IBookCsvExportService>(),
             NullLogger<BookController>.Instance)
         {
             ControllerContext = new ControllerContext
