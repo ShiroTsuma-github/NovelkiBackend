@@ -128,10 +128,23 @@ public static class BookSearchQueryParser
         }
 
         var fieldName = token[..separatorIndex];
-        var valueText = token[(separatorIndex + 1)..];
+        var valueText = token[(separatorIndex + 1)..].Trim();
         if (!NumberAliases.TryGetValue(fieldName, out var field))
         {
             return false;
+        }
+
+        var parsedOperator = BookSearchOperator.Equal;
+        foreach (var op in new[] { ">=", "<=", ">", "<", "=" })
+        {
+            if (!valueText.StartsWith(op, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            valueText = valueText[op.Length..].Trim();
+            parsedOperator = ToOperator(op);
+            break;
         }
 
         if (!decimal.TryParse(valueText, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
@@ -139,7 +152,7 @@ public static class BookSearchQueryParser
             return false;
         }
 
-        filter = new BookSearchNumberFilter(field, BookSearchOperator.Equal, value);
+        filter = new BookSearchNumberFilter(field, parsedOperator, value);
         return true;
     }
 

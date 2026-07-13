@@ -55,35 +55,8 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 - Zakres: wprowadzic lzejszy DTO dla listy oraz osobny DTO dla detalu; repozytorium i mapowanie maja ladowac tylko dane potrzebne dla danej strony; details page zachowuje pelny zakres danych.
 - Akceptacja: endpoint listy nie zwraca `progressHistory` ani pelnych danych linkow nieuzywanych na liscie; details endpoint nadal zwraca komplet danych; books i admin dzialaja bez regresji funkcjonalnej; testy obejmuja kontrakt obu endpointow oraz brak zbednych kolekcji w odpowiedzi listy.
 
-### NB-055 - Zweryfikuj i doprecyzuj UX skladni filtra rating z operatorami
-
-- Typ: `Investigation`
-- Priorytet: `P2`
-- Komponent: `Application/Common/BookSearchQueryParser.cs`, `Web/src/features/books/BooksPage.tsx`, testy parsera i UI wyszukiwania
-- Problem: `DONE NB-037` dodal alias `rating:`, ale z perspektywy frontendu nadal nie jest jasne lub nie dziala zgodnie z oczekiwaniem uzycie operatorow w stylu `rating:>8` albo `rating:>=8`.
-- Zakres: odtworzyc aktualne zachowanie dla `rating>=8`, `rating:8`, `rating:>8`, `rating:>=8`; jesli parser ma wspierac operator po dwukropku, wdrozyc to; jesli nie, poprawic help text i walidacje/feedback tak, zeby uzytkownik nie trafial w martwa skladnie.
-- Akceptacja: wspierane warianty rating query sa jednoznacznie okreslone i opisane w UI; nieobslugiwany format daje czytelny feedback albo jest obsluzony; testy obejmuja parser i scenariusz wpisania zapytania na frontendzie.
-
-### NB-038 - Dodaj osobny panel opcji dla cards view
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/BooksPage.tsx`, `ColumnSettingsPopup`, `BookCardGrid`
-- Problem: po przelaczeniu na cards popup nadal jest zorientowany na kolumny tabeli i nie daje ustawien dla karty.
-- Zakres: przygotowac osobne preferencje cards view, np. pokazywanie alternate titles, tags, genres, author, progress, rating i status.
-- Akceptacja: w trybie table widac ustawienia kolumn; w trybie cards widac ustawienia elementow karty; preferencje zapisuja sie w localStorage osobno; zmiana opcji od razu zmienia karty.
-
-### NB-040 - Sortuj Type i Status wedlug domenowego porzadku
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`, seed danych status/type
-- Problem: sortowanie po `Type` i `Status` jest alfabetyczne, a oczekiwany jest domenowy porzadek cykliczny.
-- Zakres: uzyc `SortOrder` albo jawnej kolejnosci domenowej dla statusow i typow; zdefiniowac zachowanie asc/desc.
-- Akceptacja: sort statusu nie zalezy od alfabetu; sort type nie zalezy od alfabetu; asc i desc sa deterministyczne; test pokrywa przynajmniej kilka statusow i typow.
-
 ### NB-041 - Dodaj dashboard summary biblioteki
-
+- NOTE: NEEDS REFINEMENT
 - Typ: `Feature gap`
 - Priorytet: `P3`
 - Komponent: `Web/src/features/books/BooksPage.tsx`, API agregatow jesli potrzebne
@@ -120,16 +93,18 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 - Zakres: zastosowac strategie spojnego wyszukiwania jak na main page, w tym utrzymanie poprzednich danych podczas fetchu i czytelny stan `Searching...` zamiast skakania zawartosci.
 - Akceptacja: wpisywanie frazy do admin search nie powoduje pustych przeskokow tabeli miedzy requestami; uzytkownik widzi poprzednie wyniki do czasu nowej odpowiedzi; loading jest czytelny; testy obejmuja szybkie wpisywanie i zachowanie tabeli podczas fetchu.
 
-### NB-043 - Dopracuj spacing gornych akcji i aktywny stan nawigacji
-
-- Typ: `UX/UI`
-- Priorytet: `P3`
-- Komponent: globalny layout/nawigacja, przyciski na gorze listy ksiazek
-- Problem: padding po prawej stronie gornych guzikow jest za maly, a `Add` jest wizualnie podswietlone razem z `Books`, co jest mylace.
-- Zakres: skorygowac padding przyciskow z ikonami i stan aktywny nawigacji dla `/books` oraz `/books/new`.
-- Akceptacja: ikony i tekst maja rowny oddech po lewej/prawej; aktywny stan jednoznacznie pokazuje aktualna podstrone; wejscie na add book nie wyglada jak rownoczesnie aktywne dwa glowne miejsca, jesli produkt tego nie oczekuje.
 
 ## Verification Tickets
+
+
+### DONE NB-055 - Zweryfikuj i doprecyzuj UX skladni filtra rating z operatorami
+
+- Typ: `Investigation`
+- Priorytet: `P2`
+- Komponent: `Application/Common/BookSearchQueryParser.cs`, `Web/src/features/books/BooksPage.tsx`, testy parsera i UI wyszukiwania
+- Problem: `DONE NB-037` dodal alias `rating:`, ale z perspektywy frontendu nadal nie jest jasne lub nie dziala zgodnie z oczekiwaniem uzycie operatorow w stylu `rating:>8` albo `rating:>=8`.
+- Zakres: odtworzyc aktualne zachowanie dla `rating>=8`, `rating:8`, `rating:>8`, `rating:>=8`; jesli parser ma wspierac operator po dwukropku, wdrozyc to; jesli nie, poprawic help text i walidacje/feedback tak, zeby uzytkownik nie trafial w martwa skladnie.
+- Akceptacja: wspierane warianty rating query sa jednoznacznie okreslone i opisane w UI; nieobslugiwany format daje czytelny feedback albo jest obsluzony; testy obejmuja parser i scenariusz wpisania zapytania na frontendzie.
 
 ### NB-050 - Wykonaj security baseline i test penetracyjny aplikacji
 
@@ -188,6 +163,17 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 
 ## SKONCZONE
 
+### DONE NB-043 - Dopracuj spacing gornych akcji i aktywny stan nawigacji
+
+- Typ: `UX/UI`
+- Priorytet: `P3`
+- Komponent: globalny layout/nawigacja, przyciski na gorze listy ksiazek
+- Problem: padding po prawej stronie gornych guzikow jest za maly, a `Add` jest wizualnie podswietlone razem z `Books`, co jest mylace.
+- Zakres: skorygowac padding przyciskow z ikonami i stan aktywny nawigacji dla `/books` oraz `/books/new`.
+- Akceptacja: ikony i tekst maja rowny oddech po lewej/prawej; aktywny stan jednoznacznie pokazuje aktualna podstrone; wejscie na add book nie wyglada jak rownoczesnie aktywne dwa glowne miejsca, jesli produkt tego nie oczekuje.
+
+
+
 ### DONE NB-022 - Dodaj sugestie poprawnych Type i Status w imporcie
 
 - Typ: `Feature gap`
@@ -197,6 +183,26 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 - Zakres: dostarczyc do frontendu dostepne typy/statusy i pokazac je jako select/autocomplete w edytorze wiersza.
 - Akceptacja: pole `Type` oferuje istniejace typy; pole `Status` oferuje istniejace statusy; wpis reczny dalej mozna poprawic i revalidate; blad pokazuje oczekiwana wartosc albo liste sugestii.
 - Commit: `ee3a731 feat: suggest import types and statuses`
+
+
+### DONE NB-038 - Dodaj osobny panel opcji dla cards view
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `ColumnSettingsPopup`, `BookCardGrid`
+- Problem: po przelaczeniu na cards popup nadal jest zorientowany na kolumny tabeli i nie daje ustawien dla karty.
+- Zakres: przygotowac osobne preferencje cards view, np. pokazywanie alternate titles, tags, genres, author, progress, rating i status.
+- Akceptacja: w trybie table widac ustawienia kolumn; w trybie cards widac ustawienia elementow karty; preferencje zapisuja sie w localStorage osobno; zmiana opcji od razu zmienia karty.
+
+### DONE NB-040 - Sortuj Type i Status wedlug domenowego porzadku
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `Infrastructure/Persistence/BookRepository.cs`, seed danych status/type
+- Problem: sortowanie po `Type` i `Status` jest alfabetyczne, a oczekiwany jest domenowy porzadek cykliczny.
+- Zakres: uzyc `SortOrder` albo jawnej kolejnosci domenowej dla statusow i typow; zdefiniowac zachowanie asc/desc.
+- Akceptacja: sort statusu nie zalezy od alfabetu; sort type nie zalezy od alfabetu; asc i desc sa deterministyczne; test pokrywa przynajmniej kilka statusow i typow.
+
 
 ### DONE NB-027 - Ustabilizuj sortowanie po tytule
 
