@@ -43,50 +43,14 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
         var stored = await _storage.SaveAsync(book.OwnerId, book.Id, request.Content, request.FileName, request.ContentType, cancellationToken);
+        var change = BookCoverMutationSupport.ApplyStoredCover(book, stored, BookCoverSource.ManualUpload, null);
 
-        var hadExistingCover = book.Cover is not null;
-        book.Cover ??= new BookCover { BookId = book.Id, Book = book };
-        var cover = book.Cover;
-        var previousStoragePath = cover.StoragePath;
-        var previousThumbnailStoragePath = cover.ThumbnailStoragePath;
-
-        cover.Status = BookCoverStatus.Uploaded;
-        cover.Source = BookCoverSource.ManualUpload;
-        cover.StoragePath = stored.Original.StoragePath;
-        cover.ThumbnailStoragePath = stored.Thumbnail.StoragePath;
-        cover.OriginalImageUrl = null;
-        cover.MimeType = stored.Original.MimeType;
-        cover.ThumbnailMimeType = stored.Thumbnail.MimeType;
-        cover.SizeBytes = stored.Original.SizeBytes;
-        cover.ThumbnailSizeBytes = stored.Thumbnail.SizeBytes;
-        cover.Width = stored.Original.Width;
-        cover.Height = stored.Original.Height;
-        cover.ThumbnailWidth = stored.Thumbnail.Width;
-        cover.ThumbnailHeight = stored.Thumbnail.Height;
-        cover.FailureReason = null;
-        cover.LastAttemptAt = DateTimeOffset.UtcNow;
-        BookCoverLinkHelper.TouchBook(book);
-        if (hadExistingCover)
-        {
-            await _bookRepository.SaveAsync(cancellationToken);
-        }
-        else
-        {
-            await _coverRepository.AddAsync(cover, cancellationToken);
-        }
-
-        if (!string.Equals(previousStoragePath, stored.Original.StoragePath, StringComparison.OrdinalIgnoreCase))
-        {
-            await _storage.DeleteIfExistsAsync(previousStoragePath, cancellationToken);
-        }
-        if (!string.Equals(previousThumbnailStoragePath, stored.Thumbnail.StoragePath, StringComparison.OrdinalIgnoreCase))
-        {
-            await _storage.DeleteIfExistsAsync(previousThumbnailStoragePath, cancellationToken);
-        }
+        await BookCoverMutationSupport.SaveAsync(change, _bookRepository, _coverRepository, cancellationToken);
+        await BookCoverMutationSupport.DeletePreviousFilesIfChangedAsync(change, stored, _storage, cancellationToken);
 
         await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
 
-        return cover.ToDto(book.Id);
+        return change.Cover.ToDto(book.Id);
     }
 }
 
@@ -126,51 +90,15 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
         var stored = await _remoteImageService.SaveFromUrlAsync(book.OwnerId, book.Id, request.ImageUrl, cancellationToken);
+        var change = BookCoverMutationSupport.ApplyStoredCover(book, stored, BookCoverSource.ManualUrl, request.ImageUrl);
+        BookCoverLinkHelper.EnsureCoverSourceLink(book, request.ImageUrl, change.Cover.Source);
 
-        var hadExistingCover = book.Cover is not null;
-        book.Cover ??= new BookCover { BookId = book.Id, Book = book };
-        var cover = book.Cover;
-        var previousStoragePath = cover.StoragePath;
-        var previousThumbnailStoragePath = cover.ThumbnailStoragePath;
-
-        cover.Status = BookCoverStatus.Uploaded;
-        cover.Source = BookCoverSource.ManualUrl;
-        cover.StoragePath = stored.Original.StoragePath;
-        cover.ThumbnailStoragePath = stored.Thumbnail.StoragePath;
-        cover.OriginalImageUrl = request.ImageUrl;
-        cover.MimeType = stored.Original.MimeType;
-        cover.ThumbnailMimeType = stored.Thumbnail.MimeType;
-        cover.SizeBytes = stored.Original.SizeBytes;
-        cover.ThumbnailSizeBytes = stored.Thumbnail.SizeBytes;
-        cover.Width = stored.Original.Width;
-        cover.Height = stored.Original.Height;
-        cover.ThumbnailWidth = stored.Thumbnail.Width;
-        cover.ThumbnailHeight = stored.Thumbnail.Height;
-        cover.FailureReason = null;
-        cover.LastAttemptAt = DateTimeOffset.UtcNow;
-        BookCoverLinkHelper.EnsureCoverSourceLink(book, request.ImageUrl, cover.Source);
-        BookCoverLinkHelper.TouchBook(book);
-        if (hadExistingCover)
-        {
-            await _bookRepository.SaveAsync(cancellationToken);
-        }
-        else
-        {
-            await _coverRepository.AddAsync(cover, cancellationToken);
-        }
-
-        if (!string.Equals(previousStoragePath, stored.Original.StoragePath, StringComparison.OrdinalIgnoreCase))
-        {
-            await _storage.DeleteIfExistsAsync(previousStoragePath, cancellationToken);
-        }
-        if (!string.Equals(previousThumbnailStoragePath, stored.Thumbnail.StoragePath, StringComparison.OrdinalIgnoreCase))
-        {
-            await _storage.DeleteIfExistsAsync(previousThumbnailStoragePath, cancellationToken);
-        }
+        await BookCoverMutationSupport.SaveAsync(change, _bookRepository, _coverRepository, cancellationToken);
+        await BookCoverMutationSupport.DeletePreviousFilesIfChangedAsync(change, stored, _storage, cancellationToken);
 
         await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
 
-        return cover.ToDto(book.Id);
+        return change.Cover.ToDto(book.Id);
     }
 }
 
@@ -205,42 +133,14 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
     {
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
             ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        var hadExistingCover = book.Cover is not null;
-        book.Cover ??= new BookCover { BookId = book.Id, Book = book };
-        var cover = book.Cover;
-        var previousStoragePath = cover.StoragePath;
-        var previousThumbnailStoragePath = cover.ThumbnailStoragePath;
+        var change = BookCoverMutationSupport.ApplyPendingRefresh(book);
 
-        cover.Status = BookCoverStatus.Pending;
-        cover.Source = null;
-        cover.StoragePath = null;
-        cover.ThumbnailStoragePath = null;
-        cover.OriginalImageUrl = null;
-        cover.MimeType = null;
-        cover.ThumbnailMimeType = null;
-        cover.SizeBytes = null;
-        cover.ThumbnailSizeBytes = null;
-        cover.Width = null;
-        cover.Height = null;
-        cover.ThumbnailWidth = null;
-        cover.ThumbnailHeight = null;
-        cover.FailureReason = null;
-        cover.LastAttemptAt = DateTimeOffset.UtcNow;
-        BookCoverLinkHelper.TouchBook(book);
-        if (hadExistingCover)
-        {
-            await _bookRepository.SaveAsync(cancellationToken);
-        }
-        else
-        {
-            await _coverRepository.AddAsync(cover, cancellationToken);
-        }
-
-        await _storage.DeleteIfExistsAsync(previousStoragePath, cancellationToken);
-        await _storage.DeleteIfExistsAsync(previousThumbnailStoragePath, cancellationToken);
+        await BookCoverMutationSupport.SaveAsync(change, _bookRepository, _coverRepository, cancellationToken);
+        await _storage.DeleteIfExistsAsync(change.PreviousStoragePath, cancellationToken);
+        await _storage.DeleteIfExistsAsync(change.PreviousThumbnailStoragePath, cancellationToken);
         await _queue.QueueAsync(book.Id, cancellationToken);
         await _cacheInvalidator.InvalidateBooksAsync(book.OwnerId, cancellationToken);
-        return cover.ToDto(book.Id);
+        return change.Cover.ToDto(book.Id);
     }
 }
 
