@@ -174,6 +174,13 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal(1, result.ImportedCount);
         Assert.Equal(0, result.SkippedCount);
         Assert.Empty(result.Errors);
+        var importedBook = Assert.Single(result.ImportedBooks);
+        Assert.Equal("The Novel", importedBook.PrimaryTitle);
+        Assert.Equal("Novel", importedBook.ContentType);
+        Assert.Equal("Reading", importedBook.Status);
+        Assert.Equal(49, importedBook.CurrentChapterNumber);
+        Assert.Equal("Progress: 49", importedBook.CurrentChapterLabel);
+        Assert.Equal(200, importedBook.TotalChapters);
         Assert.Equal(database.UserId, cacheInvalidator.InvalidatedOwnerId);
         Assert.Single(queue.BookIds);
 

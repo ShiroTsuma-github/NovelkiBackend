@@ -7,6 +7,7 @@ import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { BookImportFinalizeResult, BookImportRowDto, BookImportRowUpdateRequest, BookImportSessionDto } from '@/api/types'
 import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { formatProgress } from './bookProgress'
 
 type ImportBooksDialogProps = {
   open: boolean
@@ -24,6 +25,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   const [allowInvalidRowAutoExpand, setAllowInvalidRowAutoExpand] = useState(true)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [dropzoneActive, setDropzoneActive] = useState(false)
+  const [finalizeResult, setFinalizeResult] = useState<BookImportFinalizeResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const invalidRows = useMemo(() => session?.rows.filter((row) => !row.isValid) ?? [], [session])
 
@@ -44,8 +46,8 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     mutationFn: (sessionId: string) => api.finalizeBookImport(sessionId),
     onSuccess: (result) => {
       setSession(null)
+      setFinalizeResult(result)
       onImported(result)
-      onClose()
     },
     onError: (error) => {
       toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not finalize import.')
@@ -93,6 +95,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       setAllowInvalidRowAutoExpand(true)
       setConfirmCancelOpen(false)
       setDropzoneActive(false)
+      setFinalizeResult(null)
     }
   }, [open])
 
@@ -151,6 +154,11 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   }
 
   function handleDismiss() {
+    if (finalizeResult) {
+      onClose()
+      return
+    }
+
     if (session?.sessionId) {
       setConfirmCancelOpen(true)
       return
@@ -211,7 +219,9 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
 
         <input accept=".csv,text/csv" className="hidden" ref={fileInputRef} type="file" onChange={handleFileSelection} />
 
-        {!session ? (
+        {finalizeResult ? (
+          <ImportFinalizeSuccess result={finalizeResult} onClose={onClose} />
+        ) : !session ? (
           <div
             className={`grid gap-4 rounded-2xl border border-dashed p-8 text-center transition ${dropzoneActive ? 'border-cyan-400 bg-slate-900/80 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border-slate-700 bg-slate-900'}`}
             onDragEnter={(event) => {
@@ -345,6 +355,63 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
         onCancel={() => setConfirmCancelOpen(false)}
         onConfirm={handleConfirmCancelImport}
       />
+    </div>
+  )
+}
+
+function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalizeResult; onClose: () => void }) {
+  return (
+    <div className="grid min-h-0 gap-4">
+      <div className="grid gap-4 md:grid-cols-2">
+        <SummaryCard label="Imported" value={String(result.importedCount)} tone="ok" />
+        <SummaryCard label="Skipped" value={String(result.skippedCount)} tone={result.skippedCount ? 'warn' : 'neutral'} />
+      </div>
+
+      {result.errors.length ? (
+        <div className="grid gap-2 rounded-2xl border border-amber-900/60 bg-amber-950/40 p-4 text-sm text-amber-100">
+          <div className="font-semibold">Partial import messages</div>
+          {result.errors.map((error) => <p key={error}>{error}</p>)}
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+        <div>
+          <h3 className="text-base font-semibold text-slate-50">Imported books</h3>
+          <p className="text-sm text-slate-400">Saved titles from this CSV finalization.</p>
+        </div>
+        {result.importedBooks.length ? (
+          <div className="overflow-hidden rounded-xl border border-slate-800">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead className="bg-slate-950 text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="w-32 px-4 py-3">Type</th>
+                  <th className="w-36 px-4 py-3">Progress</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.importedBooks.map((book) => (
+                  <tr className="border-t border-slate-800" key={`${book.contentType}:${book.primaryTitle}`}>
+                    <td className="px-4 py-3 font-medium text-slate-100">{book.primaryTitle}</td>
+                    <td className="px-4 py-3 text-slate-300">{book.contentType}</td>
+                    <td className="px-4 py-3 text-slate-300">{formatProgress(book)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-6 text-center text-sm text-slate-400">
+            No books were imported.
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end">
+        <button className={buttonClass} type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
     </div>
   )
 }

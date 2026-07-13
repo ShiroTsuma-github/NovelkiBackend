@@ -257,7 +257,17 @@ export type BookImportRowUpdateRequest = {
 export type BookImportFinalizeResult = {
   importedCount: number
   skippedCount: number
+  importedBooks: BookImportFinalizedBook[]
   errors: string[]
+}
+
+export type BookImportFinalizedBook = {
+  primaryTitle: string
+  contentType: string
+  status: string
+  currentChapterNumber?: number | null
+  currentChapterLabel?: string | null
+  totalChapters?: number | null
 }
 
 export type AdminLibraryPurgeResult = {

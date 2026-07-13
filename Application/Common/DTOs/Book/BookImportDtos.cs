@@ -55,5 +55,16 @@ public record BookImportFinalizeResultDto
 {
     public int ImportedCount { get; set; }
     public int SkippedCount { get; set; }
+    public IReadOnlyCollection<BookImportFinalizedBookDto> ImportedBooks { get; set; } = Array.Empty<BookImportFinalizedBookDto>();
     public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
+}
+
+public record BookImportFinalizedBookDto
+{
+    public required string PrimaryTitle { get; set; }
+    public required string ContentType { get; set; }
+    public required string Status { get; set; }
+    public decimal? CurrentChapterNumber { get; set; }
+    public string? CurrentChapterLabel { get; set; }
+    public decimal? TotalChapters { get; set; }
 }
