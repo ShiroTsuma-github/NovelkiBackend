@@ -25,13 +25,7 @@ public class GetAllAdminBooksHandler : IRequestHandler<GetAllAdminBooksQuery, Pa
         var books = await _queryService.GetAdminBooksAsync(criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
         var total = await _queryService.GetAdminBookCountAsync(criteria, cancellationToken);
 
-        return new PaginatedResult<AdminBookListItemDto>
-        {
-            Skip = request.Skip,
-            Take = request.Take,
-            Total = total,
-            Data = books.ToList()
-        };
+        return PaginatedResult<AdminBookListItemDto>.Create(request.Skip, request.Take, total, books);
     }
 }
 

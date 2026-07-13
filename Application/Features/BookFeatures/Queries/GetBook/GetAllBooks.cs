@@ -39,13 +39,7 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
 
         var books = await _queryService.GetBooksAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken);
         var total = await _queryService.GetBookCountAsync(ownerId, criteria, cancellationToken);
-        var result = new PaginatedResult<BookListItemDto>
-        {
-            Skip = request.Skip,
-            Take = request.Take,
-            Total = total,
-            Data = books.ToList()
-        };
+        var result = PaginatedResult<BookListItemDto>.Create(request.Skip, request.Take, total, books);
         await _cache.SetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, effectiveSortDirection, result, cancellationToken);
         return result;
     }

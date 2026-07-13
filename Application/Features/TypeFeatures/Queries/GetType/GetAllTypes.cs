@@ -17,13 +17,7 @@ public class GetAllTypesQueryHandler : IRequestHandler<GetAllTypesQuery, Paginat
     {
         var types = await _typeRepository.GetAllAsync(request.Skip, request.Take, cancellationToken);
         var total = await _typeRepository.GetCountAsync(cancellationToken);
-        return new PaginatedResult<TypeDto>
-        {
-            Take = request.Take,
-            Skip = request.Skip,
-            Data = types.Select(t => t.ToDto()).ToList(),
-            Total = total
-        };
+        return PaginatedResult<TypeDto>.Create(request.Skip, request.Take, total, types.Select(t => t.ToDto()));
     }
 }
 

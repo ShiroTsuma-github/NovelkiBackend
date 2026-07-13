@@ -47,67 +47,28 @@ internal static class BookListProjectionMapper
 {
     public static BookListItemDto MapListProjection(BookListProjection projection)
     {
-        return new BookListItemDto
+        return MapListFields(projection, new BookListItemDto
         {
-            Id = projection.Id,
-            Created = projection.Created,
-            LastModified = projection.LastModified,
             PrimaryTitle = projection.PrimaryTitle,
-            Description = projection.Description,
-            AlternativeTitles = projection.AlternativeTitles,
-            AlternativeTitlesCount = projection.AlternativeTitlesCount,
-            Author = projection.Author,
             ContentType = projection.ContentType,
-            Status = projection.Status,
-            CurrentChapterNumber = projection.CurrentChapterNumber,
-            CurrentChapterLabel = projection.CurrentChapterLabel,
-            TotalChapters = projection.TotalChapters,
-            Rating = projection.Rating,
-            Priority = projection.Priority,
-            Notes = projection.Notes,
-            Genres = projection.Genres,
-            GenresCount = projection.GenresCount,
-            Tags = projection.Tags,
-            TagsCount = projection.TagsCount,
-            LinksCount = projection.LinksCount,
-            Cover = MapCoverProjection(projection)
-        };
+            Status = projection.Status
+        });
     }
 
     public static AdminBookListItemDto MapAdminListProjection(
         BookListProjection projection,
         IReadOnlyDictionary<Guid, BookOwnerProjection> owners)
     {
-        var dto = MapListProjection(projection);
         owners.TryGetValue(projection.OwnerId, out var owner);
-        return new AdminBookListItemDto
+        return MapListFields(projection, new AdminBookListItemDto
         {
-            Id = dto.Id,
-            Created = dto.Created,
-            LastModified = dto.LastModified,
-            PrimaryTitle = dto.PrimaryTitle,
-            Description = dto.Description,
-            AlternativeTitles = dto.AlternativeTitles,
-            AlternativeTitlesCount = dto.AlternativeTitlesCount,
-            Author = dto.Author,
-            ContentType = dto.ContentType,
-            Status = dto.Status,
-            CurrentChapterNumber = dto.CurrentChapterNumber,
-            CurrentChapterLabel = dto.CurrentChapterLabel,
-            TotalChapters = dto.TotalChapters,
-            Rating = dto.Rating,
-            Priority = dto.Priority,
-            Notes = dto.Notes,
-            Cover = dto.Cover,
-            Genres = dto.Genres,
-            GenresCount = dto.GenresCount,
-            Tags = dto.Tags,
-            TagsCount = dto.TagsCount,
-            LinksCount = dto.LinksCount,
+            PrimaryTitle = projection.PrimaryTitle,
+            ContentType = projection.ContentType,
+            Status = projection.Status,
             OwnerId = projection.OwnerId,
             OwnerUsername = owner?.Username,
             OwnerEmail = owner?.Email
-        };
+        });
     }
 
     private static BookCoverDto? MapCoverProjection(BookListProjection projection)
@@ -131,5 +92,33 @@ internal static class BookListProjectionMapper
             ImageUrl = projection.HasCoverStoragePath ? $"/api/v1/book/{projection.Id}/cover/file?v={version.ToUnixTimeMilliseconds()}" : null,
             ThumbnailImageUrl = projection.HasCoverThumbnailStoragePath ? $"/api/v1/book/{projection.Id}/cover/thumbnail?v={version.ToUnixTimeMilliseconds()}" : null
         };
+    }
+
+    private static TListItemDto MapListFields<TListItemDto>(BookListProjection projection, TListItemDto destination)
+        where TListItemDto : BookListItemDto
+    {
+        destination.Id = projection.Id;
+        destination.Created = projection.Created;
+        destination.LastModified = projection.LastModified;
+        destination.PrimaryTitle = projection.PrimaryTitle;
+        destination.Description = projection.Description;
+        destination.AlternativeTitles = projection.AlternativeTitles;
+        destination.AlternativeTitlesCount = projection.AlternativeTitlesCount;
+        destination.Author = projection.Author;
+        destination.ContentType = projection.ContentType;
+        destination.Status = projection.Status;
+        destination.CurrentChapterNumber = projection.CurrentChapterNumber;
+        destination.CurrentChapterLabel = projection.CurrentChapterLabel;
+        destination.TotalChapters = projection.TotalChapters;
+        destination.Rating = projection.Rating;
+        destination.Priority = projection.Priority;
+        destination.Notes = projection.Notes;
+        destination.Genres = projection.Genres;
+        destination.GenresCount = projection.GenresCount;
+        destination.Tags = projection.Tags;
+        destination.TagsCount = projection.TagsCount;
+        destination.LinksCount = projection.LinksCount;
+        destination.Cover = MapCoverProjection(projection);
+        return destination;
     }
 }
