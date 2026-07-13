@@ -16,6 +16,9 @@ Concept tickety:
 6. refaktor kodu backend z tech debtu (wymaga dodania wiecej test coverage, zeby zapobiec regresji. Najlepiej przed regresja na testach od api poleciec)
 7. refaktor frontendu, gwarantujac ze finalny front nie zmieni w zaden sposob z wygladem
 8. przebudowanie frontendu stylistycznie z uzyciem konkretnych guidelineow (nie dawac wszystko rounded)
+9. rating : nie pozwala :>= ani :>8 np
+10.  admin  panel  nie ma jak default page, ze search nie flickeruje przez ciagle dodawanie i usuwanie pozycji
+11. admin panel chyba w ogole nie ma search dzialajacy
 
 
 ## Auth
