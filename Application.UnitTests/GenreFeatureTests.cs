@@ -2,6 +2,7 @@ using Application.Common.DTOs.Genre;
 using Application.Common.Models;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.GenreFeatures.Queries.GetGenre;
+using Application.Features.GenreFeatures.Validators;
 using Domain.Entities;
 using Domain.Exceptions;
 using Domain.Repositories;
@@ -49,6 +50,38 @@ public class GenreFeatureTests
         Assert.Equal(1, result.Skip);
         Assert.Equal(1, result.Take);
         Assert.Single(result.Data);
+    }
+
+    [Fact]
+    public async Task GenreHandlers_ShouldCoverQueriesUpdateDeleteAndDetails()
+    {
+        var repository = new FakeGenreRepository();
+        var genre = new Genre { Name = "Fantasy", NormalizedName = "FANTASY", Description = "Magic" };
+        await repository.AddAsync(genre, CancellationToken.None);
+
+        var byId = await new GetGenreQueryHandler(repository).Handle(new GetGenreQuery(genre.Id), CancellationToken.None);
+        var byName = await new GetGenreByNameQueryHandler(repository).Handle(new GetGenreByNameQuery("Fantasy"), CancellationToken.None);
+        var details = await new GetGenreDetailsQueryHandler(repository).Handle(new GetGenreDetailsQuery(genre.Id), CancellationToken.None);
+        var detailsByName = await new GetGenreDetailsByNameQueryHandler(repository).Handle(new GetGenreDetailsByNameQuery("Fantasy"), CancellationToken.None);
+
+        Assert.Equal(genre.Id, byId.Id);
+        Assert.Equal(genre.Id, byName.Id);
+        Assert.Equal(genre.Id, details.Id);
+        Assert.Equal(genre.Id, detailsByName.Id);
+
+        var updated = await new UpdateGenreCommandHandler(repository)
+            .Handle(new UpdateGenreCommand { Id = genre.Id, Name = "Drama", Description = "Serious" }, CancellationToken.None);
+        Assert.Equal("Drama", updated.Name);
+
+        await new DeleteGenreCommandHandler(repository).Handle(new DeleteGenreCommand(genre.Id), CancellationToken.None);
+        Assert.Equal(0, await repository.GetCountAsync(CancellationToken.None));
+    }
+
+    [Fact]
+    public void GenreValidators_ShouldRejectBlankNames()
+    {
+        Assert.False(new CreateGenreCommandValidator().Validate(new CreateGenreCommand("", null)).IsValid);
+        Assert.False(new UpdateGenreCommandValidator().Validate(new UpdateGenreCommand { Id = Guid.NewGuid(), Name = "" }).IsValid);
     }
 
     private sealed class FakeGenreRepository : IGenreRepository
