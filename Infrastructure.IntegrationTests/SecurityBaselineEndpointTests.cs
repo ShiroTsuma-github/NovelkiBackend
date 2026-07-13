@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 using Application.Common.Interfaces;
@@ -108,6 +109,47 @@ public class SecurityBaselineEndpointTests
         Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
     }
 
+    [Fact]
+    public async Task AccountLogin_ShouldRateLimitRepeatedRequestsByRemoteIp()
+    {
+        await using var factory = new SecurityApiFactory();
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        var firstResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
+        var secondResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
+
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExpensiveImportEndpoint_ShouldRateLimitNonAdminUsers()
+    {
+        await using var factory = new SecurityApiFactory();
+        await factory.EnsureCreatedAsync();
+        using var client = factory.CreateAuthenticatedClient(UserAId);
+
+        var firstResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+        var secondResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task ExpensiveImportEndpoint_ShouldNotRateLimitAdminUsers()
+    {
+        await using var factory = new SecurityApiFactory();
+        await factory.EnsureCreatedAsync();
+        using var client = factory.CreateAuthenticatedClient(UserAId, "Admin");
+
+        var firstResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+        var secondResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+
+        Assert.Equal(HttpStatusCode.BadRequest, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
+    }
+
     private sealed class SecurityApiFactory : WebApplicationFactory<Program>
     {
         private readonly SqliteConnection _connection = new("DataSource=:memory:");
@@ -129,6 +171,10 @@ public class SecurityBaselineEndpointTests
                     ["Jwt:Issuer"] = "NovelkiBackend.Tests",
                     ["Jwt:Audience"] = "NovelkiBackend.Tests",
                     ["Database:AutoMigrate"] = "false",
+                    ["RateLimiting:Account:PermitLimit"] = "1",
+                    ["RateLimiting:Account:WindowSeconds"] = "60",
+                    ["RateLimiting:Expensive:PermitLimit"] = "1",
+                    ["RateLimiting:Expensive:WindowSeconds"] = "60",
                     ["BookCovers:S3:Endpoint"] = "",
                     ["BookCovers:S3:AccessKey"] = "",
                     ["BookCovers:S3:SecretKey"] = "",

@@ -1,6 +1,7 @@
 ﻿namespace Api.Controllers;
 
 using Application.Features.AccountFeatures.Commands;
+using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
 [Route("api/v1/account")]
@@ -16,6 +17,7 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("register")]
+    [EnableRateLimiting(Api.DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Register(RegisterUserCommand registerUserCommand)
     {
         var response = await _mediator.Send(registerUserCommand);
@@ -24,6 +26,7 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(Api.DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Login(LoginUserCommand loginUserCommand)
     {
         var response = await _mediator.Send(loginUserCommand);

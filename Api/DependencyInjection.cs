@@ -1,12 +1,17 @@
 ﻿namespace Api;
 
 using System.IO.Compression;
+using System.Security.Claims;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.OpenApi.Models;
 
 static class DependencyInjection
 {
     public const string FrontendCorsPolicy = "Frontend";
+    public const string AccountAuthRateLimitPolicy = "account-auth";
+    public const string ExpensiveUserActionRateLimitPolicy = "expensive-user-action";
 
     public static void AddWebServices(this IHostApplicationBuilder builder)
     {
@@ -53,6 +58,56 @@ static class DependencyInjection
                         .AllowAnyHeader()
                         .AllowAnyMethod();
                 }
+            });
+        });
+        builder.Services.AddRateLimiter(options =>
+        {
+            var accountPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Account:PermitLimit") ?? 10;
+            var accountWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Account:WindowSeconds") ?? 60;
+            var expensivePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:PermitLimit") ?? 20;
+            var expensiveWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:WindowSeconds") ?? 60;
+
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.OnRejected = async (context, cancellationToken) =>
+            {
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    context.HttpContext.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString("0");
+                }
+
+                await context.HttpContext.Response.WriteAsJsonAsync(new
+                {
+                    error = "Too many requests. Please retry later."
+                }, cancellationToken);
+            };
+
+            options.AddPolicy(AccountAuthRateLimitPolicy, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    GetRemoteIpPartitionKey(httpContext),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = accountPermitLimit,
+                        Window = TimeSpan.FromSeconds(accountWindowSeconds),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
+            options.AddPolicy(ExpensiveUserActionRateLimitPolicy, httpContext =>
+            {
+                if (httpContext.User.IsInRole("Admin"))
+                {
+                    return RateLimitPartition.GetNoLimiter("admin");
+                }
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    GetAuthenticatedUserPartitionKey(httpContext),
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = expensivePermitLimit,
+                        Window = TimeSpan.FromSeconds(expensiveWindowSeconds),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    });
             });
         });
         builder.Services.AddEndpointsApiExplorer();
@@ -103,5 +158,15 @@ static class DependencyInjection
                 return name;
             });
         });
+    }
+
+    private static string GetRemoteIpPartitionKey(HttpContext httpContext)
+    {
+        return httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
+
+    private static string GetAuthenticatedUserPartitionKey(HttpContext httpContext)
+    {
+        return httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? GetRemoteIpPartitionKey(httpContext);
     }
 }

@@ -7,6 +7,7 @@ using Application.Common.Interfaces;
 using Api.Observability;
 using System.Diagnostics;
 using System.Text;
+using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
 [Route("api/v1/book")]
@@ -102,6 +103,7 @@ public partial class BookController : ControllerBase
     [Authorize]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]
+    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> CreateImportSession(IFormFile? file, CancellationToken cancellationToken)
     {
         if (file == null)
@@ -178,6 +180,7 @@ public partial class BookController : ControllerBase
 
     [HttpPost("import/sessions/{sessionId:guid}/finalize")]
     [Authorize]
+    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> FinalizeImport(Guid sessionId, CancellationToken cancellationToken)
     {
         var result = await _bookCsvImportService.FinalizeAsync(sessionId, cancellationToken);
@@ -209,6 +212,7 @@ public partial class BookController : ControllerBase
     [Authorize]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(10 * 1024 * 1024)]
+    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> UploadCover(Guid id, IFormFile? file)
     {
         if (file == null)
@@ -230,6 +234,7 @@ public partial class BookController : ControllerBase
 
     [HttpPut("{id:guid}/cover/url")]
     [Authorize]
+    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> SetCoverFromUrl(Guid id, [FromBody] SetBookCoverFromUrlRequest request)
     {
         var cover = await _mediator.Send(new SetBookCoverFromUrlCommand(id, request.ImageUrl));
@@ -240,6 +245,7 @@ public partial class BookController : ControllerBase
 
     [HttpPost("{id:guid}/cover/refresh")]
     [Authorize]
+    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> RefreshCover(Guid id)
     {
         var cover = await _mediator.Send(new RefreshBookCoverCommand(id));
