@@ -3,7 +3,9 @@ import type {
   AuthorDto,
   AdminLibraryPurgeResult,
   AdminBookDto,
+  AdminBookListItemDto,
   BookDto,
+  BookListItemDto,
   BookCoverDto,
   BookImportFinalizeResult,
   BookImportRowUpdateRequest,
@@ -47,12 +49,12 @@ export const api = {
       token: null,
     }),
   getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string; advanceCycle?: boolean }) =>
-    apiRequest<PaginatedResult<BookDto>>(`/book${toQueryString(params)}`),
+    apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(params)}`),
   getBooksSummary: (params: { query?: string }) =>
     apiRequest<BookSummaryDto>(`/book/summary${toQueryString(params)}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),
   getAdminBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
-    apiRequest<PaginatedResult<AdminBookDto>>(`/admin/books${toQueryString(params)}`),
+    apiRequest<PaginatedResult<AdminBookListItemDto>>(`/admin/books${toQueryString(params)}`),
   getAdminBook: (id: string) => apiRequest<AdminBookDto>(`/admin/books/${id}`),
   createBook: (request: BookMutationRequest) =>
     apiRequest<{ id: string }>('/book', { method: 'POST', body: request }),
@@ -73,6 +75,8 @@ export const api = {
     apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}/rows/${rowId}`, { method: 'PUT', body: request }),
   deleteBookImportRow: (sessionId: string, rowId: string) =>
     apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}/rows/${rowId}`, { method: 'DELETE' }),
+  deleteInvalidBookImportRows: (sessionId: string) =>
+    apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}/rows/invalid`, { method: 'DELETE' }),
   finalizeBookImport: (sessionId: string) =>
     apiRequest<BookImportFinalizeResult>(`/book/import/sessions/${sessionId}/finalize`, { method: 'POST' }),
   cancelBookImport: (sessionId: string) =>
