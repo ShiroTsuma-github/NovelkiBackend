@@ -24,6 +24,12 @@ public class RepositoryTests
         return new BookSummaryQueryService(context, new BookSearchCriteriaApplier(context));
     }
 
+    private static BookExportQueryService CreateExportQueryService(ApplicationDbContext context)
+    {
+        var criteriaApplier = new BookSearchCriteriaApplier(context);
+        return new BookExportQueryService(context, criteriaApplier, new BookSortBuilder(context));
+    }
+
     [Fact]
     public async Task BookRepository_ShouldScopeListAndGetByOwner()
     {
@@ -370,6 +376,32 @@ public class RepositoryTests
 
         Assert.Empty(results);
         Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public async Task BookExportQueryService_ShouldReturnFilteredSortedDetailedDtos()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var matching = await TestData.AddBookWithRelationsAsync(context, database.UserId);
+        matching.Rating = 9;
+        matching.CurrentChapterNumber = 42;
+        matching.Notes = "Export notes";
+        await TestData.AddBookAsync(context, database.UserId, "Unrelated Export");
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var queryService = CreateExportQueryService(context);
+        var criteria = BookSearchQueryParser.Parse("tag:favorite rating:>=8");
+
+        var result = await queryService.GetBooksForExportAsync(database.UserId, criteria, 0, 10, "title", "asc", CancellationToken.None);
+
+        var book = Assert.Single(result.Data);
+        Assert.Equal(1, result.Total);
+        Assert.Equal(matching.PrimaryTitle, book.PrimaryTitle);
+        Assert.Equal("Export notes", book.Notes);
+        Assert.Equal(42, book.CurrentChapterNumber);
+        Assert.Contains("favorite", book.Tags);
+        Assert.NotNull(book.Cover);
     }
 
     [Fact]

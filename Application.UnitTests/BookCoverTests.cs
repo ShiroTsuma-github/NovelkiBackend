@@ -60,6 +60,91 @@ public class BookCoverTests
     }
 
     [Fact]
+    public async Task AniListProvider_ShouldReadFirstCoverImage()
+    {
+        var provider = new AniListBookCoverProvider(new HttpClient(new FakeHttpMessageHandler("""
+            {"data":{"Page":{"media":[{"coverImage":{"extraLarge":"https://cdn.example.com/anilist-xl.jpg","large":"https://cdn.example.com/anilist.jpg"}}]}}}
+            """))
+        {
+            BaseAddress = new Uri("https://graphql.anilist.co")
+        });
+
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(BookCoverSource.AniList, result.Source);
+        Assert.Equal("https://cdn.example.com/anilist-xl.jpg", result.ImageUrl);
+    }
+
+    [Fact]
+    public async Task JikanProvider_ShouldReadFirstCoverImage()
+    {
+        var provider = new JikanBookCoverProvider(new HttpClient(new FakeHttpMessageHandler("""
+            {"data":[{"images":{"jpg":{"large_image_url":"https://cdn.example.com/jikan-large.jpg","image_url":"https://cdn.example.com/jikan.jpg"}}}]}
+            """))
+        {
+            BaseAddress = new Uri("https://api.jikan.moe")
+        });
+
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(BookCoverSource.Jikan, result.Source);
+        Assert.Equal("https://cdn.example.com/jikan-large.jpg", result.ImageUrl);
+    }
+
+    [Fact]
+    public async Task GoogleBooksProvider_ShouldReadCoverAndNormalizeHttps()
+    {
+        var provider = new GoogleBooksCoverProvider(new HttpClient(new FakeHttpMessageHandler("""
+            {"items":[{"volumeInfo":{"imageLinks":{"thumbnail":"http://books.google.com/cover.jpg"}}}]}
+            """))
+        {
+            BaseAddress = new Uri("https://www.googleapis.com")
+        });
+
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(BookCoverSource.GoogleBooks, result.Source);
+        Assert.Equal("https://books.google.com/cover.jpg", result.ImageUrl);
+    }
+
+    [Fact]
+    public async Task OpenLibraryProvider_ShouldBuildCoverUrlFromCoverId()
+    {
+        var provider = new OpenLibraryCoverProvider(new HttpClient(new FakeHttpMessageHandler("""
+            {"docs":[{"title":"I Shall Seal the Heavens","cover_i":12345}]}
+            """))
+        {
+            BaseAddress = new Uri("https://openlibrary.org")
+        });
+
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(BookCoverSource.OpenLibrary, result.Source);
+        Assert.Equal("https://covers.openlibrary.org/b/id/12345-L.jpg", result.ImageUrl);
+    }
+
+    [Fact]
+    public async Task WikidataProvider_ShouldReadImageBinding()
+    {
+        var provider = new WikidataCoverProvider(new HttpClient(new FakeHttpMessageHandler("""
+            {"results":{"bindings":[{"image":{"type":"uri","value":"https://commons.wikimedia.org/wiki/Special:FilePath/Cover.jpg"}}]}}
+            """))
+        {
+            BaseAddress = new Uri("https://query.wikidata.org")
+        });
+
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal(BookCoverSource.Wikidata, result.Source);
+        Assert.Equal("https://commons.wikimedia.org/wiki/Special:FilePath/Cover.jpg", result.ImageUrl);
+    }
+
+    [Fact]
     public async Task SetBookCoverFromUrl_ShouldStoreManualUrlCover()
     {
         var book = CreateBook(new BookCover
