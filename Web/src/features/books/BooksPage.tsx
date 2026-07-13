@@ -41,11 +41,20 @@ export type BookViewMode = 'table' | 'cards'
 export type ColumnPreference = { id: string; visible: boolean }
 export type ColumnDefinition<T> = {
   id: string
-  label: string
+  label: ReactNode
   defaultVisible: boolean
   sortBy?: string
   widthClass?: string
   render: (item: T) => ReactNode
+}
+
+export function totalChaptersColumnLabel() {
+  return (
+    <>
+      <span className="sm:hidden">Total</span>
+      <span className="hidden sm:inline">Total chapters</span>
+    </>
+  )
 }
 
 const bookColumns: ColumnDefinition<BookListItemDto>[] = [
@@ -56,7 +65,7 @@ const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-20', render: (book) => book.status },
   { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-20', render: (book) => book.contentType },
   { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', widthClass: 'w-24', render: formatProgress },
-  { id: 'totalChapters', label: 'Chapters', defaultVisible: false, sortBy: 'chapters', widthClass: 'w-24', render: (book) => book.totalChapters ?? '-' },
+  { id: 'totalChapters', label: totalChaptersColumnLabel(), defaultVisible: false, sortBy: 'chapters', widthClass: 'w-28', render: (book) => book.totalChapters ?? '-' },
   { id: 'rating', label: 'Rating', defaultVisible: true, sortBy: 'rating', widthClass: 'w-16', render: (book) => book.rating ?? '-' },
   { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', widthClass: 'w-20', render: (book) => book.priority ?? '-' },
   { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', widthClass: 'w-36', render: (book) => formatDate(book.created) },
@@ -392,6 +401,12 @@ export function BookAdvancedSearch({
   value: string
   onChange: (value: string) => void
 }) {
+  const [draftValue, setDraftValue] = useState(value)
+
+  useEffect(() => {
+    setDraftValue(value)
+  }, [value])
+
   return (
     <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <label className="relative">
@@ -399,12 +414,16 @@ export function BookAdvancedSearch({
         <input
           className={`${inputClass} w-full pl-9`}
           placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating:>=8'}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
+          value={draftValue}
+          onChange={(event) => {
+            const nextValue = event.target.value
+            setDraftValue(nextValue)
+            onChange(nextValue)
+          }}
         />
       </label>
       <p className="text-xs text-slate-500">
-        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, and wildcard searches like <code>title:i*</code>.
+        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, <code>total-chapters:&gt;500</code>, and wildcard searches like <code>title:i*</code>.
       </p>
     </section>
   )

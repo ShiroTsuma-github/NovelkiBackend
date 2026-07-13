@@ -54,6 +54,8 @@ public class BookSearchQueryParserTests
     [InlineData("chapter:<200", BookSearchNumberField.TotalChapters, BookSearchOperator.LessThan, 200)]
     [InlineData("chapters:300", BookSearchNumberField.TotalChapters, BookSearchOperator.Equal, 300)]
     [InlineData("total:<=400", BookSearchNumberField.TotalChapters, BookSearchOperator.LessThanOrEqual, 400)]
+    [InlineData("total-chapters:<=450", BookSearchNumberField.TotalChapters, BookSearchOperator.LessThanOrEqual, 450)]
+    [InlineData("total chapters:<=475", BookSearchNumberField.TotalChapters, BookSearchOperator.LessThanOrEqual, 475)]
     [InlineData("totalChapters:>500", BookSearchNumberField.TotalChapters, BookSearchOperator.GreaterThan, 500)]
     public void Parse_ShouldTreatColonNumberFiltersWithOperatorsAsNumberFilters(
         string query,
@@ -97,5 +99,18 @@ public class BookSearchQueryParserTests
         var field = Assert.Single(criteria.Fields);
         Assert.Equal(BookSearchField.Tag, field.Field);
         Assert.Equal(["favorite", "to-read", "slow burn"], field.Values);
+    }
+
+    [Theory]
+    [InlineData("total chapters>=200", BookSearchOperator.GreaterThanOrEqual, 200)]
+    [InlineData("total-chapters<200", BookSearchOperator.LessThan, 200)]
+    public void Parse_ShouldAcceptTotalChapterAliasesWithoutColon(string query, BookSearchOperator expectedOperator, decimal expectedValue)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        var filter = Assert.Single(criteria.Numbers);
+        Assert.Equal(BookSearchNumberField.TotalChapters, filter.Field);
+        Assert.Equal(expectedOperator, filter.Operator);
+        Assert.Equal(expectedValue, filter.Value);
     }
 }

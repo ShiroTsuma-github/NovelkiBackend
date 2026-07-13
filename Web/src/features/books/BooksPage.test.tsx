@@ -55,6 +55,41 @@ describe('BooksPage', () => {
     expect(screen.getByText('progress:>=50')).toBeInTheDocument()
     expect(screen.getByText('chapters:<200')).toBeInTheDocument()
     expect(screen.getByText('total:>500')).toBeInTheDocument()
+    expect(screen.getByText('total-chapters:>500')).toBeInTheDocument()
+  })
+
+  it('preserves spaces in the search input while sending a trimmed query to the api', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    const searchInput = screen.getByPlaceholderText(/rating:>=8/i)
+    await user.clear(searchInput)
+    await user.type(searchInput, 'status:plan to read ')
+
+    expect(searchInput).toHaveValue('status:plan to read ')
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({
+      query: 'status:plan to read',
+    })))
+  })
+
+  it('keeps the caret position when inserting a space in the middle of the search', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=title%3ALordofMysteries' })
+
+    await screen.findByText('Lord of Mysteries')
+    const searchInput = screen.getByPlaceholderText(/rating:>=8/i) as HTMLInputElement
+    searchInput.focus()
+    searchInput.setSelectionRange('title:Lord'.length, 'title:Lord'.length)
+    await user.keyboard(' ')
+
+    expect(searchInput).toHaveValue('title:Lord ofMysteries')
+    expect(searchInput.selectionStart).toBe('title:Lord '.length)
+    expect(searchInput.selectionEnd).toBe('title:Lord '.length)
   })
 
   it('switches to cards view and persists the preference', async () => {
@@ -307,7 +342,7 @@ describe('BooksPage', () => {
     renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
-    await user.click(screen.getByRole('button', { name: /chapters/i }))
+    await user.click(screen.getByRole('button', { name: /total chapters|total/i }))
 
     await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({
       skip: 0,
@@ -316,6 +351,21 @@ describe('BooksPage', () => {
       sortBy: 'chapters',
       sortDirection: 'asc',
     })))
+  })
+
+  it('renders the total chapters column label in the shared column settings', async () => {
+    window.localStorage.setItem('novelki.books.columns.v1', JSON.stringify([
+      { id: 'totalChapters', visible: true },
+    ]))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /^columns$/i }))
+
+    expect(screen.getAllByText('Total chapters').length).toBeGreaterThan(0)
   })
 
   it('cycles status sorting through the domain order on repeated clicks', async () => {

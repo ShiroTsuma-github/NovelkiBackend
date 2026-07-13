@@ -51,20 +51,20 @@ public sealed class BookSortBuilder
                     book => book.ContentType.Name);
             case "progress":
                 return descending
-                    ? query.OrderByDescending(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.CurrentChapterNumber == null).ThenByDescending(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.CurrentChapterNumber == null).ThenBy(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
             case "chapters":
                 return descending
-                    ? query.OrderByDescending(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.TotalChapters == null).ThenByDescending(book => book.TotalChapters).ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => book.TotalChapters).ThenBy(book => book.PrimaryTitle);
             case "rating":
                 return descending
                     ? query.OrderBy(book => book.Rating == null).ThenByDescending(book => book.Rating).ThenBy(book => book.PrimaryTitle)
                     : query.OrderBy(book => book.Rating == null).ThenBy(book => book.Rating).ThenBy(book => book.PrimaryTitle);
             case "priority":
                 return descending
-                    ? query.OrderByDescending(book => book.Priority).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.Priority).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.Priority == null).ThenByDescending(book => book.Priority).ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.Priority == null).ThenBy(book => book.Priority).ThenBy(book => book.PrimaryTitle);
             case "owner":
                 return descending
                     ? query.OrderByDescending(book => book.OwnerId).ThenBy(book => book.PrimaryTitle)

@@ -110,6 +110,23 @@ describe('AdminPage', () => {
     await waitFor(() => expect(screen.queryByText('Reading Title')).not.toBeInTheDocument())
   })
 
+  it('preserves spaces in the admin search input while sending a trimmed query to the api', async () => {
+    vi.mocked(api.getAdminBooks).mockResolvedValue(paginated([createAdminBook()]))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AdminPage />, { route: '/admin' })
+
+    await screen.findByText('Shadow Slave')
+    const searchInput = screen.getByPlaceholderText(/rating:>=8/i)
+    await user.clear(searchInput)
+    await user.type(searchInput, 'status:plan to read ')
+
+    expect(searchInput).toHaveValue('status:plan to read ')
+    await waitFor(() => expect(api.getAdminBooks).toHaveBeenLastCalledWith(expect.objectContaining({
+      query: 'status:plan to read',
+    })))
+  })
+
   it('keeps previous admin rows visible while the next search is fetching', async () => {
     const pendingSearch = createDeferred<PaginatedResult<AdminBookListItemDto>>()
     vi.mocked(api.getAdminBooks).mockImplementation((params) => {
@@ -184,7 +201,7 @@ describe('AdminPage', () => {
     renderWithProviders(<AdminPage />, { route: '/admin' })
 
     expect(await screen.findByText('Shadow Slave')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /chapters/i }))
+    await user.click(screen.getByRole('button', { name: /total chapters|total/i }))
 
     await waitFor(() => expect(api.getAdminBooks).toHaveBeenLastCalledWith(expect.objectContaining({
       skip: 0,
