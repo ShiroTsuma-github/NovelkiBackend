@@ -46,11 +46,16 @@ public record BookCoverDto
     public required string Status { get; set; }
     public string? Source { get; set; }
     public string? ImageUrl { get; set; }
+    public string? ThumbnailImageUrl { get; set; }
     public string? OriginalImageUrl { get; set; }
     public string? MimeType { get; set; }
     public long? SizeBytes { get; set; }
     public int? Width { get; set; }
     public int? Height { get; set; }
+    public string? ThumbnailMimeType { get; set; }
+    public long? ThumbnailSizeBytes { get; set; }
+    public int? ThumbnailWidth { get; set; }
+    public int? ThumbnailHeight { get; set; }
     public string? FailureReason { get; set; }
     public DateTimeOffset? LastAttemptAt { get; set; }
 }

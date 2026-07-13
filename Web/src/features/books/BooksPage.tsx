@@ -1315,6 +1315,7 @@ function BookCardGrid({
                 className="w-full"
                 cover={book.cover}
                 emptyLabel="No cover"
+                preferredVariant="thumbnail"
                 title={book.primaryTitle}
               />
               {hasCardField(fields, 'rating') && book.rating != null ? (

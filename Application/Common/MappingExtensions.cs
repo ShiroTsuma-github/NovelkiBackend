@@ -261,11 +261,16 @@ public static class MappingExtensions
             Status = source.Status.ToString(),
             Source = source.Source?.ToString(),
             ImageUrl = source.StoragePath == null ? null : $"/api/v1/book/{bookId}/cover/file",
+            ThumbnailImageUrl = source.ThumbnailStoragePath == null ? null : $"/api/v1/book/{bookId}/cover/thumbnail",
             OriginalImageUrl = source.OriginalImageUrl,
             MimeType = source.MimeType,
             SizeBytes = source.SizeBytes,
             Width = source.Width,
             Height = source.Height,
+            ThumbnailMimeType = source.ThumbnailMimeType,
+            ThumbnailSizeBytes = source.ThumbnailSizeBytes,
+            ThumbnailWidth = source.ThumbnailWidth,
+            ThumbnailHeight = source.ThumbnailHeight,
             FailureReason = source.FailureReason,
             LastAttemptAt = source.LastAttemptAt
         };

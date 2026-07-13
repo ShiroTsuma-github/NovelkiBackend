@@ -11,7 +11,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
         _storage = storage;
     }
 
-    public async Task<BookCoverStoredFile> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+    public async Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var imageUri) ||
             imageUri.Scheme is not ("http" or "https"))

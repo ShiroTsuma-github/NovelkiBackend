@@ -17,24 +17,28 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
         _bucket = _options.S3?.Bucket ?? throw new InvalidOperationException("BookCovers:S3:Bucket is not configured.");
     }
 
-    public async Task<BookCoverStoredFile> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
+    public async Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
     {
-        var validated = await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, _options.MaxBytes, cancellationToken);
-        var storagePath = $"{ownerId:N}/{bookId:N}{validated.Extension}";
+        var processed = await BookCoverImageProcessor.ProcessAsync(content, contentType, _options.MaxBytes, cancellationToken);
+        var storagePath = $"{ownerId:N}/{bookId:N}.jpg";
+        var thumbnailStoragePath = $"{ownerId:N}/{bookId:N}.thumb.jpg";
 
-        using var uploadStream = new MemoryStream(validated.Bytes, writable: false);
-        var request = new PutObjectRequest
-        {
-            BucketName = _bucket,
-            Key = storagePath,
-            InputStream = uploadStream,
-            AutoCloseStream = false,
-            ContentType = validated.MimeType,
-            UseChunkEncoding = false
-        };
+        await UploadAsync(storagePath, processed.Original.Bytes, processed.Original.MimeType, cancellationToken);
+        await UploadAsync(thumbnailStoragePath, processed.Thumbnail.Bytes, processed.Thumbnail.MimeType, cancellationToken);
 
-        await _s3.PutObjectAsync(request, cancellationToken);
-        return new BookCoverStoredFile(storagePath, validated.MimeType, validated.Bytes.Length, null, null);
+        return new BookCoverStoredFiles(
+            new BookCoverStoredVariant(
+                storagePath,
+                processed.Original.MimeType,
+                processed.Original.Bytes.Length,
+                processed.Original.Width,
+                processed.Original.Height),
+            new BookCoverStoredVariant(
+                thumbnailStoragePath,
+                processed.Thumbnail.MimeType,
+                processed.Thumbnail.Bytes.Length,
+                processed.Thumbnail.Width,
+                processed.Thumbnail.Height));
     }
 
     public async Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken)
@@ -64,5 +68,21 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound || ex.ErrorCode == "NoSuchKey")
         {
         }
+    }
+
+    private async Task UploadAsync(string storagePath, byte[] bytes, string mimeType, CancellationToken cancellationToken)
+    {
+        using var uploadStream = new MemoryStream(bytes, writable: false);
+        var request = new PutObjectRequest
+        {
+            BucketName = _bucket,
+            Key = storagePath,
+            InputStream = uploadStream,
+            AutoCloseStream = false,
+            ContentType = mimeType,
+            UseChunkEncoding = false
+        };
+
+        await _s3.PutObjectAsync(request, cancellationToken);
     }
 }

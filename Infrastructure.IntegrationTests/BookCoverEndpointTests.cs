@@ -53,6 +53,7 @@ public class BookCoverEndpointTests
         Assert.Equal(BookCoverStatus.Uploaded, stored.Status);
         Assert.Equal(BookCoverSource.ManualUrl, stored.Source);
         Assert.Equal("test/cover.jpg", stored.StoragePath);
+        Assert.Equal("test/cover.thumb.jpg", stored.ThumbnailStoragePath);
         Assert.Null(stored.FailureReason);
     }
 
@@ -205,9 +206,11 @@ public class BookCoverEndpointTests
 
     private sealed class FakeRemoteImageService : IBookCoverRemoteImageService
     {
-        public Task<BookCoverStoredFile> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+        public Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
         {
-            return Task.FromResult(new BookCoverStoredFile("test/cover.jpg", "image/jpeg", 123, null, null));
+            return Task.FromResult(new BookCoverStoredFiles(
+                new BookCoverStoredVariant("test/cover.jpg", "image/jpeg", 123, 900, 1350),
+                new BookCoverStoredVariant("test/cover.thumb.jpg", "image/jpeg", 45, 500, 750)));
         }
     }
 

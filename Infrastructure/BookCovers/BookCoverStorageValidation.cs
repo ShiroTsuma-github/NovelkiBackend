@@ -34,7 +34,7 @@ internal static class BookCoverStorageValidation
             throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");
         }
 
-        return new ValidatedBookCoverContent(bytes, detectedMimeType, GetExtension(detectedMimeType));
+        return new ValidatedBookCoverContent(bytes, detectedMimeType);
     }
 
     private static string? DetectMimeType(byte[] bytes)
@@ -72,17 +72,6 @@ internal static class BookCoverStorageValidation
 
         return null;
     }
-
-    private static string GetExtension(string mimeType)
-    {
-        return mimeType.ToLowerInvariant() switch
-        {
-            "image/jpeg" => ".jpg",
-            "image/png" => ".png",
-            "image/webp" => ".webp",
-            _ => ".img"
-        };
-    }
 }
 
-internal sealed record ValidatedBookCoverContent(byte[] Bytes, string MimeType, string Extension);
+internal sealed record ValidatedBookCoverContent(byte[] Bytes, string MimeType);
