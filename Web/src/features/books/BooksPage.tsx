@@ -5,7 +5,7 @@ import { Bar, BarChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Toolti
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
-import type { BookDto, BookImportFinalizeResult, BookSummaryDto, BookSummaryTypeCountDto } from '@/api/types'
+import type { BookImportFinalizeResult, BookListItemDto, BookSummaryDto, BookSummaryTypeCountDto } from '@/api/types'
 import {
   buttonClass,
   inputClass,
@@ -39,7 +39,7 @@ export type ColumnDefinition<T> = {
   render: (item: T) => ReactNode
 }
 
-const bookColumns: ColumnDefinition<BookDto>[] = [
+const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
   { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-[26%]', render: (book) => <span className="block truncate font-medium text-slate-950">{book.primaryTitle}</span> },
   { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => formatList(book.alternativeTitles) },
@@ -54,12 +54,12 @@ const bookColumns: ColumnDefinition<BookDto>[] = [
   { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-32', render: (book) => formatDate(book.lastModified || book.created) },
   { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => <Pills values={book.genres} /> },
   { id: 'tags', label: 'Tags', defaultVisible: true, widthClass: 'w-[10%]', render: (book) => <Pills values={book.tags} /> },
-  { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.links.length },
+  { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.linksCount },
   { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => truncate(book.notes) },
   { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[18%]', render: (book) => truncate(book.description) },
 ]
 
-const bookCardFields: ColumnDefinition<BookDto>[] = [
+const bookCardFields: ColumnDefinition<BookListItemDto>[] = [
   { id: 'title', label: 'Title', defaultVisible: true, render: (book) => <span>{book.primaryTitle}</span> },
   { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, render: (book) => <span>{formatList(book.alternativeTitles)}</span> },
   { id: 'author', label: 'Author', defaultVisible: true, render: (book) => <span>{book.author ?? 'Unknown author'}</span> },
@@ -1252,7 +1252,7 @@ export function ColumnHeader<T>({
   )
 }
 
-function BookRow({ book, columns }: { book: BookDto; columns: ColumnDefinition<BookDto>[] }) {
+function BookRow({ book, columns }: { book: BookListItemDto; columns: ColumnDefinition<BookListItemDto>[] }) {
   return (
     <tr className="border-t border-slate-100 hover:bg-slate-50">
       {columns.map((column) => (
@@ -1278,9 +1278,9 @@ function BookCardGrid({
   fields,
   isLoading,
 }: {
-  books: BookDto[]
+  books: BookListItemDto[]
   cardsPerRow: number
-  fields: ColumnDefinition<BookDto>[]
+  fields: ColumnDefinition<BookListItemDto>[]
   isLoading: boolean
 }) {
   if (isLoading) {
@@ -1369,7 +1369,7 @@ function BookCardGrid({
   )
 }
 
-function hasCardField(fields: ColumnDefinition<BookDto>[], id: string) {
+function hasCardField(fields: ColumnDefinition<BookListItemDto>[], id: string) {
   return fields.some((field) => field.id === id)
 }
 
@@ -1591,7 +1591,7 @@ function isCyclicSort(sortBy: string) {
   return sortBy === 'status' || sortBy === 'type'
 }
 
-function getCyclicSortDirectionFromResult(books: BookDto[], sortBy: string) {
+function getCyclicSortDirectionFromResult(books: BookListItemDto[], sortBy: string) {
   const firstBook = books[0]
   if (!firstBook) {
     return null
@@ -1676,7 +1676,7 @@ function getStatusBadgeClass(status: string) {
   return 'border-slate-700/80 bg-slate-300/95 text-slate-950'
 }
 
-export function formatProgress(book: BookDto) {
+export function formatProgress(book: BookListItemDto) {
   const isCompleted = book.status.trim().toLowerCase() === 'completed'
   const current = isCompleted && book.currentChapterNumber != null
     ? book.currentChapterNumber

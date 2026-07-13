@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
-import { books, dictionaries, paginated, statuses } from '@/test/fixtures'
+import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
 
@@ -28,7 +28,7 @@ describe('BooksPage', () => {
   })
 
   it('renders books in table view and fetches with default list params', async () => {
-    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
@@ -44,7 +44,7 @@ describe('BooksPage', () => {
   })
 
   it('shows the colon-based rating operator syntax in advanced search help', async () => {
-    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
@@ -55,7 +55,7 @@ describe('BooksPage', () => {
   })
 
   it('switches to cards view and persists the preference', async () => {
-    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
     const user = userEvent.setup()
 
     renderWithProviders(<BooksPage />, { route: '/books' })
@@ -68,7 +68,7 @@ describe('BooksPage', () => {
   })
 
   it('keeps top action buttons with balanced icon spacing', async () => {
-    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 

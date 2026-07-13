@@ -24,14 +24,14 @@ public class BookListCacheTests
         var ownerId = Guid.NewGuid();
         var storage = new FakeDistributedCache();
         var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
-        var expected = new PaginatedResult<BookDto>
+        var expected = new PaginatedResult<BookListItemDto>
         {
             Skip = 0,
             Take = 20,
             Total = 1,
             Data =
             [
-                new BookDto
+                new BookListItemDto
                 {
                     Id = Guid.NewGuid(),
                     PrimaryTitle = "Lord of Mysteries",
@@ -39,9 +39,7 @@ public class BookListCacheTests
                     Status = "Reading",
                     AlternativeTitles = [],
                     Genres = [],
-                    Tags = [],
-                    Links = [],
-                    ProgressHistory = []
+                    Tags = []
                 }
             ]
         };
@@ -61,14 +59,14 @@ public class BookListCacheTests
         var ownerId = Guid.NewGuid();
         var storage = new FakeDistributedCache();
         var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
-        var initial = new PaginatedResult<BookDto>
+        var initial = new PaginatedResult<BookListItemDto>
         {
             Skip = 0,
             Take = 20,
             Total = 1,
             Data = [CreateBookDto("Old Result")]
         };
-        var refreshed = new PaginatedResult<BookDto>
+        var refreshed = new PaginatedResult<BookListItemDto>
         {
             Skip = 0,
             Take = 20,
@@ -89,9 +87,9 @@ public class BookListCacheTests
         Assert.Contains(storage.StringEntries, pair => pair.Key == $"books:{ownerId}:version" && pair.Value == "2");
     }
 
-    private static BookDto CreateBookDto(string title)
+    private static BookListItemDto CreateBookDto(string title)
     {
-        return new BookDto
+        return new BookListItemDto
         {
             Id = Guid.NewGuid(),
             PrimaryTitle = title,
@@ -99,9 +97,7 @@ public class BookListCacheTests
             Status = "Reading",
             AlternativeTitles = [],
             Genres = [],
-            Tags = [],
-            Links = [],
-            ProgressHistory = []
+            Tags = []
         };
     }
 

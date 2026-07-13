@@ -1,5 +1,6 @@
 namespace Application.Features.BookFeatures.Queries.GetBook;
 
+using Application.Common.Interfaces;
 using Application.Common.DTOs.Book;
 
 public record GetAllAdminBooksQuery(
@@ -7,33 +8,35 @@ public record GetAllAdminBooksQuery(
     int Take = 100,
     string? Query = null,
     string? SortBy = null,
-    string? SortDirection = null) : IRequest<PaginatedResult<AdminBookDto>>;
+    string? SortDirection = null) : IRequest<PaginatedResult<AdminBookListItemDto>>;
 
-public class GetAllAdminBooksHandler : IRequestHandler<GetAllAdminBooksQuery, PaginatedResult<AdminBookDto>>
+public class GetAllAdminBooksHandler : IRequestHandler<GetAllAdminBooksQuery, PaginatedResult<AdminBookListItemDto>>
 {
-    private readonly IBookRepository _repository;
+    private readonly IBookRepository _bookRepository;
+    private readonly IBookListReadRepository _repository;
 
-    public GetAllAdminBooksHandler(IBookRepository repository)
+    public GetAllAdminBooksHandler(IBookRepository bookRepository, IBookListReadRepository repository)
     {
+        _bookRepository = bookRepository;
         _repository = repository;
     }
 
-    public async Task<PaginatedResult<AdminBookDto>> Handle(GetAllAdminBooksQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<AdminBookListItemDto>> Handle(GetAllAdminBooksQuery request, CancellationToken cancellationToken)
     {
         var criteria = BookSearchQueryParser.Parse(request.Query);
         var books = criteria.HasFilters
-            ? await _repository.SearchAsync(criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
-            : await _repository.GetAllAsync(request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
+            ? await _repository.SearchAdminListAsync(criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken)
+            : await _repository.GetAllAdminListAsync(request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
         var total = criteria.HasFilters
-            ? await _repository.GetSearchCountAsync(criteria, cancellationToken)
-            : await _repository.GetCountAsync(cancellationToken);
+            ? await _bookRepository.GetSearchCountAsync(criteria, cancellationToken)
+            : await _bookRepository.GetCountAsync(cancellationToken);
 
-        return new PaginatedResult<AdminBookDto>
+        return new PaginatedResult<AdminBookListItemDto>
         {
             Skip = request.Skip,
             Take = request.Take,
             Total = total,
-            Data = books.Select(b => b.ToAdminDto()).ToList()
+            Data = books.ToList()
         };
     }
 }

@@ -65,6 +65,31 @@ export type BookDto = {
   links: BookLinkDto[]
 }
 
+export type BookListItemDto = {
+  id: string
+  created: string
+  lastModified: string
+  primaryTitle: string
+  description?: string | null
+  alternativeTitles: string[]
+  alternativeTitlesCount: number
+  author?: string | null
+  contentType: string
+  status: string
+  currentChapterNumber?: number | null
+  currentChapterLabel?: string | null
+  totalChapters?: number | null
+  rating?: number | null
+  priority?: number | null
+  notes?: string | null
+  cover?: BookCoverDto | null
+  genres: string[]
+  genresCount: number
+  tags: string[]
+  tagsCount: number
+  linksCount: number
+}
+
 export type BookSummaryDto = {
   totalBooks: number
   ratedBooks: number
@@ -102,6 +127,12 @@ export type BookSummaryRatingCountDto = {
 
 export type AdminBookDto = BookDto & {
   ownerId: string
+}
+
+export type AdminBookListItemDto = BookListItemDto & {
+  ownerId: string
+  ownerUsername?: string | null
+  ownerEmail?: string | null
 }
 
 export type BookLinkDto = {
