@@ -75,13 +75,20 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
             ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
         var status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
             ?? throw new EntityNotFoundException<Status, Guid>(request.StatusId);
-        await EnsureBookDoesNotExistAsync(ownerId, book.Id, contentType.Id, request.PrimaryTitle, request.AlternativeTitles, cancellationToken);
-        var author = await ResolveAuthorAsync(request, cancellationToken);
+        await BookMutationSupport.EnsureBookDoesNotExistAsync(
+            _bookRepository,
+            ownerId,
+            book.Id,
+            contentType.Id,
+            request.PrimaryTitle,
+            request.AlternativeTitles,
+            cancellationToken);
+        var author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, request.AuthorId, request.AuthorName, cancellationToken);
         var primaryTitle = request.PrimaryTitle.Trim();
-        var description = TrimToNull(request.Description);
-        var currentChapterLabel = TrimToNull(request.CurrentChapterLabel);
-        var notes = TrimToNull(request.Notes);
-        var rawImportedLine = TrimToNull(request.RawImportedLine);
+        var description = BookMutationSupport.TrimToNull(request.Description);
+        var currentChapterLabel = BookMutationSupport.TrimToNull(request.CurrentChapterLabel);
+        var notes = BookMutationSupport.TrimToNull(request.Notes);
+        var rawImportedLine = BookMutationSupport.TrimToNull(request.RawImportedLine);
 
         var progressChanged = book.CurrentChapterNumber != request.CurrentChapterNumber ||
                               book.CurrentChapterLabel != currentChapterLabel;
@@ -103,25 +110,13 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
         book.Notes = notes;
         book.RawImportedLine = rawImportedLine;
 
-        var titles = new List<BookTitle> { primaryTitle.ToPrimaryTitle() };
-        foreach (var title in request.AlternativeTitles ?? Enumerable.Empty<BookTitleInput>())
-        {
-            if (!string.IsNullOrWhiteSpace(title.Title))
-            {
-                titles.Add(title.ToBookTitle());
-            }
-        }
-
-        var links = new List<BookLink>();
-        foreach (var link in request.Links ?? Enumerable.Empty<BookLinkInput>())
-        {
-            links.Add(link.ToBookLink());
-        }
+        var titles = BookMutationSupport.BuildTitles(primaryTitle, request.AlternativeTitles);
+        var links = BookMutationSupport.BuildLinks(request.Links);
 
         var genreIds = (await _genreRepository.GetByIdsAsync(request.GenreIds ?? Enumerable.Empty<Guid>(), cancellationToken))
             .Select(g => g.Id)
             .ToList();
-        var tagIds = (await ResolveTagsAsync(ownerId, request.Tags ?? Enumerable.Empty<string>(), cancellationToken))
+        var tagIds = (await BookMutationSupport.ResolveTagsAsync(_tagRepository, ownerId, request.Tags ?? Enumerable.Empty<string>(), cancellationToken))
             .Select(t => t.Id)
             .ToList();
         var progressHistory = progressChanged
@@ -136,102 +131,6 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
 
         await _bookRepository.SaveAsync(cancellationToken);
         await _cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
-    }
-
-    private async Task EnsureBookDoesNotExistAsync(
-        Guid ownerId,
-        Guid currentBookId,
-        Guid contentTypeId,
-        string primaryTitle,
-        IEnumerable<BookTitleInput>? alternativeTitles,
-        CancellationToken cancellationToken)
-    {
-        foreach (var title in EnumerateTitles(primaryTitle, alternativeTitles))
-        {
-            var existing = await _bookRepository.GetByNameAsync(title, ownerId, contentTypeId, cancellationToken);
-            if (existing != null && existing.Id != currentBookId)
-            {
-                throw new EntityAlreadyExistsException<Book, Guid>(title, existing.Id);
-            }
-        }
-    }
-
-    private async Task<Author?> ResolveAuthorAsync(UpdateBookCommand request, CancellationToken cancellationToken)
-    {
-        if (request.AuthorId.HasValue)
-        {
-            return await _authorRepository.GetByIdAsync(request.AuthorId.Value, cancellationToken)
-                ?? throw new EntityNotFoundException<Author, Guid>(request.AuthorId.Value);
-        }
-
-        if (string.IsNullOrWhiteSpace(request.AuthorName))
-        {
-            return null;
-        }
-
-        var authorName = request.AuthorName.Trim();
-        var existing = await _authorRepository.GetByNameAsync(authorName, cancellationToken);
-        if (existing != null)
-        {
-            return existing;
-        }
-
-        var author = new Author
-        {
-            PrimaryName = authorName,
-            NormalizedPrimaryName = MappingExtensions.NormalizeName(authorName)
-        };
-        author.Names.Add(new AuthorName
-        {
-            Name = authorName,
-            NormalizedName = MappingExtensions.NormalizeName(authorName),
-            IsPrimary = true,
-            Source = "Manual"
-        });
-        await _authorRepository.AddAsync(author, cancellationToken);
-        return author;
-    }
-
-    private async Task<IEnumerable<Tag>> ResolveTagsAsync(Guid ownerId, IEnumerable<string> tagNames, CancellationToken cancellationToken)
-    {
-        var names = tagNames.Where(t => !string.IsNullOrWhiteSpace(t)).Select(t => t.Trim()).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        var existingTags = (await _tagRepository.GetByNamesAsync(ownerId, names, cancellationToken)).ToList();
-        var existingNormalized = existingTags.Select(t => t.NormalizedName).ToHashSet();
-        foreach (var name in names)
-        {
-            var normalized = MappingExtensions.NormalizeName(name);
-            if (!existingNormalized.Contains(normalized))
-            {
-                var tag = new Tag
-                {
-                    OwnerId = ownerId,
-                    Name = name,
-                    NormalizedName = normalized
-                };
-                await _tagRepository.AddAsync(tag, cancellationToken);
-                existingTags.Add(tag);
-            }
-        }
-
-        return existingTags;
-    }
-
-    private static IEnumerable<string> EnumerateTitles(string primaryTitle, IEnumerable<BookTitleInput>? alternativeTitles)
-    {
-        yield return primaryTitle;
-
-        foreach (var title in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
-        {
-            if (!string.IsNullOrWhiteSpace(title.Title))
-            {
-                yield return title.Title;
-            }
-        }
-    }
-
-    private static string? TrimToNull(string? value)
-    {
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 }
 
