@@ -463,7 +463,46 @@ public class BookRepository : IBookRepository, IBookListReadRepository
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        var page = await (await ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
+        var pageQuery = await BuildProjectedPageQueryAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
+        var page = await pageQuery.ToListAsync(cancellationToken);
+
+        return page.Select(MapListProjection).ToList();
+    }
+
+    private async Task<List<AdminBookListItemDto>> ToProjectedAdminListPageAsync(
+        IQueryable<Book> query,
+        int skip,
+        int take,
+        string? sortBy,
+        string? sortDirection,
+        CancellationToken cancellationToken)
+    {
+        var pageQuery = await BuildProjectedPageQueryAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
+        var page = await pageQuery.ToListAsync(cancellationToken);
+        var ownerIds = page.Select(book => book.OwnerId).Distinct().ToArray();
+        var owners = await _context.Users
+            .AsNoTracking()
+            .Where(user => ownerIds.Contains(user.Id))
+            .Select(user => new BookOwnerProjection
+            {
+                Id = user.Id,
+                Username = user.UserName,
+                Email = user.Email
+            })
+            .ToDictionaryAsync(user => user.Id, cancellationToken);
+
+        return page.Select(book => MapAdminListProjection(book, owners)).ToList();
+    }
+
+    private async Task<IQueryable<BookListProjection>> BuildProjectedPageQueryAsync(
+        IQueryable<Book> query,
+        int skip,
+        int take,
+        string? sortBy,
+        string? sortDirection,
+        CancellationToken cancellationToken)
+    {
+        return (await ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
             .Skip(skip)
             .Take(take)
             .Select(book => new BookListProjection
@@ -471,6 +510,7 @@ public class BookRepository : IBookRepository, IBookListReadRepository
                 Id = book.Id,
                 Created = book.Created,
                 LastModified = book.LastModified,
+                OwnerId = book.OwnerId,
                 PrimaryTitle = book.PrimaryTitle,
                 Description = book.Description == null
                     ? null
@@ -518,88 +558,7 @@ public class BookRepository : IBookRepository, IBookListReadRepository
                 CoverCreated = book.Cover != null ? book.Cover.Created : null,
                 HasCoverStoragePath = book.Cover != null && book.Cover.StoragePath != null,
                 HasCoverThumbnailStoragePath = book.Cover != null && book.Cover.ThumbnailStoragePath != null
-            })
-            .ToListAsync(cancellationToken);
-
-        return page.Select(MapListProjection).ToList();
-    }
-
-    private async Task<List<AdminBookListItemDto>> ToProjectedAdminListPageAsync(
-        IQueryable<Book> query,
-        int skip,
-        int take,
-        string? sortBy,
-        string? sortDirection,
-        CancellationToken cancellationToken)
-    {
-        var page = await (await ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
-            .Skip(skip)
-            .Take(take)
-            .Select(book => new AdminBookListProjection
-            {
-                Id = book.Id,
-                Created = book.Created,
-                LastModified = book.LastModified,
-                PrimaryTitle = book.PrimaryTitle,
-                Description = book.Description == null
-                    ? null
-                    : book.Description.Length > 80
-                        ? book.Description.Substring(0, 77) + "..."
-                        : book.Description,
-                AlternativeTitles = book.Titles
-                    .Where(title => !title.IsPrimary)
-                    .OrderBy(title => title.Id)
-                    .Select(title => title.Title)
-                    .Take(4)
-                    .ToList(),
-                AlternativeTitlesCount = book.Titles.Count(title => !title.IsPrimary),
-                Author = book.Author != null ? book.Author.PrimaryName : null,
-                ContentType = book.ContentType.Name,
-                Status = book.Status.Name,
-                CurrentChapterNumber = book.CurrentChapterNumber,
-                CurrentChapterLabel = book.CurrentChapterLabel,
-                TotalChapters = book.TotalChapters,
-                Rating = book.Rating,
-                Priority = book.Priority,
-                Notes = book.Notes == null
-                    ? null
-                    : book.Notes.Length > 80
-                        ? book.Notes.Substring(0, 77) + "..."
-                        : book.Notes,
-                Genres = book.BookGenres
-                    .OrderBy(bookGenre => bookGenre.Genre.Name)
-                    .Select(bookGenre => bookGenre.Genre.Name)
-                    .Take(4)
-                    .ToList(),
-                GenresCount = book.BookGenres.Count(),
-                Tags = book.BookTags
-                    .OrderBy(bookTag => bookTag.Tag.Name)
-                    .Select(bookTag => bookTag.Tag.Name)
-                    .Take(4)
-                    .ToList(),
-                TagsCount = book.BookTags.Count(),
-                LinksCount = book.Links.Count(),
-                CoverStatus = book.Cover != null ? book.Cover.Status : null,
-                CoverSource = book.Cover != null ? book.Cover.Source : null,
-                CoverFailureReason = book.Cover != null ? book.Cover.FailureReason : null,
-                CoverLastAttemptAt = book.Cover != null ? book.Cover.LastAttemptAt : null,
-                CoverLastModified = book.Cover != null ? book.Cover.LastModified : null,
-                CoverCreated = book.Cover != null ? book.Cover.Created : null,
-                HasCoverStoragePath = book.Cover != null && book.Cover.StoragePath != null,
-                HasCoverThumbnailStoragePath = book.Cover != null && book.Cover.ThumbnailStoragePath != null,
-                OwnerId = book.OwnerId,
-                OwnerUsername = _context.Users
-                    .Where(user => user.Id == book.OwnerId)
-                    .Select(user => user.UserName)
-                    .FirstOrDefault(),
-                OwnerEmail = _context.Users
-                    .Where(user => user.Id == book.OwnerId)
-                    .Select(user => user.Email)
-                    .FirstOrDefault()
-            })
-            .ToListAsync(cancellationToken);
-
-        return page.Select(MapAdminListProjection).ToList();
+            });
     }
 
     private async Task<IEnumerable<Book>> ToSortedPageAsync(
@@ -1079,9 +1038,12 @@ public class BookRepository : IBookRepository, IBookListReadRepository
         };
     }
 
-    private static AdminBookListItemDto MapAdminListProjection(AdminBookListProjection projection)
+    private static AdminBookListItemDto MapAdminListProjection(
+        BookListProjection projection,
+        IReadOnlyDictionary<Guid, BookOwnerProjection> owners)
     {
         var dto = MapListProjection(projection);
+        owners.TryGetValue(projection.OwnerId, out var owner);
         return new AdminBookListItemDto
         {
             Id = dto.Id,
@@ -1107,8 +1069,8 @@ public class BookRepository : IBookRepository, IBookListReadRepository
             TagsCount = dto.TagsCount,
             LinksCount = dto.LinksCount,
             OwnerId = projection.OwnerId,
-            OwnerUsername = projection.OwnerUsername,
-            OwnerEmail = projection.OwnerEmail
+            OwnerUsername = owner?.Username,
+            OwnerEmail = owner?.Email
         };
     }
 
@@ -1140,6 +1102,7 @@ public class BookRepository : IBookRepository, IBookListReadRepository
         public Guid Id { get; init; }
         public DateTimeOffset Created { get; init; }
         public DateTimeOffset LastModified { get; init; }
+        public Guid OwnerId { get; init; }
         public required string PrimaryTitle { get; init; }
         public string? Description { get; init; }
         public required List<string> AlternativeTitles { get; init; }
@@ -1168,10 +1131,10 @@ public class BookRepository : IBookRepository, IBookListReadRepository
         public bool HasCoverThumbnailStoragePath { get; init; }
     }
 
-    private sealed class AdminBookListProjection : BookListProjection
+    private sealed class BookOwnerProjection
     {
-        public Guid OwnerId { get; init; }
-        public string? OwnerUsername { get; init; }
-        public string? OwnerEmail { get; init; }
+        public Guid Id { get; init; }
+        public string? Username { get; init; }
+        public string? Email { get; init; }
     }
 }
