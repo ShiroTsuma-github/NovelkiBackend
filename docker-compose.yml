@@ -16,6 +16,10 @@ services:
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
       Admin__Emails__0: ${ADMIN_EMAIL}
+      RateLimiting__Account__PermitLimit: ${RATE_LIMITING_ACCOUNT_PERMIT_LIMIT:-10}
+      RateLimiting__Account__WindowSeconds: ${RATE_LIMITING_ACCOUNT_WINDOW_SECONDS:-60}
+      RateLimiting__Expensive__PermitLimit: ${RATE_LIMITING_EXPENSIVE_PERMIT_LIMIT:-20}
+      RateLimiting__Expensive__WindowSeconds: ${RATE_LIMITING_EXPENSIVE_WINDOW_SECONDS:-60}
       Cors__AllowedOrigins__0: http://localhost:${WEB_PORT:-8080}
       Cors__AllowedOrigins__1: http://localhost:5173
       BookCovers__S3__Endpoint: ${BOOK_COVERS__S3__ENDPOINT:-}
