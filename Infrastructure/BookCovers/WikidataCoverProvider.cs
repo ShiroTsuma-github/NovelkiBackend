@@ -28,7 +28,7 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            var bindings = TryGetProperty(document.RootElement, "results", "bindings");
+            var bindings = BookCoverJson.TryGetProperty(document.RootElement, "results", "bindings");
             if (bindings == null || bindings.Value.ValueKind != JsonValueKind.Array)
             {
                 continue;
@@ -36,7 +36,7 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
 
             foreach (var binding in bindings.Value.EnumerateArray())
             {
-                var imageUrl = TryGetString(binding, "image", "value");
+                var imageUrl = BookCoverJson.TryGetString(binding, "image", "value");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.Wikidata, imageUrl);
@@ -52,31 +52,4 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
         return value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
     }
 
-    private static JsonElement? TryGetProperty(JsonElement element, params string[] path)
-    {
-        var current = element;
-        foreach (var part in path)
-        {
-            if (!current.TryGetProperty(part, out current))
-            {
-                return null;
-            }
-        }
-
-        return current;
-    }
-
-    private static string? TryGetString(JsonElement element, params string[] path)
-    {
-        var current = element;
-        foreach (var part in path)
-        {
-            if (!current.TryGetProperty(part, out current))
-            {
-                return null;
-            }
-        }
-
-        return current.ValueKind == JsonValueKind.String ? current.GetString() : null;
-    }
 }
