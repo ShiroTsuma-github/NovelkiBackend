@@ -272,8 +272,14 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findByRole('button', { name: /discard all invalid/i })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /discard all invalid/i }))
+    const discardInvalidButton = await screen.findByRole('button', { name: /discard all invalid/i })
+    const closeButton = screen.getByRole('button', { name: /^close$/i })
+    const finalizeButton = screen.getByRole('button', { name: /finalize import/i })
+
+    expect((closeButton.compareDocumentPosition(discardInvalidButton) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy()
+    expect((discardInvalidButton.compareDocumentPosition(finalizeButton) & Node.DOCUMENT_POSITION_FOLLOWING)).toBeTruthy()
+
+    fireEvent.click(discardInvalidButton)
 
     await waitFor(() => {
       expect(api.deleteInvalidBookImportRows).toHaveBeenCalledWith('session-mixed')

@@ -274,17 +274,6 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             <div className="h-[min(60vh,44rem)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
               {invalidRows.length ? (
                 <div className="grid h-full min-h-0 gap-3">
-                  <div className="flex justify-end">
-                    <button
-                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
-                      disabled={deleteInvalidRowsMutation.isPending}
-                      type="button"
-                      onClick={() => deleteInvalidRowsMutation.mutate(session.sessionId)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      {deleteInvalidRowsMutation.isPending ? 'Removing invalid...' : 'Discard all invalid'}
-                    </button>
-                  </div>
                   <Virtuoso
                     className="import-rows-scroll"
                     components={{ Scroller: ImportRowsScroller }}
@@ -326,6 +315,17 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               <button className={secondaryButtonClass} disabled={finalizeMutation.isPending} type="button" onClick={handleDismiss}>
                 Close
               </button>
+              {invalidRows.length ? (
+                <button
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                  disabled={deleteInvalidRowsMutation.isPending || finalizeMutation.isPending}
+                  type="button"
+                  onClick={() => deleteInvalidRowsMutation.mutate(session.sessionId)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  {deleteInvalidRowsMutation.isPending ? 'Removing invalid...' : 'Discard all invalid'}
+                </button>
+              ) : null}
               <button
                 className={buttonClass}
                 disabled={!session.canFinalize || finalizeMutation.isPending}
