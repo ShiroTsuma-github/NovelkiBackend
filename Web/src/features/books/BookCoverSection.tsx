@@ -83,7 +83,7 @@ export function useResolvedCoverImage(cover?: BookCoverDto | null, variant: 'ful
   return blobUrl
 }
 
-function getCoverCacheKey(cover?: BookCoverDto | null, variant: 'full' | 'thumbnail') {
+function getCoverCacheKey(cover: BookCoverDto | null | undefined, variant: 'full' | 'thumbnail') {
   const targetUrl = variant === 'thumbnail'
     ? cover?.thumbnailImageUrl ?? cover?.imageUrl
     : cover?.imageUrl

@@ -153,6 +153,51 @@ public class BookCoverTests
         }
     }
 
+    [Theory]
+    [InlineData("http://127.0.0.1/cover.jpg")]
+    [InlineData("http://10.0.0.5/cover.jpg")]
+    [InlineData("http://172.16.0.5/cover.jpg")]
+    [InlineData("http://192.168.1.5/cover.jpg")]
+    [InlineData("http://169.254.169.254/latest/meta-data/")]
+    [InlineData("http://[::1]/cover.jpg")]
+    public async Task RemoteImageService_ShouldRejectPrivateOrLoopbackHosts(string imageUrl)
+    {
+        var storageRoot = CreateTempStorageRoot();
+        try
+        {
+            var handler = new FakeHttpMessageHandler(CreateTestPngBytes(), "image/png");
+            var service = CreateRemoteImageService(storageRoot, handler);
+
+            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+                service.SaveFromUrlAsync(OwnerId, BookId, imageUrl, CancellationToken.None));
+
+            Assert.Equal(0, handler.RequestCount);
+        }
+        finally
+        {
+            DeleteTempStorageRoot(storageRoot);
+        }
+    }
+
+    [Fact]
+    public async Task RemoteImageService_ShouldRejectRedirectResponses()
+    {
+        var storageRoot = CreateTempStorageRoot();
+        try
+        {
+            var service = CreateRemoteImageService(
+                storageRoot,
+                new FakeHttpMessageHandler(Array.Empty<byte>(), "text/plain", HttpStatusCode.Redirect));
+
+            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+                service.SaveFromUrlAsync(OwnerId, BookId, "https://example.com/redirect", CancellationToken.None));
+        }
+        finally
+        {
+            DeleteTempStorageRoot(storageRoot);
+        }
+    }
+
     [Fact]
     public async Task RefreshBookCover_ShouldAddPendingCover_WhenBookHasNoCoverRow()
     {
@@ -193,12 +238,17 @@ public class BookCoverTests
 
     private static BookCoverRemoteImageService CreateRemoteImageService(string storageRoot, byte[] content, string contentType)
     {
+        return CreateRemoteImageService(storageRoot, new FakeHttpMessageHandler(content, contentType));
+    }
+
+    private static BookCoverRemoteImageService CreateRemoteImageService(string storageRoot, HttpMessageHandler handler)
+    {
         var storage = new LocalBookCoverStorage(Options.Create(new BookCoverOptions
         {
             StorageRoot = storageRoot,
             MaxBytes = 1024
         }));
-        var client = new HttpClient(new FakeHttpMessageHandler(content, contentType));
+        var client = new HttpClient(handler);
 
         return new BookCoverRemoteImageService(new FakeHttpClientFactory(client), storage);
     }
@@ -245,6 +295,8 @@ public class BookCoverTests
     {
         private readonly byte[] _content;
         private readonly string _contentType;
+        private readonly HttpStatusCode _statusCode;
+        public int RequestCount { get; private set; }
 
         public FakeHttpMessageHandler(string html)
             : this(Encoding.UTF8.GetBytes(html), "text/html")
@@ -252,17 +304,24 @@ public class BookCoverTests
         }
 
         public FakeHttpMessageHandler(byte[] content, string contentType)
+            : this(content, contentType, HttpStatusCode.OK)
+        {
+        }
+
+        public FakeHttpMessageHandler(byte[] content, string contentType, HttpStatusCode statusCode)
         {
             _content = content;
             _contentType = contentType;
+            _statusCode = statusCode;
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            RequestCount++;
             var content = new ByteArrayContent(_content);
             content.Headers.ContentType = new MediaTypeHeaderValue(_contentType);
 
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            return Task.FromResult(new HttpResponseMessage(_statusCode)
             {
                 Content = content
             });

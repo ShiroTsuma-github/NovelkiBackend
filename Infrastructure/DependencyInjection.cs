@@ -121,6 +121,10 @@ public static class DependencyInjection
         builder.Services.AddHttpClient("BookCoverImages", client =>
         {
             client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+        })
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            AllowAutoRedirect = false
         });
 
         builder.Services.AddHttpContextAccessor();

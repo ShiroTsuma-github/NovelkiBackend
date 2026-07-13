@@ -338,12 +338,19 @@ public static class BookExportCsv
 
     private static string Escape(object? value)
     {
-        var text = value?.ToString() ?? string.Empty;
+        var text = NeutralizeSpreadsheetFormula(value?.ToString() ?? string.Empty);
         if (!text.Contains(',') && !text.Contains('"') && !text.Contains('\n') && !text.Contains('\r'))
         {
             return text;
         }
 
         return $"\"{text.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
+    }
+
+    private static string NeutralizeSpreadsheetFormula(string text)
+    {
+        return text.Length > 0 && text[0] is '=' or '+' or '-' or '@'
+            ? $"'{text}"
+            : text;
     }
 }

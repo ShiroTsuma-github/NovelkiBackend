@@ -273,6 +273,19 @@ public class BookControllerTests
         Assert.Contains("\"A,B\"", csv);
     }
 
+    [Fact]
+    public void BookExportCsv_ShouldNeutralizeSpreadsheetFormulas()
+    {
+        var csv = BookExportCsv.Build([
+            Book("=HYPERLINK(\"https://evil.example\")", author: "+cmd", tags: ["@tag"], notes: "-payload"),
+        ]);
+
+        Assert.Contains("'=HYPERLINK", csv);
+        Assert.Contains("'+cmd", csv);
+        Assert.Contains("'@tag", csv);
+        Assert.Contains("'-payload", csv);
+    }
+
     private static BookController CreateController(IMediator? mediator = null, IBookCsvImportService? importService = null)
     {
         return new BookController(
