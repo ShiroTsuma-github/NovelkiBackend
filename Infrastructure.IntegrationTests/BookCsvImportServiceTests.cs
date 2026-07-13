@@ -268,6 +268,29 @@ Existing Book,Novel,Reading
     }
 
     [Fact]
+    public async Task FinalizeAsync_ShouldRejectInvalidSessionWithoutPersistingOrQueuingCovers()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var queue = new TrackingBookCoverQueue();
+        var cacheInvalidator = new TrackingCacheInvalidator();
+        var service = CreateService(context, database.UserId, queue, cacheInvalidator);
+
+        using var stream = CreateCsv("""
+primaryTitle,contentType,status,totalChapters,currentChapterNumber
+Invalid Book,Novel,Reading,10,11
+""");
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.FinalizeAsync(session.SessionId, CancellationToken.None));
+        Assert.Equal(0, await context.Books.CountAsync());
+        Assert.Empty(queue.BookIds);
+        Assert.Null(cacheInvalidator.InvalidatedOwnerId);
+    }
+
+    [Fact]
     public async Task DeleteInvalidRowsAsync_ShouldRemoveOnlyInvalidRows()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());

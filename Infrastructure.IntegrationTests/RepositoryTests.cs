@@ -307,6 +307,41 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldProjectUserAndAdminListsWithSharedBookFields()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var book = await TestData.AddBookWithRelationsAsync(context, database.UserId);
+        book.Description = new string('d', 100);
+        book.Notes = new string('n', 100);
+        book.Cover!.ThumbnailStoragePath = "11111111111111111111111111111111/example.thumb.jpg";
+        book.Cover.ThumbnailMimeType = "image/jpeg";
+        book.Cover.LastAttemptAt = DateTimeOffset.Parse("2026-07-13T10:15:30+00:00");
+        await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        var repository = new BookRepository(context);
+
+        var userList = (await repository.GetAllListAsync(database.UserId, 0, 10, "title", "asc", CancellationToken.None)).ToList();
+        var adminList = (await repository.GetAllAdminListAsync(0, 10, "title", "asc", CancellationToken.None)).ToList();
+
+        var userItem = Assert.Single(userList);
+        var adminItem = Assert.Single(adminList);
+        Assert.Equal(userItem.Id, adminItem.Id);
+        Assert.Equal(userItem.PrimaryTitle, adminItem.PrimaryTitle);
+        Assert.Equal(userItem.Description, adminItem.Description);
+        Assert.Equal(userItem.Notes, adminItem.Notes);
+        Assert.Equal(userItem.AlternativeTitles, adminItem.AlternativeTitles);
+        Assert.Equal(userItem.Genres, adminItem.Genres);
+        Assert.Equal(userItem.Tags, adminItem.Tags);
+        Assert.Equal(userItem.Cover!.ImageUrl, adminItem.Cover!.ImageUrl);
+        Assert.Equal(userItem.Cover.ThumbnailImageUrl, adminItem.Cover.ThumbnailImageUrl);
+        Assert.Contains($"/api/v1/book/{book.Id}/cover/file?v=", userItem.Cover.ImageUrl);
+        Assert.Contains($"/api/v1/book/{book.Id}/cover/thumbnail?v=", userItem.Cover.ThumbnailImageUrl);
+        Assert.Equal(database.UserId, adminItem.OwnerId);
+        Assert.False(string.IsNullOrWhiteSpace(adminItem.OwnerUsername));
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldReturnNoAdminSearchResultsForMissingQuery()
     {
         using var database = new SqliteTestDatabase();
