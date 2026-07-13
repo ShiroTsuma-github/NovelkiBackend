@@ -87,6 +87,47 @@ public class BookListCacheTests
         Assert.Contains(storage.StringEntries, pair => pair.Key == $"books:{ownerId}:version" && pair.Value == "2");
     }
 
+    [Fact]
+    public async Task GetBooksAsync_ShouldReuseExistingPositiveVersion()
+    {
+        var ownerId = Guid.NewGuid();
+        var storage = new FakeDistributedCache();
+        storage.SetString($"books:{ownerId}:version", "7");
+        var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
+
+        await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
+
+        Assert.Equal("7", storage.StringEntries[$"books:{ownerId}:version"]);
+    }
+
+    [Fact]
+    public async Task GetBooksAsync_ShouldReinitializeInvalidVersionValue()
+    {
+        var ownerId = Guid.NewGuid();
+        var storage = new FakeDistributedCache();
+        storage.SetString($"books:{ownerId}:version", "0");
+        var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
+
+        await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
+
+        Assert.Equal("1", storage.StringEntries[$"books:{ownerId}:version"]);
+    }
+
+    [Fact]
+    public async Task SetAndGetBooksAsync_ShouldNormalizeNullAndWhitespaceQueryTheSameWay()
+    {
+        var ownerId = Guid.NewGuid();
+        var storage = new FakeDistributedCache();
+        var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
+        var expected = PaginatedResult<BookListItemDto>.Create(0, 10, 1, [CreateBookDto("Whitespace")]);
+
+        await cache.SetBooksAsync(ownerId, 0, 10, "   ", null, null, expected, CancellationToken.None);
+        var result = await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Equal("Whitespace", result.Data[0].PrimaryTitle);
+    }
+
     private static BookListItemDto CreateBookDto(string title)
     {
         return new BookListItemDto
@@ -122,6 +163,7 @@ public class BookListCacheTests
         }
 
         public void Set(string key, byte[] value, DistributedCacheEntryOptions options) => _entries[key] = value;
+        public void SetString(string key, string value) => _entries[key] = System.Text.Encoding.UTF8.GetBytes(value);
         public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
         {
             _entries[key] = value;

@@ -345,6 +345,65 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public void CreateBookValidator_ShouldRejectOverlongScalarFields()
+    {
+        var validator = new CreateBookCommandValidator();
+        var command = ValidCreateCommand(authorName: new string('a', 301)) with
+        {
+            PrimaryTitle = new string('t', 501),
+            CurrentChapterLabel = new string('c', 101),
+            Description = new string('d', 4001),
+            Notes = new string('n', 4001),
+            RawImportedLine = new string('r', 4001)
+        };
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title must be 500 characters or fewer.");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AuthorName");
+        Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterLabel");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Description");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Notes");
+        Assert.Contains(result.Errors, e => e.PropertyName == "RawImportedLine");
+    }
+
+    [Fact]
+    public void CreateBookValidator_ShouldRejectInvalidAlternativeTitlesTagsAndLinks()
+    {
+        var validator = new CreateBookCommandValidator();
+        var command = ValidCreateCommand(
+            alternativeTitles:
+            [
+                new BookTitleInput(" ", "pl", "Manual"),
+                new BookTitleInput(new string('t', 501), new string('l', 11), new string('s', 51))
+            ],
+            tags: [" ", new string('x', 101)],
+            links:
+            [
+                new BookLinkInput(""),
+                new BookLinkInput("ftp://example.com/cover.jpg", new string('l', 201), ""),
+                new BookLinkInput(new string('h', 2001), "label", new string('s', 51))
+            ]);
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[0].Title");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[1].Title");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[1].Language");
+        Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[1].Source");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Tags[0]");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Tags[1]");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[0].Url");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[1].Url");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[1].Label");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[1].SourceType");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[2].Url");
+        Assert.Contains(result.Errors, e => e.PropertyName == "Links[2].SourceType");
+    }
+
+    [Fact]
     public void UpdateBookProgressValidator_ShouldRejectNegativeChapterNumber()
     {
         var validator = new UpdateBookProgressCommandValidator();
