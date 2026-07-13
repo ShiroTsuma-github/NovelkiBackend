@@ -1,6 +1,7 @@
 namespace Application.Common;
 
 using Application.Common.DTOs.Author;
+using Application.Common.DTOs.Book;
 using Application.Common.DTOs.Genre;
 using Application.Common.DTOs.Status;
 using Application.Common.DTOs.Tag;
@@ -61,13 +62,10 @@ public static partial class MappingExtensions
 
     public static GenreDetailsDto ToDetailsDto(this Genre source)
     {
-        return new GenreDetailsDto
+        return MapDetails(source.Id, source.Name, source.Description, source.BookGenres.Select(bg => bg.Book), new GenreDetailsDto
         {
-            Id = source.Id,
             Name = source.Name,
-            Description = source.Description,
-            Books = source.BookGenres.Select(bg => bg.Book.ToDto()).ToList()
-        };
+        });
     }
 
     public static Status ToEntity(this CreateStatusCommand source)
@@ -99,13 +97,10 @@ public static partial class MappingExtensions
 
     public static StatusDetailsDto ToDetailsDto(this Status source)
     {
-        return new StatusDetailsDto
+        return MapDetails(source.Id, source.Name, source.Description, source.Books, new StatusDetailsDto
         {
-            Id = source.Id,
             Name = source.Name,
-            Description = source.Description,
-            Books = source.Books.Select(b => b.ToDto()).ToList()
-        };
+        });
     }
 
     public static ContentType ToEntity(this CreateTypeCommand source)
@@ -137,12 +132,24 @@ public static partial class MappingExtensions
 
     public static TypeDetailsDto ToDetailsDto(this ContentType source)
     {
-        return new TypeDetailsDto
+        return MapDetails(source.Id, source.Name, source.Description, source.Books, new TypeDetailsDto
         {
-            Id = source.Id,
             Name = source.Name,
-            Description = source.Description,
-            Books = source.Books.Select(b => b.ToDto()).ToList()
-        };
+        });
+    }
+
+    private static TDetailsDto MapDetails<TDetailsDto>(
+        Guid id,
+        string name,
+        string? description,
+        IEnumerable<Book> books,
+        TDetailsDto destination)
+        where TDetailsDto : BookCollectionDetailsDto
+    {
+        destination.Id = id;
+        destination.Name = name;
+        destination.Description = description;
+        destination.Books = books.Select(book => book.ToDto()).ToList();
+        return destination;
     }
 }
