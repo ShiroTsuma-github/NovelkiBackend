@@ -820,20 +820,36 @@ describe('BooksPage', () => {
 
   it('builds card detail rows only from globally enabled card fields', () => {
     expect(getCardDetailRowClass({
+      cardsPerRow: 4,
       showAlternativeTitles: false,
       showAuthor: false,
       showProgress: false,
       showTitle: true,
       showType: false,
-    })).toBe('grid-rows-[minmax(0,2.5rem)]')
+    })).toBe('grid-rows-[minmax(0,3.5rem)]')
 
     expect(getCardDetailRowClass({
+      cardsPerRow: 4,
       showAlternativeTitles: false,
       showAuthor: true,
       showProgress: true,
       showTitle: true,
       showType: true,
-    })).toBe('grid-rows-[minmax(0,2.5rem)_minmax(0,1.5rem)_minmax(0,1.75rem)]')
+    })).toBe('grid-rows-[minmax(0,3.5rem)_minmax(0,1.5rem)_minmax(0,1.75rem)]')
+  })
+
+  it('uses tighter card title row presets as more cards are shown per row', () => {
+    const visibleFields = {
+      showAlternativeTitles: false,
+      showAuthor: true,
+      showProgress: false,
+      showTitle: true,
+      showType: false,
+    }
+
+    expect(getCardDetailRowClass({ cardsPerRow: 4, ...visibleFields })).toBe('grid-rows-[minmax(0,3.5rem)_minmax(0,1.5rem)]')
+    expect(getCardDetailRowClass({ cardsPerRow: 6, ...visibleFields })).toBe('grid-rows-[minmax(0,3rem)_minmax(0,1.5rem)]')
+    expect(getCardDetailRowClass({ cardsPerRow: 8, ...visibleFields })).toBe('grid-rows-[minmax(0,2.5rem)_minmax(0,1.5rem)]')
   })
 
   function createSummary() {
