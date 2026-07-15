@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-070 - Dodaj chapter volume i estimated reading time
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Web/src/features/analytics/charts/ChapterVolumeChart.tsx`, `EstimatedReadingTimeChart.tsx`, wspolny helper ustawien czasu z `BooksPage.tsx`
-- Zaleznosci: `NB-062`, `NB-067`
-- Problem: frontend nie porownuje liczby tytulow z objetoscia rozdzialow ani nie przelicza jej na ustawienia tempa uzytkownika.
-- Zakres: wdrozyc mockupy 08-09; chapter volume pokazac jako dwa wykresy z osobnymi skalami; estimated time liczyc na kliencie z currentChapters i minut per type; wspoldzielic klucz localStorage z Summary.
-- Akceptacja: count i volume nie uzywaja dual axis; null statystyk ma czytelny opis; zmiana minut nie wysyla requestu; uszkodzony localStorage wraca do bezpiecznych wartosci; testy obejmuja typ bez rozdzialow, wartosci dziesietne, zero minut, nowy typ, format duzych godzin i mobile.
-
 ### NB-042 - Dodaj wykresy trendow biblioteki
 
 - Typ: `Feature gap`
@@ -65,6 +55,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-070 - Dodaj chapter volume i estimated reading time
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/ChapterVolumeChart.tsx`, `EstimatedReadingTimeChart.tsx`, wspolny helper ustawien czasu z `BooksPage.tsx`
+- Zaleznosci: `NB-062`, `NB-067`
+- Problem: frontend nie porownuje liczby tytulow z objetoscia rozdzialow ani nie przelicza jej na ustawienia tempa uzytkownika.
+- Zakres: wdrozyc mockupy 08-09; chapter volume pokazac jako dwa wykresy z osobnymi skalami; estimated time liczyc na kliencie z currentChapters i minut per type; wspoldzielic klucz localStorage z Summary.
+- Akceptacja: count i volume nie uzywaja dual axis; null statystyk ma czytelny opis; zmiana minut nie wysyla requestu; uszkodzony localStorage wraca do bezpiecznych wartosci; testy obejmuja typ bez rozdzialow, wartosci dziesietne, zero minut, nowy typ, format duzych godzin i mobile.
 
 ### NB-069 - Dodaj frontendowe wykresy ocen i priorytetow
 

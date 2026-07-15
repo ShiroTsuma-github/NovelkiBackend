@@ -1,0 +1,72 @@
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+import type { BookAnalyticsDto } from '@/api/types'
+import { formatChapterCount } from '@/features/books/BooksPage'
+import { DrilldownLink, fieldQuery, formatCount } from './chartUtils'
+
+type ChapterVolumeChartProps = {
+  data: BookAnalyticsDto | undefined
+}
+
+export function ChapterVolumeChart({ data }: ChapterVolumeChartProps) {
+  const items = data?.progress.typeVolumes ?? []
+
+  if (!items.length) {
+    return <div className="grid min-h-56 place-items-center text-sm text-slate-500">No chapter volume data for this analytics scope.</div>
+  }
+
+  return (
+    <div className="grid gap-5">
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div>
+          <div className="mb-2 text-sm font-semibold text-slate-950">Book count by type</div>
+          <div className="h-56 min-w-0">
+            <ResponsiveContainer>
+              <BarChart data={items}>
+                <XAxis dataKey="type" tickLine={false} />
+                <YAxis allowDecimals={false} tickLine={false} />
+                <Tooltip formatter={(value) => [`${formatCount(Number(value))} books`, 'Books']} />
+                <Bar dataKey="bookCount" fill="#0891b2" name="Books" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div>
+          <div className="mb-2 text-sm font-semibold text-slate-950">Current chapters by type</div>
+          <div className="h-56 min-w-0">
+            <ResponsiveContainer>
+              <BarChart data={items}>
+                <XAxis dataKey="type" tickLine={false} />
+                <YAxis tickLine={false} />
+                <Tooltip formatter={(value) => [`${formatChapterCount(Number(value))} chapters`, 'Current chapters']} />
+                <Bar dataKey="currentChapters" fill="#7c3aed" name="Current chapters" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-2">
+        {items.map((item) => (
+          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.type}>
+            <div className="flex items-center justify-between gap-3">
+              <DrilldownLink query={fieldQuery('type', item.type)}>{item.type}</DrilldownLink>
+              <span className="text-slate-500">{formatCount(item.bookCount)} books</span>
+            </div>
+            <div className="mt-1 text-slate-600">
+              Current chapters: {formatChapterCount(item.currentChapters)} · Avg: {formatChapterCount(item.averageCurrentChapter)} · Median: {formatChapterCount(item.medianCurrentChapter)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export function chapterVolumeRows(data?: BookAnalyticsDto) {
+  return (data?.progress.typeVolumes ?? []).map((item) => [
+    item.type,
+    formatCount(item.bookCount),
+    formatChapterCount(item.currentChapters),
+    formatChapterCount(item.averageCurrentChapter),
+    formatChapterCount(item.medianCurrentChapter),
+  ])
+}
