@@ -5,7 +5,7 @@ import { api } from '@/api/client'
 import type { BookImportFinalizeResult, BookImportSessionDto } from '@/api/types'
 import { toast } from 'sonner'
 import { renderWithProviders } from '@/test/render'
-import { ImportBooksDialog } from './ImportBooksDialog'
+import { getImportSessionStats, ImportBooksDialog } from './ImportBooksDialog'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -33,6 +33,20 @@ vi.mock('sonner', () => ({
 }))
 
 describe('ImportBooksDialog', () => {
+  it('calculates import session stats without dividing empty sessions by zero', () => {
+    const stats = getImportSessionStats({
+      ...importSessionWithFieldErrors,
+      invalidRows: 0,
+      rows: [],
+      totalRows: 0,
+      validRows: 0,
+    })
+
+    expect(stats.invalidRows).toEqual([])
+    expect(stats.invalidRowsCount).toBe(0)
+    expect(stats.progressPercent).toBe(0)
+  })
+
   it('creates an import session when a csv file is dropped into the dialog', async () => {
     vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
 

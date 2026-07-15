@@ -19,6 +19,20 @@ function ImportRowsScroller(props: React.ComponentProps<'div'>) {
   return <div {...props} className="import-rows-scroll" />
 }
 
+export function getImportSessionStats(session: BookImportSessionDto | null) {
+  const invalidRows = session?.rows.filter((row) => !row.isValid) ?? []
+  const totalRows = session?.totalRows ?? 0
+  const validRows = session?.validRows ?? 0
+
+  return {
+    invalidRows,
+    invalidRowsCount: session?.invalidRows ?? 0,
+    progressPercent: totalRows === 0 ? 0 : (validRows / totalRows) * 100,
+    totalRows,
+    validRows,
+  }
+}
+
 export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDialogProps) {
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
@@ -27,7 +41,8 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   const [dropzoneActive, setDropzoneActive] = useState(false)
   const [finalizeResult, setFinalizeResult] = useState<BookImportFinalizeResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const invalidRows = useMemo(() => session?.rows.filter((row) => !row.isValid) ?? [], [session])
+  const importStats = useMemo(() => getImportSessionStats(session), [session])
+  const invalidRows = importStats.invalidRows
 
   const createSessionMutation = useMutation({
     mutationFn: (file: File) => api.createBookImportSession(file),
@@ -263,20 +278,20 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
           <>
             <div className="grid gap-4 md:grid-cols-4">
               <SummaryCard label="File" value={session.fileName} />
-              <SummaryCard label="Rows" value={String(session.totalRows)} />
-              <SummaryCard label="Positive" value={String(session.validRows)} />
-              <SummaryCard label="Negative" value={String(session.invalidRows)} tone={session.invalidRows ? 'warn' : 'ok'} />
+              <SummaryCard label="Rows" value={String(importStats.totalRows)} />
+              <SummaryCard label="Positive" value={String(importStats.validRows)} />
+              <SummaryCard label="Negative" value={String(importStats.invalidRowsCount)} tone={importStats.invalidRowsCount ? 'warn' : 'ok'} />
             </div>
 
             <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-slate-100">Progress</div>
-                <div className="text-sm text-slate-300">{session.validRows} / {session.totalRows} valid</div>
+                <div className="text-sm text-slate-300">{importStats.validRows} / {importStats.totalRows} valid</div>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-800">
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-[width]"
-                  style={{ width: `${session.totalRows === 0 ? 0 : (session.validRows / session.totalRows) * 100}%` }}
+                  style={{ width: `${importStats.progressPercent}%` }}
                 />
               </div>
             </div>
