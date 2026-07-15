@@ -134,13 +134,19 @@ describe('AnalyticsPage', () => {
 
     await screen.findByText('Status by type')
     await user.click(screen.getByRole('button', { name: /date range/i }))
-    await user.click(screen.getByRole('button', { name: dayButtonMatcher(start) }))
+    const startDay = screen.getByRole('button', { name: dayButtonMatcher(start) })
+    await user.click(startDay)
 
     const pendingButton = screen.getByRole('button', { name: new RegExp(`date range: ${format(start, 'MMM d, yyyy')}`, 'i') })
     expect(pendingButton).toHaveAttribute('title', format(start, 'MMM d, yyyy'))
     expect(pendingButton).not.toHaveTextContent('Today')
+    expect(getDayCell(startDay)).toHaveClass('rounded-l-full')
 
-    await user.click(screen.getByRole('button', { name: dayButtonMatcher(end) }))
+    const endDay = screen.getByRole('button', { name: dayButtonMatcher(end) })
+    await user.click(endDay)
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+    expect(getDayCell(screen.getByRole('button', { name: dayButtonMatcher(end) }))).toHaveClass('rounded-r-full')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
     await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -721,6 +727,15 @@ function dayButtonName(date: Date) {
 
 function dayButtonMatcher(date: Date) {
   return new RegExp(`^${escapeRegExp(dayButtonName(date))}`)
+}
+
+function getDayCell(button: HTMLElement) {
+  const cell = button.closest('td')
+  if (!cell) {
+    throw new Error('Expected date button to be rendered inside a day cell.')
+  }
+
+  return cell
 }
 
 function escapeRegExp(value: string) {
