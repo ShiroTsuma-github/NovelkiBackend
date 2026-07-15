@@ -114,6 +114,25 @@ public static partial class MappingExtensions
                         ChaptersAdvanced = item.ChaptersAdvanced
                     })
                     .ToList()
+            },
+            LibraryGrowth = new BookAnalyticsLibraryGrowthDto
+            {
+                OpeningCount = source.LibraryGrowth.OpeningCount,
+                Points = source.LibraryGrowth.Points
+                    .Select(item => new BookAnalyticsLibraryGrowthPointDto
+                    {
+                        Date = item.Date,
+                        BooksAdded = item.BooksAdded,
+                        CumulativeBooks = item.CumulativeBooks,
+                        ByType = item.ByType
+                            .Select(type => new BookAnalyticsTypeCountDto
+                            {
+                                Type = type.Type,
+                                BookCount = type.BookCount
+                            })
+                            .ToList()
+                    })
+                    .ToList()
             }
         };
     }

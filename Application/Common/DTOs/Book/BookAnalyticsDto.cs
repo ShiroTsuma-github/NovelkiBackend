@@ -10,6 +10,7 @@ public sealed record BookAnalyticsDto
     public BookAnalyticsPlanningDto Planning { get; init; } = new();
     public BookAnalyticsProgressDto Progress { get; init; } = new();
     public BookAnalyticsActivityDto Activity { get; init; } = new();
+    public BookAnalyticsLibraryGrowthDto LibraryGrowth { get; init; } = new();
 }
 
 public sealed record BookAnalyticsScopeDto
@@ -115,4 +116,24 @@ public sealed record BookAnalyticsActivityPointDto
     public int ProgressEvents { get; init; }
     public int BooksTouched { get; init; }
     public decimal ChaptersAdvanced { get; init; }
+}
+
+public sealed record BookAnalyticsLibraryGrowthDto
+{
+    public int OpeningCount { get; init; }
+    public IReadOnlyList<BookAnalyticsLibraryGrowthPointDto> Points { get; init; } = [];
+}
+
+public sealed record BookAnalyticsLibraryGrowthPointDto
+{
+    public DateOnly Date { get; init; }
+    public int BooksAdded { get; init; }
+    public int CumulativeBooks { get; init; }
+    public IReadOnlyList<BookAnalyticsTypeCountDto> ByType { get; init; } = [];
+}
+
+public sealed record BookAnalyticsTypeCountDto
+{
+    public required string Type { get; init; }
+    public int BookCount { get; init; }
 }

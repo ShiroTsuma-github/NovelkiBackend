@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-064 - Dodaj agregacje wzrostu biblioteki
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/Book.cs`, `Infrastructure.IntegrationTests/*`
-- Zaleznosci: `NB-059`
-- Problem: API nie pokazuje, jak rosla kolekcja ani ktore typy odpowiadaly za nowe rekordy.
-- Zakres: dodac `libraryGrowth.openingCount` i punkty day/week/month z booksAdded, cumulativeBooks oraz byType na podstawie `Book.Created`; zachowac widoczny skok masowego importu.
-- Akceptacja: openingCount obejmuje rekordy sprzed from; wartosci skumulowane koncza sie aktualnym total dla filtra; byType sumuje sie do punktu; puste buckety zachowuja wartosc skumulowana; testy obejmuja import jednego dnia, brak nowych ksiazek, granice roku, query, from/to i owner isolation.
-
 ### NB-065 - Dodaj agregacje jakosci biblioteki, linkow i okladek
 
 - Typ: `Feature`
@@ -135,6 +125,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-064 - Dodaj agregacje wzrostu biblioteki
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/Book.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie pokazuje, jak rosla kolekcja ani ktore typy odpowiadaly za nowe rekordy.
+- Zakres: dodac `libraryGrowth.openingCount` i punkty day/week/month z booksAdded, cumulativeBooks oraz byType na podstawie `Book.Created`; zachowac widoczny skok masowego importu.
+- Akceptacja: openingCount obejmuje rekordy sprzed from; wartosci skumulowane koncza sie aktualnym total dla filtra; byType sumuje sie do punktu; puste buckety zachowuja wartosc skumulowana; testy obejmuja import jednego dnia, brak nowych ksiazek, granice roku, query, from/to i owner isolation.
 
 ### NB-063 - Dodaj agregacje aktywnosci czytelniczej
 

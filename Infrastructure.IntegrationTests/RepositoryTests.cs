@@ -653,6 +653,77 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldAggregateLibraryGrowthByCreatedDateAndType()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("15151515-1515-1515-1515-151515151515");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "growth-other", NormalizedUserName = "GROWTH-OTHER" });
+
+        var opening = TestData.Book(database.UserId, "Growth Scope Opening");
+        var yearEdge = TestData.Book(database.UserId, "Growth Scope Year Edge");
+        yearEdge.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+        var importNovel = TestData.Book(database.UserId, "Growth Scope Import Novel");
+        var importManga = TestData.Book(database.UserId, "Growth Scope Import Manga");
+        importManga.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var laterManga = TestData.Book(database.UserId, "Growth Scope Later Manga");
+        laterManga.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        var unmatched = TestData.Book(database.UserId, "Growth Outside Import");
+        var otherOwner = TestData.Book(otherOwnerId, "Growth Scope Other Owner");
+
+        context.Books.AddRange(opening, yearEdge, importNovel, importManga, laterManga, unmatched, otherOwner);
+        await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(context, opening.Id, new DateTimeOffset(2025, 12, 30, 10, 0, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, yearEdge.Id, new DateTimeOffset(2025, 12, 31, 10, 0, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, importNovel.Id, new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, importManga.Id, new DateTimeOffset(2026, 1, 1, 9, 5, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, laterManga.Id, new DateTimeOffset(2026, 1, 3, 9, 0, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, unmatched.Id, new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, otherOwner.Id, new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero));
+        var service = CreateAnalyticsQueryService(context);
+        var criteria = BookSearchQueryParser.Parse("title:\"Growth Scope\"");
+
+        var day = await service.GetAnalyticsAsync(
+            database.UserId,
+            criteria,
+            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Growth Scope\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 5), "day"),
+            CancellationToken.None);
+
+        Assert.Equal(5, day.Overview.TotalBooks);
+        Assert.Equal(2, day.LibraryGrowth.OpeningCount);
+        Assert.Equal(4, day.LibraryGrowth.Points.Count);
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 1), 2, 4, ("Manga", 1), ("Novel", 1));
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 2), 0, 4);
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 3), 1, 5, ("Manga", 1));
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 4), 0, 5);
+
+        var month = await service.GetAnalyticsAsync(
+            database.UserId,
+            criteria,
+            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Growth Scope\"", new DateOnly(2025, 12, 31), new DateOnly(2026, 2, 1), "month"),
+            CancellationToken.None);
+
+        Assert.Equal(1, month.LibraryGrowth.OpeningCount);
+        AssertGrowthPoint(month, new DateOnly(2025, 12, 31), 1, 2, ("Manhwa", 1));
+        AssertGrowthPoint(month, new DateOnly(2026, 1, 1), 3, 5, ("Manga", 2), ("Novel", 1));
+
+        static void AssertGrowthPoint(
+            Domain.Models.BookAnalyticsSnapshot snapshot,
+            DateOnly date,
+            int booksAdded,
+            int cumulativeBooks,
+            params (string Type, int BookCount)[] byType)
+        {
+            var point = Assert.Single(snapshot.LibraryGrowth.Points, item => item.Date == date);
+            Assert.Equal(booksAdded, point.BooksAdded);
+            Assert.Equal(cumulativeBooks, point.CumulativeBooks);
+            Assert.Equal(byType.Select(item => item.Type).ToArray(), point.ByType.Select(item => item.Type).ToArray());
+            Assert.Equal(byType.Select(item => item.BookCount).ToArray(), point.ByType.Select(item => item.BookCount).ToArray());
+            Assert.Equal(booksAdded, point.ByType.Sum(item => item.BookCount));
+        }
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();

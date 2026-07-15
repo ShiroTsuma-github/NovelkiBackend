@@ -26,6 +26,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         var planning = await GetPlanningAsync(query, overview.TotalBooks, cancellationToken);
         var progress = await GetProgressAsync(query, overview.TotalBooks, cancellationToken);
         var activity = await GetActivityAsync(query, scope, overview.TotalBooks, cancellationToken);
+        var libraryGrowth = await GetLibraryGrowthAsync(query, scope, overview.TotalBooks, cancellationToken);
 
         return new BookAnalyticsSnapshot(
             DateTimeOffset.UtcNow,
@@ -35,7 +36,8 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             ratings,
             planning,
             progress,
-            activity);
+            activity,
+            libraryGrowth);
     }
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -382,18 +384,74 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             .ToList());
     }
 
+    private static async Task<BookAnalyticsLibraryGrowthSnapshot> GetLibraryGrowthAsync(
+        IQueryable<Book> query,
+        BookAnalyticsScopeSnapshot scope,
+        int totalBooks,
+        CancellationToken cancellationToken)
+    {
+        if (totalBooks == 0)
+        {
+            return BookAnalyticsLibraryGrowthSnapshot.Empty;
+        }
+
+        var rows = await query
+            .Select(book => new LibraryGrowthRow(book.ContentType.Name, book.Created))
+            .ToListAsync(cancellationToken);
+        var datedRows = rows
+            .Select(row => new LibraryGrowthDatedRow(
+                row.Type,
+                DateOnly.FromDateTime(row.Created.UtcDateTime)))
+            .ToList();
+        var openingCount = datedRows.Count(row => row.Created < scope.From);
+        var additionsByBucket = datedRows
+            .Where(row => row.Created >= scope.From && row.Created < scope.To)
+            .GroupBy(row => ResolveBucketDate(row.Created, scope.From, scope.Bucket))
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var cumulativeBooks = openingCount;
+        var points = new List<BookAnalyticsLibraryGrowthPointSnapshot>();
+        foreach (var bucket in CreateBucketDates(scope))
+        {
+            var additions = additionsByBucket.GetValueOrDefault(bucket) ?? [];
+            cumulativeBooks += additions.Count;
+            var byType = additions
+                .GroupBy(row => row.Type)
+                .Select(group => new BookAnalyticsTypeCountSnapshot(group.Key, group.Count()))
+                .OrderByDescending(item => item.BookCount)
+                .ThenBy(item => item.Type)
+                .ToList();
+
+            points.Add(new BookAnalyticsLibraryGrowthPointSnapshot(
+                bucket,
+                additions.Count,
+                cumulativeBooks,
+                byType));
+        }
+
+        return new BookAnalyticsLibraryGrowthSnapshot(openingCount, points);
+    }
+
     private static SortedDictionary<DateOnly, ActivityPointAccumulator> CreateEmptyActivityPoints(
         BookAnalyticsScopeSnapshot scope)
     {
         var points = new SortedDictionary<DateOnly, ActivityPointAccumulator>();
-        for (var bucket = ResolveBucketDate(scope.From, scope.From, scope.Bucket);
-             bucket < scope.To;
-             bucket = NextBucketDate(bucket, scope.Bucket))
+        foreach (var bucket in CreateBucketDates(scope))
         {
             points[bucket] = new ActivityPointAccumulator();
         }
 
         return points;
+    }
+
+    private static IEnumerable<DateOnly> CreateBucketDates(BookAnalyticsScopeSnapshot scope)
+    {
+        for (var bucket = ResolveBucketDate(scope.From, scope.From, scope.Bucket);
+             bucket < scope.To;
+             bucket = NextBucketDate(bucket, scope.Bucket))
+        {
+            yield return bucket;
+        }
     }
 
     private static DateOnly ResolveBucketDate(DateOnly date, DateOnly from, string bucket)
@@ -444,6 +502,10 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         DateTimeOffset ChangedAt,
         decimal? ChapterNumber,
         string? ChapterLabel);
+
+    private sealed record LibraryGrowthRow(string Type, DateTimeOffset Created);
+
+    private sealed record LibraryGrowthDatedRow(string Type, DateOnly Created);
 
     private sealed class ActivityPointAccumulator
     {
