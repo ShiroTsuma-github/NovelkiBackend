@@ -119,7 +119,7 @@ export function ColumnSettingsPopup<T>({
       </button>
       {open ? (
         <div
-          className="app-scrollbar fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-left normal-case tracking-normal shadow-xl"
+          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-left normal-case tracking-normal shadow-xl"
           style={position}
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">

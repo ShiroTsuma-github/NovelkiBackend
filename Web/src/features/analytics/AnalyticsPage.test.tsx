@@ -171,7 +171,6 @@ describe('AnalyticsPage', () => {
     await user.click(screen.getByRole('button', { name: /view data for status by type/i }))
 
     expect(screen.getByRole('columnheader', { name: 'Type' })).toBeInTheDocument()
-    expect(screen.getByRole('table', { name: /status by type data table/i }).parentElement).toHaveClass('app-scrollbar')
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
   })
 

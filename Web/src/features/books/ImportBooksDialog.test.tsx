@@ -371,7 +371,6 @@ describe('ImportBooksDialog', () => {
 
     const summaryTable = screen.getByRole('table')
     expect(summaryTable.parentElement).toHaveClass('overflow-auto')
-    expect(summaryTable.parentElement).toHaveClass('app-scrollbar-dark')
     expect(summaryTable.parentElement).toHaveClass('max-h-[min(28rem,55vh)]')
   })
 

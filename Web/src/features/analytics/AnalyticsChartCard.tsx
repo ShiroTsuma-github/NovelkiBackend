@@ -89,7 +89,7 @@ export function AnalyticsChartCard({
       )}
 
       {dataTableEnabled && showData ? (
-        <div className="app-scrollbar max-h-80 overflow-auto rounded-lg border border-slate-200" id={tableId}>
+        <div className="max-h-80 overflow-auto rounded-lg border border-slate-200" id={tableId}>
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <caption className="sr-only">{title} data table</caption>
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">

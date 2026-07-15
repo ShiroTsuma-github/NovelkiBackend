@@ -430,7 +430,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                           onFocus={() => setAuthorSuggestionsOpen(true)}
                         />
                         {authorSuggestionsOpen && authorName.trim().length >= 2 ? (
-                          <div className="app-scrollbar-dark absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
+                          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
                             {authorSuggestionsQuery.isLoading ? (
                               <div className="px-3 py-2 text-sm text-slate-400">Searching authors...</div>
                             ) : null}
@@ -765,7 +765,7 @@ function ChipBox({
         />
       </div>
       {trimmed ? (
-        <div className="app-scrollbar-dark absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
+        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
           {suggestions.map((item) => (
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
