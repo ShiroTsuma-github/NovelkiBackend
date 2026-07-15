@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-068 - Dodaj frontendowe wykresy skladu kolekcji
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Web/src/features/analytics/charts/StatusByTypeChart.tsx`, `TopGenresChart.tsx`, `TopTagsChart.tsx`, wspolne legendy/formattery
-- Zaleznosci: `NB-060`, `NB-067`
-- Problem: strona Analytics nie wizualizuje skladu wedlug status/type, gatunkow i tagow.
-- Zakres: wdrozyc trzy karty zgodnie z mockupami 01-03; status jako 100% stacked bars, gatunki i tagi jako Top N + Other.
-- Akceptacja: male segmenty sa dostepne w tooltipie/tabeli; udzialy multi-value maja jasne wyjasnienie; tag color nie lamie kontrastu; klikniecie buduje query; testy obejmuja empty, jedna kategorie, Other, dlugie nazwy, remisy i responsywnosc.
-
 ### NB-069 - Dodaj frontendowe wykresy ocen i priorytetow
 
 - Typ: `Feature`
@@ -85,6 +75,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-068 - Dodaj frontendowe wykresy skladu kolekcji
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/StatusByTypeChart.tsx`, `TopGenresChart.tsx`, `TopTagsChart.tsx`, wspolne legendy/formattery
+- Zaleznosci: `NB-060`, `NB-067`
+- Problem: strona Analytics nie wizualizuje skladu wedlug status/type, gatunkow i tagow.
+- Zakres: wdrozyc trzy karty zgodnie z mockupami 01-03; status jako 100% stacked bars, gatunki i tagi jako Top N + Other.
+- Akceptacja: male segmenty sa dostepne w tooltipie/tabeli; udzialy multi-value maja jasne wyjasnienie; tag color nie lamie kontrastu; klikniecie buduje query; testy obejmuja empty, jedna kategorie, Other, dlugie nazwy, remisy i responsywnosc.
 
 ### NB-041 - Dopracuj Library summary jako skrot do Analytics
 
