@@ -452,6 +452,8 @@ function DateRangeChooser({
             defaultMonth={subMonths(today, 1)}
             disabled={{ before: accountStartDate, after: today }}
             mode="range"
+            modifiers={{ rangeSelectionAnchor: rangeSelectionAnchor ?? undefined }}
+            modifiersClassNames={{ rangeSelectionAnchor: dayPickerClassNames.range_start }}
             numberOfMonths={2}
             selected={rangeSelectionAnchor ? { from: rangeSelectionAnchor } : calendarRange}
             onDayClick={applyCalendarDay}
