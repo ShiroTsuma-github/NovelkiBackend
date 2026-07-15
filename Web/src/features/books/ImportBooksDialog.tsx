@@ -206,7 +206,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   return (
     <div
       aria-modal="true"
-      className="app-scrollbar-dark fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"
       role="dialog"
       onClick={handleDismiss}
     >
@@ -395,7 +395,7 @@ function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalize
           <p className="text-sm text-slate-400">Saved titles from this CSV finalization.</p>
         </div>
         {result.importedBooks.length ? (
-          <div className="app-scrollbar-dark max-h-[min(28rem,55vh)] overflow-auto rounded-xl border border-slate-800">
+          <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-xl border border-slate-800">
             <table className="w-full border-collapse text-left text-sm">
               <thead className="bg-slate-950 text-xs uppercase tracking-wide text-slate-400">
                 <tr>

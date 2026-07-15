@@ -14,7 +14,7 @@ export function PriorityByStatusChart({ data }: PriorityByStatusChartProps) {
   }
 
   return (
-    <div className="app-scrollbar overflow-x-auto">
+    <div className="overflow-x-auto">
       <table className="min-w-full border-separate border-spacing-2 text-sm" data-testid="priority-heatmap">
         <thead>
           <tr>

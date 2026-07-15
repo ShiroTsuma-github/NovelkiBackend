@@ -29,7 +29,7 @@ export function BookDataTable<T extends { id: string }>({
   onSort: (sortBy: string) => void
 }) {
   return (
-    <div className={`app-scrollbar ${wrapperClassName} overflow-x-auto`}>
+    <div className={`${wrapperClassName} overflow-x-auto`}>
       <table className="min-w-[72rem] w-full table-fixed border-collapse text-left text-sm">
         <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
           <tr>

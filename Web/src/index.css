@@ -62,23 +62,6 @@ body {
   min-height: 100vh;
 }
 
-.app-scrollbar {
-  --scrollbar-track: #e2e8f0;
-  --scrollbar-thumb: #64748b;
-  --scrollbar-thumb-hover: #475569;
-  --scrollbar-thumb-active: #0891b2;
-  scrollbar-gutter: stable;
-}
-
-.app-scrollbar-dark,
-.import-rows-scroll {
-  --scrollbar-track: #0f172a;
-  --scrollbar-thumb: #475569;
-  --scrollbar-thumb-hover: #64748b;
-  --scrollbar-thumb-active: #22d3ee;
-  scrollbar-gutter: stable;
-}
-
 button,
 input,
 select,
