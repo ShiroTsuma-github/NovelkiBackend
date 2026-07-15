@@ -6,6 +6,8 @@ import type { BookAnalyticsDto } from '@/api/types'
 import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
+import { ChapterVolumeChart, chapterVolumeRows } from './charts/ChapterVolumeChart'
+import { EstimatedReadingTimeChart, estimatedReadingTimeRows } from './charts/EstimatedReadingTimeChart'
 import { PriorityByStatusChart, priorityRows } from './charts/PriorityByStatusChart'
 import { RatingDistributionChart, ratingRows } from './charts/RatingDistributionChart'
 import { StatusByTypeChart, statusByTypeRows } from './charts/StatusByTypeChart'
@@ -186,6 +188,32 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <PriorityByStatusChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Type', 'Books', 'Current chapters', 'Average current', 'Median current']}
+          description="Compares title count and chapter volume with separate scales."
+          emptyMessage="No chapter volume data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={chapterVolumeRows(data)}
+          title="Chapter volume by type"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <ChapterVolumeChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
+          description="Client-side estimate based on your minutes-per-chapter settings."
+          emptyMessage="No chapter data to estimate reading time."
+          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={estimatedReadingTimeRows(data)}
+          title="Estimated reading time"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <EstimatedReadingTimeChart data={data} />
         </AnalyticsChartCard>
       </div>
     </div>

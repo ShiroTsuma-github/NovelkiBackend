@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import type { BookAnalyticsDto } from '@/api/types'
+import { readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { expectReadableTextContrast } from '@/test/contrast'
 import { renderWithProviders } from '@/test/render'
 import { AnalyticsPage } from './AnalyticsPage'
@@ -167,7 +168,7 @@ describe('AnalyticsPage', () => {
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
-    expect(await screen.findByText('Novel')).toBeInTheDocument()
+    expect((await screen.findAllByText('Novel')).length).toBeGreaterThan(0)
     expect(screen.getByText('No genre data for this analytics scope.')).toBeInTheDocument()
     expect(screen.getByText('No tag data for this analytics scope.')).toBeInTheDocument()
   })
@@ -224,18 +225,74 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('No priority data for this analytics scope.')).toBeInTheDocument()
   })
 
+  it('renders chapter volume with separate count and chapter sections', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      progress: {
+        typeVolumes: [
+          { type: 'Novel', bookCount: 2, currentChapters: 120.5, averageCurrentChapter: 60.25, medianCurrentChapter: 55 },
+          { type: 'Manga', bookCount: 1, currentChapters: 0, averageCurrentChapter: null, medianCurrentChapter: null },
+        ],
+      },
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('Book count by type')).toBeInTheDocument()
+    expect(screen.getByText('Current chapters by type')).toBeInTheDocument()
+    expect(screen.getByText(/Current chapters: 120.5/)).toBeInTheDocument()
+  })
+
+  it('estimates reading time from shared localStorage without refetching', async () => {
+    window.localStorage.setItem(readingTimeStorageKey, JSON.stringify({ Novel: 2 }))
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      progress: {
+        typeVolumes: [
+          { type: 'Novel', bookCount: 1, currentChapters: 468, averageCurrentChapter: 468, medianCurrentChapter: 468 },
+        ],
+      },
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('15.6 h')).toBeInTheDocument()
+    const requestCount = vi.mocked(api.getBookAnalytics).mock.calls.length
+    const input = screen.getByRole('spinbutton', { name: /novel minutes per chapter/i })
+
+    await user.clear(input)
+    await user.type(input, '0')
+
+    expect(await screen.findByText('0.0 h')).toBeInTheDocument()
+    expect(window.localStorage.getItem(readingTimeStorageKey)).toContain('"Novel":0')
+    expect(vi.mocked(api.getBookAnalytics).mock.calls.length).toBe(requestCount)
+  })
+
+  it('shows chapter volume and estimated time empty states when no chapter rows exist', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      progress: {
+        typeVolumes: [],
+      },
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('No chapter volume data for this analytics scope.')).toBeInTheDocument()
+    expect(screen.getByText('No chapter data to estimate reading time.')).toBeInTheDocument()
+  })
+
   it('keeps analytics type labels readable against their calculated background', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
-    expectReadableTextContrast(await screen.findByText('Novel'))
+    expectReadableTextContrast((await screen.findAllByText('Novel'))[0])
   })
 })
 
 type AnalyticsOverrides = Partial<BookAnalyticsDto['overview']> & {
   composition?: Partial<BookAnalyticsDto['composition']>
   planning?: Partial<BookAnalyticsDto['planning']>
+  progress?: Partial<BookAnalyticsDto['progress']>
   ratings?: Partial<BookAnalyticsDto['ratings']>
 }
 
@@ -284,6 +341,16 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
     }] : [],
     ...overrides.planning,
   }
+  const progress = {
+    typeVolumes: overview.totalBooks > 0 ? [{
+      type: 'Novel',
+      bookCount: 6,
+      currentChapters: 468,
+      averageCurrentChapter: 78,
+      medianCurrentChapter: 64,
+    }] : [],
+    ...overrides.progress,
+  }
 
   return {
     generatedAt: '2026-07-15T12:00:00Z',
@@ -297,9 +364,7 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
     composition,
     ratings,
     planning,
-    progress: {
-      typeVolumes: [],
-    },
+    progress,
     activity: {
       points: overview.totalBooks > 0 ? [{
         date: '2026-01-05',
