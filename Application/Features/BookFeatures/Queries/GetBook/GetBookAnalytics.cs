@@ -13,6 +13,8 @@ public sealed record GetBookAnalyticsQuery(
 public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQuery, BookAnalyticsDto>
 {
     private const int DefaultRangeDays = 84;
+    private const int MaxDailyBucketRangeDays = 366;
+    private const int MaxWeeklyBucketRangeDays = 3660;
     private static readonly HashSet<string> SupportedBuckets = new(StringComparer.OrdinalIgnoreCase)
     {
         "day",
@@ -45,6 +47,7 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
             throw ValidationError(nameof(request.From), "From must be earlier than to.");
         }
 
+        bucket = ResolveEffectiveBucket(bucket, from, to);
         var scope = new BookAnalyticsScopeSnapshot(request.Query, from, to, bucket);
         var criteria = BookSearchQueryParser.Parse(request.Query);
         var snapshot = await _queryService.GetAnalyticsAsync(_user.RequiredId, criteria, scope, cancellationToken);
@@ -55,5 +58,21 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
     private static ValidationException ValidationError(string propertyName, string message)
     {
         return new ValidationException([new ValidationFailure(propertyName, message)]);
+    }
+
+    private static string ResolveEffectiveBucket(string requestedBucket, DateOnly from, DateOnly to)
+    {
+        var rangeDays = to.DayNumber - from.DayNumber;
+        if (rangeDays > MaxWeeklyBucketRangeDays)
+        {
+            return "month";
+        }
+
+        if (requestedBucket == "day" && rangeDays > MaxDailyBucketRangeDays)
+        {
+            return "week";
+        }
+
+        return requestedBucket;
     }
 }

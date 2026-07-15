@@ -195,6 +195,7 @@ public class BookQueryHandlerTests
 
         Assert.Equal(new DateOnly(1900, 1, 1), service.Scope!.From);
         Assert.Equal(new DateOnly(2026, 7, 16), service.Scope.To);
+        Assert.Equal("month", service.Scope.Bucket);
     }
 
     private static BookListItemDto ListItem(string title)

@@ -19,7 +19,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
     <div className="grid gap-4">
       <div className="h-56 min-w-0" aria-label="Reading activity trend">
         <ResponsiveContainer>
-          <LineChart data={points}>
+          <LineChart data={displayPoints}>
             <XAxis dataKey="date" tickLine={false} />
             <YAxis allowDecimals={false} tickLine={false} />
             <Tooltip
