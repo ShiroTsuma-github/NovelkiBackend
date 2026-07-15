@@ -133,6 +133,42 @@ public static partial class MappingExtensions
                             .ToList()
                     })
                     .ToList()
+            },
+            Quality = new BookAnalyticsQualityDto
+            {
+                FieldCompleteness = source.Quality.FieldCompleteness
+                    .Select(item => new BookAnalyticsFieldCompletenessDto
+                    {
+                        Field = item.Field,
+                        BookCount = item.BookCount,
+                        ShareOfBooks = item.ShareOfBooks
+                    })
+                    .ToList(),
+                LinkSources = source.Quality.LinkSources
+                    .Select(item => new BookAnalyticsLinkSourceDto
+                    {
+                        Source = item.Source,
+                        LinkCount = item.LinkCount,
+                        BookCount = item.BookCount,
+                        ShareOfBooks = item.ShareOfBooks
+                    })
+                    .ToList(),
+                CoverStatuses = source.Quality.CoverStatuses
+                    .Select(item => new BookAnalyticsCoverStatusDto
+                    {
+                        Status = item.Status,
+                        BookCount = item.BookCount,
+                        ShareOfBooks = item.ShareOfBooks
+                    })
+                    .ToList(),
+                CoverSources = source.Quality.CoverSources
+                    .Select(item => new BookAnalyticsCoverSourceDto
+                    {
+                        Source = item.Source,
+                        BookCount = item.BookCount,
+                        ShareOfBooks = item.ShareOfBooks
+                    })
+                    .ToList()
             }
         };
     }

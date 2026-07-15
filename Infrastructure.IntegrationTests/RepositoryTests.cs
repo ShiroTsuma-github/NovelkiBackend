@@ -724,6 +724,145 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldAggregateQualityLinksAndCoversWithScopedDenominators()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("16161616-1616-1616-1616-161616161616");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "quality-other", NormalizedUserName = "QUALITY-OTHER" });
+        var author = TestData.Author("Quality Author");
+        var genre = TestData.Genre("Quality Genre");
+        var tag = TestData.Tag(database.UserId, "quality-tag");
+        context.Authors.Add(author);
+        context.Genres.Add(genre);
+        context.Tags.Add(tag);
+
+        var complete = TestData.Book(database.UserId, "Quality Scope Complete", author);
+        complete.Description = "Complete description";
+        complete.Rating = 9;
+        complete.Priority = 3;
+        complete.TotalChapters = 100;
+        complete.Titles.Add(new BookTitle
+        {
+            Title = "Quality Alternate",
+            NormalizedTitle = MappingExtensions.NormalizeName("Quality Alternate"),
+            IsPrimary = false,
+            Source = "Test"
+        });
+        complete.BookGenres.Add(new BookGenre { Book = complete, Genre = genre });
+        complete.BookTags.Add(new BookTag { Book = complete, Tag = tag });
+        complete.Links.Add(new BookLink { Url = "https://nu.example/one", SourceType = "NovelUpdates", IsPrimary = true });
+        complete.Links.Add(new BookLink { Url = "https://nu.example/two", SourceType = "NovelUpdates", IsPrimary = false });
+        complete.Links.Add(new BookLink { Url = "https://wiki.example/one", SourceType = "Wikidata", IsPrimary = false });
+        complete.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.NovelUpdates,
+            StoragePath = "covers/complete.jpg"
+        };
+
+        var partial = TestData.Book(database.UserId, "Quality Scope Partial");
+        partial.Description = "   ";
+        partial.Titles.Add(new BookTitle
+        {
+            Title = "   ",
+            NormalizedTitle = "",
+            IsPrimary = false,
+            Source = "Test"
+        });
+        partial.Links.Add(new BookLink { Url = "https://manual.example/one", SourceType = "Manual", IsPrimary = true });
+        partial.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Uploaded,
+            Source = BookCoverSource.ManualUpload,
+            ThumbnailStoragePath = "covers/partial.thumb.jpg"
+        };
+
+        var coverWithoutFile = TestData.Book(database.UserId, "Quality Scope Cover Missing File");
+        coverWithoutFile.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.GoogleBooks
+        };
+
+        var failedCover = TestData.Book(database.UserId, "Quality Scope Failed Cover");
+        failedCover.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Failed,
+            Source = null
+        };
+
+        var unmatched = TestData.Book(database.UserId, "Quality Outside Complete", author);
+        unmatched.Description = "Outside";
+        unmatched.Links.Add(new BookLink { Url = "https://outside.example", SourceType = "NovelUpdates", IsPrimary = true });
+        unmatched.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.NovelUpdates,
+            StoragePath = "covers/outside.jpg"
+        };
+
+        var otherOwner = TestData.Book(otherOwnerId, "Quality Scope Other Owner");
+        otherOwner.Description = "Other";
+        otherOwner.Links.Add(new BookLink { Url = "https://other.example", SourceType = "NovelUpdates", IsPrimary = true });
+        otherOwner.Cover = new BookCover
+        {
+            Status = BookCoverStatus.Found,
+            Source = BookCoverSource.NovelUpdates,
+            StoragePath = "covers/other.jpg"
+        };
+
+        context.Books.AddRange(complete, partial, coverWithoutFile, failedCover, unmatched, otherOwner);
+        await context.SaveChangesAsync();
+        var service = CreateAnalyticsQueryService(context);
+
+        var result = await service.GetAnalyticsAsync(
+            database.UserId,
+            BookSearchQueryParser.Parse("title:\"Quality Scope\""),
+            AnalyticsScope("title:\"Quality Scope\""),
+            CancellationToken.None);
+
+        Assert.Equal(4, result.Overview.TotalBooks);
+        AssertCompleteness(result, "author", 1, 0.25d);
+        AssertCompleteness(result, "description", 1, 0.25d);
+        AssertCompleteness(result, "genre", 1, 0.25d);
+        AssertCompleteness(result, "tag", 1, 0.25d);
+        AssertCompleteness(result, "rating", 1, 0.25d);
+        AssertCompleteness(result, "priority", 1, 0.25d);
+        AssertCompleteness(result, "totalChapters", 1, 0.25d);
+        AssertCompleteness(result, "link", 2, 0.5d);
+        AssertCompleteness(result, "alternateTitle", 1, 0.25d);
+        AssertCompleteness(result, "usableCover", 2, 0.5d);
+
+        var novelUpdates = Assert.Single(result.Quality.LinkSources, item => item.Source == "NovelUpdates");
+        Assert.Equal(2, novelUpdates.LinkCount);
+        Assert.Equal(1, novelUpdates.BookCount);
+        Assert.Equal(0.25d, novelUpdates.ShareOfBooks, precision: 6);
+        var manual = Assert.Single(result.Quality.LinkSources, item => item.Source == "Manual");
+        Assert.Equal(1, manual.LinkCount);
+        Assert.Equal(1, manual.BookCount);
+        var wikidata = Assert.Single(result.Quality.LinkSources, item => item.Source == "Wikidata");
+        Assert.Equal(1, wikidata.LinkCount);
+        Assert.Equal(1, wikidata.BookCount);
+
+        Assert.Equal(["Found", "Failed", "Uploaded"], result.Quality.CoverStatuses.Select(item => item.Status).ToArray());
+        Assert.Equal(2, result.Quality.CoverStatuses.Single(item => item.Status == "Found").BookCount);
+        Assert.Equal(["GoogleBooks", "ManualUpload", "NovelUpdates", "Unknown"], result.Quality.CoverSources.Select(item => item.Source).ToArray());
+        Assert.Equal(1, result.Quality.CoverSources.Single(item => item.Source == "Unknown").BookCount);
+
+        static void AssertCompleteness(
+            Domain.Models.BookAnalyticsSnapshot snapshot,
+            string field,
+            int bookCount,
+            double share)
+        {
+            var item = Assert.Single(snapshot.Quality.FieldCompleteness, completeness => completeness.Field == field);
+            Assert.Equal(bookCount, item.BookCount);
+            Assert.Equal(share, item.ShareOfBooks, precision: 6);
+        }
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();
