@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-041 - Dopracuj Library summary jako skrot do Analytics
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/BooksPage.tsx`, `Web/src/features/analytics/*`, `Web/src/api/client.ts`
-- Zaleznosci: `NB-067`
-- Problem: obecny Summary zawiera pelne zakladki wykresow, ktore beda dublowac osobna strone i powiekszac glowny ekran listy.
-- Zakres: pozostawic w Summary najwazniejsze KPI i zwiezle rozklady status/type; dodac akcje `Open analytics`, ktora przenosi aktualny `query` do `/analytics`; zachowac obecne ustawienia minut na rozdzial pod wspolnym kluczem localStorage; usunac tylko te wizualizacje, ktore maja pelny odpowiednik na stronie Analytics.
-- Akceptacja: Summary pozostaje nad wyszukiwarka i nie zaslania listy; KPI zgadzaja sie z aktualnym filtrem; `Open analytics` przenosi query bez utraty znakow specjalnych; ustawienia czasu sa wspolne z Analytics; brak danych ma czytelny stan; testy obejmuja przeniesienie pustego i zlozonego query, localStorage, loading/error oraz brak regresji listy ksiazek.
-
 ### NB-068 - Dodaj frontendowe wykresy skladu kolekcji
 
 - Typ: `Feature`
@@ -95,6 +85,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-041 - Dopracuj Library summary jako skrot do Analytics
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `Web/src/features/analytics/*`, `Web/src/api/client.ts`
+- Zaleznosci: `NB-067`
+- Problem: obecny Summary zawiera pelne zakladki wykresow, ktore beda dublowac osobna strone i powiekszac glowny ekran listy.
+- Zakres: pozostawic w Summary najwazniejsze KPI i zwiezle rozklady status/type; dodac akcje `Open analytics`, ktora przenosi aktualny `query` do `/analytics`; zachowac obecne ustawienia minut na rozdzial pod wspolnym kluczem localStorage; usunac tylko te wizualizacje, ktore maja pelny odpowiednik na stronie Analytics.
+- Akceptacja: Summary pozostaje nad wyszukiwarka i nie zaslania listy; KPI zgadzaja sie z aktualnym filtrem; `Open analytics` przenosi query bez utraty znakow specjalnych; ustawienia czasu sa wspolne z Analytics; brak danych ma czytelny stan; testy obejmuja przeniesienie pustego i zlozonego query, localStorage, loading/error oraz brak regresji listy ksiazek.
 
 ### NB-067 - Dodaj trase, filtry URL i wspolna karte Analytics
 

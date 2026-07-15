@@ -2,6 +2,7 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { readReadingTimeSettings, readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
@@ -173,9 +174,9 @@ describe('BooksPage', () => {
     expect(screen.getByText('Average rating')).toBeInTheDocument()
     const summarySection = screen.getByRole('heading', { name: /library summary/i }).closest('section')
     expect(summarySection).not.toBeNull()
-    const summaryStatusButton = Array.from(summarySection!.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Status')
-    expect(summaryStatusButton).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Status distribution')).toBeInTheDocument()
+    expect(screen.getByText('Book types')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open analytics/i })).toBeInTheDocument()
     const searchText = screen.getByText(/supports filters like/i)
     expect((summarySection?.compareDocumentPosition(searchText) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
@@ -207,7 +208,25 @@ describe('BooksPage', () => {
     expect(screen.getAllByText('0')).toHaveLength(4)
   })
 
-  it('switches summary tabs and updates estimated time from per-type inputs', async () => {
+  it('links summary to analytics with the current complex query', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooksSummary).mockResolvedValue(createSummary())
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=author%3AToika%20title%3A%22Lord%20of%20Mysteries%22' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /summary/i }))
+
+    const link = await screen.findByRole('link', { name: /open analytics/i })
+    expect(link).toHaveAttribute('href', '/analytics?query=author%3AToika+title%3A%22Lord+of+Mysteries%22')
+    expect(screen.getByText('Status distribution')).toBeInTheDocument()
+    expect(screen.getByText('Book types')).toBeInTheDocument()
+    expect(screen.queryByText('Estimated reading time')).not.toBeInTheDocument()
+  })
+
+  it('links summary to analytics without query and preserves shared reading-time settings', async () => {
+    window.localStorage.setItem(readingTimeStorageKey, JSON.stringify({ Novel: 2 }))
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     vi.mocked(api.getBooksSummary).mockResolvedValue(createSummary())
     const user = userEvent.setup()
@@ -216,19 +235,9 @@ describe('BooksPage', () => {
 
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('button', { name: /summary/i }))
-    await screen.findByText('Status distribution')
-    await user.click(screen.getByRole('button', { name: 'Time' }))
 
-    expect(screen.getByText('Estimated reading time')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('5')).toBeInTheDocument()
-    expect(screen.getByText('39.0 h')).toBeInTheDocument()
-
-    const novelInput = screen.getAllByRole('spinbutton')[0]
-    await user.clear(novelInput)
-    await user.type(novelInput, '2')
-
-    await waitFor(() => expect(screen.getByText('15.6 h')).toBeInTheDocument())
-    expect(window.localStorage.getItem('novelki.books.summary.time-per-chapter.v1')).toContain('"Novel":2')
+    expect(await screen.findByRole('link', { name: /open analytics/i })).toHaveAttribute('href', '/analytics')
+    expect(readReadingTimeSettings()).toEqual({ Novel: 2 })
   })
 
   it('lets the user change cards per row and persists the preference', async () => {
