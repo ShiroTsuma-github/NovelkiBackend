@@ -83,7 +83,7 @@ export function AnalyticsChartCard({
           {emptyMessage}
         </div>
       ) : (
-        <div className="min-h-64 min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <div className="analytics-chart-surface min-h-64 min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4">
           {children}
         </div>
       )}
