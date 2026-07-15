@@ -11,6 +11,8 @@ public class AuthUser : IUser
 
     public IEnumerable<string> Roles { get; set; } = [];
 
+    public DateTimeOffset? CreatedAt { get; set; }
+
     public bool IsAuthenticated {  get; set; }
 
     public bool Valid {  get; set; }

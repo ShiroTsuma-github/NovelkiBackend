@@ -3,9 +3,11 @@ import userEvent from '@testing-library/user-event'
 import { addDays, format, subMonths } from 'date-fns'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { setStoredSession } from '@/api/http'
 import type { BookAnalyticsDto } from '@/api/types'
 import { readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { expectReadableTextContrast } from '@/test/contrast'
+import { testSession } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { AnalyticsPage } from './AnalyticsPage'
 
@@ -105,6 +107,7 @@ describe('AnalyticsPage', () => {
 
   it('applies beginning and custom calendar ranges with an inclusive end date', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    setStoredSession({ ...testSession, createdAt: '2025-12-15T10:30:00Z' })
     const user = userEvent.setup()
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
@@ -125,7 +128,27 @@ describe('AnalyticsPage', () => {
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
     await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
-      from: '1900-01-01',
+      from: '2025-12-15',
+    })))
+  })
+
+  it('disables calendar days before the account creation date', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    setStoredSession({ ...testSession, createdAt: '2026-01-10T10:30:00Z' })
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-10&to=2026-02-01' })
+
+    await screen.findByText('Status by type')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+
+    expect(screen.getByRole('button', { name: /wednesday, january 7th, 2026/i })).toBeDisabled()
+
+    await user.click(screen.getByRole('button', { name: 'Beginning' }))
+    await user.click(screen.getByRole('button', { name: /apply filters/i }))
+
+    await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
+      from: '2026-01-10',
     })))
   })
 

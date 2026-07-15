@@ -36,6 +36,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new Claim(JwtRegisteredClaimNames.Email, user.Email!)
         };
 
+        if (user.CreatedAt is { } createdAt)
+        {
+            claims.Add(new Claim("created_at", createdAt.ToString("O")));
+        }
+
         foreach (var role in user.Roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
@@ -54,7 +59,8 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             RefreshToken = string.Empty,
             ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
             RefreshTokenExpiresAt = DateTimeOffset.UtcNow,
-            UserId = user.RequiredId
+            UserId = user.RequiredId,
+            CreatedAt = user.CreatedAt ?? DateTimeOffset.UtcNow
         };
     }
 }

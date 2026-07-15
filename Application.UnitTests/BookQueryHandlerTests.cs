@@ -198,6 +198,24 @@ public class BookQueryHandlerTests
         Assert.Equal("month", service.Scope.Bucket);
     }
 
+    [Fact]
+    public async Task GetBookAnalytics_ShouldClampFromToAccountCreationDate()
+    {
+        var service = new FakeBookAnalyticsQueryService();
+        var handler = new GetBookAnalyticsHandler(service, new FakeUser
+        {
+            CreatedAt = DateTimeOffset.Parse("2026-01-10T10:30:00Z")
+        });
+
+        await handler.Handle(new GetBookAnalyticsQuery(
+            From: new DateOnly(1900, 1, 1),
+            To: new DateOnly(2026, 2, 1),
+            Bucket: "week"), CancellationToken.None);
+
+        Assert.Equal(new DateOnly(2026, 1, 10), service.Scope!.From);
+        Assert.Equal("week", service.Scope.Bucket);
+    }
+
     private static BookListItemDto ListItem(string title)
     {
         return new BookListItemDto
@@ -216,6 +234,7 @@ public class BookQueryHandlerTests
         public string? Email => "reader@example.com";
         public string? Username => "reader";
         public IEnumerable<string> Roles => [];
+        public DateTimeOffset? CreatedAt { get; init; }
         public bool IsAuthenticated => true;
         public bool Valid => true;
     }

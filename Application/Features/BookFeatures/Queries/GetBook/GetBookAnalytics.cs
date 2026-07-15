@@ -42,6 +42,15 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
         var todayExclusive = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
         var to = request.To ?? todayExclusive;
         var from = request.From ?? to.AddDays(-DefaultRangeDays);
+        if (_user.CreatedAt is { } userCreatedAt)
+        {
+            var accountStart = DateOnly.FromDateTime(userCreatedAt.UtcDateTime);
+            if (from < accountStart)
+            {
+                from = accountStart;
+            }
+        }
+
         if (from >= to)
         {
             throw ValidationError(nameof(request.From), "From must be earlier than to.");

@@ -49,6 +49,7 @@ public class IdentityService : IIdentityService
             Username = user.UserName,
             Email = user.Email,
             Id = user.Id,
+            CreatedAt = user.CreatedAt,
             IsAuthenticated = true,
             Roles = await _userManager.GetRolesAsync(user),
             Valid = true
@@ -75,7 +76,8 @@ public class IdentityService : IIdentityService
         exists = await _userManager.FindByEmailAsync(register.email);
         if (exists != null) throw new EmailInUseException(register.email);
 
-        var user = new User { UserName = register.username, Email = register.email };
+        var createdAt = DateTimeOffset.UtcNow;
+        var user = new User { UserName = register.username, Email = register.email, CreatedAt = createdAt };
         var result = await _userManager.CreateAsync(user, register.password);
         if (!result.Succeeded)
         {
@@ -85,7 +87,8 @@ public class IdentityService : IIdentityService
         return new RegisterResponse
         {
             Id = user.Id,
-            Name = register.username
+            Name = register.username,
+            CreatedAt = createdAt
         };
     }
 
@@ -124,6 +127,7 @@ public class IdentityService : IIdentityService
             Username = user.UserName,
             Email = user.Email,
             Id = user.Id,
+            CreatedAt = user.CreatedAt,
             IsAuthenticated = true,
             Roles = await _userManager.GetRolesAsync(user),
             Valid = true

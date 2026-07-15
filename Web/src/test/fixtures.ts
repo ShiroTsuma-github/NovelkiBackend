@@ -7,6 +7,7 @@ export const testSession: TokenResponse = {
   expiresAt: '2099-01-01T00:00:00Z',
   refreshTokenExpiresAt: '2099-02-01T00:00:00Z',
   userId: '11111111-1111-1111-1111-111111111111',
+  createdAt: '2026-01-01T00:00:00Z',
 }
 
 export const dictionaries: DictionaryDto[] = [

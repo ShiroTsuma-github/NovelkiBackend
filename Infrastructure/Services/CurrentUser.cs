@@ -29,6 +29,15 @@ public class CurrentUser : IUser
 
     public string? Username => User?.FindFirstValue(ClaimTypes.Name);
 
+    public DateTimeOffset? CreatedAt
+    {
+        get
+        {
+            var createdAtClaim = User?.FindFirstValue("created_at");
+            return DateTimeOffset.TryParse(createdAtClaim, out var createdAt) ? createdAt : null;
+        }
+    }
+
     public IEnumerable<string> Roles => User?.FindAll(ClaimTypes.Role).Select(c => c.Value) ?? Enumerable.Empty<string>();
 
     public bool IsAuthenticated => User?.Identity?.IsAuthenticated ?? false;
