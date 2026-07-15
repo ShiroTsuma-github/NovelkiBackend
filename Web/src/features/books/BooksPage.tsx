@@ -586,6 +586,7 @@ function BookCardGrid({
   }
 
   const cardText = getCardTextSizeClasses(cardsPerRow)
+  const cardRowMinHeights = getCardRowMinHeightClasses(cardsPerRow)
   const showTitle = hasCardField(fields, 'title')
   const showAlternativeTitles = hasCardField(fields, 'alternativeTitles')
   const showAuthor = hasCardField(fields, 'author')
@@ -638,12 +639,12 @@ function BookCardGrid({
                 </div>
               ) : null}
               {showAuthor ? (
-                <div className="min-h-6">
+                <div className={cardRowMinHeights.author}>
                   <p className={`truncate text-slate-500 ${cardText.meta}`}>{book.author ?? 'Unknown author'}</p>
                 </div>
               ) : null}
               {showProgress || showType ? (
-                <div className="flex min-h-7 items-end justify-between gap-3">
+                <div className={`flex items-end justify-between gap-3 ${cardRowMinHeights.progress}`}>
                   <div className="min-w-0 flex-1">
                     {showProgress ? (
                       <p className={`truncate font-medium text-slate-700 ${cardText.meta}`}>{formatProgress(book)}</p>
@@ -691,6 +692,29 @@ export function getCardTextSizeClasses(cardsPerRow: number) {
   }
 }
 
+export function getCardRowMinHeightClasses(cardsPerRow: number) {
+  const normalized = normalizeCardsPerRow(cardsPerRow)
+
+  if (normalized <= 4) {
+    return {
+      author: 'min-h-6',
+      progress: 'min-h-7',
+    }
+  }
+
+  if (normalized <= 6) {
+    return {
+      author: 'min-h-5',
+      progress: 'min-h-6',
+    }
+  }
+
+  return {
+    author: 'min-h-4',
+    progress: 'min-h-5',
+  }
+}
+
 export function getCardDetailRowClass({
   cardsPerRow,
   showAlternativeTitles,
@@ -717,11 +741,11 @@ export function getCardDetailRowClass({
   }
 
   if (showAuthor) {
-    rows.push('minmax(0,1.5rem)')
+    rows.push(`minmax(0,${getCardAuthorRowHeight(cardsPerRow)})`)
   }
 
   if (showProgress || showType) {
-    rows.push('minmax(0,1.75rem)')
+    rows.push(`minmax(0,${getCardProgressRowHeight(cardsPerRow)})`)
   }
 
   return rows.length ? `grid-rows-[${rows.join('_')}]` : ''
@@ -739,6 +763,34 @@ function getCardTitleRowHeight(cardsPerRow: number) {
   }
 
   return '2.5rem'
+}
+
+function getCardAuthorRowHeight(cardsPerRow: number) {
+  const normalized = normalizeCardsPerRow(cardsPerRow)
+
+  if (normalized <= 4) {
+    return '1.5rem'
+  }
+
+  if (normalized <= 6) {
+    return '1.25rem'
+  }
+
+  return '1rem'
+}
+
+function getCardProgressRowHeight(cardsPerRow: number) {
+  const normalized = normalizeCardsPerRow(cardsPerRow)
+
+  if (normalized <= 4) {
+    return '1.75rem'
+  }
+
+  if (normalized <= 6) {
+    return '1.5rem'
+  }
+
+  return '1.25rem'
 }
 
 function Pills({ values }: { values: string[] }) {

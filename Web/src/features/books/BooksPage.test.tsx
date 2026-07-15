@@ -6,7 +6,7 @@ import { readReadingTimeSettings, readingTimeStorageKey } from '@/features/analy
 import { expectReadableTextContrast } from '@/test/contrast'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
-import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
+import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardRowMinHeightClasses, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -838,7 +838,7 @@ describe('BooksPage', () => {
     })).toBe('grid-rows-[minmax(0,3.5rem)_minmax(0,1.5rem)_minmax(0,1.75rem)]')
   })
 
-  it('uses tighter card title row presets as more cards are shown per row', () => {
+  it('uses tighter card detail row presets as more cards are shown per row', () => {
     const visibleFields = {
       showAlternativeTitles: false,
       showAuthor: true,
@@ -848,8 +848,24 @@ describe('BooksPage', () => {
     }
 
     expect(getCardDetailRowClass({ cardsPerRow: 4, ...visibleFields })).toBe('grid-rows-[minmax(0,3.5rem)_minmax(0,1.5rem)]')
-    expect(getCardDetailRowClass({ cardsPerRow: 6, ...visibleFields })).toBe('grid-rows-[minmax(0,3rem)_minmax(0,1.5rem)]')
-    expect(getCardDetailRowClass({ cardsPerRow: 8, ...visibleFields })).toBe('grid-rows-[minmax(0,2.5rem)_minmax(0,1.5rem)]')
+    expect(getCardDetailRowClass({ cardsPerRow: 6, ...visibleFields })).toBe('grid-rows-[minmax(0,3rem)_minmax(0,1.25rem)]')
+    expect(getCardDetailRowClass({ cardsPerRow: 8, ...visibleFields })).toBe('grid-rows-[minmax(0,2.5rem)_minmax(0,1rem)]')
+    expect(getCardDetailRowClass({ cardsPerRow: 8, ...visibleFields, showProgress: true })).toBe('grid-rows-[minmax(0,2.5rem)_minmax(0,1rem)_minmax(0,1.25rem)]')
+  })
+
+  it('uses tighter card row min-heights for dense card layouts', () => {
+    expect(getCardRowMinHeightClasses(4)).toEqual({
+      author: 'min-h-6',
+      progress: 'min-h-7',
+    })
+    expect(getCardRowMinHeightClasses(6)).toEqual({
+      author: 'min-h-5',
+      progress: 'min-h-6',
+    })
+    expect(getCardRowMinHeightClasses(8)).toEqual({
+      author: 'min-h-4',
+      progress: 'min-h-5',
+    })
   })
 
   function createSummary() {
