@@ -52,6 +52,11 @@ public class RepositoryTests
             $"UPDATE Books SET Created = {value}, LastModified = {value} WHERE Id = {bookId}");
     }
 
+    private static Task SetBookAuditDatesAsync(ApplicationDbContext context, DateTimeOffset value, params Book[] books)
+    {
+        return Task.WhenAll(books.Select(book => SetBookAuditDatesAsync(context, book.Id, value)));
+    }
+
     private static Domain.Models.BookAnalyticsScopeSnapshot AnalyticsScope(string? query = null)
     {
         return new Domain.Models.BookAnalyticsScopeSnapshot(
@@ -340,10 +345,14 @@ public class RepositoryTests
         matched.CurrentChapterNumber = 10;
         var unmatched = TestData.Book(database.UserId, "Analytics Other");
         unmatched.Rating = null;
+        var outOfRangeMatch = TestData.Book(database.UserId, "Analytics Match Old");
+        outOfRangeMatch.Rating = 10;
         var otherOwner = TestData.Book(otherOwnerId, "Analytics Match Other Owner");
         otherOwner.Rating = 10;
-        context.Books.AddRange(matched, unmatched, otherOwner);
+        context.Books.AddRange(matched, unmatched, outOfRangeMatch, otherOwner);
         await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(context, new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), matched, unmatched, otherOwner);
+        await SetBookAuditDatesAsync(context, outOfRangeMatch.Id, new DateTimeOffset(2025, 12, 31, 10, 0, 0, TimeSpan.Zero));
         var service = CreateAnalyticsQueryService(context);
 
         var result = await service.GetAnalyticsAsync(
@@ -395,6 +404,7 @@ public class RepositoryTests
 
         context.Books.AddRange(novelReading, novelCompleted, mangaReading, otherOwnerBook);
         await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(context, new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), novelReading, novelCompleted, mangaReading, otherOwnerBook);
         var service = CreateAnalyticsQueryService(context);
 
         var result = await service.GetAnalyticsAsync(database.UserId, BookSearchCriteria.Empty, AnalyticsScope(), CancellationToken.None);
@@ -446,6 +456,7 @@ public class RepositoryTests
 
         context.Books.AddRange(unratedReading, singleRatedReading, completed, unmatched, otherOwner);
         await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(context, new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), unratedReading, singleRatedReading, completed, unmatched, otherOwner);
         var service = CreateAnalyticsQueryService(context);
 
         var result = await service.GetAnalyticsAsync(
@@ -522,6 +533,18 @@ public class RepositoryTests
             unmatched,
             otherOwner);
         await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(
+            context,
+            new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero),
+            novelLow,
+            novelHigh,
+            novelUnknown,
+            mangaTieA,
+            mangaTieB,
+            mangaHigh,
+            manhwaUnknown,
+            unmatched,
+            otherOwner);
         var service = CreateAnalyticsQueryService(context);
 
         var result = await service.GetAnalyticsAsync(
@@ -594,6 +617,7 @@ public class RepositoryTests
 
         context.Books.AddRange(active, singleEntry, yearEdge, unmatched, otherOwner);
         await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(context, new DateTimeOffset(2026, 1, 1, 9, 0, 0, TimeSpan.Zero), active, singleEntry, yearEdge, unmatched, otherOwner);
         var service = CreateAnalyticsQueryService(context);
         var criteria = BookSearchQueryParser.Parse("title:\"Activity Scope\"");
 
@@ -700,13 +724,13 @@ public class RepositoryTests
             new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Growth Scope\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 5), "day"),
             CancellationToken.None);
 
-        Assert.Equal(5, day.Overview.TotalBooks);
-        Assert.Equal(2, day.LibraryGrowth.OpeningCount);
+        Assert.Equal(3, day.Overview.TotalBooks);
+        Assert.Equal(0, day.LibraryGrowth.OpeningCount);
         Assert.Equal(4, day.LibraryGrowth.Points.Count);
-        AssertGrowthPoint(day, new DateOnly(2026, 1, 1), 2, 4, ("Manga", 1), ("Novel", 1));
-        AssertGrowthPoint(day, new DateOnly(2026, 1, 2), 0, 4);
-        AssertGrowthPoint(day, new DateOnly(2026, 1, 3), 1, 5, ("Manga", 1));
-        AssertGrowthPoint(day, new DateOnly(2026, 1, 4), 0, 5);
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 1), 2, 2, ("Manga", 1), ("Novel", 1));
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 2), 0, 2);
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 3), 1, 3, ("Manga", 1));
+        AssertGrowthPoint(day, new DateOnly(2026, 1, 4), 0, 3);
 
         var month = await service.GetAnalyticsAsync(
             database.UserId,
@@ -714,9 +738,9 @@ public class RepositoryTests
             new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Growth Scope\"", new DateOnly(2025, 12, 31), new DateOnly(2026, 2, 1), "month"),
             CancellationToken.None);
 
-        Assert.Equal(1, month.LibraryGrowth.OpeningCount);
-        AssertGrowthPoint(month, new DateOnly(2025, 12, 31), 1, 2, ("Manhwa", 1));
-        AssertGrowthPoint(month, new DateOnly(2026, 1, 1), 3, 5, ("Manga", 2), ("Novel", 1));
+        Assert.Equal(0, month.LibraryGrowth.OpeningCount);
+        AssertGrowthPoint(month, new DateOnly(2025, 12, 31), 1, 1, ("Manhwa", 1));
+        AssertGrowthPoint(month, new DateOnly(2026, 1, 1), 3, 4, ("Manga", 2), ("Novel", 1));
 
         static void AssertGrowthPoint(
             Domain.Models.BookAnalyticsSnapshot snapshot,
@@ -825,6 +849,7 @@ public class RepositoryTests
 
         context.Books.AddRange(complete, partial, coverWithoutFile, failedCover, unmatched, otherOwner);
         await context.SaveChangesAsync();
+        await SetBookAuditDatesAsync(context, new DateTimeOffset(2026, 1, 15, 10, 0, 0, TimeSpan.Zero), complete, partial, coverWithoutFile, failedCover, unmatched, otherOwner);
         var service = CreateAnalyticsQueryService(context);
 
         var result = await service.GetAnalyticsAsync(
