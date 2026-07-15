@@ -1,6 +1,6 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
-import { DrilldownLink, formatCount, formatPercent, noneQuery, percent } from './chartUtils'
+import { analyticsTooltipProps, DrilldownLink, formatCount, formatPercent, noneQuery, percent } from './chartUtils'
 
 type RatingDistributionChartProps = {
   data: BookAnalyticsDto | undefined
@@ -36,7 +36,7 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
             <BarChart data={counts} margin={{ left: 0, right: 8 }}>
               <XAxis dataKey="rating" tickLine={false} />
               <YAxis allowDecimals={false} tickLine={false} />
-              <Tooltip formatter={(value, _name, item) => [`${formatCount(Number(value))} books`, `Rating ${item.payload.rating}`]} />
+              <Tooltip {...analyticsTooltipProps} formatter={(value, _name, item) => [`${formatCount(Number(value))} books`, `Rating ${item.payload.rating}`]} />
               <Bar dataKey="bookCount" name="Books" radius={[6, 6, 0, 0]}>
                 {counts.map((item) => (
                   <Cell fill={item.bookCount > 0 ? '#7c3aed' : '#334155'} key={item.rating} />

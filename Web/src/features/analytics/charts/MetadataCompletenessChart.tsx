@@ -13,7 +13,6 @@ const missingFieldQueries: Record<string, string> = {
   priority: noneQuery('priority'),
   totalChapters: noneQuery('total'),
   link: noneQuery('link'),
-  usableCover: noneQuery('cover'),
 }
 
 export function MetadataCompletenessChart({ data }: MetadataCompletenessChartProps) {

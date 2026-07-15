@@ -4,6 +4,23 @@ import { addDays, addMonths, addWeeks, format, parseISO } from 'date-fns'
 
 export const chartColors = ['#0891b2', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#65a30d', '#0f766e']
 
+export const analyticsTooltipProps = {
+  contentStyle: {
+    backgroundColor: '#0f172a',
+    border: '1px solid #334155',
+    borderRadius: '0.75rem',
+    boxShadow: '0 18px 45px rgb(0 0 0 / 0.28)',
+    color: '#e2e8f0',
+  },
+  itemStyle: {
+    color: '#e2e8f0',
+  },
+  labelStyle: {
+    color: '#f8fafc',
+    fontWeight: 700,
+  },
+}
+
 export function formatCount(value: number) {
   return new Intl.NumberFormat('en-US').format(value)
 }
