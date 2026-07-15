@@ -27,12 +27,12 @@ type AnalyticsBucket = 'day' | 'week' | 'month'
 
 const analyticsBuckets: AnalyticsBucket[] = ['day', 'week', 'month']
 const analyticsRangePresets = [
-  { label: 'Beginning', getFrom: (_today: Date, accountStart: Date) => accountStart },
-  { label: 'Last 2 years', getFrom: (today: Date, accountStart: Date) => maxDate(subYears(today, 2), accountStart) },
-  { label: 'Last 1 year', getFrom: (today: Date, accountStart: Date) => maxDate(subYears(today, 1), accountStart) },
-  { label: 'Last 6 months', getFrom: (today: Date, accountStart: Date) => maxDate(subMonths(today, 6), accountStart) },
-  { label: 'Last 3 months', getFrom: (today: Date, accountStart: Date) => maxDate(subMonths(today, 3), accountStart) },
-  { label: 'Last month', getFrom: (today: Date, accountStart: Date) => maxDate(subMonths(today, 1), accountStart) },
+  { label: 'Beginning', getFrom: (_today: Date) => null },
+  { label: 'Last 2 years', getFrom: (today: Date) => subYears(today, 2) },
+  { label: 'Last 1 year', getFrom: (today: Date) => subYears(today, 1) },
+  { label: 'Last 6 months', getFrom: (today: Date) => subMonths(today, 6) },
+  { label: 'Last 3 months', getFrom: (today: Date) => subMonths(today, 3) },
+  { label: 'Last month', getFrom: (today: Date) => subMonths(today, 1) },
 ] as const
 
 export function AnalyticsPage() {
@@ -348,8 +348,12 @@ function DateRangeChooser({
 
   function applyPreset(preset: typeof analyticsRangePresets[number]) {
     const today = getToday()
+    if (isPresetDisabled(preset, today, accountStartDate)) {
+      return
+    }
+
     const nextRange = {
-      from: preset.getFrom(today, accountStartDate),
+      from: getPresetFromDate(preset, today, accountStartDate),
       to: today,
     }
     setCalendarRange(nextRange)
@@ -412,14 +416,20 @@ function DateRangeChooser({
         <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-950 p-3 text-slate-100 shadow-xl">
           <div className="mb-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {analyticsRangePresets.map((preset) => {
+              const today = getToday()
               const isActive = display.presetLabel === preset.label
+              const isDisabled = isPresetDisabled(preset, today, accountStartDate)
               return (
                 <button
+                  aria-disabled={isDisabled}
                   className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                     isActive
                       ? 'border-cyan-400 bg-cyan-500/20 text-cyan-100'
+                      : isDisabled
+                        ? 'cursor-not-allowed border-slate-800 bg-slate-950 text-slate-600'
                       : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500 hover:bg-slate-800 hover:text-white'
                   }`}
+                  disabled={isDisabled}
                   key={preset.label}
                   type="button"
                   onClick={() => applyPreset(preset)}
@@ -527,6 +537,23 @@ function maxDate(left: Date, right: Date) {
   return left > right ? left : right
 }
 
+function getPresetFromDate(
+  preset: typeof analyticsRangePresets[number],
+  today: Date,
+  accountStartDate: Date,
+) {
+  return preset.label === 'Beginning' ? accountStartDate : preset.getFrom(today) ?? accountStartDate
+}
+
+function isPresetDisabled(
+  preset: typeof analyticsRangePresets[number],
+  today: Date,
+  accountStartDate: Date,
+) {
+  const from = preset.getFrom(today)
+  return from !== null && from < accountStartDate
+}
+
 function parseDateInput(value: string) {
   return parseISO(value)
 }
@@ -540,7 +567,9 @@ function getDateRangeDisplay(filters: ReturnType<typeof getAnalyticsFilters>, ac
   const toInclusive = getInclusiveToDate(filters.to)
   const today = getToday()
   const preset = analyticsRangePresets.find((item) =>
-    isSameDay(from, item.getFrom(today, accountStartDate)) && isSameDay(toInclusive, today))
+    !isPresetDisabled(item, today, accountStartDate) &&
+    isSameDay(from, getPresetFromDate(item, today, accountStartDate)) &&
+    isSameDay(toInclusive, today))
   const toLabel = isSameDay(toInclusive, today) ? 'Today' : format(toInclusive, 'MMM d, yyyy')
   const label = preset ? preset.label : `${format(from, 'MMM d, yyyy')} – ${toLabel}`
 
