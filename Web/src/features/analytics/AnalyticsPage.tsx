@@ -53,7 +53,7 @@ export function AnalyticsPage() {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-950">Analytics</h1>
-          <p className="text-sm text-slate-500">Library metrics scoped by search query and date range.</p>
+          <p className="text-sm text-slate-500">Library metrics scoped by book search and created-date range.</p>
         </div>
         {analyticsQuery.isFetching && data ? (
           <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">Refreshing...</span>
@@ -61,6 +61,9 @@ export function AnalyticsPage() {
       </div>
 
       <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <p className="text-sm text-slate-600">
+          Query uses the same filters as Books search. From/To filters books by created date and affects every metric and chart.
+        </p>
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_9rem_auto]">
           <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-700">
             Query

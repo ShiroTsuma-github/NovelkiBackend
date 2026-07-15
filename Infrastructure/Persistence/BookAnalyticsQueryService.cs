@@ -1,6 +1,7 @@
 namespace Infrastructure.Persistence;
 
 using Domain.Models;
+using System.Globalization;
 
 public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
 {
@@ -19,7 +20,9 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         BookAnalyticsScopeSnapshot scope,
         CancellationToken cancellationToken)
     {
-        var query = ApplyCriteria(_context.Books.AsNoTracking().Where(book => book.OwnerId == ownerId), criteria);
+        var query = ApplyScope(
+            ApplyCriteria(_context.Books.AsNoTracking().Where(book => book.OwnerId == ownerId), criteria),
+            scope);
         var overview = await GetOverviewAsync(query, cancellationToken);
         var composition = await GetCompositionAsync(query, overview.TotalBooks, cancellationToken);
         var ratings = await GetRatingsAsync(query, overview, cancellationToken);
@@ -45,6 +48,20 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
     {
         return criteria.HasFilters ? _criteriaApplier.Apply(query, criteria) : query;
+    }
+
+    private IQueryable<Book> ApplyScope(IQueryable<Book> query, BookAnalyticsScopeSnapshot scope)
+    {
+        var from = ToUtcDateTimeOffset(scope.From);
+        var to = ToUtcDateTimeOffset(scope.To);
+        if (IsSqliteProvider())
+        {
+            var fromText = ToSqliteDateTimeOffsetString(from);
+            var toText = ToSqliteDateTimeOffsetString(to);
+            return query.Where(book => string.Compare(book.Created.ToString(), fromText) >= 0 && string.Compare(book.Created.ToString(), toText) < 0);
+        }
+
+        return query.Where(book => book.Created >= from && book.Created < to);
     }
 
     private static async Task<BookAnalyticsOverviewSnapshot> GetOverviewAsync(
@@ -599,6 +616,11 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
     private static DateTimeOffset ToUtcDateTimeOffset(DateOnly value)
     {
         return new DateTimeOffset(value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+    }
+
+    private static string ToSqliteDateTimeOffsetString(DateTimeOffset value)
+    {
+        return value.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
     }
 
     private bool IsSqliteProvider()
