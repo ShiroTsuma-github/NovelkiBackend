@@ -3,6 +3,7 @@ using Infrastructure.Contexts;
 using Infrastructure.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace Infrastructure.IntegrationTests.TestSupport;
 
@@ -37,12 +38,18 @@ public sealed class SqliteTestDatabase : IDisposable
 
     public Guid UserId { get; }
 
-    public ApplicationDbContext CreateContext()
+    public ApplicationDbContext CreateContext(params IInterceptor[] interceptors)
     {
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+        var builder = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(_connection)
-            .EnableSensitiveDataLogging()
-            .Options;
+            .EnableSensitiveDataLogging();
+
+        if (interceptors.Length > 0)
+        {
+            builder.AddInterceptors(interceptors);
+        }
+
+        var options = builder.Options;
 
         return new ApplicationDbContext(options, _user);
     }

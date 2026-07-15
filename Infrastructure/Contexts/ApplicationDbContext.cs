@@ -67,6 +67,8 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.HasIndex(b => new { b.OwnerId, b.NormalizedPrimaryTitle, b.ContentTypeId }).IsUnique();
             entity.HasIndex(b => new { b.OwnerId, b.CurrentChapterNumber });
             entity.HasIndex(b => new { b.OwnerId, b.Rating });
+            entity.HasIndex(b => new { b.OwnerId, b.Priority });
+            entity.HasIndex(b => new { b.OwnerId, b.Created });
             entity.HasIndex(b => new { b.OwnerId, b.StatusId });
             entity.HasIndex(b => new { b.OwnerId, b.ContentTypeId });
 
@@ -99,6 +101,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         modelBuilder.Entity<BookCover>(entity =>
         {
             entity.HasIndex(c => c.BookId).IsUnique();
+            entity.HasIndex(c => new { c.BookId, c.Status, c.Source });
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.Source).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.StoragePath).HasMaxLength(500);
@@ -117,6 +120,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         {
             entity.HasIndex(t => t.NormalizedTitle);
             entity.HasIndex(t => new { t.BookId, t.NormalizedTitle }).IsUnique();
+            entity.HasIndex(t => new { t.BookId, t.IsPrimary });
             entity.Property(t => t.Title).HasMaxLength(500);
             entity.Property(t => t.NormalizedTitle).HasMaxLength(500);
             entity.Property(t => t.Language).HasMaxLength(10);
@@ -129,6 +133,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
 
         modelBuilder.Entity<BookLink>(entity =>
         {
+            entity.HasIndex(l => new { l.BookId, l.SourceType });
             entity.Property(l => l.Url).HasMaxLength(2000);
             entity.Property(l => l.Label).HasMaxLength(200);
             entity.Property(l => l.SourceType).HasMaxLength(50);
@@ -140,7 +145,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
 
         modelBuilder.Entity<BookProgressHistory>(entity =>
         {
-            entity.HasIndex(h => new { h.BookId, h.ChangedAt });
+            entity.HasIndex(h => new { h.BookId, h.ChangedAt, h.Id });
             entity.Property(h => h.ChapterLabel).HasMaxLength(100);
             entity.Property(h => h.Comment).HasMaxLength(1000);
             entity.HasOne(h => h.Book)
