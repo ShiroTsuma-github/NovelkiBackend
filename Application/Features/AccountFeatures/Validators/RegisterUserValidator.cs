@@ -9,7 +9,9 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
         RuleFor(x => x.Username)
             .NotEmpty().WithMessage("Username is required.")
             .MinimumLength(3).WithMessage("Username must be at least 3 characters long.")
-            .MaximumLength(32).WithMessage("Username can't be longer than 32 characters.");
+            .MaximumLength(32).WithMessage("Username can't be longer than 32 characters.")
+            .Matches("^[A-Za-z0-9._@+-]+$")
+            .WithMessage("Username can contain only letters, numbers, and -._@+ characters.");
 
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email address is required.")

@@ -66,4 +66,46 @@ public class AccountValidationTests
 
         Assert.True(result.IsValid);
     }
+
+    [Theory]
+    [InlineData("reader~name")]
+    [InlineData("reader name")]
+    [InlineData("reader/name")]
+    [InlineData("reader:name")]
+    public void RegisterValidator_ShouldRejectUsernameCharactersThatIdentityRejects(string username)
+    {
+        var validator = new RegisterUserCommandValidator();
+        var command = new RegisterUserCommand
+        {
+            Username = username,
+            Email = "reader@example.com",
+            Password = "Password1!"
+        };
+
+        var result = validator.Validate(command);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegisterUserCommand.Username));
+    }
+
+    [Theory]
+    [InlineData("reader-name")]
+    [InlineData("reader.name")]
+    [InlineData("reader_name")]
+    [InlineData("reader+name")]
+    [InlineData("reader@name")]
+    public void RegisterValidator_ShouldAcceptIdentityAllowedUsernameCharacters(string username)
+    {
+        var validator = new RegisterUserCommandValidator();
+        var command = new RegisterUserCommand
+        {
+            Username = username,
+            Email = "reader@example.com",
+            Password = "Password1!"
+        };
+
+        var result = validator.Validate(command);
+
+        Assert.True(result.IsValid);
+    }
 }
