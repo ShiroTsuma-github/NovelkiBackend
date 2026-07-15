@@ -295,7 +295,7 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByText('10%')).toBeInTheDocument()
-    expect(screen.getAllByText('Unrated: 9').length).toBeGreaterThan(1)
+    expect(screen.getAllByText('Unrated: 9')).toHaveLength(1)
     expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
     expect(screen.queryByRole('link', { name: /^10: 1/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
@@ -346,7 +346,29 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByText('Book count by type')).toBeInTheDocument()
     expect(screen.getByText('Current chapters by type')).toBeInTheDocument()
-    expect(screen.getByText(/Current chapters: 120.5/)).toBeInTheDocument()
+    expect(screen.queryByText(/Current chapters: 120.5/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Manga' })).not.toBeInTheDocument()
+  })
+
+  it('keeps status by type drill-down focused on content types only', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      composition: {
+        statusByType: [{
+          type: 'Manga',
+          totalBooks: 3,
+          statuses: [
+            { status: 'Reading', bookCount: 2 },
+            { status: 'Completed', bookCount: 1 },
+          ],
+        }],
+      },
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByRole('link', { name: 'Manga' })).toHaveAttribute('href', '/books?query=type%3AManga')
+    expect(screen.queryByRole('link', { name: /Reading: 2/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Completed: 1/i })).not.toBeInTheDocument()
   })
 
   it('estimates reading time from shared localStorage without refetching', async () => {

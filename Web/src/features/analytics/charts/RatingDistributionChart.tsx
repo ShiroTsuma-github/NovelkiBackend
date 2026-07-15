@@ -29,9 +29,7 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
           <div className="mt-3 text-sm text-slate-500">
             Avg {ratings.averageRating == null ? '-' : ratings.averageRating.toFixed(1)}
           </div>
-          <div className="mt-1 text-sm font-semibold text-slate-700">
-            Unrated: {formatCount(ratings.unratedBooks)}
-          </div>
+          <DrilldownLink query={noneQuery('rating')}>Unrated: {formatCount(ratings.unratedBooks)}</DrilldownLink>
         </div>
         <div className="h-64 min-w-0">
           <ResponsiveContainer>
@@ -47,9 +45,6 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-2 text-sm">
-        <DrilldownLink query={noneQuery('rating')}>Unrated: {formatCount(ratings.unratedBooks)}</DrilldownLink>
       </div>
     </div>
   )
