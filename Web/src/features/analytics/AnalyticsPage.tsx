@@ -6,6 +6,8 @@ import type { BookAnalyticsDto } from '@/api/types'
 import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
+import { PriorityByStatusChart, priorityRows } from './charts/PriorityByStatusChart'
+import { RatingDistributionChart, ratingRows } from './charts/RatingDistributionChart'
 import { StatusByTypeChart, statusByTypeRows } from './charts/StatusByTypeChart'
 import { relationRows, TopRelationsChart } from './charts/TopRelationsChart'
 import { extractAnalyticsDateFilters } from './dateQueryFilters'
@@ -158,6 +160,32 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <TopRelationsChart field="tag" items={data?.composition.tags ?? []} title="Tags" />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Rating', 'Books', 'Bucket']}
+          description="Rated books are shown on a 1-10 axis; unrated books stay separate."
+          emptyMessage="No rating data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.overview.totalBooks)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={ratingRows(data)}
+          title="Rating distribution"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <RatingDistributionChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Status', 'Priority', 'Books', 'Share of status']}
+          description="Priority heatmap per status, including the Unset bucket."
+          emptyMessage="No priority data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.planning.prioritiesByStatus.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={priorityRows(data)}
+          title="Priority by status"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <PriorityByStatusChart data={data} />
         </AnalyticsChartCard>
       </div>
     </div>

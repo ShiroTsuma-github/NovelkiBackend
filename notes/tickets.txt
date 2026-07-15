@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-069 - Dodaj frontendowe wykresy ocen i priorytetow
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Web/src/features/analytics/charts/RatingDistributionChart.tsx`, `PriorityByStatusChart.tsx`
-- Zaleznosci: `NB-061`, `NB-067`
-- Problem: frontend miesza Unrated z rozkladem ocen i nie pokazuje priorytetow w kontekscie statusu.
-- Zakres: wdrozyc mockupy 05-06: slupki 1-10 plus coverage ring oraz heatmape status x priority z Unset; dodac formatowanie sredniej, liczby i procentu w tooltipach.
-- Akceptacja: Unrated nie splaszcza slupkow; kategorie zero zachowuja os; heatmapa ma liczby w komorkach i skale per status; klikniecie Unrated/Unset uzywa `none`; testy obejmuja brak ocen, jedna ocene, wszystkie zera, pojedynczy status, duze liczby i mobile.
-
 ### NB-070 - Dodaj chapter volume i estimated reading time
 
 - Typ: `Feature`
@@ -75,6 +65,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-069 - Dodaj frontendowe wykresy ocen i priorytetow
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/RatingDistributionChart.tsx`, `PriorityByStatusChart.tsx`
+- Zaleznosci: `NB-061`, `NB-067`
+- Problem: frontend miesza Unrated z rozkladem ocen i nie pokazuje priorytetow w kontekscie statusu.
+- Zakres: wdrozyc mockupy 05-06: slupki 1-10 plus coverage ring oraz heatmape status x priority z Unset; dodac formatowanie sredniej, liczby i procentu w tooltipach.
+- Akceptacja: Unrated nie splaszcza slupkow; kategorie zero zachowuja os; heatmapa ma liczby w komorkach i skale per status; klikniecie Unrated/Unset uzywa `none`; testy obejmuja brak ocen, jedna ocene, wszystkie zera, pojedynczy status, duze liczby i mobile.
 
 ### NB-068 - Dodaj frontendowe wykresy skladu kolekcji
 
