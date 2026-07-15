@@ -143,6 +143,9 @@ describe('AnalyticsPage', () => {
     await user.click(screen.getByRole('button', { name: /date range/i }))
 
     expect(screen.getByRole('button', { name: /wednesday, january 7th, 2026/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Last 2 years' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Last 1 year' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Last 6 months' })).not.toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Beginning' }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
