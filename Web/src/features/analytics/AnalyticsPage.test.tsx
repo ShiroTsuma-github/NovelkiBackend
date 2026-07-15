@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { addDays, format, subMonths } from 'date-fns'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import type { BookAnalyticsDto } from '@/api/types'
 import { readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
@@ -19,6 +20,10 @@ describe('AnalyticsPage', () => {
     vi.mocked(api.getBookAnalytics).mockReset()
   })
 
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('fetches analytics from restored URL filters', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
 
@@ -34,8 +39,7 @@ describe('AnalyticsPage', () => {
       bucket: 'month',
     })
     expect(screen.getByDisplayValue('author:Toika rating:>=8')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('2026-01-01')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('2026-02-01')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /date range: jan 1, 2026/i })).toHaveAttribute('title', 'Jan 1, 2026 – Jan 31, 2026')
   })
 
   it('extracts date filters from query into analytics range request', async () => {
@@ -52,8 +56,118 @@ describe('AnalyticsPage', () => {
       to: '2026-08-01',
     }))
     expect(screen.getByDisplayValue('author:Toika')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('2026-07-01')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('2026-08-01')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /date range: jul 1, 2026/i })).toHaveAttribute('title', 'Jul 1, 2026 – Jul 31, 2026')
+  })
+
+  it('defaults analytics to the last three months through today', async () => {
+    const today = getTodayForTest()
+    const from = subMonths(today, 3)
+    const toExclusive = addDays(today, 1)
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics' })
+
+    expect(await screen.findByText('Status by type')).toBeInTheDocument()
+    expect(api.getBookAnalytics).toHaveBeenCalledWith(expect.objectContaining({
+      from: toDateInputValueForTest(from),
+      to: toDateInputValueForTest(toExclusive),
+    }))
+    expect(screen.getByRole('button', { name: /date range: last 3 months/i })).toHaveAttribute('title', `${format(from, 'MMM d, yyyy')} – ${format(today, 'MMM d, yyyy')}`)
+    expect(screen.getByText('Today')).toBeInTheDocument()
+  })
+
+  it('opens themed preset choices above the calendar and applies a preset range', async () => {
+    const today = getTodayForTest()
+    const from = subMonths(today, 1)
+    const toExclusive = addDays(today, 1)
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    await screen.findByText('Status by type')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+
+    const lastMonth = screen.getByRole('button', { name: 'Last month' })
+    expect(screen.getByRole('button', { name: 'Beginning' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Last 2 years' })).toBeInTheDocument()
+    expect(lastMonth.compareDocumentPosition(screen.getAllByRole('grid')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Last 3 months' })).toHaveClass('border-slate-700')
+
+    await user.click(lastMonth)
+    await user.click(screen.getByRole('button', { name: /apply filters/i }))
+
+    await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
+      from: toDateInputValueForTest(from),
+      to: toDateInputValueForTest(toExclusive),
+    })))
+  })
+
+  it('applies beginning and custom calendar ranges with an inclusive end date', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    await screen.findByText('Status by type')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+    await user.click(screen.getByRole('button', { name: /wednesday, january 7th, 2026/i }))
+    await user.click(screen.getByRole('button', { name: /tuesday, january 20th, 2026/i }))
+    await user.click(screen.getByRole('button', { name: /apply filters/i }))
+
+    await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
+      from: '2026-01-07',
+      to: '2026-01-21',
+    })))
+
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+    await user.click(screen.getByRole('button', { name: 'Beginning' }))
+    await user.click(screen.getByRole('button', { name: /apply filters/i }))
+
+    await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
+      from: '1900-01-01',
+    })))
+  })
+
+  it('closes the date range picker when clicking outside', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    await screen.findByText('Status by type')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+    expect(screen.getByRole('button', { name: 'Beginning' })).toBeInTheDocument()
+
+    await user.click(screen.getByLabelText(/query/i))
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Beginning' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: /date range/i })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('starts a fresh custom range after a preset before updating the end date', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    await screen.findByText('Status by type')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+    await user.click(screen.getByRole('button', { name: 'Last 6 months' }))
+
+    expect(screen.getByRole('button', { name: /date range: last 6 months/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+    await user.click(screen.getByRole('button', { name: /monday, february 9th, 2026/i }))
+    expect(screen.getByRole('button', { name: /date range: last 6 months/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /friday, february 20th, 2026/i }))
+    await user.click(screen.getByRole('button', { name: /apply filters/i }))
+
+    await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
+      from: '2026-02-09',
+      to: '2026-02-21',
+    })))
   })
 
   it('updates URL-backed filters and creates a new request', async () => {
@@ -527,6 +641,19 @@ type AnalyticsOverrides = Partial<BookAnalyticsDto['overview']> & {
   activity?: Partial<BookAnalyticsDto['activity']>
   libraryGrowth?: Partial<BookAnalyticsDto['libraryGrowth']>
   quality?: Partial<BookAnalyticsDto['quality']>
+}
+
+function getTodayForTest() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function toDateInputValueForTest(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
