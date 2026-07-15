@@ -172,6 +172,58 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('No tag data for this analytics scope.')).toBeInTheDocument()
   })
 
+  it('renders rating distribution with a separate unrated drill-down', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      ratings: {
+        ratedBooks: 1,
+        unratedBooks: 9,
+        averageRating: 10,
+        counts: Array.from({ length: 10 }, (_unused, index) => ({
+          rating: index + 1,
+          bookCount: index === 9 ? 1 : 0,
+        })),
+      },
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('10%')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
+    await user.click(screen.getAllByRole('button', { name: /view data/i })[3])
+    expect(screen.getByRole('cell', { name: 'Unrated' })).toBeInTheDocument()
+  })
+
+  it('renders priority heatmap with unset drill-down', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      planning: {
+        prioritiesByStatus: [{
+          status: 'Plan to Read',
+          totalBooks: 4,
+          priorities: [
+            { priority: '1', bookCount: 1 },
+            { priority: 'Unset', bookCount: 3 },
+          ],
+        }],
+      },
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByTestId('priority-heatmap')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Plan to Read' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22')
+    expect(screen.getByRole('link', { name: '3' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22%20priority%3Anone')
+  })
+
+  it('shows rating and priority empty states when all analytics rows are zero', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({ totalBooks: 0 }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('No rating data for this analytics scope.')).toBeInTheDocument()
+    expect(screen.getByText('No priority data for this analytics scope.')).toBeInTheDocument()
+  })
+
   it('keeps analytics type labels readable against their calculated background', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
 
@@ -183,6 +235,8 @@ describe('AnalyticsPage', () => {
 
 type AnalyticsOverrides = Partial<BookAnalyticsDto['overview']> & {
   composition?: Partial<BookAnalyticsDto['composition']>
+  planning?: Partial<BookAnalyticsDto['planning']>
+  ratings?: Partial<BookAnalyticsDto['ratings']>
 }
 
 function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
@@ -209,6 +263,27 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
     tags: overview.totalBooks > 0 ? [{ name: 'favorite', bookCount: 4, shareOfBooks: 40 }] : [],
     ...overrides.composition,
   }
+  const ratings = {
+    ratedBooks: overview.ratedBooks,
+    unratedBooks: overview.unratedBooks,
+    averageRating: overview.averageRating,
+    counts: Array.from({ length: 10 }, (_unused, index) => ({
+      rating: index + 1,
+      bookCount: index === 8 ? 1 : 0,
+    })),
+    ...overrides.ratings,
+  }
+  const planning = {
+    prioritiesByStatus: overview.totalBooks > 0 ? [{
+      status: 'Reading',
+      totalBooks: 6,
+      priorities: [
+        { priority: '1', bookCount: 2 },
+        { priority: 'Unset', bookCount: 4 },
+      ],
+    }] : [],
+    ...overrides.planning,
+  }
 
   return {
     generatedAt: '2026-07-15T12:00:00Z',
@@ -220,15 +295,8 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
     },
     overview,
     composition,
-    ratings: {
-      ratedBooks: overview.ratedBooks,
-      unratedBooks: overview.unratedBooks,
-      averageRating: overview.averageRating,
-      counts: [],
-    },
-    planning: {
-      prioritiesByStatus: [],
-    },
+    ratings,
+    planning,
     progress: {
       typeVolumes: [],
     },
