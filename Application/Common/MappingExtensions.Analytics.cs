@@ -102,6 +102,18 @@ public static partial class MappingExtensions
                         MedianCurrentChapter = item.MedianCurrentChapter
                     })
                     .ToList()
+            },
+            Activity = new BookAnalyticsActivityDto
+            {
+                Points = source.Activity.Points
+                    .Select(item => new BookAnalyticsActivityPointDto
+                    {
+                        Date = item.Date,
+                        ProgressEvents = item.ProgressEvents,
+                        BooksTouched = item.BooksTouched,
+                        ChaptersAdvanced = item.ChaptersAdvanced
+                    })
+                    .ToList()
             }
         };
     }

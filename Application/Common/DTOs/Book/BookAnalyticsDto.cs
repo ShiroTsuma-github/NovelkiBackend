@@ -9,6 +9,7 @@ public sealed record BookAnalyticsDto
     public BookAnalyticsRatingsDto Ratings { get; init; } = new();
     public BookAnalyticsPlanningDto Planning { get; init; } = new();
     public BookAnalyticsProgressDto Progress { get; init; } = new();
+    public BookAnalyticsActivityDto Activity { get; init; } = new();
 }
 
 public sealed record BookAnalyticsScopeDto
@@ -101,4 +102,17 @@ public sealed record BookAnalyticsTypeVolumeDto
     public decimal CurrentChapters { get; init; }
     public decimal? AverageCurrentChapter { get; init; }
     public decimal? MedianCurrentChapter { get; init; }
+}
+
+public sealed record BookAnalyticsActivityDto
+{
+    public IReadOnlyList<BookAnalyticsActivityPointDto> Points { get; init; } = [];
+}
+
+public sealed record BookAnalyticsActivityPointDto
+{
+    public DateOnly Date { get; init; }
+    public int ProgressEvents { get; init; }
+    public int BooksTouched { get; init; }
+    public decimal ChaptersAdvanced { get; init; }
 }

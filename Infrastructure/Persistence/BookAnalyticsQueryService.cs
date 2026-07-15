@@ -25,6 +25,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         var ratings = await GetRatingsAsync(query, overview, cancellationToken);
         var planning = await GetPlanningAsync(query, overview.TotalBooks, cancellationToken);
         var progress = await GetProgressAsync(query, overview.TotalBooks, cancellationToken);
+        var activity = await GetActivityAsync(query, scope, overview.TotalBooks, cancellationToken);
 
         return new BookAnalyticsSnapshot(
             DateTimeOffset.UtcNow,
@@ -33,7 +34,8 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             composition,
             ratings,
             planning,
-            progress);
+            progress,
+            activity);
     }
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -315,5 +317,138 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         return (sortedValues[middle - 1] + sortedValues[middle]) / 2m;
     }
 
+    private async Task<BookAnalyticsActivitySnapshot> GetActivityAsync(
+        IQueryable<Book> query,
+        BookAnalyticsScopeSnapshot scope,
+        int totalBooks,
+        CancellationToken cancellationToken)
+    {
+        if (totalBooks == 0)
+        {
+            return BookAnalyticsActivitySnapshot.Empty;
+        }
+
+        var bookIds = query.Select(book => book.Id);
+        var rows = await _context.BookProgressHistory
+            .AsNoTracking()
+            .Where(history => bookIds.Contains(history.BookId))
+            .Select(history => new ProgressHistoryRow(
+                history.BookId,
+                history.Id,
+                history.ChangedAt,
+                history.ChapterNumber,
+                history.ChapterLabel))
+            .ToListAsync(cancellationToken);
+
+        var points = CreateEmptyActivityPoints(scope);
+        foreach (var group in rows
+            .OrderBy(row => row.BookId)
+            .ThenBy(row => row.ChangedAt)
+            .ThenBy(row => row.Id)
+            .GroupBy(row => row.BookId))
+        {
+            ProgressHistoryRow? previous = null;
+            foreach (var row in group)
+            {
+                if (previous is null)
+                {
+                    previous = row;
+                    continue;
+                }
+
+                var changedDate = DateOnly.FromDateTime(row.ChangedAt.UtcDateTime);
+                if (changedDate >= scope.From && changedDate < scope.To)
+                {
+                    var bucket = ResolveBucketDate(changedDate, scope.From, scope.Bucket);
+                    if (points.TryGetValue(bucket, out var point))
+                    {
+                        point.ProgressEvents++;
+                        point.BookIds.Add(row.BookId);
+                        point.ChaptersAdvanced += CalculatePositiveChapterAdvance(previous.ChapterNumber, row.ChapterNumber);
+                    }
+                }
+
+                previous = row;
+            }
+        }
+
+        return new BookAnalyticsActivitySnapshot(points
+            .OrderBy(point => point.Key)
+            .Select(point => new BookAnalyticsActivityPointSnapshot(
+                point.Key,
+                point.Value.ProgressEvents,
+                point.Value.BookIds.Count,
+                point.Value.ChaptersAdvanced))
+            .ToList());
+    }
+
+    private static SortedDictionary<DateOnly, ActivityPointAccumulator> CreateEmptyActivityPoints(
+        BookAnalyticsScopeSnapshot scope)
+    {
+        var points = new SortedDictionary<DateOnly, ActivityPointAccumulator>();
+        for (var bucket = ResolveBucketDate(scope.From, scope.From, scope.Bucket);
+             bucket < scope.To;
+             bucket = NextBucketDate(bucket, scope.Bucket))
+        {
+            points[bucket] = new ActivityPointAccumulator();
+        }
+
+        return points;
+    }
+
+    private static DateOnly ResolveBucketDate(DateOnly date, DateOnly from, string bucket)
+    {
+        var bucketDate = bucket switch
+        {
+            "day" => date,
+            "week" => StartOfWeek(date),
+            "month" => new DateOnly(date.Year, date.Month, 1),
+            _ => date,
+        };
+
+        return bucketDate < from ? from : bucketDate;
+    }
+
+    private static DateOnly NextBucketDate(DateOnly bucket, string bucketSize)
+    {
+        return bucketSize switch
+        {
+            "day" => bucket.AddDays(1),
+            "week" => StartOfWeek(bucket).AddDays(7),
+            "month" => new DateOnly(bucket.Year, bucket.Month, 1).AddMonths(1),
+            _ => bucket.AddDays(1),
+        };
+    }
+
+    private static DateOnly StartOfWeek(DateOnly date)
+    {
+        var daysSinceMonday = ((int)date.DayOfWeek - (int)DayOfWeek.Monday + 7) % 7;
+        return date.AddDays(-daysSinceMonday);
+    }
+
+    private static decimal CalculatePositiveChapterAdvance(decimal? previous, decimal? current)
+    {
+        if (previous is null || current is null || current <= previous)
+        {
+            return 0m;
+        }
+
+        return current.Value - previous.Value;
+    }
+
     private sealed record RelationCountRow(string Name, int BookCount);
+
+    private sealed record ProgressHistoryRow(
+        Guid BookId,
+        Guid Id,
+        DateTimeOffset ChangedAt,
+        decimal? ChapterNumber,
+        string? ChapterLabel);
+
+    private sealed class ActivityPointAccumulator
+    {
+        public int ProgressEvents { get; set; }
+        public HashSet<Guid> BookIds { get; } = [];
+        public decimal ChaptersAdvanced { get; set; }
+    }
 }

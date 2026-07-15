@@ -542,6 +542,117 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldAggregateReadingActivityFromProgressHistory()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("14141414-1414-1414-1414-141414141414");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "activity-other", NormalizedUserName = "ACTIVITY-OTHER" });
+
+        var active = TestData.Book(database.UserId, "Activity Scope Active");
+        AddProgress(active,
+            ProgressHistory("00000000-0000-0000-0000-000000000001", new DateTimeOffset(2025, 12, 31, 8, 0, 0, TimeSpan.Zero), 1m, "1"),
+            ProgressHistory("00000000-0000-0000-0000-000000000002", new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero), 1m, "Chapter One"),
+            ProgressHistory("00000000-0000-0000-0000-000000000003", new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero), 3m, "3"),
+            ProgressHistory("00000000-0000-0000-0000-000000000004", new DateTimeOffset(2026, 1, 2, 10, 0, 0, TimeSpan.Zero), 2m, "2"),
+            ProgressHistory("00000000-0000-0000-0000-000000000005", new DateTimeOffset(2026, 1, 3, 10, 0, 0, TimeSpan.Zero), null, "unknown"),
+            ProgressHistory("00000000-0000-0000-0000-000000000006", new DateTimeOffset(2026, 1, 4, 10, 0, 0, TimeSpan.Zero), 5m, "5"),
+            ProgressHistory("00000000-0000-0000-0000-000000000007", new DateTimeOffset(2026, 1, 8, 10, 0, 0, TimeSpan.Zero), 8m, "8")
+        );
+
+        var singleEntry = TestData.Book(database.UserId, "Activity Scope Single");
+        singleEntry.ProgressHistory.Add(ProgressHistory("00000000-0000-0000-0000-000000000101", new DateTimeOffset(2026, 1, 3, 10, 0, 0, TimeSpan.Zero), 50m, "50"));
+
+        var yearEdge = TestData.Book(database.UserId, "Activity Scope Year Edge");
+        AddProgress(yearEdge,
+            ProgressHistory("00000000-0000-0000-0000-000000000201", new DateTimeOffset(2025, 12, 30, 10, 0, 0, TimeSpan.Zero), 2m, "2"),
+            ProgressHistory("00000000-0000-0000-0000-000000000202", new DateTimeOffset(2025, 12, 31, 10, 0, 0, TimeSpan.Zero), 4m, "4")
+        );
+
+        var unmatched = TestData.Book(database.UserId, "Activity Outside");
+        AddProgress(unmatched,
+            ProgressHistory("00000000-0000-0000-0000-000000000301", new DateTimeOffset(2025, 12, 31, 10, 0, 0, TimeSpan.Zero), 1m, "1"),
+            ProgressHistory("00000000-0000-0000-0000-000000000302", new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero), 99m, "99")
+        );
+
+        var otherOwner = TestData.Book(otherOwnerId, "Activity Scope Other Owner");
+        AddProgress(otherOwner,
+            ProgressHistory("00000000-0000-0000-0000-000000000401", new DateTimeOffset(2025, 12, 31, 10, 0, 0, TimeSpan.Zero), 1m, "1"),
+            ProgressHistory("00000000-0000-0000-0000-000000000402", new DateTimeOffset(2026, 1, 1, 10, 0, 0, TimeSpan.Zero), 99m, "99")
+        );
+
+        context.Books.AddRange(active, singleEntry, yearEdge, unmatched, otherOwner);
+        await context.SaveChangesAsync();
+        var service = CreateAnalyticsQueryService(context);
+        var criteria = BookSearchQueryParser.Parse("title:\"Activity Scope\"");
+
+        var day = await service.GetAnalyticsAsync(
+            database.UserId,
+            criteria,
+            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Activity Scope\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 8), "day"),
+            CancellationToken.None);
+
+        Assert.Equal(7, day.Activity.Points.Count);
+        AssertActivityPoint(day, new DateOnly(2026, 1, 1), 2, 1, 2m);
+        AssertActivityPoint(day, new DateOnly(2026, 1, 2), 1, 1, 0m);
+        AssertActivityPoint(day, new DateOnly(2026, 1, 3), 1, 1, 0m);
+        AssertActivityPoint(day, new DateOnly(2026, 1, 4), 1, 1, 0m);
+        AssertActivityPoint(day, new DateOnly(2026, 1, 7), 0, 0, 0m);
+        Assert.DoesNotContain(day.Activity.Points, point => point.Date == new DateOnly(2026, 1, 8));
+
+        var week = await service.GetAnalyticsAsync(
+            database.UserId,
+            criteria,
+            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Activity Scope\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 15), "week"),
+            CancellationToken.None);
+
+        AssertActivityPoint(week, new DateOnly(2026, 1, 1), 5, 1, 2m);
+        AssertActivityPoint(week, new DateOnly(2026, 1, 5), 1, 1, 3m);
+        AssertActivityPoint(week, new DateOnly(2026, 1, 12), 0, 0, 0m);
+
+        var month = await service.GetAnalyticsAsync(
+            database.UserId,
+            criteria,
+            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"Activity Scope\"", new DateOnly(2025, 12, 31), new DateOnly(2026, 2, 1), "month"),
+            CancellationToken.None);
+
+        AssertActivityPoint(month, new DateOnly(2025, 12, 31), 1, 1, 2m);
+        AssertActivityPoint(month, new DateOnly(2026, 1, 1), 6, 1, 5m);
+
+        static BookProgressHistory ProgressHistory(string id, DateTimeOffset changedAt, decimal? chapterNumber, string chapterLabel)
+        {
+            return new BookProgressHistory
+            {
+                Id = Guid.Parse(id),
+                ChangedAt = changedAt,
+                ChapterNumber = chapterNumber,
+                ChapterLabel = chapterLabel
+            };
+        }
+
+        static void AddProgress(Book book, params BookProgressHistory[] history)
+        {
+            foreach (var item in history)
+            {
+                book.ProgressHistory.Add(item);
+            }
+        }
+
+        static void AssertActivityPoint(
+            Domain.Models.BookAnalyticsSnapshot snapshot,
+            DateOnly date,
+            int progressEvents,
+            int booksTouched,
+            decimal chaptersAdvanced)
+        {
+            var point = Assert.Single(snapshot.Activity.Points, item => item.Date == date);
+            Assert.Equal(progressEvents, point.ProgressEvents);
+            Assert.Equal(booksTouched, point.BooksTouched);
+            Assert.Equal(chaptersAdvanced, point.ChaptersAdvanced);
+        }
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();
