@@ -21,6 +21,7 @@ export type TokenResponse = {
   expiresAt: string
   refreshTokenExpiresAt: string
   userId: string
+  createdAt: string
 }
 
 export type RegisterResponse = {

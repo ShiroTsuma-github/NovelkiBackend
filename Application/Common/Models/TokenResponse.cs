@@ -8,5 +8,6 @@ public sealed record TokenResponse
     public DateTimeOffset ExpiresAt { get; init; }
     public DateTimeOffset RefreshTokenExpiresAt { get; init; }
     public Guid UserId { get; init; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
 
 }

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DayPicker, type DateRange } from 'react-day-picker'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
+import { getStoredSession } from '@/api/http'
 import type { BookAnalyticsDto } from '@/api/types'
 import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
@@ -26,12 +27,12 @@ type AnalyticsBucket = 'day' | 'week' | 'month'
 
 const analyticsBuckets: AnalyticsBucket[] = ['day', 'week', 'month']
 const analyticsRangePresets = [
-  { label: 'Beginning', getFrom: (_today: Date) => new Date(1900, 0, 1) },
-  { label: 'Last 2 years', getFrom: (today: Date) => subYears(today, 2) },
-  { label: 'Last 1 year', getFrom: (today: Date) => subYears(today, 1) },
-  { label: 'Last 6 months', getFrom: (today: Date) => subMonths(today, 6) },
-  { label: 'Last 3 months', getFrom: (today: Date) => subMonths(today, 3) },
-  { label: 'Last month', getFrom: (today: Date) => subMonths(today, 1) },
+  { label: 'Beginning', getFrom: (_today: Date, accountStart: Date) => accountStart },
+  { label: 'Last 2 years', getFrom: (today: Date, accountStart: Date) => maxDate(subYears(today, 2), accountStart) },
+  { label: 'Last 1 year', getFrom: (today: Date, accountStart: Date) => maxDate(subYears(today, 1), accountStart) },
+  { label: 'Last 6 months', getFrom: (today: Date, accountStart: Date) => maxDate(subMonths(today, 6), accountStart) },
+  { label: 'Last 3 months', getFrom: (today: Date, accountStart: Date) => maxDate(subMonths(today, 3), accountStart) },
+  { label: 'Last month', getFrom: (today: Date, accountStart: Date) => maxDate(subMonths(today, 1), accountStart) },
 ] as const
 
 export function AnalyticsPage() {
@@ -302,12 +303,13 @@ function DateRangeChooser({
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const accountStartDate = getAccountStartDate()
   const fromDate = parseDateInput(filters.from)
   const toInclusiveDate = getInclusiveToDate(filters.to)
   const selectedRange: DateRange = { from: fromDate, to: toInclusiveDate }
   const [calendarRange, setCalendarRange] = useState<DateRange | undefined>(selectedRange)
   const [rangeSelectionAnchor, setRangeSelectionAnchor] = useState<Date | null>(null)
-  const display = getDateRangeDisplay(filters)
+  const display = getDateRangeDisplay(filters, accountStartDate)
 
   useEffect(() => {
     setCalendarRange(selectedRange)
@@ -347,7 +349,7 @@ function DateRangeChooser({
   function applyPreset(preset: typeof analyticsRangePresets[number]) {
     const today = getToday()
     const nextRange = {
-      from: preset.getFrom(today),
+      from: preset.getFrom(today, accountStartDate),
       to: today,
     }
     setCalendarRange(nextRange)
@@ -361,6 +363,10 @@ function DateRangeChooser({
   }
 
   function applyCalendarDay(day: Date) {
+    if (day < accountStartDate) {
+      return
+    }
+
     if (!rangeSelectionAnchor) {
       setRangeSelectionAnchor(day)
       setCalendarRange({ from: day })
@@ -426,6 +432,7 @@ function DateRangeChooser({
           <DayPicker
             classNames={dayPickerClassNames}
             defaultMonth={calendarRange?.from ?? fromDate}
+            disabled={{ before: accountStartDate }}
             mode="range"
             numberOfMonths={2}
             selected={calendarRange}
@@ -485,7 +492,7 @@ function defaultToDate() {
 }
 
 function defaultFromDate() {
-  return toDateInputValue(subMonths(getToday(), 3))
+  return toDateInputValue(maxDate(subMonths(getToday(), 3), getAccountStartDate()))
 }
 
 function toDateInputValue(date: Date) {
@@ -501,6 +508,25 @@ function getToday() {
   return date
 }
 
+function getAccountStartDate() {
+  const createdAt = getStoredSession()?.createdAt
+  if (!createdAt) {
+    return new Date(1900, 0, 1)
+  }
+
+  const date = parseISO(createdAt)
+  if (Number.isNaN(date.getTime())) {
+    return new Date(1900, 0, 1)
+  }
+
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function maxDate(left: Date, right: Date) {
+  return left > right ? left : right
+}
+
 function parseDateInput(value: string) {
   return parseISO(value)
 }
@@ -509,12 +535,12 @@ function getInclusiveToDate(exclusiveToValue: string) {
   return addDays(parseDateInput(exclusiveToValue), -1)
 }
 
-function getDateRangeDisplay(filters: ReturnType<typeof getAnalyticsFilters>) {
+function getDateRangeDisplay(filters: ReturnType<typeof getAnalyticsFilters>, accountStartDate: Date) {
   const from = parseDateInput(filters.from)
   const toInclusive = getInclusiveToDate(filters.to)
   const today = getToday()
   const preset = analyticsRangePresets.find((item) =>
-    isSameDay(from, item.getFrom(today)) && isSameDay(toInclusive, today))
+    isSameDay(from, item.getFrom(today, accountStartDate)) && isSameDay(toInclusive, today))
   const toLabel = isSameDay(toInclusive, today) ? 'Today' : format(toInclusive, 'MMM d, yyyy')
   const label = preset ? preset.label : `${format(from, 'MMM d, yyyy')} – ${toLabel}`
 

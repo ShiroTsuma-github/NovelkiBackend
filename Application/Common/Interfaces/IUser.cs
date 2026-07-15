@@ -7,6 +7,7 @@ public interface IUser
     public string? Email { get; }
     public string? Username { get; }
     public IEnumerable<string> Roles { get; }
+    public DateTimeOffset? CreatedAt => null;
     public bool IsAuthenticated { get; }
     public bool Valid { get; }
 }
