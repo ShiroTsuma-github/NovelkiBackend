@@ -259,7 +259,7 @@ export function BooksPage() {
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+      <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {(booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
