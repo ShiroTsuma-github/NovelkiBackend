@@ -183,6 +183,20 @@ public class BookQueryHandlerTests
                 To: new DateOnly(2026, 7, 15)), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task GetBookAnalytics_ShouldAllowBeginningRange()
+    {
+        var service = new FakeBookAnalyticsQueryService();
+        var handler = new GetBookAnalyticsHandler(service, new FakeUser());
+
+        await handler.Handle(new GetBookAnalyticsQuery(
+            From: new DateOnly(1900, 1, 1),
+            To: new DateOnly(2026, 7, 16)), CancellationToken.None);
+
+        Assert.Equal(new DateOnly(1900, 1, 1), service.Scope!.From);
+        Assert.Equal(new DateOnly(2026, 7, 16), service.Scope.To);
+    }
+
     private static BookListItemDto ListItem(string title)
     {
         return new BookListItemDto

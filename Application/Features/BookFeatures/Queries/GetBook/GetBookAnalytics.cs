@@ -13,7 +13,6 @@ public sealed record GetBookAnalyticsQuery(
 public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQuery, BookAnalyticsDto>
 {
     private const int DefaultRangeDays = 84;
-    private const int MaxRangeDays = 3660;
     private static readonly HashSet<string> SupportedBuckets = new(StringComparer.OrdinalIgnoreCase)
     {
         "day",
@@ -44,11 +43,6 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
         if (from >= to)
         {
             throw ValidationError(nameof(request.From), "From must be earlier than to.");
-        }
-
-        if (to.DayNumber - from.DayNumber > MaxRangeDays)
-        {
-            throw ValidationError(nameof(request.To), "Analytics range cannot exceed 10 years.");
         }
 
         var scope = new BookAnalyticsScopeSnapshot(request.Query, from, to, bucket);

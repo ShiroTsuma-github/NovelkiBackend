@@ -1,5 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { addDays, format, isSameDay, parseISO, subMonths, subYears } from 'date-fns'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { DayPicker, type DateRange } from 'react-day-picker'
 import { useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import type { BookAnalyticsDto } from '@/api/types'
@@ -23,6 +25,14 @@ import { extractAnalyticsDateFilters } from './dateQueryFilters'
 type AnalyticsBucket = 'day' | 'week' | 'month'
 
 const analyticsBuckets: AnalyticsBucket[] = ['day', 'week', 'month']
+const analyticsRangePresets = [
+  { label: 'Beginning', getFrom: (_today: Date) => new Date(1900, 0, 1) },
+  { label: 'Last 2 years', getFrom: (today: Date) => subYears(today, 2) },
+  { label: 'Last 1 year', getFrom: (today: Date) => subYears(today, 1) },
+  { label: 'Last 6 months', getFrom: (today: Date) => subMonths(today, 6) },
+  { label: 'Last 3 months', getFrom: (today: Date) => subMonths(today, 3) },
+  { label: 'Last month', getFrom: (today: Date) => subMonths(today, 1) },
+] as const
 
 export function AnalyticsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -64,7 +74,7 @@ export function AnalyticsPage() {
         <p className="text-sm text-slate-600">
           Query uses the same filters as Books search. From/To filters books by created date and affects every metric and chart.
         </p>
-        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem_10rem_9rem_auto]">
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem_9rem_auto]">
           <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-700">
             Query
             <input
@@ -74,24 +84,7 @@ export function AnalyticsPage() {
               onChange={(event) => setDraftFilters((current) => ({ ...current, query: event.target.value }))}
             />
           </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-            From
-            <input
-              className={`${inputClass} border-slate-300 bg-white text-slate-950 focus:border-cyan-500`}
-              type="date"
-              value={draftFilters.from}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
-            />
-          </label>
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-            To
-            <input
-              className={`${inputClass} border-slate-300 bg-white text-slate-950 focus:border-cyan-500`}
-              type="date"
-              value={draftFilters.to}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
-            />
-          </label>
+          <DateRangeChooser filters={draftFilters} onChange={setDraftFilters} />
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
             Bucket
             <select
@@ -300,6 +293,150 @@ export function AnalyticsPage() {
   )
 }
 
+function DateRangeChooser({
+  filters,
+  onChange,
+}: {
+  filters: ReturnType<typeof getAnalyticsFilters>
+  onChange: React.Dispatch<React.SetStateAction<ReturnType<typeof getAnalyticsFilters>>>
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const fromDate = parseDateInput(filters.from)
+  const toInclusiveDate = getInclusiveToDate(filters.to)
+  const selectedRange: DateRange = { from: fromDate, to: toInclusiveDate }
+  const [calendarRange, setCalendarRange] = useState<DateRange | undefined>(selectedRange)
+  const [rangeSelectionAnchor, setRangeSelectionAnchor] = useState<Date | null>(null)
+  const display = getDateRangeDisplay(filters)
+
+  useEffect(() => {
+    setCalendarRange(selectedRange)
+  }, [filters.from, filters.to])
+
+  useEffect(() => {
+    if (!isOpen) {
+      return undefined
+    }
+
+    function closeOnOutsidePointerDown(event: PointerEvent) {
+      const target = event.target
+      if (target instanceof Node && !rootRef.current?.contains(target)) {
+        setIsOpen(false)
+        setRangeSelectionAnchor(null)
+        setCalendarRange(selectedRange)
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        setRangeSelectionAnchor(null)
+        setCalendarRange(selectedRange)
+      }
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePointerDown)
+    document.addEventListener('keydown', closeOnEscape)
+
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePointerDown)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isOpen, filters.from, filters.to])
+
+  function applyPreset(preset: typeof analyticsRangePresets[number]) {
+    const today = getToday()
+    const nextRange = {
+      from: preset.getFrom(today),
+      to: today,
+    }
+    setCalendarRange(nextRange)
+    setRangeSelectionAnchor(null)
+    setIsOpen(false)
+    onChange((current) => ({
+      ...current,
+      from: toDateInputValue(nextRange.from),
+      to: toDateInputValue(addDays(today, 1)),
+    }))
+  }
+
+  function applyCalendarDay(day: Date) {
+    if (!rangeSelectionAnchor) {
+      setRangeSelectionAnchor(day)
+      setCalendarRange({ from: day })
+      return
+    }
+
+    const from = day < rangeSelectionAnchor ? day : rangeSelectionAnchor
+    const to = day < rangeSelectionAnchor ? rangeSelectionAnchor : day
+    setRangeSelectionAnchor(null)
+    setCalendarRange({ from, to })
+    setIsOpen(false)
+    onChange((current) => ({
+      ...current,
+      from: toDateInputValue(from),
+      to: toDateInputValue(addDays(to, 1)),
+    }))
+  }
+
+  return (
+    <div className="relative grid gap-1.5 text-sm font-semibold text-slate-700" ref={rootRef}>
+      Date range
+      <button
+        aria-expanded={isOpen}
+        aria-label={`Date range: ${display.label}. ${display.title}`}
+        className="flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-950 shadow-sm hover:border-cyan-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+        title={display.title}
+        type="button"
+        onClick={() => {
+          setIsOpen((current) => {
+            const next = !current
+            setRangeSelectionAnchor(null)
+            setCalendarRange(selectedRange)
+            return next
+          })
+        }}
+      >
+        <span className="truncate">{display.label}</span>
+        <span className="shrink-0 rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-300">
+          {display.toLabel}
+        </span>
+      </button>
+      {isOpen ? (
+        <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-950 p-3 text-slate-100 shadow-xl">
+          <div className="mb-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            {analyticsRangePresets.map((preset) => {
+              const isActive = display.presetLabel === preset.label
+              return (
+                <button
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    isActive
+                      ? 'border-cyan-400 bg-cyan-500/20 text-cyan-100'
+                      : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  key={preset.label}
+                  type="button"
+                  onClick={() => applyPreset(preset)}
+                >
+                  {preset.label}
+                </button>
+              )
+            })}
+          </div>
+          <DayPicker
+            classNames={dayPickerClassNames}
+            defaultMonth={calendarRange?.from ?? fromDate}
+            mode="range"
+            numberOfMonths={2}
+            selected={calendarRange}
+            onDayClick={applyCalendarDay}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function MetricCard({ label, loading, value }: { label: string; loading: boolean; value: string }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
@@ -344,15 +481,11 @@ function normalizeBucket(value?: string | null): AnalyticsBucket {
 }
 
 function defaultToDate() {
-  const date = new Date()
-  date.setDate(date.getDate() + 1)
-  return toDateInputValue(date)
+  return toDateInputValue(addDays(getToday(), 1))
 }
 
 function defaultFromDate() {
-  const date = new Date()
-  date.setDate(date.getDate() - 83)
-  return toDateInputValue(date)
+  return toDateInputValue(subMonths(getToday(), 3))
 }
 
 function toDateInputValue(date: Date) {
@@ -360,6 +493,62 @@ function toDateInputValue(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function getToday() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
+function parseDateInput(value: string) {
+  return parseISO(value)
+}
+
+function getInclusiveToDate(exclusiveToValue: string) {
+  return addDays(parseDateInput(exclusiveToValue), -1)
+}
+
+function getDateRangeDisplay(filters: ReturnType<typeof getAnalyticsFilters>) {
+  const from = parseDateInput(filters.from)
+  const toInclusive = getInclusiveToDate(filters.to)
+  const today = getToday()
+  const preset = analyticsRangePresets.find((item) =>
+    isSameDay(from, item.getFrom(today)) && isSameDay(toInclusive, today))
+  const toLabel = isSameDay(toInclusive, today) ? 'Today' : format(toInclusive, 'MMM d, yyyy')
+  const label = preset ? preset.label : `${format(from, 'MMM d, yyyy')} – ${toLabel}`
+
+  return {
+    label,
+    presetLabel: preset?.label,
+    toLabel,
+    title: `${format(from, 'MMM d, yyyy')} – ${format(toInclusive, 'MMM d, yyyy')}`,
+  }
+}
+
+const dayPickerClassNames = {
+  root: 'text-slate-100',
+  months: 'grid gap-4 md:grid-cols-2',
+  month: 'space-y-3',
+  month_caption: 'flex items-center justify-center px-8 py-1 text-sm font-semibold text-slate-100',
+  caption_label: 'rounded-md px-2 py-1',
+  nav: 'absolute right-3 top-[4.75rem] flex gap-2',
+  button_previous: 'grid h-8 w-8 place-items-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-500 hover:text-cyan-100',
+  button_next: 'grid h-8 w-8 place-items-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-500 hover:text-cyan-100',
+  chevron: 'h-4 w-4 fill-current',
+  month_grid: 'w-full border-separate border-spacing-1',
+  weekdays: 'text-xs uppercase tracking-wide text-slate-500',
+  weekday: 'h-8 text-center font-semibold',
+  week: '',
+  day: 'h-9 w-9 rounded-md text-center text-sm text-slate-200',
+  day_button: 'h-9 w-9 rounded-md font-medium hover:bg-cyan-500/20 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60',
+  today: 'text-cyan-200',
+  selected: 'bg-cyan-500 text-slate-950',
+  range_start: 'rounded-l-full bg-cyan-400 text-slate-950',
+  range_middle: 'rounded-none bg-cyan-500/20 text-cyan-100',
+  range_end: 'rounded-r-full bg-cyan-400 text-slate-950',
+  outside: 'text-slate-600',
+  disabled: 'text-slate-700',
 }
 
 function getAnalyticsEmptyMessage(data: BookAnalyticsDto | undefined, query: string) {
