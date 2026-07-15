@@ -433,6 +433,39 @@ public class BookControllerTests
     }
 
     [Fact]
+    public async Task GetAnalytics_ShouldSendExplicitQueryStringFilters()
+    {
+        var expected = new BookAnalyticsDto
+        {
+            GeneratedAt = DateTimeOffset.UtcNow,
+            Scope = new BookAnalyticsScopeDto
+            {
+                Query = "author:Toika",
+                From = new DateOnly(2026, 1, 1),
+                To = new DateOnly(2026, 2, 1),
+                Bucket = "month"
+            },
+            Overview = new BookAnalyticsOverviewDto()
+        };
+        var mediator = new Mock<IMediator>();
+        mediator
+            .Setup(mock => mock.Send(
+                new GetBookAnalyticsQuery("author:Toika", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), "month"),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.GetAnalytics(
+            "author:Toika",
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 2, 1),
+            "month");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(expected, ok.Value);
+    }
+
+    [Fact]
     public async Task UpdateProgressAndDelete_ShouldSendCommandsAndReturnNoContent()
     {
         var bookId = Guid.NewGuid();
