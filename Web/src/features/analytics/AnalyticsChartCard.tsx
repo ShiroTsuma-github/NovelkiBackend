@@ -11,6 +11,7 @@ type AnalyticsChartCardProps = {
   children: ReactNode
   columns: string[]
   rows: Array<Array<ReactNode>>
+  dataTableEnabled?: boolean
 }
 
 export function AnalyticsChartCard({
@@ -24,6 +25,7 @@ export function AnalyticsChartCard({
   children,
   columns,
   rows,
+  dataTableEnabled = true,
 }: AnalyticsChartCardProps) {
   const [showData, setShowData] = useState(false)
   const reactId = useId()
@@ -42,16 +44,18 @@ export function AnalyticsChartCard({
           <h2 className="text-base font-semibold text-slate-950" id={titleId}>{title}</h2>
           <p className="mt-1 text-sm text-slate-600" id={descriptionId}>{description}</p>
         </div>
-        <button
-          aria-controls={tableId}
-          aria-expanded={showData}
-          aria-label={`${showData ? 'Hide' : 'View'} data for ${title}`}
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
-          type="button"
-          onClick={() => setShowData((current) => !current)}
-        >
-          {showData ? 'Hide data' : 'View data'}
-        </button>
+        {dataTableEnabled ? (
+          <button
+            aria-controls={tableId}
+            aria-expanded={showData}
+            aria-label={`${showData ? 'Hide' : 'View'} data for ${title}`}
+            className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:border-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+            type="button"
+            onClick={() => setShowData((current) => !current)}
+          >
+            {showData ? 'Hide data' : 'View data'}
+          </button>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -84,8 +88,8 @@ export function AnalyticsChartCard({
         </div>
       )}
 
-      {showData ? (
-        <div className="overflow-x-auto rounded-lg border border-slate-200" id={tableId}>
+      {dataTableEnabled && showData ? (
+        <div className="max-h-80 overflow-auto rounded-lg border border-slate-200" id={tableId}>
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <caption className="sr-only">{title} data table</caption>
             <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">

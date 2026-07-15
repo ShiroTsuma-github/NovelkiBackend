@@ -124,14 +124,16 @@ describe('AnalyticsPage', () => {
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
   })
 
-  it('exposes text-equivalent data tables for all analytics cards', async () => {
+  it('exposes text-equivalent data tables where raw data adds value', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     const user = userEvent.setup()
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     const buttons = await screen.findAllByRole('button', { name: /view data for/i })
-    expect(buttons).toHaveLength(12)
+    expect(buttons).toHaveLength(10)
+    expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view data for priority by status/i })).not.toBeInTheDocument()
 
     for (const button of buttons) {
       await user.click(button)
@@ -185,7 +187,7 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByText('Other')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /view data for top genres/i }))
-    expect(screen.getByRole('cell', { name: /grouped remainder/i })).toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /bucket/i })).not.toBeInTheDocument()
   })
 
   it('renders empty composition card states without hiding other cards', async () => {
@@ -220,14 +222,12 @@ describe('AnalyticsPage', () => {
         })),
       },
     }))
-    const user = userEvent.setup()
-
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByText('10%')).toBeInTheDocument()
+    expect(screen.getAllByText('Unrated: 9').length).toBeGreaterThan(1)
     expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
-    await user.click(screen.getByRole('button', { name: /view data for rating distribution/i }))
-    expect(screen.getByRole('cell', { name: 'Unrated' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
   })
 
   it('renders priority heatmap with unset drill-down', async () => {
@@ -247,6 +247,7 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByTestId('priority-heatmap')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view data for priority by status/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Plan to Read' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22')
     expect(screen.getByRole('link', { name: '3' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22%20priority%3Anone')
   })
@@ -318,18 +319,23 @@ describe('AnalyticsPage', () => {
   it('renders reading activity and library growth trends for empty buckets, one point, and import jumps', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
       activity: {
-        points: [{
-          date: '2026-01-01',
-          progressEvents: 1,
-          booksTouched: 1,
-          chaptersAdvanced: 9_999,
-        }],
+        points: [
+          { date: '2026-01-01', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
+          { date: '2026-01-08', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
+          {
+            date: '2026-01-15',
+            progressEvents: 1,
+            booksTouched: 1,
+            chaptersAdvanced: 9_999,
+          },
+        ],
       },
       libraryGrowth: {
         openingCount: 1,
         points: [
           { date: '2026-01-01', booksAdded: 0, cumulativeBooks: 1, byType: [] },
-          { date: '2026-01-08', booksAdded: 1_000_000, cumulativeBooks: 1_000_001, byType: [{ type: 'Novel', bookCount: 1_000_000 }] },
+          { date: '2026-01-08', booksAdded: 0, cumulativeBooks: 1, byType: [] },
+          { date: '2026-01-15', booksAdded: 1_000_000, cumulativeBooks: 1_000_001, byType: [{ type: 'Novel', bookCount: 1_000_000 }] },
         ],
       },
     }))
@@ -338,10 +344,12 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01&bucket=week' })
 
     expect(await screen.findByText(/Chapters advanced: 9,999/i)).toBeInTheDocument()
+    expect(screen.getAllByText('2026-01-01 - 2026-01-08').length).toBeGreaterThan(1)
     expect(screen.getByText(/\+1,000,000 added/i)).toBeInTheDocument()
     expect(screen.getByText(/No additions by type/i)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /view data for library growth/i }))
+    expect(screen.getByRole('cell', { name: '2026-01-01 - 2026-01-08' })).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'No additions' })).toBeInTheDocument()
   })
 

@@ -8,7 +8,9 @@ export function formatCount(value: number) {
 }
 
 export function formatPercent(value: number) {
-  return `${value.toFixed(value >= 10 ? 0 : 1)}%`
+  const normalized = Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0))
+  const rounded = Math.round(normalized * 10) / 10
+  return `${rounded.toFixed(rounded >= 10 || rounded === 0 ? 0 : 1)}%`
 }
 
 export function percent(part: number, total: number) {

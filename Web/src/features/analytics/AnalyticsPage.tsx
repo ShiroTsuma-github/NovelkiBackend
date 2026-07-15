@@ -128,7 +128,7 @@ export function AnalyticsPage() {
         <MetricCard label="Current chapters" loading={isInitialLoading} value={data ? formatChapterCount(data.overview.currentChapters) : '-'} />
       </div>
 
-      <div className="grid min-w-0 gap-5 xl:grid-cols-2">
+      <div className="min-w-0 columns-1 gap-5 space-y-5 xl:columns-2 [&>section]:mb-5 [&>section]:break-inside-avoid">
         <AnalyticsChartCard
           columns={['Type', 'Status', 'Books', 'Share of type']}
           description="100% stacked bars showing how statuses split inside each content type."
@@ -143,7 +143,7 @@ export function AnalyticsPage() {
           <StatusByTypeChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
-          columns={['Genre', 'Books', 'Share of books', 'Bucket']}
+          columns={['Genre', 'Books', 'Share of books']}
           description="Top genres by matching books, with smaller categories grouped into Other."
           emptyMessage="No genre data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.composition.genres.length)}
@@ -156,7 +156,7 @@ export function AnalyticsPage() {
           <TopRelationsChart field="genre" items={data?.composition.genres ?? []} title="Genres" />
         </AnalyticsChartCard>
         <AnalyticsChartCard
-          columns={['Tag', 'Books', 'Share of books', 'Bucket']}
+          columns={['Tag', 'Books', 'Share of books']}
           description="Top tags by matching books, with smaller categories grouped into Other."
           emptyMessage="No tag data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.composition.tags.length)}
@@ -169,7 +169,8 @@ export function AnalyticsPage() {
           <TopRelationsChart field="tag" items={data?.composition.tags ?? []} title="Tags" />
         </AnalyticsChartCard>
         <AnalyticsChartCard
-          columns={['Rating', 'Books', 'Bucket']}
+          columns={['Rating', 'Books']}
+          dataTableEnabled={false}
           description="Rated books are shown on a 1-10 axis; unrated books stay separate."
           emptyMessage="No rating data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.overview.totalBooks)}
@@ -183,6 +184,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Status', 'Priority', 'Books', 'Share of status']}
+          dataTableEnabled={false}
           description="Priority heatmap per status, including the Unset bucket."
           emptyMessage="No priority data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.planning.prioritiesByStatus.length)}
@@ -234,6 +236,19 @@ export function AnalyticsPage() {
           <LibraryGrowthChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
+          columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
+          description="Client-side estimate based on your minutes-per-chapter settings."
+          emptyMessage="No chapter data to estimate reading time."
+          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={estimatedReadingTimeRows(data)}
+          title="Estimated reading time"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <EstimatedReadingTimeChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
           columns={['Field', 'Complete books', 'Coverage', 'Missing books']}
           description="Coverage per metadata field, intended to guide cleanup work."
           emptyMessage="0 metadata fields reported for this scope."
@@ -271,19 +286,6 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <CoverAvailabilityChart data={data} />
-        </AnalyticsChartCard>
-        <AnalyticsChartCard
-          columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
-          description="Client-side estimate based on your minutes-per-chapter settings."
-          emptyMessage="No chapter data to estimate reading time."
-          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
-          isError={analyticsQuery.isError && !!data}
-          isLoading={isInitialLoading}
-          rows={estimatedReadingTimeRows(data)}
-          title="Estimated reading time"
-          onRetry={() => analyticsQuery.refetch()}
-        >
-          <EstimatedReadingTimeChart data={data} />
         </AnalyticsChartCard>
       </div>
     </div>

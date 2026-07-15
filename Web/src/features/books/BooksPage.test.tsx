@@ -45,6 +45,16 @@ describe('BooksPage', () => {
     }))
   })
 
+  it('keeps table actions isolated from crowded columns', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+
+    const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    expect(container.querySelector('table')).toHaveClass('min-w-[72rem]')
+    expect(screen.getByRole('columnheader', { name: /actions/i })).toHaveClass('sticky', 'right-0', 'w-32')
+  })
+
   it('shows the colon-based rating operator syntax in advanced search help', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
 
