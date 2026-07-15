@@ -10,6 +10,9 @@ import { expectReadableTextContrast } from '@/test/contrast'
 import { testSession } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { AnalyticsPage } from './AnalyticsPage'
+import { libraryGrowthChartPoints } from './charts/LibraryGrowthChart'
+import { readingActivityChartPoints } from './charts/ReadingActivityChart'
+import { statusByTypeRows } from './charts/StatusByTypeChart'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -379,21 +382,21 @@ describe('AnalyticsPage', () => {
     expect(readingTime.compareDocumentPosition(readingActivity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('shows card data tables without forcing horizontal page overflow', async () => {
+  it('shows useful card data tables without forcing horizontal page overflow', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     const user = userEvent.setup()
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     await screen.findByText('Status by type')
-    await user.click(screen.getByRole('button', { name: /view data for status by type/i }))
+    await user.click(screen.getByRole('button', { name: /view data for cover availability/i }))
 
-    expect(screen.getByRole('columnheader', { name: 'Type' })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Kind' })).toBeInTheDocument()
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
   })
 
-  it('rounds status percentages before rendering table values', async () => {
-    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+  it('rounds status percentages before rendering status row values', () => {
+    const rows = statusByTypeRows(createAnalytics({
       composition: {
         statusByType: [{
           type: 'Novel',
@@ -402,14 +405,9 @@ describe('AnalyticsPage', () => {
         }],
       },
     }))
-    const user = userEvent.setup()
 
-    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
-
-    await user.click(await screen.findByRole('button', { name: /view data for status by type/i }))
-
-    expect(screen.getByRole('cell', { name: '100%' })).toBeInTheDocument()
-    expect(screen.queryByText(/100\.00000000000001%/)).not.toBeInTheDocument()
+    expect(rows).toContainEqual(['Novel', 'Reading', '10', '100%'])
+    expect(rows.flat()).not.toContain('100.00000000000001%')
   })
 
   it('exposes text-equivalent data tables where raw data adds value', async () => {
@@ -419,7 +417,10 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     const buttons = await screen.findAllByRole('button', { name: /view data for/i })
-    expect(buttons).toHaveLength(10)
+    expect(buttons).toHaveLength(7)
+    expect(screen.queryByRole('button', { name: /view data for status by type/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view data for top tags/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /view data for metadata completeness/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for priority by status/i })).not.toBeInTheDocument()
 
@@ -428,8 +429,10 @@ describe('AnalyticsPage', () => {
       expect(button).toHaveAttribute('aria-expanded', 'true')
     }
 
-    expect(screen.getByText('Status by type data table')).toBeInTheDocument()
     expect(screen.getByText('Cover availability data table')).toBeInTheDocument()
+    expect(screen.queryByText('Status by type data table')).not.toBeInTheDocument()
+    expect(screen.queryByText('Top tags data table')).not.toBeInTheDocument()
+    expect(screen.queryByText('Metadata completeness data table')).not.toBeInTheDocument()
   })
 
   it('toggles card data with keyboard and keeps screen-reader names specific', async () => {
@@ -682,6 +685,52 @@ describe('AnalyticsPage', () => {
     expect(screen.queryByText(/activity periods are informational/i)).not.toBeInTheDocument()
   })
 
+  it('keeps daily chart points while compacting newest-first trend summaries', async () => {
+    const activityPoints = [
+      { date: '2026-07-10', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
+      { date: '2026-07-11', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
+      { date: '2026-07-12', progressEvents: 2, booksTouched: 1, chaptersAdvanced: 7 },
+      { date: '2026-07-13', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
+    ]
+    const growthPoints = [
+      { date: '2026-07-10', booksAdded: 0, cumulativeBooks: 5, byType: [] },
+      { date: '2026-07-11', booksAdded: 0, cumulativeBooks: 5, byType: [] },
+      { date: '2026-07-12', booksAdded: 1, cumulativeBooks: 6, byType: [{ type: 'Novel', bookCount: 1 }] },
+      { date: '2026-07-13', booksAdded: 0, cumulativeBooks: 6, byType: [] },
+    ]
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      scope: {
+        from: '2026-07-10',
+        to: '2026-07-14',
+        bucket: 'day',
+      },
+      activity: { points: activityPoints },
+      libraryGrowth: { openingCount: 5, points: growthPoints },
+    }))
+
+    expect(readingActivityChartPoints(activityPoints, 'day')).toHaveLength(4)
+    expect(libraryGrowthChartPoints(growthPoints, 'day')).toHaveLength(4)
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-07-10&to=2026-07-14&bucket=day' })
+
+    expect(await screen.findByText(/Chapters advanced: 7/i)).toBeInTheDocument()
+
+    const readingActivitySection = screen.getByRole('heading', { name: 'Reading activity' }).closest('section')
+    const libraryGrowthSection = screen.getByRole('heading', { name: 'Library growth' }).closest('section')
+    expect(readingActivitySection).not.toBeNull()
+    expect(libraryGrowthSection).not.toBeNull()
+
+    const readingText = readingActivitySection!.textContent ?? ''
+    expect(readingText).toContain('Jul 13, 2026')
+    expect(readingText).toContain('July 10\u201311, 2026')
+    expect(readingText.indexOf('Jul 13, 2026')).toBeLessThan(readingText.indexOf('July 10\u201311, 2026'))
+
+    const growthText = libraryGrowthSection!.textContent ?? ''
+    expect(growthText).toContain('Jul 13, 2026')
+    expect(growthText).toContain('July 10\u201311, 2026')
+    expect(growthText.indexOf('Jul 13, 2026')).toBeLessThan(growthText.indexOf('July 10\u201311, 2026'))
+  })
+
   it('renders quality charts with zero, full, unknown, and long-label buckets', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
       totalBooks: 10,
@@ -738,6 +787,7 @@ describe('AnalyticsPage', () => {
 })
 
 type AnalyticsOverrides = Partial<BookAnalyticsDto['overview']> & {
+  scope?: Partial<BookAnalyticsDto['scope']>
   composition?: Partial<BookAnalyticsDto['composition']>
   planning?: Partial<BookAnalyticsDto['planning']>
   progress?: Partial<BookAnalyticsDto['progress']>
@@ -849,6 +899,7 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
       from: '2026-01-01',
       to: '2026-02-01',
       bucket: 'week',
+      ...overrides.scope,
     },
     overview,
     composition,

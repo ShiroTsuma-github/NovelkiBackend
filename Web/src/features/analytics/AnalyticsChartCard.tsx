@@ -89,26 +89,26 @@ export function AnalyticsChartCard({
       )}
 
       {dataTableEnabled && showData ? (
-        <div className="max-h-80 overflow-auto rounded-lg border border-slate-200" id={tableId}>
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
+        <div className="max-h-80 overflow-auto rounded-lg border border-slate-700 bg-slate-950" id={tableId}>
+          <table className="min-w-full divide-y divide-slate-800 text-sm">
             <caption className="sr-only">{title} data table</caption>
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <thead className="bg-slate-900 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">
               <tr>
                 {columns.map((column) => (
                   <th className="px-3 py-2" key={column} scope="col">{column}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
+            <tbody className="divide-y divide-slate-800 bg-slate-950 text-slate-200">
               {rows.length ? rows.map((row, rowIndex) => (
-                <tr key={rowIndex}>
+                <tr className="hover:bg-slate-900/70" key={rowIndex}>
                   {row.map((cell, cellIndex) => (
                     <td className="px-3 py-2" key={cellIndex}>{cell}</td>
                   ))}
                 </tr>
               )) : (
                 <tr>
-                  <td className="px-3 py-4 text-center text-slate-500" colSpan={columns.length}>No rows.</td>
+                  <td className="px-3 py-4 text-center text-slate-400" colSpan={columns.length}>No rows.</td>
                 </tr>
               )}
             </tbody>
