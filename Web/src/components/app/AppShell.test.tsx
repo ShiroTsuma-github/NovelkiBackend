@@ -22,7 +22,15 @@ describe('AppShell', () => {
     renderAt('/books')
 
     expect(screen.getByRole('link', { name: /books/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /analytics/i })).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('link', { name: /add/i })).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks analytics as active on the analytics route', () => {
+    renderAt('/analytics')
+
+    expect(screen.getByRole('link', { name: /analytics/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /books/i })).not.toHaveAttribute('aria-current')
   })
 })
 
@@ -32,6 +40,7 @@ function renderAt(route: string) {
       <Routes>
         <Route element={<AppShell />}>
           <Route element={<div>Page</div>} path="/books" />
+          <Route element={<div>Page</div>} path="/analytics" />
           <Route element={<div>Page</div>} path="/books/new" />
         </Route>
       </Routes>

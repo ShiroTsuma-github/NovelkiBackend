@@ -1,4 +1,4 @@
-import { BookOpen, LogOut, Plus, Search, Shield } from 'lucide-react'
+import { BarChart3, BookOpen, LogOut, Plus, Search, Shield } from 'lucide-react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { cn } from '@/lib/utils'
@@ -37,6 +37,10 @@ export function AppShell() {
             <NavLink className={navLinkClass} end to="/books">
               <Search className="h-4 w-4" />
               Books
+            </NavLink>
+            <NavLink className={navLinkClass} to="/analytics">
+              <BarChart3 className="h-4 w-4" />
+              Analytics
             </NavLink>
             <NavLink className={navLinkClass} to="/books/new">
               <Plus className="h-4 w-4" />

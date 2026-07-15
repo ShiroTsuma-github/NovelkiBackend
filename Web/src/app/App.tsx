@@ -7,6 +7,7 @@ import { AppShell } from '@/components/app/AppShell'
 import { AdminPage } from '@/features/admin/AdminPage'
 import { LoginPage } from '@/features/auth/LoginPage'
 import { RegisterPage } from '@/features/auth/RegisterPage'
+import { AnalyticsPage } from '@/features/analytics/AnalyticsPage'
 import { BookDetailsPage } from '@/features/books/BookDetailsPage'
 import { BookFormPage } from '@/features/books/BookFormPage'
 import { BooksPage } from '@/features/books/BooksPage'
@@ -30,6 +31,7 @@ export function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route element={<ProtectedLayout />}>
               <Route path="/books" element={<BooksPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/books/new" element={<BookFormPage mode="create" />} />
               <Route path="/books/:id" element={<BookDetailsPage />} />
               <Route path="/books/:id/edit" element={<BookFormPage mode="edit" />} />

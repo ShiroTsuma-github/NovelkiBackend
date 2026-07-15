@@ -125,6 +125,158 @@ export type BookSummaryRatingCountDto = {
   bookCount: number
 }
 
+export type BookAnalyticsDto = {
+  generatedAt: string
+  scope: BookAnalyticsScopeDto
+  overview: BookAnalyticsOverviewDto
+  composition: BookAnalyticsCompositionDto
+  ratings: BookAnalyticsRatingsDto
+  planning: BookAnalyticsPlanningDto
+  progress: BookAnalyticsProgressDto
+  activity: BookAnalyticsActivityDto
+  libraryGrowth: BookAnalyticsLibraryGrowthDto
+  quality: BookAnalyticsQualityDto
+}
+
+export type BookAnalyticsScopeDto = {
+  query?: string | null
+  from: string
+  to: string
+  bucket: string
+}
+
+export type BookAnalyticsOverviewDto = {
+  totalBooks: number
+  ratedBooks: number
+  unratedBooks: number
+  averageRating?: number | null
+  currentChapters: number
+  booksWithKnownCurrentChapter: number
+  booksWithoutKnownCurrentChapter: number
+}
+
+export type BookAnalyticsCompositionDto = {
+  statusByType: BookAnalyticsStatusByTypeDto[]
+  genres: BookAnalyticsRelationCountDto[]
+  tags: BookAnalyticsRelationCountDto[]
+}
+
+export type BookAnalyticsStatusByTypeDto = {
+  type: string
+  totalBooks: number
+  statuses: BookAnalyticsStatusCountDto[]
+}
+
+export type BookAnalyticsStatusCountDto = {
+  status: string
+  bookCount: number
+}
+
+export type BookAnalyticsRelationCountDto = {
+  name: string
+  bookCount: number
+  shareOfBooks: number
+}
+
+export type BookAnalyticsRatingsDto = {
+  ratedBooks: number
+  unratedBooks: number
+  averageRating?: number | null
+  counts: BookAnalyticsRatingCountDto[]
+}
+
+export type BookAnalyticsRatingCountDto = {
+  rating: number
+  bookCount: number
+}
+
+export type BookAnalyticsPlanningDto = {
+  prioritiesByStatus: BookAnalyticsPrioritiesByStatusDto[]
+}
+
+export type BookAnalyticsPrioritiesByStatusDto = {
+  status: string
+  totalBooks: number
+  priorities: BookAnalyticsPriorityCountDto[]
+}
+
+export type BookAnalyticsPriorityCountDto = {
+  priority: string
+  bookCount: number
+}
+
+export type BookAnalyticsProgressDto = {
+  typeVolumes: BookAnalyticsTypeVolumeDto[]
+}
+
+export type BookAnalyticsTypeVolumeDto = {
+  type: string
+  bookCount: number
+  currentChapters: number
+  averageCurrentChapter?: number | null
+  medianCurrentChapter?: number | null
+}
+
+export type BookAnalyticsActivityDto = {
+  points: BookAnalyticsActivityPointDto[]
+}
+
+export type BookAnalyticsActivityPointDto = {
+  date: string
+  progressEvents: number
+  booksTouched: number
+  chaptersAdvanced: number
+}
+
+export type BookAnalyticsLibraryGrowthDto = {
+  openingCount: number
+  points: BookAnalyticsLibraryGrowthPointDto[]
+}
+
+export type BookAnalyticsLibraryGrowthPointDto = {
+  date: string
+  booksAdded: number
+  cumulativeBooks: number
+  byType: BookAnalyticsTypeCountDto[]
+}
+
+export type BookAnalyticsTypeCountDto = {
+  type: string
+  bookCount: number
+}
+
+export type BookAnalyticsQualityDto = {
+  fieldCompleteness: BookAnalyticsFieldCompletenessDto[]
+  linkSources: BookAnalyticsLinkSourceDto[]
+  coverStatuses: BookAnalyticsCoverStatusDto[]
+  coverSources: BookAnalyticsCoverSourceDto[]
+}
+
+export type BookAnalyticsFieldCompletenessDto = {
+  field: string
+  bookCount: number
+  shareOfBooks: number
+}
+
+export type BookAnalyticsLinkSourceDto = {
+  source: string
+  linkCount: number
+  bookCount: number
+  shareOfBooks: number
+}
+
+export type BookAnalyticsCoverStatusDto = {
+  status: string
+  bookCount: number
+  shareOfBooks: number
+}
+
+export type BookAnalyticsCoverSourceDto = {
+  source: string
+  bookCount: number
+  shareOfBooks: number
+}
+
 export type AdminBookDto = BookDto & {
   ownerId: string
 }
