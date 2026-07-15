@@ -35,10 +35,13 @@ export function PriorityByStatusChart({ data }: PriorityByStatusChartProps) {
                 const share = percent(count, row.totalBooks)
                 return (
                   <td className={`rounded-lg px-3 py-3 text-center font-semibold ${getHeatClass(share)}`} key={`${row.status}-${priority}`}>
-                    <DrilldownLink query={`${fieldQuery('status', row.status)} ${priority.toLowerCase() === 'unset' ? noneQuery('priority') : `priority:${priority}`}`}>
+                    <DrilldownLink
+                      className="text-inherit decoration-current/70 hover:text-inherit hover:decoration-current"
+                      query={`${fieldQuery('status', row.status)} ${priority.toLowerCase() === 'unset' ? noneQuery('priority') : `priority:${priority}`}`}
+                    >
                       {formatCount(count)}
                     </DrilldownLink>
-                    <div className="mt-1 text-xs text-slate-500">{formatPercent(share)}</div>
+                    <div className="mt-1 text-xs font-semibold text-current/85">{formatPercent(share)}</div>
                   </td>
                 )
               })}
