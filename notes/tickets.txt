@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-063 - Dodaj agregacje aktywnosci czytelniczej
-
-- Typ: `Feature`
-- Priorytet: `P2`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/BookProgressHistory.cs`, `Infrastructure.IntegrationTests/*`
-- Zaleznosci: `NB-059`
-- Problem: API nie pokazuje regularnosci aktualizacji postepu ani liczby ksiazek czytanych w okresie.
-- Zakres: dodac `activity.points` dla bucketow day/week/month z progressEvents, booksTouched i dodatnim chaptersAdvanced; pierwszy wpis historii ksiazki traktowac jako baseline; porzadkowac wpisy po BookId, ChangedAt i Id.
-- Akceptacja: ujemna korekta nie zwieksza chaptersAdvanced; zmiana samego labela liczy event; pierwszy wpis/import nie tworzy aktywnosci; `from` jest wlaczne, `to` wylaczne; testy obejmuja pojedynczy wpis, identyczne ChangedAt, korekte w dol, brak liczby, granice tygodnia/miesiaca/roku, query i owner isolation.
-
 ### NB-064 - Dodaj agregacje wzrostu biblioteki
 
 - Typ: `Feature`
@@ -145,6 +135,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-063 - Dodaj agregacje aktywnosci czytelniczej
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/BookProgressHistory.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie pokazuje regularnosci aktualizacji postepu ani liczby ksiazek czytanych w okresie.
+- Zakres: dodac `activity.points` dla bucketow day/week/month z progressEvents, booksTouched i dodatnim chaptersAdvanced; pierwszy wpis historii ksiazki traktowac jako baseline; porzadkowac wpisy po BookId, ChangedAt i Id.
+- Akceptacja: ujemna korekta nie zwieksza chaptersAdvanced; zmiana samego labela liczy event; pierwszy wpis/import nie tworzy aktywnosci; `from` jest wlaczne, `to` wylaczne; testy obejmuja pojedynczy wpis, identyczne ChangedAt, korekte w dol, brak liczby, granice tygodnia/miesiaca/roku, query i owner isolation.
 
 ### NB-062 - Dodaj agregacje objetosci rozdzialow wedlug typu
 
