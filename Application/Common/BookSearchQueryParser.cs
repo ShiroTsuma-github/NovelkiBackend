@@ -89,9 +89,9 @@ public static class BookSearchQueryParser
                 continue;
             }
 
-            if (TryParseDateFilter(token, out var dateFilter))
+            if (TryParseDateFilter(token, out var dateFilters))
             {
-                dates.Add(dateFilter);
+                dates.AddRange(dateFilters);
                 continue;
             }
 
@@ -134,9 +134,9 @@ public static class BookSearchQueryParser
         return true;
     }
 
-    private static bool TryParseDateFilter(string token, out BookSearchDateFilter filter)
+    private static bool TryParseDateFilter(string token, out IReadOnlyCollection<BookSearchDateFilter> filters)
     {
-        filter = default!;
+        filters = default!;
         var separatorIndex = token.IndexOf(':');
         if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
         {
@@ -165,12 +165,12 @@ public static class BookSearchQueryParser
             break;
         }
 
-        if (!hasOperator || !TryParseDateOnly(Unquote(valueText), out var value))
+        if (!hasOperator || !TryParseDatePeriod(Unquote(valueText), out var period))
         {
             return false;
         }
 
-        filter = new BookSearchDateFilter(field, parsedOperator, value);
+        filters = ToDateFilters(field, parsedOperator, period);
         return true;
     }
 
@@ -375,6 +375,95 @@ public static class BookSearchQueryParser
             DateTimeStyles.None,
             out date);
     }
+
+    private static bool TryParseDatePeriod(string value, out DatePeriod period)
+    {
+        if (TryParseDateOnly(value, out var day))
+        {
+            period = new DatePeriod(day, day.AddDays(1));
+            return true;
+        }
+
+        if (TryParseMonthPeriod(value, out var monthPeriod))
+        {
+            period = monthPeriod;
+            return true;
+        }
+
+        if (value.Length == 4 &&
+            int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var year) &&
+            year is >= 1 and <= 9998)
+        {
+            var start = new DateOnly(year, 1, 1);
+            period = new DatePeriod(start, start.AddYears(1));
+            return true;
+        }
+
+        period = default;
+        return false;
+    }
+
+    private static bool TryParseMonthPeriod(string value, out DatePeriod period)
+    {
+        period = default;
+        var separator = value.Contains('-', StringComparison.Ordinal) ? '-' :
+            value.Contains('.', StringComparison.Ordinal) ? '.' :
+            value.Contains('/', StringComparison.Ordinal) ? '/' :
+            '\0';
+
+        if (separator == '\0')
+        {
+            return false;
+        }
+
+        var parts = value.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        var firstIsYear = parts[0].Length == 4;
+        var secondIsYear = parts[1].Length == 4;
+        if (firstIsYear == secondIsYear)
+        {
+            return false;
+        }
+
+        var yearText = firstIsYear ? parts[0] : parts[1];
+        var monthText = firstIsYear ? parts[1] : parts[0];
+        if (!int.TryParse(yearText, NumberStyles.None, CultureInfo.InvariantCulture, out var year) ||
+            !int.TryParse(monthText, NumberStyles.None, CultureInfo.InvariantCulture, out var month) ||
+            year is < 1 or > 9999 ||
+            month is < 1 or > 12)
+        {
+            return false;
+        }
+
+        var start = new DateOnly(year, month, 1);
+        period = new DatePeriod(start, start.AddMonths(1));
+        return true;
+    }
+
+    private static IReadOnlyCollection<BookSearchDateFilter> ToDateFilters(
+        BookSearchDateField field,
+        BookSearchOperator op,
+        DatePeriod period)
+    {
+        return op switch
+        {
+            BookSearchOperator.Equal => [
+                new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start),
+                new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)
+            ],
+            BookSearchOperator.GreaterThan => [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.EndExclusive)],
+            BookSearchOperator.GreaterThanOrEqual => [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start)],
+            BookSearchOperator.LessThan => [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.Start)],
+            BookSearchOperator.LessThanOrEqual => [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)],
+            _ => [new BookSearchDateFilter(field, op, period.Start)]
+        };
+    }
+
+    private readonly record struct DatePeriod(DateOnly Start, DateOnly EndExclusive);
 
     private static string NormalizeAliases(string query)
     {

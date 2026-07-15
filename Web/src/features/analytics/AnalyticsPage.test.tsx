@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import type { BookAnalyticsDto } from '@/api/types'
+import { expectReadableTextContrast } from '@/test/contrast'
 import { renderWithProviders } from '@/test/render'
 import { AnalyticsPage } from './AnalyticsPage'
 
@@ -34,6 +35,24 @@ describe('AnalyticsPage', () => {
     expect(screen.getByDisplayValue('author:Toika rating:>=8')).toBeInTheDocument()
     expect(screen.getByDisplayValue('2026-01-01')).toBeInTheDocument()
     expect(screen.getByDisplayValue('2026-02-01')).toBeInTheDocument()
+  })
+
+  it('extracts date filters from query into analytics range request', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+
+    renderWithProviders(<AnalyticsPage />, {
+      route: '/analytics?query=author%3AToika%20updated%3A%3D2026-07',
+    })
+
+    expect(await screen.findByText('Status by type')).toBeInTheDocument()
+    expect(api.getBookAnalytics).toHaveBeenCalledWith(expect.objectContaining({
+      query: 'author:Toika',
+      from: '2026-07-01',
+      to: '2026-08-01',
+    }))
+    expect(screen.getByDisplayValue('author:Toika')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('2026-07-01')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('2026-08-01')).toBeInTheDocument()
   })
 
   it('updates URL-backed filters and creates a new request', async () => {
@@ -102,6 +121,14 @@ describe('AnalyticsPage', () => {
 
     expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument()
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
+  })
+
+  it('keeps analytics type labels readable against their calculated background', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expectReadableTextContrast(await screen.findByText('Novel'))
   })
 })
 
