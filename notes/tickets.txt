@@ -9,23 +9,178 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 ISSUES:
 problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na actions guziki prawie) -- ticket do przemyslenia
 
-### NB-041 - Dodaj dashboard summary biblioteki
-- NOTE: NEEDS REFINEMENT
-- Typ: `Feature gap`
+## Library Analytics
+
+Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
+
+### NB-058 - Rozszerz parser wyszukiwania o filtry brakujacych danych
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Application/Common/BookSearchQueryParser.cs`, `Domain/Repositories/BookSearchCriteria.cs`, `Infrastructure/Persistence/BookSearchCriteriaApplier.cs`, `Application.UnitTests/BookSearchQueryParserTests.cs`, `Infrastructure.IntegrationTests/*`
+- Problem: wykresy kompletnosci i kategorie Unrated/Unset nie moga otworzyc odpowiadajacej listy ksiazek, bo parser nie umie filtrowac wartosci pustych i brakujacych relacji.
+- Zakres: dodac skladnie `rating:none`, `priority:none`, `author:none`, `genre:none`, `tag:none`, `total:none`, `cover:none` i `link:none`; zachowac dotychczasowe filtry tekstowe i porownania liczbowe; zdefiniowac `none` jako null, pusty tekst albo brak relacji zgodnie z typem pola.
+- Akceptacja: kazdy filtr `none` zwraca tylko ksiazki z brakujaca wartoscia/relacja aktualnego uzytkownika; `genre:none` i `tag:none` nie myla pustej relacji z niepasujaca nazwa; nieznane pole lub niepoprawne uzycie `none` daje dotychczasowy kontrolowany blad parsera; testy obejmuja laczenie `none` z innymi filtrami, cudzyslowy, wielkosc liter, pusta biblioteke i owner isolation.
+
+### NB-059 - Dodaj kontrakt i fundament endpointu Analytics
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Application/Common/Interfaces/IBookAnalyticsQueryService.cs`, `Application/Features/BookFeatures/Queries/GetBookAnalytics.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Api/Controllers/BookController.cs`
+- Zaleznosci: `NB-058`
+- Problem: obecny endpoint summary nie zapewnia kontraktu, zakresu czasu ani sekcji potrzebnych osobnej stronie Analytics.
+- Zakres: dodac owner-scoped `GET /api/v1/book/analytics` z parametrami `query`, `from`, `to` i `bucket`; zdefiniowac `generatedAt`, `scope`, `overview` i puste sekcje rozszerzane przez kolejne tickety; wykorzystac `BookSearchCriteriaApplier`; walidowac czas i bucket; agregacje wykonywac w bazie z `AsNoTracking`.
+- Akceptacja: endpoint zwraca tylko dane aktualnego uzytkownika; `query` filtruje overview; `from >= to`, nieznany bucket i zakres ponad 10 lat zwracaja 400; pusta biblioteka zwraca zera i puste tablice; kolekcje nie sa nullem; testy obejmuja owner isolation, brak danych, filtrowanie, domyslny zakres 12 tygodni, granice czasu i anulowanie requestu.
+
+### NB-060 - Dodaj agregacje skladu biblioteki
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie zwraca danych do porownania statusow w typach ani rankingow gatunkow i tagow.
+- Zakres: dodac `composition.statusByType`, `composition.genres` i `composition.tags`; liczyc relacje wielowartosciowe raz na ksiazke; zwracac bookCount i shareOfBooks; rankingi sortowac malejaco, stabilnie po nazwie; przygotowac dane do Top N i Other.
+- Akceptacja: status-by-type zawiera total typu i wszystkie wystepujace statusy; gatunek/tag nie liczy tej samej ksiazki dwa razy; mianownikiem udzialu jest liczba filtrowanych ksiazek; tagi sa ograniczone do wlasciciela; puste relacje zwracaja puste tablice; testy obejmuja wiele gatunkow/tagow, duplikaty relacji, remisy, filtry i owner isolation.
+
+### NB-061 - Dodaj agregacje ocen i priorytetow
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie rozdziela pokrycia ocenami od rozkladu 1-10 ani priorytetow wedlug statusu.
+- Zakres: dodac sekcje `ratings` z ratedBooks, unratedBooks, averageRating i counts 1-10 oraz `planning.prioritiesByStatus` dla 1-5 i Unset; zachowac kategorie z liczba zero.
+- Akceptacja: srednia liczy tylko ocenione ksiazki; counts zawiera wszystkie wartosci 1-10; suma rated/unrated zgadza sie z total; priorytet null jest osobna kategoria; testy obejmuja brak ocen, jedna ocene, wszystkie oceny, brak priorytetu, status z jedna ksiazka, query i owner isolation.
+
+### NB-062 - Dodaj agregacje objetosci rozdzialow wedlug typu
+
+- Typ: `Feature`
 - Priorytet: `P3`
-- Komponent: `Web/src/features/books/BooksPage.tsx`, API agregatow jesli potrzebne
-- Problem: lista ksiazek nie pokazuje agregatow typu liczba per type/status, przeczytane i laczny czas czytania.
-- Zakres: dodac sekcje summary z licznikami per type, per status, liczba completed/read i przyblizonym lacznym czasem czytania.
-- Akceptacja: summary laduje sie razem z lista albo przez osobny endpoint; wartosci sa zgodne z aktualna biblioteka uzytkownika; brak danych pokazuje pusty stan; sekcja nie zaslania glownej pracy z lista.
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: frontend nie ma danych do porownania liczby ksiazek, sumy i typowej objetosci rozdzialow per type.
+- Zakres: dodac `progress.typeVolumes` z bookCount, currentChapters, averageCurrentChapter i medianCurrentChapter; mediane policzyc po stronie bazy lub przez udokumentowana, przenosna projekcje.
+- Akceptacja: null current nie zwieksza sumy i nie wchodzi do sredniej/mediany; wartosci dziesietne sa zachowane; typ bez znanych rozdzialow ma zero sumy i null statystyk; testy obejmuja parzysta/nieparzysta liczbe rekordow, remisy, null, wartosci dziesietne, query i owner isolation.
+
+### NB-063 - Dodaj agregacje aktywnosci czytelniczej
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/BookProgressHistory.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie pokazuje regularnosci aktualizacji postepu ani liczby ksiazek czytanych w okresie.
+- Zakres: dodac `activity.points` dla bucketow day/week/month z progressEvents, booksTouched i dodatnim chaptersAdvanced; pierwszy wpis historii ksiazki traktowac jako baseline; porzadkowac wpisy po BookId, ChangedAt i Id.
+- Akceptacja: ujemna korekta nie zwieksza chaptersAdvanced; zmiana samego labela liczy event; pierwszy wpis/import nie tworzy aktywnosci; `from` jest wlaczne, `to` wylaczne; testy obejmuja pojedynczy wpis, identyczne ChangedAt, korekte w dol, brak liczby, granice tygodnia/miesiaca/roku, query i owner isolation.
+
+### NB-064 - Dodaj agregacje wzrostu biblioteki
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/Book.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie pokazuje, jak rosla kolekcja ani ktore typy odpowiadaly za nowe rekordy.
+- Zakres: dodac `libraryGrowth.openingCount` i punkty day/week/month z booksAdded, cumulativeBooks oraz byType na podstawie `Book.Created`; zachowac widoczny skok masowego importu.
+- Akceptacja: openingCount obejmuje rekordy sprzed from; wartosci skumulowane koncza sie aktualnym total dla filtra; byType sumuje sie do punktu; puste buckety zachowuja wartosc skumulowana; testy obejmuja import jednego dnia, brak nowych ksiazek, granice roku, query, from/to i owner isolation.
+
+### NB-065 - Dodaj agregacje jakosci biblioteki, linkow i okladek
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/BookLink.cs`, `Domain/Entities/BookCover.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie pokazuje brakow metadanych, zrodel linkow ani stanu pipeline okladek.
+- Zakres: dodac `quality.fieldCompleteness`, `linkSources`, `coverStatuses` i `coverSources`; kompletnosc liczyc per ksiazka dla autora, opisu, gatunku, tagu, oceny, priorytetu, total chapters, linku, alternatywnego tytulu i uzytecznej okladki; uzyteczna okladka wymaga Found/Uploaded i obrazu lub miniatury.
+- Akceptacja: wszystkie wskazniki maja wspolny mianownik filtrowanych ksiazek; wiele linkow nie zawyza coverage; ranking source liczy linki i rozne ksiazki; cover bez pliku nie jest uzyteczny; testy obejmuja puste teksty, wiele relacji, statusy okladki, brak storage path, filtry i owner isolation.
+
+### NB-066 - Zweryfikuj wydajnosc Analytics i dodaj uzasadnione indeksy
+
+- Typ: `Performance`
+- Priorytet: `P2`
+- Komponent: `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure/Contexts/ApplicationDbContext.cs`, `Infrastructure/Migrations/*`, testy planow PostgreSQL
+- Zaleznosci: `NB-060`, `NB-061`, `NB-062`, `NB-063`, `NB-064`, `NB-065`
+- Problem: agregacje i historia postepu moga powodowac kosztowne skany przy duzej bibliotece.
+- Zakres: przygotowac seed min. 10 000 ksiazek i 250 000 wpisow historii; zmierzyc `EXPLAIN ANALYZE`; dodac tylko indeksy potwierdzone planem, w tym zweryfikowac `Books(OwnerId, Created)` i indeks historii rozszerzony o Id; sprawdzic liczbe zapytan i rozmiar JSON; nie pobierac pelnych encji do pamieci.
+- Akceptacja: domyslny request miesci sie w 500 ms i 100 KB na uzgodnionym PostgreSQL albo raport opisuje zmierzony wyjatek; plan nie ma nieuzasadnionych skanow sekwencyjnych; migracja ma rollback; test/raport obejmuje duza liczbe kategorii, dlugi zakres i owner isolation.
+
+### NB-067 - Dodaj trase, filtry URL i wspolna karte Analytics
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Web/src/app/App.tsx`, `Web/src/components/app/AppShell.tsx`, `Web/src/features/analytics/*`, `Web/src/api/client.ts`, `Web/src/api/types.ts`
+- Zaleznosci: `NB-059`
+- Problem: wykresy nie mieszcza sie w Summary bez przeciazenia listy i nie maja wspolnego kontenera ani stanu URL.
+- Zakres: dodac chroniona trase `/analytics`, pozycje nawigacji, filtry query/from/to/bucket w URL, KPI z overview i `AnalyticsChartCard` ze stanami loading/empty/error oraz `View data`; zachowac poprzednie dane podczas refetch.
+- Akceptacja: auth chroni trase; refresh/back/forward odtwarza filtry; zmiana filtrow tworzy poprawny request; skeleton nie zmienia ukladu; empty library i no matches maja rozne komunikaty; testy obejmuja routing, URL, retry, preserved data, mobile i brak poziomego scrolla.
+
+### NB-041 - Dopracuj Library summary jako skrot do Analytics
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/books/BooksPage.tsx`, `Web/src/features/analytics/*`, `Web/src/api/client.ts`
+- Zaleznosci: `NB-067`
+- Problem: obecny Summary zawiera pelne zakladki wykresow, ktore beda dublowac osobna strone i powiekszac glowny ekran listy.
+- Zakres: pozostawic w Summary najwazniejsze KPI i zwiezle rozklady status/type; dodac akcje `Open analytics`, ktora przenosi aktualny `query` do `/analytics`; zachowac obecne ustawienia minut na rozdzial pod wspolnym kluczem localStorage; usunac tylko te wizualizacje, ktore maja pelny odpowiednik na stronie Analytics.
+- Akceptacja: Summary pozostaje nad wyszukiwarka i nie zaslania listy; KPI zgadzaja sie z aktualnym filtrem; `Open analytics` przenosi query bez utraty znakow specjalnych; ustawienia czasu sa wspolne z Analytics; brak danych ma czytelny stan; testy obejmuja przeniesienie pustego i zlozonego query, localStorage, loading/error oraz brak regresji listy ksiazek.
+
+### NB-068 - Dodaj frontendowe wykresy skladu kolekcji
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/StatusByTypeChart.tsx`, `TopGenresChart.tsx`, `TopTagsChart.tsx`, wspolne legendy/formattery
+- Zaleznosci: `NB-060`, `NB-067`
+- Problem: strona Analytics nie wizualizuje skladu wedlug status/type, gatunkow i tagow.
+- Zakres: wdrozyc trzy karty zgodnie z mockupami 01-03; status jako 100% stacked bars, gatunki i tagi jako Top N + Other.
+- Akceptacja: male segmenty sa dostepne w tooltipie/tabeli; udzialy multi-value maja jasne wyjasnienie; tag color nie lamie kontrastu; klikniecie buduje query; testy obejmuja empty, jedna kategorie, Other, dlugie nazwy, remisy i responsywnosc.
+
+### NB-069 - Dodaj frontendowe wykresy ocen i priorytetow
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/RatingDistributionChart.tsx`, `PriorityByStatusChart.tsx`
+- Zaleznosci: `NB-061`, `NB-067`
+- Problem: frontend miesza Unrated z rozkladem ocen i nie pokazuje priorytetow w kontekscie statusu.
+- Zakres: wdrozyc mockupy 05-06: slupki 1-10 plus coverage ring oraz heatmape status x priority z Unset; dodac formatowanie sredniej, liczby i procentu w tooltipach.
+- Akceptacja: Unrated nie splaszcza slupkow; kategorie zero zachowuja os; heatmapa ma liczby w komorkach i skale per status; klikniecie Unrated/Unset uzywa `none`; testy obejmuja brak ocen, jedna ocene, wszystkie zera, pojedynczy status, duze liczby i mobile.
+
+### NB-070 - Dodaj chapter volume i estimated reading time
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/ChapterVolumeChart.tsx`, `EstimatedReadingTimeChart.tsx`, wspolny helper ustawien czasu z `BooksPage.tsx`
+- Zaleznosci: `NB-062`, `NB-067`
+- Problem: frontend nie porownuje liczby tytulow z objetoscia rozdzialow ani nie przelicza jej na ustawienia tempa uzytkownika.
+- Zakres: wdrozyc mockupy 08-09; chapter volume pokazac jako dwa wykresy z osobnymi skalami; estimated time liczyc na kliencie z currentChapters i minut per type; wspoldzielic klucz localStorage z Summary.
+- Akceptacja: count i volume nie uzywaja dual axis; null statystyk ma czytelny opis; zmiana minut nie wysyla requestu; uszkodzony localStorage wraca do bezpiecznych wartosci; testy obejmuja typ bez rozdzialow, wartosci dziesietne, zero minut, nowy typ, format duzych godzin i mobile.
 
 ### NB-042 - Dodaj wykresy trendow biblioteki
 
 - Typ: `Feature gap`
-- Priorytet: `P4`
-- Komponent: dashboard/lista ksiazek, API agregatow czasowych
-- Problem: brakuje rozkladow month/per-month i trendow increase over time wspomnianych w backlogu.
-- Zakres: po summary counters dodac wykresy miesieczne i wzrost biblioteki/progresu w czasie.
-- Akceptacja: wykres pokazuje dane per month; brak danych ma czytelny pusty stan; obliczenia sa po stronie API albo jednoznacznie po stronie klienta; zadanie moze bazowac na NB-041.
+- Priorytet: `P2`
+- Komponent: `Web/src/features/analytics/charts/ReadingActivityChart.tsx`, `LibraryGrowthChart.tsx`, filtry zakresu czasu
+- Zaleznosci: `NB-063`, `NB-064`, `NB-067`
+- Problem: strona nie pokazuje wiarygodnego obrazu wzrostu kolekcji i aktywnosci w czasie.
+- Zakres: wdrozyc mockupy 10-11; reading activity pokazuje progressEvents i booksTouched, a chaptersAdvanced w tooltipie/tabeli; library growth pokazuje cumulative total i serie typow; filtry czasu dobieraja day/week/month zgodnie z planem.
+- Akceptacja: zmiana zakresu aktualizuje URL i obie karty; puste buckety nie przerywaja linii; import ma widoczny skok; tooltip rozroznia eventy, ksiazki i rozdzialy; testy obejmuja pusta historie, jeden punkt, zmiane bucketa, duzy zakres, loading/refetch i mobile.
+
+### NB-071 - Dodaj frontendowe wykresy jakosci biblioteki
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/MetadataCompletenessChart.tsx`, `LinkSourcesChart.tsx`, `CoverAvailabilityChart.tsx`
+- Zaleznosci: `NB-065`, `NB-067`
+- Problem: frontend nie pokazuje kolejek brakujacych metadanych, linkow ani problemow z okladkami.
+- Zakres: wdrozyc mockupy 12-14; completeness jako procenty per field, link sources jako ranking plus coverage, covers jako statusy plus top providers; copy ma opisywac narzedzie porzadkowania, nie ocene uzytkownika.
+- Akceptacja: brak relacji pokazuje 0%, nie blad; linkCount i bookCount sa rozroznione; Found/Uploaded bez pliku nie udaje usable cover; Failed/NotFound/Pending maja osobne akcje; testy obejmuja zera, 100%, wiele linkow, nieznane source/status, dlugie etykiety i mobile.
+
+### NB-072 - Utwardz responsywnosc, dostepnosc i drill-down Analytics
+
+- Typ: `Accessibility / UX`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/analytics/AnalyticsChartCard.tsx`, `Web/src/features/analytics/charts/*`, `Web/src/features/books/BookListShared.tsx`, routing Analytics/Books
+- Zaleznosci: `NB-041`, `NB-068`, `NB-069`, `NB-070`, `NB-042`, `NB-071`
+- Problem: tooltip i kolor nie wystarczaja uzytkownikom klawiatury/czytnika ekranu, a wykres bez przejscia do rekordow nie pomaga uporzadkowac biblioteki.
+- Zakres: dodac do wszystkich 12 kart `View data` z tabela HTML, aria, focus i obsluge klawiatury; zdefiniowac mapowanie kategorii na query `/books`; sprawdzic layout i formaty na desktop/mobile oraz zoom 200%; znaczenie serii nie moze zalezec tylko od koloru.
+- Akceptacja: wszystkie 12 aktywnych wykresow maja tekstowy odpowiednik; drill-down zachowuje znaki specjalne i filtry; elementy maja widoczny focus i min. 44px target na mobile; Playwright sprawdza 1440x900, 1024x768, 390x844 i zoom 200%; testy obejmuja klawiature, czytnikowe nazwy, dlugie etykiety, 0/1/9999/1000000 oraz brak poziomego scrolla.
 
 ## Navigation And Global UI
 
