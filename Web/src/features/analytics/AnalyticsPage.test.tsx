@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
@@ -127,18 +127,38 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('1,234,567.5')).toBeInTheDocument()
   })
 
-  it('keeps high-priority analytics cards above bookkeeping cards', async () => {
+  it('places priority analytics in the right column and cover/link cleanup under priority', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
-    const rating = await screen.findByText('Rating distribution')
-    const chapterVolume = screen.getByText('Chapter volume by type')
-    const libraryGrowth = screen.getByText('Library growth')
-    const metadata = screen.getByText('Metadata completeness')
+    await screen.findByText('Rating distribution')
 
-    expect(rating.compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(chapterVolume.compareDocumentPosition(libraryGrowth) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const leftColumn = screen.getByTestId('analytics-left-column')
+    const rightColumn = screen.getByTestId('analytics-right-column')
+    const left = within(leftColumn)
+    const right = within(rightColumn)
+
+    const priority = left.getByText('Priority by status')
+    const linkSources = left.getByText('Link sources')
+    const coverAvailability = left.getByText('Cover availability')
+
+    expect(left.queryByText('Rating distribution')).not.toBeInTheDocument()
+    expect(left.queryByText('Chapter volume by type')).not.toBeInTheDocument()
+    expect(left.queryByText('Estimated reading time')).not.toBeInTheDocument()
+    expect(priority.compareDocumentPosition(linkSources) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(linkSources.compareDocumentPosition(coverAvailability) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    const rating = right.getByText('Rating distribution')
+    const chapterVolume = right.getByText('Chapter volume by type')
+    const readingTime = right.getByText('Estimated reading time')
+    const readingActivity = right.getByText('Reading activity')
+
+    expect(right.queryByText('Link sources')).not.toBeInTheDocument()
+    expect(right.queryByText('Cover availability')).not.toBeInTheDocument()
+    expect(rating.compareDocumentPosition(chapterVolume) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(chapterVolume.compareDocumentPosition(readingTime) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(readingTime.compareDocumentPosition(readingActivity) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows card data tables without forcing horizontal page overflow', async () => {

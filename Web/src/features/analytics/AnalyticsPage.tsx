@@ -130,7 +130,7 @@ export function AnalyticsPage() {
       </div>
 
       <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
-        <div className="grid min-w-0 gap-5">
+        <div className="grid min-w-0 gap-5" data-testid="analytics-left-column">
         <AnalyticsChartCard
           columns={['Type', 'Status', 'Books', 'Share of type']}
           description="100% stacked bars showing how statuses split inside each content type."
@@ -171,6 +171,48 @@ export function AnalyticsPage() {
           <TopRelationsChart field="tag" items={data?.composition.tags ?? []} title="Tags" />
         </AnalyticsChartCard>
         <AnalyticsChartCard
+          columns={['Status', 'Priority', 'Books', 'Share of status']}
+          dataTableEnabled={false}
+          description="Priority heatmap per status, including the Unset bucket."
+          emptyMessage="No priority data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.planning.prioritiesByStatus.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={priorityRows(data)}
+          title="Priority by status"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <PriorityByStatusChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Source', 'Links', 'Books', 'Coverage']}
+          description="Ranks link sources by total links and book coverage."
+          emptyMessage="0 link sources found for this scope."
+          isEmpty={!isInitialLoading && !(data?.quality.linkSources.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={linkSourceRows(data)}
+          title="Link sources"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <LinkSourcesChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Kind', 'Bucket', 'Books', 'Coverage']}
+          description="Separates cover statuses from provider coverage."
+          emptyMessage="0 cover records reported for this scope."
+          isEmpty={!isInitialLoading && !(data?.quality.coverStatuses.length || data?.quality.coverSources.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={coverAvailabilityRows(data)}
+          title="Cover availability"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <CoverAvailabilityChart data={data} />
+        </AnalyticsChartCard>
+        </div>
+        <div className="grid min-w-0 gap-5" data-testid="analytics-right-column">
+        <AnalyticsChartCard
           columns={['Rating', 'Books']}
           dataTableEnabled={false}
           description="Rated books are shown on a 1-10 axis; unrated books stay separate."
@@ -198,20 +240,6 @@ export function AnalyticsPage() {
           <ChapterVolumeChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
-          columns={['Status', 'Priority', 'Books', 'Share of status']}
-          dataTableEnabled={false}
-          description="Priority heatmap per status, including the Unset bucket."
-          emptyMessage="No priority data for this analytics scope."
-          isEmpty={!isInitialLoading && !(data?.planning.prioritiesByStatus.length)}
-          isError={analyticsQuery.isError && !!data}
-          isLoading={isInitialLoading}
-          rows={priorityRows(data)}
-          title="Priority by status"
-          onRetry={() => analyticsQuery.refetch()}
-        >
-          <PriorityByStatusChart data={data} />
-        </AnalyticsChartCard>
-        <AnalyticsChartCard
           columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
           description="Client-side estimate based on your minutes-per-chapter settings."
           emptyMessage="No chapter data to estimate reading time."
@@ -224,8 +252,6 @@ export function AnalyticsPage() {
         >
           <EstimatedReadingTimeChart data={data} />
         </AnalyticsChartCard>
-        </div>
-        <div className="grid min-w-0 gap-5">
         <AnalyticsChartCard
           columns={['Date', 'Progress events', 'Books touched', 'Chapters advanced']}
           description="Progress history grouped by the selected time bucket."
@@ -264,32 +290,6 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <MetadataCompletenessChart data={data} />
-        </AnalyticsChartCard>
-        <AnalyticsChartCard
-          columns={['Source', 'Links', 'Books', 'Coverage']}
-          description="Ranks link sources by total links and book coverage."
-          emptyMessage="0 link sources found for this scope."
-          isEmpty={!isInitialLoading && !(data?.quality.linkSources.length)}
-          isError={analyticsQuery.isError && !!data}
-          isLoading={isInitialLoading}
-          rows={linkSourceRows(data)}
-          title="Link sources"
-          onRetry={() => analyticsQuery.refetch()}
-        >
-          <LinkSourcesChart data={data} />
-        </AnalyticsChartCard>
-        <AnalyticsChartCard
-          columns={['Kind', 'Bucket', 'Books', 'Coverage']}
-          description="Separates cover statuses from provider coverage."
-          emptyMessage="0 cover records reported for this scope."
-          isEmpty={!isInitialLoading && !(data?.quality.coverStatuses.length || data?.quality.coverSources.length)}
-          isError={analyticsQuery.isError && !!data}
-          isLoading={isInitialLoading}
-          rows={coverAvailabilityRows(data)}
-          title="Cover availability"
-          onRetry={() => analyticsQuery.refetch()}
-        >
-          <CoverAvailabilityChart data={data} />
         </AnalyticsChartCard>
         </div>
       </div>
