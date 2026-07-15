@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowDown, ArrowUp, ChevronDown, ChevronsUpDown, Download, Edit, Eye, LayoutGrid, List, Plus, RefreshCw, Search, Settings2, Upload } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Upload } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Bar, BarChart, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -11,8 +11,18 @@ import {
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
+import { BookDataTable } from './BookDataTable'
 import { BookCoverArtwork } from './BookCoverSection'
 import { formatProgress } from './bookProgress'
+import {
+  ColumnSettingsPopup,
+  getVisibleColumns,
+  totalChaptersColumnLabel,
+  useColumnPreferences,
+  useViewMode,
+  type BookViewMode,
+  type ColumnDefinition,
+} from './bookListColumns'
 import {
   BookListFooter,
   getNextSortDirection,
@@ -24,6 +34,19 @@ import {
 import { ImportBooksDialog } from './ImportBooksDialog'
 
 export { formatProgress } from './bookProgress'
+export {
+  ColumnHeader,
+  ColumnSettingsPopup,
+  defaultColumnPreferences,
+  getColumnPopupPosition,
+  getVisibleColumns,
+  totalChaptersColumnLabel,
+  useColumnPreferences,
+  useViewMode,
+  type BookViewMode,
+  type ColumnDefinition,
+  type ColumnPreference,
+} from './bookListColumns'
 
 const cardsPerRowOptions = [2, 3, 4, 5, 6, 7, 8] as const
 const bookColumnsStorageKey = 'novelki.books.columns.v1'
@@ -31,31 +54,9 @@ const bookCardFieldsStorageKey = 'novelki.books.card-fields.v1'
 const bookLayoutStorageKey = 'novelki.books.layout.v1'
 const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
 const summaryReadingTimeStorageKey = 'novelki.books.summary.time-per-chapter.v1'
-const columnPopupWidthPx = 320
-const columnPopupEdgeGapPx = 16
-const columnPopupVerticalGapPx = 10
 const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
 const summaryChartColors = ['#0f766e', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#65a30d']
 type SummaryTabId = 'status' | 'types' | 'ratings' | 'genres' | 'time'
-export type BookViewMode = 'table' | 'cards'
-export type ColumnPreference = { id: string; visible: boolean }
-export type ColumnDefinition<T> = {
-  id: string
-  label: ReactNode
-  defaultVisible: boolean
-  sortBy?: string
-  widthClass?: string
-  render: (item: T) => ReactNode
-}
-
-export function totalChaptersColumnLabel() {
-  return (
-    <>
-      <span className="sm:hidden">Total</span>
-      <span className="hidden sm:inline">Total chapters</span>
-    </>
-  )
-}
 
 const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
@@ -277,35 +278,23 @@ export function BooksPage() {
           />
         </div>
         {viewMode === 'table' ? (
-          <div className="w-full overflow-x-auto">
-            <table className="w-full table-fixed border-collapse text-left text-sm">
-              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  {visibleColumns.map((column) => (
-                    <ColumnHeader
-                      activeDirection={column.sortBy === sortBy ? sortDirection : null}
-                      column={column}
-                      isCyclic={column.sortBy === 'status' || column.sortBy === 'type'}
-                      key={column.id}
-                      onSort={setSort}
-                    />
-                  ))}
-                  <th className="w-24 px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {booksQuery.isLoading ? (
-                  <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>Loading...</td></tr>
-                ) : null}
-                {booksQuery.data?.data.map((book) => (
-                  <BookRow book={book} columns={visibleColumns} key={book.id} />
-                ))}
-                {booksQuery.data?.data.length === 0 ? (
-                  <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>No books match the current filters.</td></tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          <BookDataTable
+            columns={visibleColumns}
+            emptyMessage="No books match the current filters."
+            isCyclicSort={isCyclicSort}
+            isLoading={booksQuery.isLoading}
+            items={booksQuery.data?.data ?? []}
+            renderActions={(book) => (
+              <div className="flex justify-end gap-2">
+                <Link className={secondaryButtonClass} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
+                <Link className={secondaryButtonClass} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
+              </div>
+            )}
+            sortBy={sortBy}
+            sortDirection={sortDirection}
+            wrapperClassName="w-full overflow-x-auto"
+            onSort={setSort}
+          />
         ) : (
           <BookCardGrid
             books={booksQuery.data?.data ?? []}
@@ -808,192 +797,6 @@ function SummaryTimeDetails({
   )
 }
 
-export function ColumnSettingsPopup<T>({
-  allowReorder = true,
-  columns,
-  description,
-  preferences,
-  title,
-  onChange,
-}: {
-  allowReorder?: boolean
-  columns: ColumnDefinition<T>[]
-  description?: string
-  preferences: ColumnPreference[]
-  title?: string
-  onChange: (preferences: ColumnPreference[]) => void
-}) {
-  const [open, setOpen] = useState(false)
-  const [position, setPosition] = useState({ left: 'auto', top: 'auto' })
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) {
-        setOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDown)
-    return () => document.removeEventListener('pointerdown', handlePointerDown)
-  }, [open])
-
-  useEffect(() => {
-    if (!open) {
-      return
-    }
-
-    function updatePosition() {
-      const rect = buttonRef.current?.getBoundingClientRect()
-      if (!rect) {
-        return
-      }
-
-      setPosition(getColumnPopupPosition(rect, window.innerWidth, window.innerHeight))
-    }
-
-    updatePosition()
-    window.addEventListener('resize', updatePosition)
-    window.addEventListener('scroll', updatePosition, true)
-    return () => {
-      window.removeEventListener('resize', updatePosition)
-      window.removeEventListener('scroll', updatePosition, true)
-    }
-  }, [open])
-
-  function toggleColumn(id: string) {
-    onChange(preferences.map((preference) => (
-      preference.id === id ? { ...preference, visible: !preference.visible } : preference
-    )))
-  }
-
-  function moveColumn(id: string, direction: -1 | 1) {
-    const index = preferences.findIndex((preference) => preference.id === id)
-    const nextIndex = index + direction
-    if (index < 0 || nextIndex < 0 || nextIndex >= preferences.length) {
-      return
-    }
-
-    const next = [...preferences]
-    const [item] = next.splice(index, 1)
-    next.splice(nextIndex, 0, item)
-    onChange(next)
-  }
-
-  function resetColumns() {
-    onChange(defaultColumnPreferences(columns))
-  }
-
-  return (
-    <div className="inline-block text-left" ref={containerRef}>
-      <button
-        ref={buttonRef}
-        className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
-        type="button"
-        onClick={() => setOpen(!open)}
-      >
-        <Settings2 className="h-4 w-4" />
-        Columns
-      </button>
-      {open ? (
-        <div
-          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-left normal-case tracking-normal shadow-xl"
-          style={position}
-        >
-          <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
-            <div>
-              <div className="text-sm font-semibold text-slate-950">{title}</div>
-              <div className="text-xs font-normal text-slate-500">{description}</div>
-            </div>
-            <button className="text-xs font-semibold text-slate-500 hover:text-slate-950" type="button" onClick={resetColumns}>Reset</button>
-          </div>
-          {preferences.map((preference, index) => {
-            const column = columns.find((item) => item.id === preference.id)
-            if (!column) {
-              return null
-            }
-
-            return (
-              <div className={`flex items-center justify-between gap-3 rounded-md border bg-white px-3.5 py-2.5 text-sm text-slate-700 ${preference.visible ? 'border-emerald-400' : 'border-slate-200'}`} key={preference.id}>
-                <button
-                  aria-pressed={preference.visible}
-                  className="inline-flex min-w-0 flex-1 items-center gap-2 text-left font-medium text-inherit"
-                  type="button"
-                  onClick={() => toggleColumn(preference.id)}
-                >
-                  <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border transition ${preference.visible ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300 bg-slate-200'}`}>
-                    <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition ${preference.visible ? 'left-4' : 'left-0.5'}`} />
-                  </span>
-                  {column.label}
-                </button>
-                {allowReorder ? (
-                  <div className="flex shrink-0 gap-1">
-                    <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === 0} type="button" onClick={() => moveColumn(preference.id, -1)}>Up</button>
-                    <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === preferences.length - 1} type="button" onClick={() => moveColumn(preference.id, 1)}>Down</button>
-                  </div>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
-export function useColumnPreferences<T>(storageKey: string, columns: ColumnDefinition<T>[]) {
-  const [preferences, setPreferences] = useState<ColumnPreference[]>(() => readColumnPreferences(storageKey, columns))
-
-  function updatePreferences(next: ColumnPreference[]) {
-    setPreferences(next)
-    window.localStorage.setItem(storageKey, JSON.stringify(next))
-  }
-
-  return [preferences, updatePreferences] as const
-}
-
-export function getColumnPopupPosition(
-  rect: Pick<DOMRect, 'left' | 'right' | 'bottom'>,
-  viewportWidth: number,
-  viewportHeight: number,
-) {
-  const maxWidth = Math.min(columnPopupWidthPx, viewportWidth - (columnPopupEdgeGapPx * 2))
-  const left = viewportWidth < 640
-    ? columnPopupEdgeGapPx
-    : Math.min(
-      Math.max(columnPopupEdgeGapPx, rect.right - maxWidth),
-      viewportWidth - maxWidth - columnPopupEdgeGapPx,
-    )
-  const top = Math.min(
-    Math.max(columnPopupEdgeGapPx, rect.bottom + columnPopupVerticalGapPx),
-    viewportHeight - columnPopupEdgeGapPx,
-  )
-
-  return {
-    left: `${left}px`,
-    top: `${top}px`,
-  }
-}
-
-export function useViewMode(storageKey: string) {
-  const [viewMode, setViewModeState] = useState<BookViewMode>(() => {
-    const stored = window.localStorage.getItem(storageKey)
-    return stored === 'cards' ? 'cards' : 'table'
-  })
-
-  function setViewMode(next: BookViewMode) {
-    setViewModeState(next)
-    window.localStorage.setItem(storageKey, next)
-  }
-
-  return [viewMode, setViewMode] as const
-}
-
 export function useCardsPerRow(storageKey: string) {
   const [cardsPerRow, setCardsPerRowState] = useState<number>(() => readCardsPerRow(storageKey))
 
@@ -1004,92 +807,6 @@ export function useCardsPerRow(storageKey: string) {
   }
 
   return [cardsPerRow, setCardsPerRow] as const
-}
-
-export function getVisibleColumns<T>(columns: ColumnDefinition<T>[], preferences: ColumnPreference[]) {
-  return preferences
-    .filter((preference) => preference.visible)
-    .map((preference) => columns.find((column) => column.id === preference.id))
-    .filter((column): column is ColumnDefinition<T> => Boolean(column))
-}
-
-export function defaultColumnPreferences<T>(columns: ColumnDefinition<T>[]): ColumnPreference[] {
-  return columns.map((column) => ({ id: column.id, visible: column.defaultVisible }))
-}
-
-function readColumnPreferences<T>(storageKey: string, columns: ColumnDefinition<T>[]) {
-  const defaults = defaultColumnPreferences(columns)
-  const stored = window.localStorage.getItem(storageKey)
-  if (!stored) {
-    return defaults
-  }
-
-  try {
-    const parsed = JSON.parse(stored) as ColumnPreference[]
-    const knownIds = new Set(columns.map((column) => column.id))
-    const storedKnown = parsed.filter((preference) => knownIds.has(preference.id))
-    const missing = defaults.filter((preference) => !storedKnown.some((item) => item.id === preference.id))
-    return [...storedKnown, ...missing]
-  } catch {
-    return defaults
-  }
-}
-
-export function ColumnHeader<T>({
-  activeDirection,
-  isCyclic = false,
-  column,
-  onSort,
-}: {
-  activeDirection: string | null
-  isCyclic?: boolean
-  column: ColumnDefinition<T>
-  onSort: (sortBy: string) => void
-}) {
-  const Icon = isCyclic && activeDirection
-    ? RefreshCw
-    : activeDirection === 'asc'
-    ? ArrowUp
-    : activeDirection === 'desc'
-      ? ArrowDown
-      : ChevronsUpDown
-
-  if (!column.sortBy) {
-    return <th className={`${column.widthClass ?? ''} px-4 py-3`}>{column.label}</th>
-  }
-
-  return (
-    <th className={`${column.widthClass ?? ''} px-4 py-3`}>
-      <button
-        className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide text-slate-500 hover:bg-slate-200 hover:text-slate-950"
-        type="button"
-        onClick={() => onSort(column.sortBy!)}
-      >
-        {column.label}
-        <Icon className="h-3.5 w-3.5" />
-      </button>
-    </th>
-  )
-}
-
-function BookRow({ book, columns }: { book: BookListItemDto; columns: ColumnDefinition<BookListItemDto>[] }) {
-  return (
-    <tr className="border-t border-slate-100 hover:bg-slate-50">
-      {columns.map((column) => (
-        <td className="px-4 py-3 text-slate-600" key={column.id}>
-          <div className="overflow-hidden">
-            {column.render(book)}
-          </div>
-        </td>
-      ))}
-      <td className="w-24 px-4 py-3">
-        <div className="flex justify-end gap-2">
-          <Link className={secondaryButtonClass} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
-          <Link className={secondaryButtonClass} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
-        </div>
-      </td>
-    </tr>
-  )
 }
 
 function BookCardGrid({

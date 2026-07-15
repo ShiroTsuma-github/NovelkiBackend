@@ -184,15 +184,6 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Zakres: przygotowac i wdrozyc spojne guideliney wizualne dla typografii, spacingu, shape language, przyciskow, formularzy, kart i dialogow; celowo odejsc od podejscia `wszystko rounded`, zachowujac czytelnosc i responsywnosc.
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
-### NB-053 - Zrefaktoruj frontend bez zmiany wygladu i zachowania UI
-
-- Typ: `Refactor`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/**/*`, wspolne komponenty i hooki frontendu
-- Problem: frontend zawiera rosnaca ilosc logiki widokowej i stanow lokalnych, co utrudnia dalszy rozwoj mimo ze UI ma pozostac wizualnie identyczne.
-- Zakres: uproscic strukture komponentow, wydzielic powtarzalne hooki/helpers i ograniczyc nadmiar odpowiedzialnosci duzych plikow bez zmiany layoutu, copy i interakcji uzytkownika.
-- Akceptacja: widok i zachowanie ekranow pozostaja bez zmian; refaktor zmniejsza zlozonosc co najmniej w glownych ekranach books/import/admin; snapshoty lub testy komponentow chronia przed regresja wygladu; testy obejmuja kluczowe flow uzytkownika przed i po refaktorze.
-
 ## Done
 
 ### NB-058 - Rozszerz parser wyszukiwania o filtry brakujacych danych
@@ -203,3 +194,12 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Problem: wykresy kompletnosci i kategorie Unrated/Unset nie moga otworzyc odpowiadajacej listy ksiazek, bo parser nie umie filtrowac wartosci pustych i brakujacych relacji.
 - Zakres: dodac skladnie `rating:none`, `priority:none`, `author:none`, `genre:none`, `tag:none`, `total:none`, `cover:none` i `link:none`; zachowac dotychczasowe filtry tekstowe i porownania liczbowe; zdefiniowac `none` jako null, pusty tekst albo brak relacji zgodnie z typem pola.
 - Akceptacja: kazdy filtr `none` zwraca tylko ksiazki z brakujaca wartoscia/relacja aktualnego uzytkownika; `genre:none` i `tag:none` nie myla pustej relacji z niepasujaca nazwa; nieznane pole lub niepoprawne uzycie `none` daje dotychczasowy kontrolowany blad parsera; testy obejmuja laczenie `none` z innymi filtrami, cudzyslowy, wielkosc liter, pusta biblioteke i owner isolation.
+
+### NB-053 - Zrefaktoruj frontend bez zmiany wygladu i zachowania UI
+
+- Typ: `Refactor`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/**/*`, wspolne komponenty i hooki frontendu
+- Problem: frontend zawiera rosnaca ilosc logiki widokowej i stanow lokalnych, co utrudnia dalszy rozwoj mimo ze UI ma pozostac wizualnie identyczne.
+- Zakres: uproscic strukture komponentow, wydzielic powtarzalne hooki/helpers i ograniczyc nadmiar odpowiedzialnosci duzych plikow bez zmiany layoutu, copy i interakcji uzytkownika.
+- Akceptacja: widok i zachowanie ekranow pozostaja bez zmian; refaktor zmniejsza zlozonosc co najmniej w glownych ekranach books/import/admin; snapshoty lub testy komponentow chronia przed regresja wygladu; testy obejmuja kluczowe flow uzytkownika przed i po refaktorze.

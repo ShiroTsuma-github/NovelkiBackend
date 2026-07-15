@@ -7,16 +7,18 @@ import { api } from '@/api/client'
 import type { AdminBookListItemDto, DictionaryMutationRequest } from '@/api/types'
 import { HttpError } from '@/api/http'
 import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { BookDataTable } from '@/features/books/BookDataTable'
 import {
-  BookAdvancedSearch,
-  ColumnHeader,
   ColumnSettingsPopup,
-  formatDate,
-  formatProgress,
   getVisibleColumns,
   totalChaptersColumnLabel,
   useColumnPreferences,
   type ColumnDefinition,
+} from '@/features/books/bookListColumns'
+import {
+  BookAdvancedSearch,
+  formatDate,
+  formatProgress,
 } from '@/features/books/BooksPage'
 import {
   BookListFooter,
@@ -170,34 +172,20 @@ export function AdminPage() {
           ) : null}
           <ColumnSettingsPopup columns={adminBookColumns} preferences={columnPreferences} onChange={setColumnPreferences} />
         </div>
-        <div className="w-full">
-          <table className="w-full table-fixed border-collapse text-left text-sm">
-            <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                {visibleColumns.map((column) => (
-                  <ColumnHeader
-                    activeDirection={column.sortBy === sortBy ? sortDirection : null}
-                    column={column}
-                    key={column.id}
-                    onSort={setSort}
-                  />
-                ))}
-                <th className="w-24 px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {adminBooksQuery.isLoading ? (
-                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>Loading...</td></tr>
-              ) : null}
-              {adminBooksQuery.data?.data.map((book) => (
-                <AdminBookRow book={book} columns={visibleColumns} key={book.id} />
-              ))}
-              {adminBooksQuery.data?.data.length === 0 ? (
-                <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={visibleColumns.length + 1}>No results.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
+        <BookDataTable
+          columns={visibleColumns}
+          emptyMessage="No results."
+          isLoading={adminBooksQuery.isLoading}
+          items={adminBooksQuery.data?.data ?? []}
+          renderActions={(book) => (
+            <div className="flex justify-end">
+              <Link className={secondaryButtonClass} to={`/admin/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
+            </div>
+          )}
+          sortBy={sortBy}
+          sortDirection={sortDirection}
+          onSort={setSort}
+        />
         <BookListFooter
           activePageGapId={pagination.activePageGapId}
           canGoBack={pagination.canGoBack}
@@ -266,25 +254,6 @@ function DictionaryCreateForm({
         Add
       </button>
     </form>
-  )
-}
-
-function AdminBookRow({ book, columns }: { book: AdminBookListItemDto; columns: ColumnDefinition<AdminBookListItemDto>[] }) {
-  return (
-    <tr className="border-t border-slate-100 hover:bg-slate-50">
-      {columns.map((column) => (
-        <td className="px-4 py-3 text-slate-600" key={column.id}>
-          <div className="overflow-hidden">
-            {column.render(book)}
-          </div>
-        </td>
-      ))}
-      <td className="w-24 px-4 py-3">
-        <div className="flex justify-end">
-          <Link className={secondaryButtonClass} to={`/admin/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
-        </div>
-      </td>
-    </tr>
   )
 }
 
