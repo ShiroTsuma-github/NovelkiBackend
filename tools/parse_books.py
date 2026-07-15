@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BOOKS_PATH = ROOT / "books.txt"
+BOOKS_PATH = ROOT / "notes/books.txt"
 CSV_PATH = ROOT / "books_import.csv"
 UNCERTAIN_PATH = ROOT / "books_uncertain.txt"
 
