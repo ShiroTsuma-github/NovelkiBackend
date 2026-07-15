@@ -51,8 +51,9 @@ describe('BooksPage', () => {
     const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
-    expect(container.querySelector('table')).toHaveClass('min-w-[72rem]')
-    expect(screen.getByRole('columnheader', { name: /actions/i })).toHaveClass('sticky', 'right-0', 'w-32')
+    expect(container.querySelector('table')).toHaveStyle({ minWidth: '80rem' })
+    expect(container.querySelectorAll('col')).toHaveLength(9)
+    expect(screen.getByRole('columnheader', { name: /actions/i })).toHaveClass('sticky', 'right-0')
   })
 
   it('shows the colon-based rating operator syntax in advanced search help', async () => {

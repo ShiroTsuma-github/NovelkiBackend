@@ -45,18 +45,9 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
       </div>
       <div className="grid gap-2">
         {items.map((item) => (
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.type}>
-            <div className="flex items-center justify-between gap-3">
-              <DrilldownLink query={fieldQuery('type', item.type)}>{item.type}</DrilldownLink>
-              <span className="text-slate-500">{formatCount(item.totalBooks)} books</span>
-            </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {item.statuses.map((status) => (
-                <DrilldownLink key={`${item.type}-${status.status}`} query={`${fieldQuery('type', item.type)} ${fieldQuery('status', status.status)}`}>
-                  {status.status}: {formatCount(status.bookCount)}
-                </DrilldownLink>
-              ))}
-            </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.type}>
+            <DrilldownLink query={fieldQuery('type', item.type)}>{item.type}</DrilldownLink>
+            <span className="text-slate-500">{formatCount(item.totalBooks)} books</span>
           </div>
         ))}
       </div>

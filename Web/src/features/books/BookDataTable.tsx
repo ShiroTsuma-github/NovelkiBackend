@@ -28,9 +28,15 @@ export function BookDataTable<T extends { id: string }>({
   wrapperClassName?: string
   onSort: (sortBy: string) => void
 }) {
+  const tableMinWidthRem = Math.max(76, columns.length * 9 + 8)
+
   return (
     <div className={`${wrapperClassName} overflow-x-auto`}>
-      <table className="min-w-[72rem] w-full table-fixed border-collapse text-left text-sm">
+      <table className="w-full table-fixed border-collapse text-left text-sm" style={{ minWidth: `${tableMinWidthRem}rem` }}>
+        <colgroup>
+          {columns.map((column) => <col className={column.widthClass ?? ''} key={column.id} />)}
+          <col className="w-32" />
+        </colgroup>
         <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
           <tr>
             {columns.map((column) => (
@@ -42,7 +48,7 @@ export function BookDataTable<T extends { id: string }>({
                 onSort={onSort}
               />
             ))}
-            <th className="sticky right-0 z-10 w-32 bg-slate-100 px-4 py-3 text-right shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)]">{actionHeader}</th>
+            <th className="sticky right-0 z-10 bg-slate-100 px-3 py-3 text-right shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)]">{actionHeader}</th>
           </tr>
         </thead>
         <tbody>
@@ -52,13 +58,13 @@ export function BookDataTable<T extends { id: string }>({
           {items.map((item) => (
             <tr className="group border-t border-slate-100 hover:bg-slate-50" key={item.id}>
               {columns.map((column) => (
-                <td className="px-4 py-3 text-slate-600" key={column.id}>
+                <td className="px-3 py-3 text-slate-600" key={column.id}>
                   <div className="overflow-hidden">
                     {column.render(item)}
                   </div>
                 </td>
               ))}
-              <td className="sticky right-0 z-10 w-32 bg-white px-4 py-3 shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)] group-hover:bg-slate-50">
+              <td className="sticky right-0 z-10 bg-white px-3 py-3 shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)] group-hover:bg-slate-50">
                 <div className="flex justify-end gap-2 whitespace-nowrap">
                   {renderActions(item)}
                 </div>
