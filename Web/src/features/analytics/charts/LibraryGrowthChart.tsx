@@ -1,6 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto, BookAnalyticsLibraryGrowthPointDto } from '@/api/types'
-import { dateRangeForBucket, DrilldownLink, fieldQuery, formatCount, formatDateRange } from './chartUtils'
+import { analyticsTooltipProps, dateRangeForBucket, DrilldownLink, fieldQuery, formatCount, formatDateRange } from './chartUtils'
 
 type LibraryGrowthChartProps = {
   data: BookAnalyticsDto | undefined
@@ -34,6 +34,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
             <XAxis dataKey="date" tickLine={false} />
             <YAxis allowDecimals={false} tickLine={false} />
             <Tooltip
+              {...analyticsTooltipProps}
               formatter={(value, name) => [`${formatCount(Number(value))}`, growthLabel(name)]}
               labelFormatter={(label) => `Bucket ${label}`}
             />

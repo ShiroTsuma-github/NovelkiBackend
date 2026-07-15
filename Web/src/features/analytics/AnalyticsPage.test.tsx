@@ -492,11 +492,12 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByText(/Cleanup queue/i)).toBeInTheDocument()
     expect(screen.getByText(/Usable covers are counted only/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '10 books' })).toHaveAttribute('href', '/books?query=cover%3Anone')
+    expect(screen.getByText(/Missing: 10 books/i)).toBeInTheDocument()
     expect(screen.getByText(/Unknown status bucket: 2 books/i)).toBeInTheDocument()
     expect(screen.getByText(/Very Long Source Name/i)).toBeInTheDocument()
 
     const analyticsLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+    expect(analyticsLinks.some((link) => link.href.includes('cover%3Anone'))).toBe(false)
     expect(analyticsLinks.some((link) => link.href.includes('coverStatus'))).toBe(false)
     expect(analyticsLinks.some((link) => link.href.includes('coverSource'))).toBe(false)
 

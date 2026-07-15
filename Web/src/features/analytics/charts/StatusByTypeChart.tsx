@@ -1,6 +1,6 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
-import { chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, normalizedPercent, percent } from './chartUtils'
+import { analyticsTooltipProps, chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, normalizedPercent, percent } from './chartUtils'
 
 type StatusByTypeChartProps = {
   data: BookAnalyticsDto | undefined
@@ -32,6 +32,7 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
             <XAxis domain={[0, 100]} tickFormatter={(value) => formatPercent(Number(value))} type="number" />
             <YAxis dataKey="type" tickLine={false} type="category" width={96} />
             <Tooltip
+              {...analyticsTooltipProps}
               formatter={(value, name, item) => [
                 `${formatPercent(Number(value))} (${formatCount(Number(item.payload[`${String(name)}Count`] ?? 0))} books)`,
                 String(name),

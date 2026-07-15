@@ -1,6 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsActivityPointDto, BookAnalyticsDto } from '@/api/types'
-import { dateRangeForBucket, formatCount, formatDateRange } from './chartUtils'
+import { analyticsTooltipProps, dateRangeForBucket, formatCount, formatDateRange } from './chartUtils'
 
 type ReadingActivityChartProps = {
   data: BookAnalyticsDto | undefined
@@ -23,6 +23,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
             <XAxis dataKey="date" tickLine={false} />
             <YAxis allowDecimals={false} tickLine={false} />
             <Tooltip
+              {...analyticsTooltipProps}
               formatter={(value, name) => [`${formatCount(Number(value))}`, activityLabel(name)]}
               labelFormatter={(label) => `Bucket ${label}`}
             />

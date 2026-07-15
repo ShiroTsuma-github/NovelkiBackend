@@ -1,7 +1,7 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
 import { formatChapterCount } from '@/features/books/BooksPage'
-import { formatCount } from './chartUtils'
+import { analyticsTooltipProps, formatCount } from './chartUtils'
 
 type ChapterVolumeChartProps = {
   data: BookAnalyticsDto | undefined
@@ -23,7 +23,7 @@ export function ChapterVolumeChart({ data }: ChapterVolumeChartProps) {
             <BarChart data={items}>
               <XAxis dataKey="type" tickLine={false} />
               <YAxis allowDecimals={false} tickLine={false} />
-              <Tooltip formatter={(value) => [`${formatCount(Number(value))} books`, 'Books']} />
+              <Tooltip {...analyticsTooltipProps} formatter={(value) => [`${formatCount(Number(value))} books`, 'Books']} />
               <Bar dataKey="bookCount" fill="#0891b2" name="Books" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -36,7 +36,7 @@ export function ChapterVolumeChart({ data }: ChapterVolumeChartProps) {
             <BarChart data={items}>
               <XAxis dataKey="type" tickLine={false} />
               <YAxis tickLine={false} />
-              <Tooltip formatter={(value) => [`${formatChapterCount(Number(value))} chapters`, 'Current chapters']} />
+              <Tooltip {...analyticsTooltipProps} formatter={(value) => [`${formatChapterCount(Number(value))} chapters`, 'Current chapters']} />
               <Bar dataKey="currentChapters" fill="#7c3aed" name="Current chapters" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
