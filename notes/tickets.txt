@@ -6,36 +6,8 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 !!!Skonczone tickety maja zostac przeniesione na koniec do poprawnej sekcji!!!
 !!!Kazdy ticket ma zawierac testy. Testy maja uwzledniac  mozliwe edge case!!!
 
-
-## Auth
-
-## Book Form And Validation
-
-## Progress
-
-## Covers And Delivery
-
-## Import CSV
-
-### NB-048 - Dodaj akcje usuwania wszystkich niepoprawnych wierszy w imporcie CSV
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `Web/src/api/client.ts`, `Application/Common/Interfaces/IBookCsvImportService.cs`, `Infrastructure/Services/BookCsvImportService.cs`, `Api/Controllers/BookController.cs`
-- Problem: przy wiekszej liczbie blednych rekordow uzytkownik musi usuwac je pojedynczo, co wydluza finalizacje importu.
-- Zakres: dodac akcje `Discard all invalid`, ktora usuwa wszystkie biezace niepoprawne wiersze z sesji importu i odswieza podsumowanie sesji.
-- Akceptacja: przy obecnosci blednych wierszy widoczny jest przycisk zbiorczy; po uzyciu znikaja tylko wiersze `isValid = false`; poprawne rekordy zostaja bez zmian; liczby `Rows/Positive/Negative` aktualizuja sie od razu; testy obejmuja przypadek mieszany, brak invalid rows i finalizacje po zbiorczym usunieciu.
-
-### NB-049 - Pokazuj ekran sukcesu importu z lista zaimportowanych tytulow przed zamknieciem modala
-
-- Typ: `UX/UI`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/books/ImportBooksDialog.tsx`, `Web/src/features/books/BooksPage.tsx`, `Application/Common/DTOs/Book/BookImportDtos.cs`, `Infrastructure/Services/BookCsvImportService.cs`
-- Problem: po `Finalize` modal zamyka sie od razu i uzytkownik nie widzi czytelnej listy poprawnie zaimportowanych ksiazek.
-- Zakres: rozszerzyc wynik finalizacji o liste zaimportowanych tytulow i po sukcesie pokazac w modalu ekran podsumowania z counts, skipped/errors i lista zapisanych ksiazek; zamkniecie modala ma byc swiadoma akcja uzytkownika.
-- Akceptacja: `Finalize` nie zamyka modala automatycznie; ekran sukcesu pokazuje co najmniej `Imported`, `Skipped` i liste tytulow poprawnie zapisanych ksiazek; bledy czesciowe nadal sa widoczne; po zamknieciu modala lista ksiazek jest odswiezona; testy obejmuja pelny sukces, czesciowy sukces i pusta liste tytulow przy `0 imported`.
-
-## Books List, Search And Cards
+ISSUES:
+problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na actions guziki prawie) -- ticket do przemyslenia
 
 ### NB-041 - Dodaj dashboard summary biblioteki
 - NOTE: NEEDS REFINEMENT
@@ -66,36 +38,6 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 - Zakres: przygotowac i wdrozyc spojne guideliney wizualne dla typografii, spacingu, shape language, przyciskow, formularzy, kart i dialogow; celowo odejsc od podejscia `wszystko rounded`, zachowujac czytelnosc i responsywnosc.
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
-### NB-056 - Ustabilizuj search w admin panelu bez flickera wynikow
-
-- Typ: `UX/UI`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/admin/AdminPage.tsx`, wspolne komponenty search/list
-- Problem: admin search aktualizuje query przy kazdym wpisaniu i prawdopodobnie czysci/odbudowuje tabele miedzy requestami, co daje efekt flickera i gorszy odbior niz na glownej liscie ksiazek.
-- Zakres: zastosowac strategie spojnego wyszukiwania jak na main page, w tym utrzymanie poprzednich danych podczas fetchu i czytelny stan `Searching...` zamiast skakania zawartosci.
-- Akceptacja: wpisywanie frazy do admin search nie powoduje pustych przeskokow tabeli miedzy requestami; uzytkownik widzi poprzednie wyniki do czasu nowej odpowiedzi; loading jest czytelny; testy obejmuja szybkie wpisywanie i zachowanie tabeli podczas fetchu.
-
-
-## Verification Tickets
-
-### NB-050 - Wykonaj security baseline i test penetracyjny aplikacji
-
-- Typ: `Investigation`
-- Priorytet: `P1`
-- Komponent: `Api/*`, `Application/*`, `Infrastructure/*`, `Web/*`, konfiguracja auth/CORS/headers/upload
-- Problem: backlog wskazuje potrzebe przegladu bezpieczenstwa, ale brak udokumentowanego wyniku i listy podatnosci do poprawy.
-- Zakres: przeprowadzic kontrolowany baseline bezpieczenstwa dla auth, autoryzacji admina, walidacji wejscia, uploadu plikow, CSV importu, IDOR, bledow ujawniajacych dane i podstawowych naglowkow bezpieczenstwa; wynik zamknac raportem oraz ticketami naprawczymi dla potwierdzonych problemow.
-- Akceptacja: istnieje checklista wykonanych testow i wynikow; kazdy potwierdzony problem ma reprodukcje i severity; brak krytycznych findings bez osobnego ticketu naprawczego; testy automatyczne obejmuja co najmniej przypadki nieautoryzowanego dostepu, przekroczenia walidacji i uploadu nieprawidlowego pliku.
-
-### NB-052 - Zredukuj tech debt backendu przez refaktor osoniety testami regresyjnymi
-
-- Typ: `Refactor`
-- Priorytet: `P2`
-- Komponent: backend cross-cutting, w pierwszej kolejnosci `Application/*`, `Infrastructure/Persistence/*`, `Api/*`, testy `Application.UnitTests` i `Infrastructure.IntegrationTests`
-- Problem: backlog wskazuje narastajacy tech debt backendu, ale bez zwiekszenia pokrycia testami refaktor grozi cichymi regresjami.
-- Zakres: najpierw dolozyc brakujace testy regresyjne dla najbardziej ryzykownych sciezek API i repozytoriow, potem uproscic duplikacje i rozproszone reguly w backendzie bez zmiany zachowania produktu.
-- Akceptacja: przed wlasciwym refaktorem istnieje nowa warstwa testow dla krytycznych flow; zachowanie publicznych endpointow pozostaje bez zmian; redukcja duplikacji jest widoczna w wybranych obszarach; testy obejmuja co najmniej create/update book, search/sort i import CSV.
-
 ### NB-053 - Zrefaktoruj frontend bez zmiany wygladu i zachowania UI
 
 - Typ: `Refactor`
@@ -104,12 +46,3 @@ Cel: lista samodzielnych ticketow do wdrozenia. Kazdy ticket ma konkretny kompon
 - Problem: frontend zawiera rosnaca ilosc logiki widokowej i stanow lokalnych, co utrudnia dalszy rozwoj mimo ze UI ma pozostac wizualnie identyczne.
 - Zakres: uproscic strukture komponentow, wydzielic powtarzalne hooki/helpers i ograniczyc nadmiar odpowiedzialnosci duzych plikow bez zmiany layoutu, copy i interakcji uzytkownika.
 - Akceptacja: widok i zachowanie ekranow pozostaja bez zmian; refaktor zmniejsza zlozonosc co najmniej w glownych ekranach books/import/admin; snapshoty lub testy komponentow chronia przed regresja wygladu; testy obejmuja kluczowe flow uzytkownika przed i po refaktorze.
-
-### NB-057 - Zweryfikuj i napraw faktyczne filtrowanie search w admin panelu
-
-- Typ: `Bug`
-- Priorytet: `P1`
-- Komponent: `Web/src/features/admin/AdminPage.tsx`, `Web/src/api/client.ts`, `Api/Controllers/AdminController.cs`, `Application/Features/BookFeatures/Queries/GetBook/GetAllAdminBooks.cs`, `Infrastructure/Persistence/BookRepository.cs`
-- Problem: feedback wskazuje, ze admin search moze w praktyce nie filtrowac wynikow zgodnie z query, mimo ze sciezka backendowa istnieje.
-- Zakres: odtworzyc konkretne przypadki, potwierdzic czy problem jest w query string, parsowaniu, cache, czy renderze; po reprodukcji naprawic realna przyczyne.
-- Akceptacja: istnieje minimalny scenariusz reprodukcji; wpisanie frazy w admin search zaweza wyniki zgodnie z parserem wyszukiwania; paginacja i sortowanie pozostaja poprawne po wyszukaniu; testy obejmuja co najmniej jeden przypadek pozytywny i jeden bez wynikow.
