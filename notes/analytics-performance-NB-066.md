@@ -63,6 +63,7 @@ Regression test added:
   - asserts analytics command count stays bounded;
   - asserts serialized analytics JSON remains under 100 KB;
   - checks broad categories and owner-scoped aggregates remain populated.
+  - writes `TestResults/analytics-performance-NB-066-bounded.json` with elapsed time, SQL command count, payload size and dataset/category counts.
 
 Large harness added:
 
@@ -70,7 +71,10 @@ Large harness added:
   - run with `RUN_ANALYTICS_PERF_TESTS=1`;
   - seeds 10,000 books and 250,000 progress history rows;
   - asserts bounded command count and JSON below 100 KB;
+  - writes `TestResults/analytics-performance-NB-066-large.json` with elapsed time, SQL command count, payload size and dataset/category counts.
   - not enabled by default to avoid making normal CI slow.
+
+Artifacts are generated files and are intentionally not committed. Use the console output line `Analytics performance artifact: ...` to locate the file after a run.
 
 ## PostgreSQL measurement status
 
