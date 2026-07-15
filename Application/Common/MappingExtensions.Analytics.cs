@@ -59,6 +59,36 @@ public static partial class MappingExtensions
                         ShareOfBooks = item.ShareOfBooks
                     })
                     .ToList()
+            },
+            Ratings = new BookAnalyticsRatingsDto
+            {
+                RatedBooks = source.Ratings.RatedBooks,
+                UnratedBooks = source.Ratings.UnratedBooks,
+                AverageRating = source.Ratings.AverageRating,
+                Counts = source.Ratings.Counts
+                    .Select(item => new BookAnalyticsRatingCountDto
+                    {
+                        Rating = item.Rating,
+                        BookCount = item.BookCount
+                    })
+                    .ToList()
+            },
+            Planning = new BookAnalyticsPlanningDto
+            {
+                PrioritiesByStatus = source.Planning.PrioritiesByStatus
+                    .Select(item => new BookAnalyticsPrioritiesByStatusDto
+                    {
+                        Status = item.Status,
+                        TotalBooks = item.TotalBooks,
+                        Priorities = item.Priorities
+                            .Select(priority => new BookAnalyticsPriorityCountDto
+                            {
+                                Priority = priority.Priority,
+                                BookCount = priority.BookCount
+                            })
+                            .ToList()
+                    })
+                    .ToList()
             }
         };
     }

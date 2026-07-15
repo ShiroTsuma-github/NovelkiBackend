@@ -405,6 +405,68 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldAggregateRatingsAndPrioritiesByStatusWithOwnerAndQueryScope()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("12121212-1212-1212-1212-121212121212");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "ratings-other", NormalizedUserName = "RATINGS-OTHER" });
+
+        var unratedReading = TestData.Book(database.UserId, "Rating Scope Alpha");
+        unratedReading.Rating = null;
+        unratedReading.Priority = null;
+
+        var singleRatedReading = TestData.Book(database.UserId, "Rating Scope Beta");
+        singleRatedReading.Rating = 7;
+        singleRatedReading.Priority = 2;
+
+        var completed = TestData.Book(database.UserId, "Rating Scope Gamma");
+        completed.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        completed.Rating = 10;
+        completed.Priority = 5;
+
+        var unmatched = TestData.Book(database.UserId, "Rating Outside");
+        unmatched.Rating = 1;
+        unmatched.Priority = 1;
+
+        var otherOwner = TestData.Book(otherOwnerId, "Rating Scope Other Owner");
+        otherOwner.Rating = 10;
+        otherOwner.Priority = 5;
+
+        context.Books.AddRange(unratedReading, singleRatedReading, completed, unmatched, otherOwner);
+        await context.SaveChangesAsync();
+        var service = CreateAnalyticsQueryService(context);
+
+        var result = await service.GetAnalyticsAsync(
+            database.UserId,
+            BookSearchQueryParser.Parse("title:\"Rating Scope\""),
+            AnalyticsScope("title:\"Rating Scope\""),
+            CancellationToken.None);
+
+        Assert.Equal(3, result.Overview.TotalBooks);
+        Assert.Equal(2, result.Ratings.RatedBooks);
+        Assert.Equal(1, result.Ratings.UnratedBooks);
+        Assert.Equal(8.5, result.Ratings.AverageRating);
+        Assert.Equal(Enumerable.Range(1, 10), result.Ratings.Counts.Select(item => item.Rating));
+        Assert.Equal(0, result.Ratings.Counts.Single(item => item.Rating == 1).BookCount);
+        Assert.Equal(1, result.Ratings.Counts.Single(item => item.Rating == 7).BookCount);
+        Assert.Equal(1, result.Ratings.Counts.Single(item => item.Rating == 10).BookCount);
+        Assert.Equal(2, result.Planning.PrioritiesByStatus.Count);
+
+        var reading = Assert.Single(result.Planning.PrioritiesByStatus, item => item.Status == "Reading");
+        Assert.Equal(2, reading.TotalBooks);
+        Assert.Equal(["1", "2", "3", "4", "5", "Unset"], reading.Priorities.Select(item => item.Priority).ToArray());
+        Assert.Equal(1, reading.Priorities.Single(item => item.Priority == "2").BookCount);
+        Assert.Equal(1, reading.Priorities.Single(item => item.Priority == "Unset").BookCount);
+        Assert.Equal(0, reading.Priorities.Single(item => item.Priority == "5").BookCount);
+
+        var completedStatus = Assert.Single(result.Planning.PrioritiesByStatus, item => item.Status == "Completed");
+        Assert.Equal(1, completedStatus.TotalBooks);
+        Assert.Equal(1, completedStatus.Priorities.Single(item => item.Priority == "5").BookCount);
+        Assert.All(completedStatus.Priorities.Where(item => item.Priority != "5"), item => Assert.Equal(0, item.BookCount));
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();

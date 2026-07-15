@@ -22,12 +22,16 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         var query = ApplyCriteria(_context.Books.AsNoTracking().Where(book => book.OwnerId == ownerId), criteria);
         var overview = await GetOverviewAsync(query, cancellationToken);
         var composition = await GetCompositionAsync(query, overview.TotalBooks, cancellationToken);
+        var ratings = await GetRatingsAsync(query, overview, cancellationToken);
+        var planning = await GetPlanningAsync(query, overview.TotalBooks, cancellationToken);
 
         return new BookAnalyticsSnapshot(
             DateTimeOffset.UtcNow,
             scope,
             overview,
-            composition);
+            composition,
+            ratings,
+            planning);
     }
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -167,6 +171,85 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
                 row.BookCount,
                 totalBooks == 0 ? 0 : (double)row.BookCount / totalBooks))
             .ToList();
+    }
+
+    private static async Task<BookAnalyticsRatingsSnapshot> GetRatingsAsync(
+        IQueryable<Book> query,
+        BookAnalyticsOverviewSnapshot overview,
+        CancellationToken cancellationToken)
+    {
+        var rows = await query
+            .Where(book => book.Rating != null)
+            .GroupBy(book => book.Rating!.Value)
+            .Select(group => new
+            {
+                Rating = group.Key,
+                BookCount = group.Count(),
+            })
+            .ToListAsync(cancellationToken);
+
+        var countsByRating = rows.ToDictionary(row => row.Rating, row => row.BookCount);
+        var counts = Enumerable.Range(1, 10)
+            .Select(rating => new BookAnalyticsRatingCountSnapshot(
+                rating,
+                countsByRating.GetValueOrDefault(rating)))
+            .ToList();
+
+        return new BookAnalyticsRatingsSnapshot(
+            overview.RatedBooks,
+            overview.UnratedBooks,
+            overview.AverageRating,
+            counts);
+    }
+
+    private static async Task<BookAnalyticsPlanningSnapshot> GetPlanningAsync(
+        IQueryable<Book> query,
+        int totalBooks,
+        CancellationToken cancellationToken)
+    {
+        if (totalBooks == 0)
+        {
+            return BookAnalyticsPlanningSnapshot.Empty;
+        }
+
+        var rows = await query
+            .GroupBy(book => new
+            {
+                Status = book.Status.Name,
+                Priority = book.Priority,
+            })
+            .Select(group => new
+            {
+                group.Key.Status,
+                group.Key.Priority,
+                BookCount = group.Count(),
+            })
+            .ToListAsync(cancellationToken);
+
+        var prioritiesByStatus = rows
+            .GroupBy(row => row.Status)
+            .Select(group =>
+            {
+                var countsByPriority = group.ToDictionary(
+                    row => row.Priority?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unset",
+                    row => row.BookCount);
+                var priorities = Enumerable.Range(1, 5)
+                    .Select(priority => new BookAnalyticsPriorityCountSnapshot(
+                        priority.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        countsByPriority.GetValueOrDefault(priority.ToString(System.Globalization.CultureInfo.InvariantCulture))))
+                    .Append(new BookAnalyticsPriorityCountSnapshot("Unset", countsByPriority.GetValueOrDefault("Unset")))
+                    .ToList();
+
+                return new BookAnalyticsPrioritiesByStatusSnapshot(
+                    group.Key,
+                    group.Sum(row => row.BookCount),
+                    priorities);
+            })
+            .OrderByDescending(group => group.TotalBooks)
+            .ThenBy(group => group.Status)
+            .ToList();
+
+        return new BookAnalyticsPlanningSnapshot(prioritiesByStatus);
     }
 
     private sealed record RelationCountRow(string Name, int BookCount);

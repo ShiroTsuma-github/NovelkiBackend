@@ -283,7 +283,9 @@ public class BookQueryHandlerTests
                 DateTimeOffset.UtcNow,
                 scope,
                 new Domain.Models.BookAnalyticsOverviewSnapshot(0, 0, 0, null, 0, 0, 0),
-                Domain.Models.BookAnalyticsCompositionSnapshot.Empty));
+                Domain.Models.BookAnalyticsCompositionSnapshot.Empty,
+                Domain.Models.BookAnalyticsRatingsSnapshot.Empty,
+                Domain.Models.BookAnalyticsPlanningSnapshot.Empty));
         }
     }
 
