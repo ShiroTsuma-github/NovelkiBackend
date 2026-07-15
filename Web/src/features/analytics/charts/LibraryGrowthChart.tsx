@@ -10,7 +10,9 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
   const points = data?.libraryGrowth.points ?? []
   const openingCount = data?.libraryGrowth.openingCount ?? 0
   const bucket = data?.scope.bucket ?? 'day'
+  const chartPoints = libraryGrowthChartPoints(points, bucket)
   const displayPoints = compactGrowthPoints(points, bucket)
+  const newestDisplayPoints = [...displayPoints].reverse()
 
   if (!points.length) {
     return (
@@ -30,7 +32,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
       </p>
       <div className="h-56 min-w-0" aria-label="Library growth trend">
         <ResponsiveContainer>
-          <LineChart data={displayPoints}>
+          <LineChart data={chartPoints}>
             <XAxis dataKey="date" tickLine={false} />
             <YAxis allowDecimals={false} tickLine={false} />
             <Tooltip
@@ -44,7 +46,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
         </ResponsiveContainer>
       </div>
       <div className="grid gap-2">
-        {displayPoints.map((point) => (
+        {newestDisplayPoints.map((point) => (
           <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={point.label}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-semibold text-slate-950">{point.label}</span>
@@ -71,18 +73,24 @@ export function libraryGrowthRows(data?: BookAnalyticsDto) {
   ])
 }
 
-function compactGrowthPoints(points: BookAnalyticsLibraryGrowthPointDto[], bucket: string) {
-  return points.reduce<Array<BookAnalyticsLibraryGrowthPointDto & { label: string; endExclusive: string }>>((rows, point) => {
+export function libraryGrowthChartPoints(points: BookAnalyticsLibraryGrowthPointDto[], bucket: string) {
+  return points.map((point) => {
     const period = dateRangeForBucket(point.date, bucket)
+    return { ...point, label: formatDateRange(period.start, period.end), endExclusive: period.end }
+  })
+}
+
+function compactGrowthPoints(points: BookAnalyticsLibraryGrowthPointDto[], bucket: string) {
+  return libraryGrowthChartPoints(points, bucket).reduce<Array<BookAnalyticsLibraryGrowthPointDto & { label: string; endExclusive: string }>>((rows, point) => {
     const isEmpty = point.booksAdded === 0 && point.byType.length === 0
     const previous = rows.at(-1)
     if (isEmpty && previous && previous.booksAdded === 0 && previous.byType.length === 0 && previous.cumulativeBooks === point.cumulativeBooks) {
-      previous.endExclusive = period.end
+      previous.endExclusive = point.endExclusive
       previous.label = formatDateRange(previous.date, previous.endExclusive)
       return rows
     }
 
-    rows.push({ ...point, label: formatDateRange(period.start, period.end), endExclusive: period.end })
+    rows.push(point)
     return rows
   }, [])
 }

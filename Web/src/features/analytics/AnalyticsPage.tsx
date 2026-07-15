@@ -130,6 +130,7 @@ export function AnalyticsPage() {
         <div className="grid min-w-0 gap-5" data-testid="analytics-left-column">
         <AnalyticsChartCard
           columns={['Type', 'Status', 'Books', 'Share of type']}
+          dataTableEnabled={false}
           description="See which content types are concentrated in each reading status."
           emptyMessage="No status/type data for this analytics scope."
           isEmpty={!isInitialLoading && !statusByTypeRows(data).length}
@@ -156,6 +157,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Tag', 'Books', 'Share of books']}
+          dataTableEnabled={false}
           description="Find the tags that dominate the current filters."
           emptyMessage="No tag data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.composition.tags.length)}
@@ -277,6 +279,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Field', 'Complete books', 'Coverage', 'Missing books']}
+          dataTableEnabled={false}
           description="Find fields that are missing most often in the current scope."
           emptyMessage="0 metadata fields reported for this scope."
           isEmpty={!isInitialLoading && !(data?.quality.fieldCompleteness.length)}
