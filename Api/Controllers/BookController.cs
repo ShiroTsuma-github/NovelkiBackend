@@ -68,9 +68,13 @@ public partial class BookController : ControllerBase
 
     [HttpGet("analytics")]
     [Authorize]
-    public async Task<IActionResult> GetAnalytics([FromQuery] GetBookAnalyticsQuery query)
+    public async Task<IActionResult> GetAnalytics(
+        [FromQuery(Name = "query")] string? searchQuery,
+        [FromQuery] DateOnly? from,
+        [FromQuery] DateOnly? to,
+        [FromQuery] string? bucket)
     {
-        var analytics = await _mediator.Send(query);
+        var analytics = await _mediator.Send(new GetBookAnalyticsQuery(searchQuery, from, to, bucket));
         return Ok(analytics);
     }
 
