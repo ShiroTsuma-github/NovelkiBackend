@@ -455,8 +455,9 @@ function DateRangeChooser({
             modifiers={{ rangeSelectionAnchor: rangeSelectionAnchor ?? undefined }}
             modifiersClassNames={{ rangeSelectionAnchor: dayPickerClassNames.range_start }}
             numberOfMonths={2}
-            selected={rangeSelectionAnchor ? { from: rangeSelectionAnchor } : calendarRange}
+            selected={rangeSelectionAnchor ? { from: undefined, to: undefined } : calendarRange}
             onDayClick={applyCalendarDay}
+            onSelect={() => undefined}
           />
         </div>
       ) : null}
