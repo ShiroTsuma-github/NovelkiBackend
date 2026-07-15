@@ -25,7 +25,7 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
         <div className="text-sm font-semibold text-slate-950">Estimated total</div>
         <div className="mt-1 text-3xl font-semibold text-slate-950">{formatHours(totalHours)}</div>
         <div className="mt-2 text-sm text-slate-500">
-          {formatDays(totalHours)} · {formatMonths(totalHours)} based on known current chapters.
+          {formatDays(totalHours)} · {formatMonths(totalHours)} · {formatYears(totalHours)} based on known current chapters.
         </div>
       </div>
       <div className="grid gap-2">
@@ -96,4 +96,8 @@ function formatDays(value: number) {
 
 function formatMonths(value: number) {
   return `${(value / (24 * 30)).toLocaleString('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} months`
+}
+
+function formatYears(value: number) {
+  return `${(value / (24 * 365)).toLocaleString('en-US', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} years`
 }

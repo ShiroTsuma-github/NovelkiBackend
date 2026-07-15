@@ -59,10 +59,10 @@ export function quoteQueryValue(value: string) {
   return /^[A-Za-z0-9_-]+$/.test(value) ? value : `"${value.replaceAll('"', '\\"')}"`
 }
 
-export function DrilldownLink({ children, query }: { children: ReactNode; query: string }) {
+export function DrilldownLink({ children, className = '', query }: { children: ReactNode; className?: string; query: string }) {
   return (
     <Link
-      className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 font-semibold text-cyan-700 underline decoration-cyan-700/60 underline-offset-4 hover:text-cyan-900 hover:decoration-cyan-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+      className={`inline-flex min-h-11 items-center gap-1 rounded-md px-2 font-semibold text-cyan-700 underline decoration-cyan-700/60 underline-offset-4 hover:text-cyan-900 hover:decoration-cyan-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${className}`}
       title={`Open books filtered by ${query}`}
       to={booksHref(query)}
     >

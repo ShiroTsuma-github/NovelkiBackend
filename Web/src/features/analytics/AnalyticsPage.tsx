@@ -133,7 +133,7 @@ export function AnalyticsPage() {
         <div className="grid min-w-0 gap-5" data-testid="analytics-left-column">
         <AnalyticsChartCard
           columns={['Type', 'Status', 'Books', 'Share of type']}
-          description="100% stacked bars showing how statuses split inside each content type."
+          description="See which content types are concentrated in each reading status."
           emptyMessage="No status/type data for this analytics scope."
           isEmpty={!isInitialLoading && !statusByTypeRows(data).length}
           isError={analyticsQuery.isError && !!data}
@@ -146,7 +146,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Genre', 'Books', 'Share of books']}
-          description="Top genres by matching books, with smaller categories grouped into Other."
+          description="Find the genres that dominate the current filters."
           emptyMessage="No genre data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.composition.genres.length)}
           isError={analyticsQuery.isError && !!data}
@@ -159,7 +159,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Tag', 'Books', 'Share of books']}
-          description="Top tags by matching books, with smaller categories grouped into Other."
+          description="Find the tags that dominate the current filters."
           emptyMessage="No tag data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.composition.tags.length)}
           isError={analyticsQuery.isError && !!data}
@@ -173,7 +173,7 @@ export function AnalyticsPage() {
         <AnalyticsChartCard
           columns={['Status', 'Priority', 'Books', 'Share of status']}
           dataTableEnabled={false}
-          description="Priority heatmap per status, including the Unset bucket."
+          description="Spot statuses where books are still unprioritized or clustered in one priority."
           emptyMessage="No priority data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.planning.prioritiesByStatus.length)}
           isError={analyticsQuery.isError && !!data}
@@ -186,7 +186,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Source', 'Links', 'Books', 'Coverage']}
-          description="Ranks link sources by total links and book coverage."
+          description="Check which external sources are represented in matching books."
           emptyMessage="0 link sources found for this scope."
           isEmpty={!isInitialLoading && !(data?.quality.linkSources.length)}
           isError={analyticsQuery.isError && !!data}
@@ -199,7 +199,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Kind', 'Bucket', 'Books', 'Coverage']}
-          description="Separates cover statuses from provider coverage."
+          description="Review cover fetch state and provider coverage without opening each book."
           emptyMessage="0 cover records reported for this scope."
           isEmpty={!isInitialLoading && !(data?.quality.coverStatuses.length || data?.quality.coverSources.length)}
           isError={analyticsQuery.isError && !!data}
@@ -215,7 +215,7 @@ export function AnalyticsPage() {
         <AnalyticsChartCard
           columns={['Rating', 'Books']}
           dataTableEnabled={false}
-          description="Rated books are shown on a 1-10 axis; unrated books stay separate."
+          description="See the rating spread and jump directly to unrated books."
           emptyMessage="No rating data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.overview.totalBooks)}
           isError={analyticsQuery.isError && !!data}
@@ -228,7 +228,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Type', 'Books', 'Current chapters', 'Average current', 'Median current']}
-          description="Compares title count and chapter volume with separate scales."
+          description="Compare where your chapter backlog sits by content type."
           emptyMessage="No chapter volume data for this analytics scope."
           isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
           isError={analyticsQuery.isError && !!data}
@@ -241,7 +241,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
-          description="Client-side estimate based on your minutes-per-chapter settings."
+          description="Estimate reading effort from chapter counts and your minutes-per-chapter settings."
           emptyMessage="No chapter data to estimate reading time."
           isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
           isError={analyticsQuery.isError && !!data}
@@ -254,7 +254,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Date', 'Progress events', 'Books touched', 'Chapters advanced']}
-          description="Progress history grouped by the selected time bucket."
+          description="Track recent progress events and touched books in the selected range."
           emptyMessage="No reading activity in this time range."
           isEmpty={!isInitialLoading && !(data?.activity.points.length)}
           isError={analyticsQuery.isError && !!data}
@@ -267,7 +267,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Date', 'Books added', 'Cumulative books', 'By type']}
-          description="Library size over time, including empty buckets and visible import jumps."
+          description="See when books were added and which types caused growth."
           emptyMessage="No library growth points in this time range."
           isEmpty={!isInitialLoading && !(data?.libraryGrowth.points.length)}
           isError={analyticsQuery.isError && !!data}
@@ -280,7 +280,7 @@ export function AnalyticsPage() {
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Field', 'Complete books', 'Coverage', 'Missing books']}
-          description="Coverage per metadata field, intended to guide cleanup work."
+          description="Find fields that are missing most often in the current scope."
           emptyMessage="0 metadata fields reported for this scope."
           isEmpty={!isInitialLoading && !(data?.quality.fieldCompleteness.length)}
           isError={analyticsQuery.isError && !!data}

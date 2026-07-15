@@ -320,7 +320,10 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByTestId('priority-heatmap')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for priority by status/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Plan to Read' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22')
-    expect(screen.getByRole('link', { name: '3' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22%20priority%3Anone')
+    const unsetLink = screen.getByRole('link', { name: '3' })
+    expect(unsetLink).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22%20priority%3Anone')
+    expect(unsetLink).toHaveClass('text-inherit')
+    expect(screen.getByText('75%')).toHaveClass('text-current/85')
   })
 
   it('shows rating and priority empty states when all analytics rows are zero', async () => {
@@ -385,6 +388,7 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByText('15.6 h')).toBeInTheDocument()
+    expect(screen.getByText(/0\.0 years based on known current chapters/i)).toBeInTheDocument()
     const requestCount = vi.mocked(api.getBookAnalytics).mock.calls.length
     const input = screen.getByRole('spinbutton', { name: /novel minutes per chapter/i })
 
