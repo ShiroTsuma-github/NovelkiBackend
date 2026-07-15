@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react'
 import { ColumnHeader, type ColumnDefinition } from './bookListColumns'
 
+const minimumTableWidthRem = 76
+const fallbackColumnWidthRem = 9
+const actionsColumnWidthRem = 8
+
 export function BookDataTable<T extends { id: string }>({
   actionHeader = 'Actions',
   columns,
@@ -28,10 +32,10 @@ export function BookDataTable<T extends { id: string }>({
   wrapperClassName?: string
   onSort: (sortBy: string) => void
 }) {
-  const tableMinWidthRem = Math.max(76, columns.length * 9 + 8)
+  const tableMinWidthRem = getBookTableMinWidthRem(columns)
 
   return (
-    <div className={`${wrapperClassName} overflow-x-auto`}>
+    <div className={`${wrapperClassName} max-w-full overflow-x-auto`}>
       <table className="w-full table-fixed border-collapse text-left text-sm" style={{ minWidth: `${tableMinWidthRem}rem` }}>
         <colgroup>
           {columns.map((column) => <col className={column.widthClass ?? ''} key={column.id} />)}
@@ -78,4 +82,27 @@ export function BookDataTable<T extends { id: string }>({
       </table>
     </div>
   )
+}
+
+export function getBookTableMinWidthRem(columns: Array<{ widthClass?: string }>) {
+  const columnWidth = columns.reduce((sum, column) => sum + getTailwindWidthRem(column.widthClass), actionsColumnWidthRem)
+  return Math.max(minimumTableWidthRem, columnWidth)
+}
+
+function getTailwindWidthRem(widthClass?: string) {
+  if (!widthClass) {
+    return fallbackColumnWidthRem
+  }
+
+  const spacingMatch = /^w-(\d+)$/.exec(widthClass)
+  if (spacingMatch) {
+    return Number(spacingMatch[1]) / 4
+  }
+
+  const remMatch = /^w-\[(\d+(?:\.\d+)?)rem\]$/.exec(widthClass)
+  if (remMatch) {
+    return Number(remMatch[1])
+  }
+
+  return fallbackColumnWidthRem
 }

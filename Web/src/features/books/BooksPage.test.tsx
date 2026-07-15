@@ -51,9 +51,45 @@ describe('BooksPage', () => {
     const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
-    expect(container.querySelector('table')).toHaveStyle({ minWidth: '80rem' })
+    expect(container.querySelector('table')).toHaveStyle({ minWidth: '83rem' })
     expect(container.querySelectorAll('col')).toHaveLength(9)
     expect(screen.getByRole('columnheader', { name: /actions/i })).toHaveClass('sticky', 'right-0')
+  })
+
+  it('keeps all enabled table columns inside a symmetric scroll container', async () => {
+    window.localStorage.setItem('novelki.books.columns.v1', JSON.stringify([
+      { id: 'id', visible: true },
+      { id: 'title', visible: true },
+      { id: 'alternativeTitles', visible: true },
+      { id: 'author', visible: true },
+      { id: 'status', visible: true },
+      { id: 'type', visible: true },
+      { id: 'progress', visible: true },
+      { id: 'totalChapters', visible: true },
+      { id: 'rating', visible: true },
+      { id: 'priority', visible: true },
+      { id: 'created', visible: true },
+      { id: 'lastModified', visible: true },
+      { id: 'genres', visible: true },
+      { id: 'tags', visible: true },
+      { id: 'links', visible: true },
+      { id: 'notes', visible: true },
+      { id: 'description', visible: true },
+    ]))
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+
+    const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+
+    const table = container.querySelector('table')
+    const scroller = table?.parentElement
+    const section = table?.closest('section')
+
+    expect(table).toHaveStyle({ minWidth: '170rem' })
+    expect(container.querySelectorAll('col')).toHaveLength(18)
+    expect(scroller).toHaveClass('max-w-full', 'overflow-x-auto')
+    expect(section).toHaveClass('min-w-0', 'overflow-hidden')
   })
 
   it('shows the colon-based rating operator syntax in advanced search help', async () => {
