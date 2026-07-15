@@ -128,7 +128,8 @@ export function AnalyticsPage() {
         <MetricCard label="Current chapters" loading={isInitialLoading} value={data ? formatChapterCount(data.overview.currentChapters) : '-'} />
       </div>
 
-      <div className="min-w-0 columns-1 gap-5 space-y-5 xl:columns-2 [&>section]:mb-5 [&>section]:break-inside-avoid">
+      <div className="grid min-w-0 items-start gap-5 xl:grid-cols-2">
+        <div className="grid min-w-0 gap-5">
         <AnalyticsChartCard
           columns={['Type', 'Status', 'Books', 'Share of type']}
           description="100% stacked bars showing how statuses split inside each content type."
@@ -210,6 +211,21 @@ export function AnalyticsPage() {
           <ChapterVolumeChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
+          columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
+          description="Client-side estimate based on your minutes-per-chapter settings."
+          emptyMessage="No chapter data to estimate reading time."
+          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={estimatedReadingTimeRows(data)}
+          title="Estimated reading time"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <EstimatedReadingTimeChart data={data} />
+        </AnalyticsChartCard>
+        </div>
+        <div className="grid min-w-0 gap-5">
+        <AnalyticsChartCard
           columns={['Date', 'Progress events', 'Books touched', 'Chapters advanced']}
           description="Progress history grouped by the selected time bucket."
           emptyMessage="No reading activity in this time range."
@@ -234,19 +250,6 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <LibraryGrowthChart data={data} />
-        </AnalyticsChartCard>
-        <AnalyticsChartCard
-          columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
-          description="Client-side estimate based on your minutes-per-chapter settings."
-          emptyMessage="No chapter data to estimate reading time."
-          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
-          isError={analyticsQuery.isError && !!data}
-          isLoading={isInitialLoading}
-          rows={estimatedReadingTimeRows(data)}
-          title="Estimated reading time"
-          onRetry={() => analyticsQuery.refetch()}
-        >
-          <EstimatedReadingTimeChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Field', 'Complete books', 'Coverage', 'Missing books']}
@@ -287,6 +290,7 @@ export function AnalyticsPage() {
         >
           <CoverAvailabilityChart data={data} />
         </AnalyticsChartCard>
+        </div>
       </div>
     </div>
   )

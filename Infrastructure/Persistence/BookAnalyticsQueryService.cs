@@ -475,7 +475,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         var completenessRows = await query
             .Select(book => new QualityCompletenessRow(
                 book.Id,
-                book.AuthorId != null,
+                book.AuthorId != null || (book.Author != null && book.Author.PrimaryName != string.Empty),
                 book.Description,
                 book.BookGenres.Any(),
                 book.BookTags.Any(),

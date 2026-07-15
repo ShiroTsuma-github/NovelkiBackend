@@ -1,6 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsActivityPointDto, BookAnalyticsDto } from '@/api/types'
-import { DrilldownLink, formatCount } from './chartUtils'
+import { dateRangeForBucket, formatCount, formatDateRange } from './chartUtils'
 
 type ReadingActivityChartProps = {
   data: BookAnalyticsDto | undefined
@@ -8,7 +8,8 @@ type ReadingActivityChartProps = {
 
 export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
   const points = data?.activity.points ?? []
-  const displayPoints = compactActivityPoints(points)
+  const bucket = data?.scope.bucket ?? 'day'
+  const displayPoints = compactActivityPoints(points, bucket)
 
   if (!points.length) {
     return <div className="grid min-h-56 place-items-center text-sm text-slate-600">No reading activity in this time range.</div>
@@ -17,7 +18,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
   return (
     <div className="grid gap-4">
       <p className="text-sm text-slate-600">
-        Progress events and touched books use separate lines; chapters advanced are listed below for exact bucket context.
+        Progress events and touched books use separate lines; activity periods are informational because progress history does not map one-to-one to the book updated filter.
       </p>
       <div className="h-56 min-w-0" aria-label="Reading activity trend">
         <ResponsiveContainer>
@@ -37,7 +38,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
         {displayPoints.map((point) => (
           <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={point.label}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              {point.queryDate ? <DrilldownLink query={`updated:=${point.queryDate}`}>{point.label}</DrilldownLink> : <span className="font-semibold text-slate-950">{point.label}</span>}
+              <span className="font-semibold text-slate-950">{point.label}</span>
               <span className="text-slate-700">
                 {formatCount(point.progressEvents)} events · {formatCount(point.booksTouched)} books touched
               </span>
@@ -51,7 +52,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
 }
 
 export function readingActivityRows(data?: BookAnalyticsDto) {
-  return compactActivityPoints(data?.activity.points ?? []).map((point) => [
+  return compactActivityPoints(data?.activity.points ?? [], data?.scope.bucket ?? 'day').map((point) => [
     point.label,
     formatCount(point.progressEvents),
     formatCount(point.booksTouched),
@@ -59,17 +60,18 @@ export function readingActivityRows(data?: BookAnalyticsDto) {
   ])
 }
 
-function compactActivityPoints(points: BookAnalyticsActivityPointDto[]) {
-  return points.reduce<Array<BookAnalyticsActivityPointDto & { label: string; queryDate?: string }>>((rows, point) => {
+function compactActivityPoints(points: BookAnalyticsActivityPointDto[], bucket: string) {
+  return points.reduce<Array<BookAnalyticsActivityPointDto & { label: string; endExclusive: string }>>((rows, point) => {
+    const period = dateRangeForBucket(point.date, bucket)
     const isEmpty = point.progressEvents === 0 && point.booksTouched === 0 && point.chaptersAdvanced === 0
     const previous = rows.at(-1)
     if (isEmpty && previous && previous.progressEvents === 0 && previous.booksTouched === 0 && previous.chaptersAdvanced === 0) {
-      previous.label = `${previous.label.split(' - ')[0]} - ${point.date}`
-      previous.queryDate = undefined
+      previous.endExclusive = period.end
+      previous.label = formatDateRange(previous.date, previous.endExclusive)
       return rows
     }
 
-    rows.push({ ...point, label: point.date, queryDate: isEmpty ? undefined : point.date })
+    rows.push({ ...point, label: formatDateRange(period.start, period.end), endExclusive: period.end })
     return rows
   }, [])
 }

@@ -1,6 +1,6 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
-import { chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, percent } from './chartUtils'
+import { chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, normalizedPercent, percent } from './chartUtils'
 
 type StatusByTypeChartProps = {
   data: BookAnalyticsDto | undefined
@@ -13,7 +13,7 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
     const row: Record<string, number | string> = { type: item.type, totalBooks: item.totalBooks }
     for (const status of statuses) {
       const count = item.statuses.find((entry) => entry.status === status)?.bookCount ?? 0
-      row[status] = percent(count, item.totalBooks)
+      row[status] = normalizedPercent(count, item.totalBooks)
       row[`${status}Count`] = count
     }
 
@@ -29,7 +29,7 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
       <div className="h-72 w-full min-w-0" data-testid="status-by-type-chart">
         <ResponsiveContainer>
           <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
-            <XAxis domain={[0, 100]} tickFormatter={(value) => `${value}%`} type="number" />
+            <XAxis domain={[0, 100]} tickFormatter={(value) => formatPercent(Number(value))} type="number" />
             <YAxis dataKey="type" tickLine={false} type="category" width={96} />
             <Tooltip
               formatter={(value, name, item) => [

@@ -1,6 +1,6 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
-import { DrilldownLink, formatCount, formatPercent, noneQuery, numberQuery, percent } from './chartUtils'
+import { DrilldownLink, formatCount, formatPercent, noneQuery, percent } from './chartUtils'
 
 type RatingDistributionChartProps = {
   data: BookAnalyticsDto | undefined
@@ -49,11 +49,6 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
         </div>
       </div>
       <div className="flex flex-wrap gap-2 text-sm">
-        {counts.map((item) => (
-          <DrilldownLink key={item.rating} query={numberQuery('rating', item.rating)}>
-            {item.rating}: {formatCount(item.bookCount)}
-          </DrilldownLink>
-        ))}
         <DrilldownLink query={noneQuery('rating')}>Unrated: {formatCount(ratings.unratedBooks)}</DrilldownLink>
       </div>
     </div>
