@@ -340,6 +340,40 @@ describe('ImportBooksDialog', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('keeps the imported books summary table scrollable for large imports', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionAfterDiscardInvalid)
+    vi.mocked(api.finalizeBookImport).mockResolvedValue({
+      ...importFinalizeFullSuccess,
+      importedCount: 1_000,
+      importedBooks: Array.from({ length: 30 }, (_unused, index) => ({
+        ...importFinalizeFullSuccess.importedBooks[0],
+        primaryTitle: `Imported Book ${index + 1}`,
+      })),
+    })
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    fireEvent.click(await screen.findByRole('button', { name: /finalize import/i }))
+
+    expect(await screen.findByText('1,000')).toBeInTheDocument()
+    expect(screen.getByText('Imported Book 30')).toBeInTheDocument()
+
+    const summaryTable = screen.getByRole('table')
+    expect(summaryTable.parentElement).toHaveClass('overflow-auto')
+    expect(summaryTable.parentElement).toHaveClass('max-h-[min(28rem,55vh)]')
+  })
+
   it('keeps partial finalize messages visible on the success screen', async () => {
     vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionAfterDiscardInvalid)
     vi.mocked(api.finalizeBookImport).mockResolvedValue(importFinalizePartialSuccess)

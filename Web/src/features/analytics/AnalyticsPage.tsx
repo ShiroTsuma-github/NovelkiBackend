@@ -7,6 +7,7 @@ import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
 import { ChapterVolumeChart, chapterVolumeRows } from './charts/ChapterVolumeChart'
+import { formatCount } from './charts/chartUtils'
 import { CoverAvailabilityChart, coverAvailabilityRows } from './charts/CoverAvailabilityChart'
 import { EstimatedReadingTimeChart, estimatedReadingTimeRows } from './charts/EstimatedReadingTimeChart'
 import { LibraryGrowthChart, libraryGrowthRows } from './charts/LibraryGrowthChart'
@@ -121,9 +122,9 @@ export function AnalyticsPage() {
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <MetricCard label="Total books" loading={isInitialLoading} value={data ? String(data.overview.totalBooks) : '-'} />
-        <MetricCard label="Rated" loading={isInitialLoading} value={data ? String(data.overview.ratedBooks) : '-'} />
-        <MetricCard label="Unrated" loading={isInitialLoading} value={data ? String(data.overview.unratedBooks) : '-'} />
+        <MetricCard label="Total books" loading={isInitialLoading} value={data ? formatCount(data.overview.totalBooks) : '-'} />
+        <MetricCard label="Rated" loading={isInitialLoading} value={data ? formatCount(data.overview.ratedBooks) : '-'} />
+        <MetricCard label="Unrated" loading={isInitialLoading} value={data ? formatCount(data.overview.unratedBooks) : '-'} />
         <MetricCard label="Average rating" loading={isInitialLoading} value={data ? formatAverageRating(data.overview.averageRating) : '-'} />
         <MetricCard label="Current chapters" loading={isInitialLoading} value={data ? formatChapterCount(data.overview.currentChapters) : '-'} />
       </div>
@@ -184,6 +185,19 @@ export function AnalyticsPage() {
           <RatingDistributionChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
+          columns={['Type', 'Books', 'Current chapters', 'Average current', 'Median current']}
+          description="Compares title count and chapter volume with separate scales."
+          emptyMessage="No chapter volume data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={chapterVolumeRows(data)}
+          title="Chapter volume by type"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <ChapterVolumeChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
           columns={['Status', 'Priority', 'Books', 'Share of status']}
           dataTableEnabled={false}
           description="Priority heatmap per status, including the Unset bucket."
@@ -196,19 +210,6 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <PriorityByStatusChart data={data} />
-        </AnalyticsChartCard>
-        <AnalyticsChartCard
-          columns={['Type', 'Books', 'Current chapters', 'Average current', 'Median current']}
-          description="Compares title count and chapter volume with separate scales."
-          emptyMessage="No chapter volume data for this analytics scope."
-          isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
-          isError={analyticsQuery.isError && !!data}
-          isLoading={isInitialLoading}
-          rows={chapterVolumeRows(data)}
-          title="Chapter volume by type"
-          onRetry={() => analyticsQuery.refetch()}
-        >
-          <ChapterVolumeChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}

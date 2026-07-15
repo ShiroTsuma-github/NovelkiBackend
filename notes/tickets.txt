@@ -26,6 +26,15 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 
 ## Done
 
+### User reported issues - Analytics and import polish
+
+- Typ: `UX regression`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/analytics/*`, `Web/src/features/books/*`
+- Problem: reading activity mialo zbedna notke, duze liczby byly bez separatorow, tabela imported books w podsumowaniu importu mogla wypasc poza dialog, cover availability generowalo nieobslugiwane query `coverStatus`/`coverSource`, a kolejnosc kart nie odzwierciedlala priorytetu rating/chapter volume.
+- Zakres: usunieto notke z reading activity; dodano formatowanie en-US z separatorami dla KPI analytics, summary listy ksiazek, chapter counts i import summary; podsumowanie imported books dostalo pionowy scroll; cover availability pokazuje statusy/providerow bez linkow do nieobslugiwanej skladni; chapter volume przeniesiono nad priority/bookkeeping, a testy pilnuja ze rating i chapter volume sa przed kartami bookkeeping.
+- Akceptacja: testy obejmuja duze liczby, brak starej notki, brak linkow `coverStatus`/`coverSource`, kolejnosc kart oraz scrollowana tabele podsumowania importu.
+
 ### User reported issues - Analytics follow-up
 
 - Typ: `UX/data correctness regression`

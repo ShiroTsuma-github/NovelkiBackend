@@ -111,6 +111,36 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByText('12')).toBeInTheDocument()
   })
 
+  it('formats large overview numbers with thousand separators', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      totalBooks: 1_000_000,
+      ratedBooks: 9_999,
+      unratedBooks: 990_001,
+      currentChapters: 1_234_567.5,
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('1,000,000')).toBeInTheDocument()
+    expect(screen.getByText('9,999')).toBeInTheDocument()
+    expect(screen.getByText('990,001')).toBeInTheDocument()
+    expect(screen.getByText('1,234,567.5')).toBeInTheDocument()
+  })
+
+  it('keeps high-priority analytics cards above bookkeeping cards', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    const rating = await screen.findByText('Rating distribution')
+    const chapterVolume = screen.getByText('Chapter volume by type')
+    const libraryGrowth = screen.getByText('Library growth')
+    const metadata = screen.getByText('Metadata completeness')
+
+    expect(rating.compareDocumentPosition(metadata) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(chapterVolume.compareDocumentPosition(libraryGrowth) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('shows card data tables without forcing horizontal page overflow', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     const user = userEvent.setup()
@@ -379,6 +409,15 @@ describe('AnalyticsPage', () => {
     expect(screen.getByRole('cell', { name: 'No additions' })).toBeInTheDocument()
   })
 
+  it('does not show the obsolete reading activity note', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByLabelText('Reading activity trend')).toBeInTheDocument()
+    expect(screen.queryByText(/activity periods are informational/i)).not.toBeInTheDocument()
+  })
+
   it('renders quality charts with zero, full, unknown, and long-label buckets', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
       totalBooks: 10,
@@ -413,7 +452,11 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText(/Usable covers are counted only/i)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '10 books' })).toHaveAttribute('href', '/books?query=cover%3Anone')
     expect(screen.getByText(/Unknown status bucket: 2 books/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Very Long Source Name/i })).toBeInTheDocument()
+    expect(screen.getByText(/Very Long Source Name/i)).toBeInTheDocument()
+
+    const analyticsLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+    expect(analyticsLinks.some((link) => link.href.includes('coverStatus'))).toBe(false)
+    expect(analyticsLinks.some((link) => link.href.includes('coverSource'))).toBe(false)
 
     await user.click(screen.getByRole('button', { name: /view data for link sources/i }))
     expect(screen.getByRole('cell', { name: '99' })).toBeInTheDocument()

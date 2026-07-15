@@ -1,16 +1,8 @@
 import type { BookAnalyticsDto } from '@/api/types'
-import { DrilldownLink, fieldQuery, formatCount, formatPercent, noneQuery } from './chartUtils'
+import { formatCount, formatPercent } from './chartUtils'
 
 type CoverAvailabilityChartProps = {
   data: BookAnalyticsDto | undefined
-}
-
-const statusQueries: Record<string, string> = {
-  Failed: fieldQuery('coverStatus', 'Failed'),
-  NotFound: fieldQuery('coverStatus', 'NotFound'),
-  Pending: fieldQuery('coverStatus', 'Pending'),
-  Found: fieldQuery('coverStatus', 'Found'),
-  Uploaded: fieldQuery('coverStatus', 'Uploaded'),
 }
 
 export function CoverAvailabilityChart({ data }: CoverAvailabilityChartProps) {
@@ -44,7 +36,7 @@ export function CoverAvailabilityChart({ data }: CoverAvailabilityChartProps) {
         <h3 className="text-sm font-semibold text-slate-950">Top cover providers</h3>
         {sources.length ? sources.map((item) => (
           <div className="flex flex-wrap items-center justify-between gap-3 text-sm" key={item.source}>
-            <DrilldownLink query={fieldQuery('coverSource', item.source)}>{item.source || 'Unknown provider'}</DrilldownLink>
+            <span className="font-semibold text-slate-950">{item.source || 'Unknown provider'}</span>
             <span className="text-slate-700">{formatCount(item.bookCount)} books · {formatPercent(item.shareOfBooks)}</span>
           </div>
         )) : <div className="text-sm text-slate-600">No cover providers reported.</div>}
@@ -71,16 +63,16 @@ export function coverAvailabilityRows(data?: BookAnalyticsDto) {
 
 function coverStatusAction(status: string, bookCount: number) {
   if (status === 'Failed') {
-    return <DrilldownLink query={statusQueries.Failed}>Review failed fetches: {formatCount(bookCount)}</DrilldownLink>
+    return `Review failed fetches: ${formatCount(bookCount)}`
   }
   if (status === 'NotFound') {
-    return <DrilldownLink query={statusQueries.NotFound}>Search manually: {formatCount(bookCount)}</DrilldownLink>
+    return `Search manually: ${formatCount(bookCount)}`
   }
   if (status === 'Pending') {
-    return <DrilldownLink query={statusQueries.Pending}>Queued for processing: {formatCount(bookCount)}</DrilldownLink>
+    return `Queued for processing: ${formatCount(bookCount)}`
   }
   if (status === 'Found' || status === 'Uploaded') {
-    return <DrilldownLink query={statusQueries[status] ?? noneQuery('cover')}>Usable when image or thumbnail exists: {formatCount(bookCount)}</DrilldownLink>
+    return `Usable when image or thumbnail exists: ${formatCount(bookCount)}`
   }
   return `Unknown status bucket: ${formatCount(bookCount)} books`
 }

@@ -17,9 +17,6 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
 
   return (
     <div className="grid gap-4">
-      <p className="text-sm text-slate-600">
-        Progress events and touched books use separate lines; activity periods are informational because progress history does not map one-to-one to the book updated filter.
-      </p>
       <div className="h-56 min-w-0" aria-label="Reading activity trend">
         <ResponsiveContainer>
           <LineChart data={points}>
