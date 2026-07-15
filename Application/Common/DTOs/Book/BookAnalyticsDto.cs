@@ -8,6 +8,7 @@ public sealed record BookAnalyticsDto
     public BookAnalyticsCompositionDto Composition { get; init; } = new();
     public BookAnalyticsRatingsDto Ratings { get; init; } = new();
     public BookAnalyticsPlanningDto Planning { get; init; } = new();
+    public BookAnalyticsProgressDto Progress { get; init; } = new();
 }
 
 public sealed record BookAnalyticsScopeDto
@@ -86,4 +87,18 @@ public sealed record BookAnalyticsPriorityCountDto
 {
     public required string Priority { get; init; }
     public int BookCount { get; init; }
+}
+
+public sealed record BookAnalyticsProgressDto
+{
+    public IReadOnlyList<BookAnalyticsTypeVolumeDto> TypeVolumes { get; init; } = [];
+}
+
+public sealed record BookAnalyticsTypeVolumeDto
+{
+    public required string Type { get; init; }
+    public int BookCount { get; init; }
+    public decimal CurrentChapters { get; init; }
+    public decimal? AverageCurrentChapter { get; init; }
+    public decimal? MedianCurrentChapter { get; init; }
 }

@@ -89,6 +89,19 @@ public static partial class MappingExtensions
                             .ToList()
                     })
                     .ToList()
+            },
+            Progress = new BookAnalyticsProgressDto
+            {
+                TypeVolumes = source.Progress.TypeVolumes
+                    .Select(item => new BookAnalyticsTypeVolumeDto
+                    {
+                        Type = item.Type,
+                        BookCount = item.BookCount,
+                        CurrentChapters = item.CurrentChapters,
+                        AverageCurrentChapter = item.AverageCurrentChapter,
+                        MedianCurrentChapter = item.MedianCurrentChapter
+                    })
+                    .ToList()
             }
         };
     }

@@ -24,6 +24,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         var composition = await GetCompositionAsync(query, overview.TotalBooks, cancellationToken);
         var ratings = await GetRatingsAsync(query, overview, cancellationToken);
         var planning = await GetPlanningAsync(query, overview.TotalBooks, cancellationToken);
+        var progress = await GetProgressAsync(query, overview.TotalBooks, cancellationToken);
 
         return new BookAnalyticsSnapshot(
             DateTimeOffset.UtcNow,
@@ -31,7 +32,8 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             overview,
             composition,
             ratings,
-            planning);
+            planning,
+            progress);
     }
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -250,6 +252,67 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             .ToList();
 
         return new BookAnalyticsPlanningSnapshot(prioritiesByStatus);
+    }
+
+    private static async Task<BookAnalyticsProgressSnapshot> GetProgressAsync(
+        IQueryable<Book> query,
+        int totalBooks,
+        CancellationToken cancellationToken)
+    {
+        if (totalBooks == 0)
+        {
+            return BookAnalyticsProgressSnapshot.Empty;
+        }
+
+        // Portable median projection: EF providers differ on percentile/median support,
+        // so keep the database work to the filtered scalar projection and compute
+        // per-type medians from chapter values only.
+        var rows = await query
+            .Select(book => new
+            {
+                Type = book.ContentType.Name,
+                book.CurrentChapterNumber,
+            })
+            .OrderBy(row => row.Type)
+            .ToListAsync(cancellationToken);
+
+        return new BookAnalyticsProgressSnapshot(rows
+            .GroupBy(row => row.Type)
+            .Select(group =>
+            {
+                var knownChapters = group
+                    .Where(row => row.CurrentChapterNumber != null)
+                    .Select(row => row.CurrentChapterNumber!.Value)
+                    .OrderBy(value => value)
+                    .ToList();
+                var sum = knownChapters.Sum();
+
+                return new BookAnalyticsTypeVolumeSnapshot(
+                    group.Key,
+                    group.Count(),
+                    sum,
+                    knownChapters.Count == 0 ? null : sum / knownChapters.Count,
+                    CalculateMedian(knownChapters));
+            })
+            .OrderByDescending(item => item.BookCount)
+            .ThenBy(item => item.Type)
+            .ToList());
+    }
+
+    private static decimal? CalculateMedian(IReadOnlyList<decimal> sortedValues)
+    {
+        if (sortedValues.Count == 0)
+        {
+            return null;
+        }
+
+        var middle = sortedValues.Count / 2;
+        if (sortedValues.Count % 2 == 1)
+        {
+            return sortedValues[middle];
+        }
+
+        return (sortedValues[middle - 1] + sortedValues[middle]) / 2m;
     }
 
     private sealed record RelationCountRow(string Name, int BookCount);
