@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { addDays, format, subMonths } from 'date-fns'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,6 +9,7 @@ import { readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { expectReadableTextContrast } from '@/test/contrast'
 import { testSession } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { AnalyticsChartCard } from './AnalyticsChartCard'
 import { AnalyticsPage } from './AnalyticsPage'
 import { libraryGrowthChartPoints } from './charts/LibraryGrowthChart'
 import { readingActivityChartPoints } from './charts/ReadingActivityChart'
@@ -44,7 +45,30 @@ describe('AnalyticsPage', () => {
       bucket: 'month',
     })
     expect(screen.getByDisplayValue('author:Toika rating:>=8')).toBeInTheDocument()
+    expect(screen.queryByText(/query uses the same filters/i)).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /date range: jan 1, 2026/i })).toHaveAttribute('title', 'Jan 1, 2026 – Jan 31, 2026')
+  })
+
+  it('renders chart fetch errors with theme-aware dark colors', () => {
+    render(
+      <AnalyticsChartCard
+        columns={[]}
+        description="Broken chart"
+        isError
+        rows={[]}
+        title="Broken analytics"
+        onRetry={() => undefined}
+      >
+        <div>Chart</div>
+      </AnalyticsChartCard>,
+    )
+
+    const alert = screen.getByRole('alert')
+    expect(alert).toHaveClass('border-rose-500/40')
+    expect(alert).toHaveClass('bg-rose-950/40')
+    expect(alert).not.toHaveClass('bg-rose-50')
+    expect(screen.getByText('Could not load this analytics card.')).toHaveClass('text-rose-100')
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('bg-rose-500/20')
   })
 
   it('extracts date filters from query into analytics range request', async () => {
