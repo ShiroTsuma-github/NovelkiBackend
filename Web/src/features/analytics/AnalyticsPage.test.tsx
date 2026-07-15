@@ -141,11 +141,14 @@ describe('AnalyticsPage', () => {
     expect(pendingButton).toHaveAttribute('title', format(start, 'MMM d, yyyy'))
     expect(pendingButton).not.toHaveTextContent('Today')
     expect(getDayCell(startDay)).toHaveClass('rounded-l-full')
+    expect(getDayCell(startDay)).not.toHaveClass('rounded-r-full')
 
     const endDay = screen.getByRole('button', { name: dayButtonMatcher(end) })
     await user.click(endDay)
     await user.click(screen.getByRole('button', { name: /date range/i }))
-    expect(getDayCell(screen.getByRole('button', { name: dayButtonMatcher(end) }))).toHaveClass('rounded-r-full')
+    const appliedEndCell = getDayCell(screen.getByRole('button', { name: dayButtonMatcher(end) }))
+    expect(appliedEndCell).toHaveClass('rounded-r-full')
+    expect(appliedEndCell).not.toHaveClass('rounded-l-full')
     await user.click(screen.getByRole('button', { name: /date range/i }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
@@ -161,6 +164,42 @@ describe('AnalyticsPage', () => {
     await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
       from: '2025-12-15',
     })))
+  })
+
+  it('clears previous range highlight when starting a new custom calendar range', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    setStoredSession({ ...testSession, createdAt: '2025-12-15T10:30:00Z' })
+    const user = userEvent.setup()
+    const today = getTodayForTest()
+    const previousStart = addDays(subMonths(today, 1), 2)
+    const previousMiddle = addDays(previousStart, 4)
+    const previousEnd = addDays(previousStart, 8)
+    const nextStart = addDays(previousStart, 14)
+
+    renderWithProviders(<AnalyticsPage />, {
+      route: `/analytics?from=${toDateInputValueForTest(previousStart)}&to=${toDateInputValueForTest(addDays(previousEnd, 1))}`,
+    })
+
+    await screen.findByText('Status by type')
+    await user.click(screen.getByRole('button', { name: /date range/i }))
+
+    expect(getDayCell(screen.getByRole('button', { name: dayButtonMatcher(previousStart) }))).toHaveClass('rounded-l-full')
+    expect(getDayCell(screen.getByRole('button', { name: dayButtonMatcher(previousEnd) }))).toHaveClass('rounded-r-full')
+
+    await user.click(screen.getByRole('button', { name: dayButtonMatcher(nextStart) }))
+
+    const nextStartCell = getDayCell(screen.getByRole('button', { name: dayButtonMatcher(nextStart) }))
+    expect(nextStartCell).toHaveClass('rounded-l-full')
+    expect(nextStartCell).not.toHaveClass('rounded-r-full')
+
+    const previousStartCell = getDayCell(screen.getByRole('button', { name: dayButtonMatcher(previousStart) }))
+    const previousMiddleCell = getDayCell(screen.getByRole('button', { name: dayButtonMatcher(previousMiddle) }))
+    const previousEndCell = getDayCell(screen.getByRole('button', { name: dayButtonMatcher(previousEnd) }))
+    expect(previousStartCell).not.toHaveClass('rounded-l-full')
+    expect(previousStartCell).not.toHaveClass('range_start')
+    expectNoClassContaining(previousStartCell, 'cyan')
+    expectNoClassContaining(previousMiddleCell, 'cyan')
+    expectNoClassContaining(previousEndCell, 'cyan')
   })
 
   it('disables calendar days before the account creation date', async () => {
@@ -736,6 +775,11 @@ function getDayCell(button: HTMLElement) {
   }
 
   return cell
+}
+
+function expectNoClassContaining(element: HTMLElement, classNamePart: string) {
+  const matchingClass = Array.from(element.classList).find((className) => className.includes(classNamePart))
+  expect(matchingClass).toBeUndefined()
 }
 
 function escapeRegExp(value: string) {
