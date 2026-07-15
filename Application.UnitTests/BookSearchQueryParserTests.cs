@@ -91,6 +91,62 @@ public class BookSearchQueryParserTests
         Assert.Empty(criteria.Numbers);
     }
 
+    [Theory]
+    [InlineData("rating:none", BookSearchMissingField.Rating)]
+    [InlineData("priority:NONE", BookSearchMissingField.Priority)]
+    [InlineData("author:'none'", BookSearchMissingField.Author)]
+    [InlineData("genre:none", BookSearchMissingField.Genre)]
+    [InlineData("tag:none", BookSearchMissingField.Tag)]
+    [InlineData("total:none", BookSearchMissingField.TotalChapters)]
+    [InlineData("cover:none", BookSearchMissingField.Cover)]
+    [InlineData("link:none", BookSearchMissingField.Link)]
+    public void Parse_ShouldReadMissingValueFilters(string query, BookSearchMissingField expectedField)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        var filter = Assert.Single(criteria.Missing);
+        Assert.Equal(expectedField, filter.Field);
+        Assert.Empty(criteria.Terms);
+        Assert.Empty(criteria.Fields);
+        Assert.Empty(criteria.Numbers);
+    }
+
+    [Theory]
+    [InlineData("createDate:>2026-07-15", BookSearchDateField.Created, BookSearchOperator.GreaterThan, 2026, 7, 15)]
+    [InlineData("createDate:>=15.07.2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7, 15)]
+    [InlineData("createdDate:=5.7.2026", BookSearchDateField.Created, BookSearchOperator.Equal, 2026, 7, 5)]
+    [InlineData("updateDate:<15/07/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 15)]
+    [InlineData("lastModified:<=5/7/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThanOrEqual, 2026, 7, 5)]
+    public void Parse_ShouldReadDateFiltersWithSupportedDateFormats(
+        string query,
+        BookSearchDateField expectedField,
+        BookSearchOperator expectedOperator,
+        int year,
+        int month,
+        int day)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        var filter = Assert.Single(criteria.Dates);
+        Assert.Equal(expectedField, filter.Field);
+        Assert.Equal(expectedOperator, filter.Operator);
+        Assert.Equal(new DateOnly(year, month, day), filter.Value);
+        Assert.Empty(criteria.Terms);
+    }
+
+    [Theory]
+    [InlineData("createDate:2026-07-15")]
+    [InlineData("updateDate:=07-15-2026")]
+    [InlineData("unknown:none")]
+    public void Parse_ShouldTreatInvalidDateAndMissingFiltersAsTerms(string query)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        Assert.Equal([query], criteria.Terms);
+        Assert.Empty(criteria.Dates);
+        Assert.Empty(criteria.Missing);
+    }
+
     [Fact]
     public void Parse_ShouldContinueFieldValueListAcrossWhitespaceAfterComma()
     {

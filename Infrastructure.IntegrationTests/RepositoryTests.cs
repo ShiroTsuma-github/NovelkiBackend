@@ -30,6 +30,12 @@ public class RepositoryTests
         return new BookExportQueryService(context, criteriaApplier, new BookSortBuilder(context));
     }
 
+    private static Task SetBookAuditDatesAsync(ApplicationDbContext context, Guid bookId, DateTimeOffset value)
+    {
+        return context.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE Books SET Created = {value}, LastModified = {value} WHERE Id = {bookId}");
+    }
+
     [Fact]
     public async Task BookCsvDatasetSeeder_ShouldLoadLargeBalancedDataset()
     {
@@ -192,6 +198,90 @@ public class RepositoryTests
             Assert.True(book.CurrentChapterNumber >= sample.CurrentChapterNumber);
             Assert.True(book.TotalChapters >= sample.TotalChapters);
         });
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSearchByMissingValueFiltersWithOwnerIsolation()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("77777777-7777-7777-7777-777777777777");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "other-missing", NormalizedUserName = "OTHER-MISSING" });
+        var complete = await TestData.AddBookWithRelationsAsync(context, database.UserId);
+        complete.Rating = 8;
+        complete.Priority = 2;
+        complete.TotalChapters = 100;
+        var missing = TestData.Book(database.UserId, "Missing Fields");
+        var otherOwnerMissing = TestData.Book(otherOwnerId, "Other Owner Missing Fields");
+        context.Books.AddRange(missing, otherOwnerMissing);
+        await context.SaveChangesAsync();
+        var queryService = CreateReadQueryService(context);
+
+        foreach (var query in new[]
+        {
+            "rating:none",
+            "priority:NONE",
+            "author:'none'",
+            "genre:none",
+            "tag:none",
+            "total:none",
+            "cover:none",
+            "link:none",
+            "genre:none tag:none"
+        })
+        {
+            var books = (await queryService.GetBooksAsync(
+                database.UserId,
+                BookSearchQueryParser.Parse(query),
+                0,
+                10,
+                "title",
+                "asc",
+                CancellationToken.None)).ToList();
+
+            var book = Assert.Single(books);
+            Assert.Equal(missing.Id, book.Id);
+            Assert.DoesNotContain(books, item => item.Id == complete.Id);
+            Assert.DoesNotContain(books, item => item.Id == otherOwnerMissing.Id);
+        }
+    }
+
+    [Fact]
+    public async Task BookRepository_ShouldSearchCreatedAndUpdatedDatesByDateOnly()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var oldBook = await TestData.AddBookAsync(context, database.UserId, "Old Date Match");
+        var midBook = await TestData.AddBookAsync(context, database.UserId, "Middle Date Match");
+        var lateBook = await TestData.AddBookAsync(context, database.UserId, "Late Date Match");
+        await SetBookAuditDatesAsync(context, oldBook.Id, new DateTimeOffset(2026, 7, 14, 23, 59, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, midBook.Id, new DateTimeOffset(2026, 7, 15, 12, 30, 0, TimeSpan.Zero));
+        await SetBookAuditDatesAsync(context, lateBook.Id, new DateTimeOffset(2026, 7, 16, 0, 1, 0, TimeSpan.Zero));
+        var queryService = CreateReadQueryService(context);
+
+        var equal = await SearchIdsAsync("createDate:=15.07.2026");
+        var greaterThan = await SearchIdsAsync("createDate:>2026-07-15");
+        var lessThanOrEqual = await SearchIdsAsync("createDate:<=15/07/2026");
+        var updatedBefore = await SearchIdsAsync("updateDate:<16.07.2026");
+
+        Assert.Equal([midBook.Id], equal);
+        Assert.Equal([lateBook.Id], greaterThan);
+        Assert.Equal([oldBook.Id, midBook.Id], lessThanOrEqual);
+        Assert.Equal([oldBook.Id, midBook.Id], updatedBefore);
+
+        async Task<IReadOnlyCollection<Guid>> SearchIdsAsync(string query)
+        {
+            var books = await queryService.GetBooksAsync(
+                database.UserId,
+                BookSearchQueryParser.Parse(query),
+                0,
+                10,
+                "created",
+                "asc",
+                CancellationToken.None);
+
+            return books.Select(book => book.Id).ToArray();
+        }
     }
 
     [Fact]

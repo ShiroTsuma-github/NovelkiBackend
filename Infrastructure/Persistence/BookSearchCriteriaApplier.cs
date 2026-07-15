@@ -2,6 +2,7 @@ namespace Infrastructure.Persistence;
 
 using Application.Common;
 using Domain.Entities;
+using System.Globalization;
 using System.Linq.Expressions;
 
 public sealed class BookSearchCriteriaApplier
@@ -42,6 +43,32 @@ public sealed class BookSearchCriteriaApplier
                 BookSearchNumberField.Priority => ApplyPriority(query, filter.Operator, filter.Value),
                 BookSearchNumberField.CurrentChapter => ApplyCurrentChapter(query, filter.Operator, filter.Value),
                 BookSearchNumberField.TotalChapters => ApplyTotalChapters(query, filter.Operator, filter.Value),
+                _ => query
+            };
+        }
+
+        foreach (var filter in criteria.Dates)
+        {
+            query = filter.Field switch
+            {
+                BookSearchDateField.Created => ApplyCreatedDate(query, filter.Operator, filter.Value),
+                BookSearchDateField.LastModified => ApplyLastModifiedDate(query, filter.Operator, filter.Value),
+                _ => query
+            };
+        }
+
+        foreach (var filter in criteria.Missing)
+        {
+            query = filter.Field switch
+            {
+                BookSearchMissingField.Rating => query.Where(book => book.Rating == null),
+                BookSearchMissingField.Priority => query.Where(book => book.Priority == null),
+                BookSearchMissingField.Author => query.Where(book => book.Author == null),
+                BookSearchMissingField.Genre => query.Where(book => !book.BookGenres.Any()),
+                BookSearchMissingField.Tag => query.Where(book => !book.BookTags.Any()),
+                BookSearchMissingField.TotalChapters => query.Where(book => book.TotalChapters == null),
+                BookSearchMissingField.Cover => query.Where(book => book.Cover == null),
+                BookSearchMissingField.Link => query.Where(book => !book.Links.Any()),
                 _ => query
             };
         }
@@ -287,5 +314,70 @@ public sealed class BookSearchCriteriaApplier
             BookSearchOperator.LessThanOrEqual => query.Where(book => book.TotalChapters != null && book.TotalChapters <= value),
             _ => query.Where(book => book.TotalChapters != null && book.TotalChapters == value)
         };
+    }
+
+    private IQueryable<Book> ApplyCreatedDate(IQueryable<Book> query, BookSearchOperator op, DateOnly value)
+    {
+        var (start, nextDay) = ToUtcDateBounds(value);
+        if (_supportsILike)
+        {
+            return op switch
+            {
+                BookSearchOperator.GreaterThan => query.Where(book => book.Created >= nextDay),
+                BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Created >= start),
+                BookSearchOperator.LessThan => query.Where(book => book.Created < start),
+                BookSearchOperator.LessThanOrEqual => query.Where(book => book.Created < nextDay),
+                _ => query.Where(book => book.Created >= start && book.Created < nextDay)
+            };
+        }
+
+        var startText = ToSqliteDateTimeOffsetString(start);
+        var nextDayText = ToSqliteDateTimeOffsetString(nextDay);
+        return op switch
+        {
+            BookSearchOperator.GreaterThan => query.Where(book => string.Compare(book.Created.ToString(), nextDayText) >= 0),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book => string.Compare(book.Created.ToString(), startText) >= 0),
+            BookSearchOperator.LessThan => query.Where(book => string.Compare(book.Created.ToString(), startText) < 0),
+            BookSearchOperator.LessThanOrEqual => query.Where(book => string.Compare(book.Created.ToString(), nextDayText) < 0),
+            _ => query.Where(book => string.Compare(book.Created.ToString(), startText) >= 0 && string.Compare(book.Created.ToString(), nextDayText) < 0)
+        };
+    }
+
+    private IQueryable<Book> ApplyLastModifiedDate(IQueryable<Book> query, BookSearchOperator op, DateOnly value)
+    {
+        var (start, nextDay) = ToUtcDateBounds(value);
+        if (_supportsILike)
+        {
+            return op switch
+            {
+                BookSearchOperator.GreaterThan => query.Where(book => book.LastModified >= nextDay),
+                BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.LastModified >= start),
+                BookSearchOperator.LessThan => query.Where(book => book.LastModified < start),
+                BookSearchOperator.LessThanOrEqual => query.Where(book => book.LastModified < nextDay),
+                _ => query.Where(book => book.LastModified >= start && book.LastModified < nextDay)
+            };
+        }
+
+        var startText = ToSqliteDateTimeOffsetString(start);
+        var nextDayText = ToSqliteDateTimeOffsetString(nextDay);
+        return op switch
+        {
+            BookSearchOperator.GreaterThan => query.Where(book => string.Compare(book.LastModified.ToString(), nextDayText) >= 0),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book => string.Compare(book.LastModified.ToString(), startText) >= 0),
+            BookSearchOperator.LessThan => query.Where(book => string.Compare(book.LastModified.ToString(), startText) < 0),
+            BookSearchOperator.LessThanOrEqual => query.Where(book => string.Compare(book.LastModified.ToString(), nextDayText) < 0),
+            _ => query.Where(book => string.Compare(book.LastModified.ToString(), startText) >= 0 && string.Compare(book.LastModified.ToString(), nextDayText) < 0)
+        };
+    }
+
+    private static (DateTimeOffset Start, DateTimeOffset NextDay) ToUtcDateBounds(DateOnly value)
+    {
+        var start = new DateTimeOffset(value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc));
+        return (start, start.AddDays(1));
+    }
+
+    private static string ToSqliteDateTimeOffsetString(DateTimeOffset value)
+    {
+        return value.ToString("yyyy-MM-dd HH:mm:ss.FFFFFFFzzz", CultureInfo.InvariantCulture);
     }
 }
