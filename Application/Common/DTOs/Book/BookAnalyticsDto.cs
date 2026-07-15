@@ -6,6 +6,8 @@ public sealed record BookAnalyticsDto
     public required BookAnalyticsScopeDto Scope { get; init; }
     public required BookAnalyticsOverviewDto Overview { get; init; }
     public BookAnalyticsCompositionDto Composition { get; init; } = new();
+    public BookAnalyticsRatingsDto Ratings { get; init; } = new();
+    public BookAnalyticsPlanningDto Planning { get; init; } = new();
 }
 
 public sealed record BookAnalyticsScopeDto
@@ -52,4 +54,36 @@ public sealed record BookAnalyticsRelationCountDto
     public required string Name { get; init; }
     public int BookCount { get; init; }
     public double ShareOfBooks { get; init; }
+}
+
+public sealed record BookAnalyticsRatingsDto
+{
+    public int RatedBooks { get; init; }
+    public int UnratedBooks { get; init; }
+    public double? AverageRating { get; init; }
+    public IReadOnlyList<BookAnalyticsRatingCountDto> Counts { get; init; } = [];
+}
+
+public sealed record BookAnalyticsRatingCountDto
+{
+    public int Rating { get; init; }
+    public int BookCount { get; init; }
+}
+
+public sealed record BookAnalyticsPlanningDto
+{
+    public IReadOnlyList<BookAnalyticsPrioritiesByStatusDto> PrioritiesByStatus { get; init; } = [];
+}
+
+public sealed record BookAnalyticsPrioritiesByStatusDto
+{
+    public required string Status { get; init; }
+    public int TotalBooks { get; init; }
+    public IReadOnlyList<BookAnalyticsPriorityCountDto> Priorities { get; init; } = [];
+}
+
+public sealed record BookAnalyticsPriorityCountDto
+{
+    public required string Priority { get; init; }
+    public int BookCount { get; init; }
 }

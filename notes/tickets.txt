@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-061 - Dodaj agregacje ocen i priorytetow
-
-- Typ: `Feature`
-- Priorytet: `P2`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
-- Zaleznosci: `NB-059`
-- Problem: API nie rozdziela pokrycia ocenami od rozkladu 1-10 ani priorytetow wedlug statusu.
-- Zakres: dodac sekcje `ratings` z ratedBooks, unratedBooks, averageRating i counts 1-10 oraz `planning.prioritiesByStatus` dla 1-5 i Unset; zachowac kategorie z liczba zero.
-- Akceptacja: srednia liczy tylko ocenione ksiazki; counts zawiera wszystkie wartosci 1-10; suma rated/unrated zgadza sie z total; priorytet null jest osobna kategoria; testy obejmuja brak ocen, jedna ocene, wszystkie oceny, brak priorytetu, status z jedna ksiazka, query i owner isolation.
-
 ### NB-062 - Dodaj agregacje objetosci rozdzialow wedlug typu
 
 - Typ: `Feature`
@@ -165,6 +155,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-061 - Dodaj agregacje ocen i priorytetow
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie rozdziela pokrycia ocenami od rozkladu 1-10 ani priorytetow wedlug statusu.
+- Zakres: dodac sekcje `ratings` z ratedBooks, unratedBooks, averageRating i counts 1-10 oraz `planning.prioritiesByStatus` dla 1-5 i Unset; zachowac kategorie z liczba zero.
+- Akceptacja: srednia liczy tylko ocenione ksiazki; counts zawiera wszystkie wartosci 1-10; suma rated/unrated zgadza sie z total; priorytet null jest osobna kategoria; testy obejmuja brak ocen, jedna ocene, wszystkie oceny, brak priorytetu, status z jedna ksiazka, query i owner isolation.
 
 ### NB-059 - Dodaj kontrakt i fundament endpointu Analytics
 
