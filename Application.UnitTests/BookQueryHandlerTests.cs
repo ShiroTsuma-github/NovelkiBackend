@@ -143,6 +143,46 @@ public class BookQueryHandlerTests
             handler.Handle(new GetAdminBookQuery(Guid.NewGuid()), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task GetBookAnalytics_ShouldApplyDefaultScopeAndOwner()
+    {
+        var service = new FakeBookAnalyticsQueryService();
+        var handler = new GetBookAnalyticsHandler(service, new FakeUser());
+
+        var result = await handler.Handle(new GetBookAnalyticsQuery(Query: "rating:none"), CancellationToken.None);
+
+        Assert.Equal(OwnerId, service.OwnerId);
+        Assert.Equal("rating:none", service.Scope!.Query);
+        Assert.Equal("week", service.Scope.Bucket);
+        Assert.Equal(84, service.Scope.To.DayNumber - service.Scope.From.DayNumber);
+        Assert.Equal(0, result.Overview.TotalBooks);
+        Assert.Empty(result.Composition.StatusByType);
+        Assert.Empty(result.Composition.Genres);
+        Assert.Empty(result.Composition.Tags);
+    }
+
+    [Theory]
+    [InlineData("year")]
+    [InlineData("quarter")]
+    public async Task GetBookAnalytics_ShouldRejectInvalidBucket(string bucket)
+    {
+        var handler = new GetBookAnalyticsHandler(new FakeBookAnalyticsQueryService(), new FakeUser());
+
+        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            handler.Handle(new GetBookAnalyticsQuery(Bucket: bucket), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetBookAnalytics_ShouldRejectInvalidDateRange()
+    {
+        var handler = new GetBookAnalyticsHandler(new FakeBookAnalyticsQueryService(), new FakeUser());
+
+        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            handler.Handle(new GetBookAnalyticsQuery(
+                From: new DateOnly(2026, 7, 15),
+                To: new DateOnly(2026, 7, 15)), CancellationToken.None));
+    }
+
     private static BookListItemDto ListItem(string title)
     {
         return new BookListItemDto
@@ -223,6 +263,27 @@ public class BookQueryHandlerTests
             SortBy = sortBy;
             SortDirection = sortDirection;
             return Task.FromResult(PaginatedResult<BookDto>.Create(skip, take, 1, [new BookDto { Id = Guid.NewGuid(), PrimaryTitle = "Export", ContentType = "Novel", Status = "Reading" }]));
+        }
+    }
+
+    private sealed class FakeBookAnalyticsQueryService : IBookAnalyticsQueryService
+    {
+        public Guid OwnerId { get; private set; }
+        public Domain.Models.BookAnalyticsScopeSnapshot? Scope { get; private set; }
+
+        public Task<Domain.Models.BookAnalyticsSnapshot> GetAnalyticsAsync(
+            Guid ownerId,
+            BookSearchCriteria criteria,
+            Domain.Models.BookAnalyticsScopeSnapshot scope,
+            CancellationToken cancellationToken)
+        {
+            OwnerId = ownerId;
+            Scope = scope;
+            return Task.FromResult(new Domain.Models.BookAnalyticsSnapshot(
+                DateTimeOffset.UtcNow,
+                scope,
+                new Domain.Models.BookAnalyticsOverviewSnapshot(0, 0, 0, null, 0, 0, 0),
+                Domain.Models.BookAnalyticsCompositionSnapshot.Empty));
         }
     }
 
