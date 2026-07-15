@@ -11,13 +11,10 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<DateTimeOffset>(
-                name: "CreatedAt",
-                table: "AspNetUsers",
-                type: "timestamp with time zone",
-                nullable: true);
-
             migrationBuilder.Sql("""
+                ALTER TABLE "AspNetUsers"
+                ADD COLUMN IF NOT EXISTS "CreatedAt" timestamp with time zone;
+
                 UPDATE "AspNetUsers" AS u
                 SET "CreatedAt" = COALESCE(
                     (
@@ -32,18 +29,15 @@ namespace Infrastructure.Migrations
                         WHERE source."Created" IS NOT NULL
                     ),
                     NOW()
-                );
-                """);
+                )
+                WHERE u."CreatedAt" IS NULL;
 
-            migrationBuilder.AlterColumn<DateTimeOffset>(
-                name: "CreatedAt",
-                table: "AspNetUsers",
-                type: "timestamp with time zone",
-                nullable: false,
-                defaultValueSql: "NOW()",
-                oldClrType: typeof(DateTimeOffset),
-                oldType: "timestamp with time zone",
-                oldNullable: true);
+                ALTER TABLE "AspNetUsers"
+                ALTER COLUMN "CreatedAt" SET DEFAULT NOW();
+
+                ALTER TABLE "AspNetUsers"
+                ALTER COLUMN "CreatedAt" SET NOT NULL;
+                """);
         }
 
         /// <inheritdoc />
