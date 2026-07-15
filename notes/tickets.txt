@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-059 - Dodaj kontrakt i fundament endpointu Analytics
-
-- Typ: `Feature`
-- Priorytet: `P2`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Application/Common/Interfaces/IBookAnalyticsQueryService.cs`, `Application/Features/BookFeatures/Queries/GetBookAnalytics.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Api/Controllers/BookController.cs`
-- Zaleznosci: `NB-058`
-- Problem: obecny endpoint summary nie zapewnia kontraktu, zakresu czasu ani sekcji potrzebnych osobnej stronie Analytics.
-- Zakres: dodac owner-scoped `GET /api/v1/book/analytics` z parametrami `query`, `from`, `to` i `bucket`; zdefiniowac `generatedAt`, `scope`, `overview` i puste sekcje rozszerzane przez kolejne tickety; wykorzystac `BookSearchCriteriaApplier`; walidowac czas i bucket; agregacje wykonywac w bazie z `AsNoTracking`.
-- Akceptacja: endpoint zwraca tylko dane aktualnego uzytkownika; `query` filtruje overview; `from >= to`, nieznany bucket i zakres ponad 10 lat zwracaja 400; pusta biblioteka zwraca zera i puste tablice; kolekcje nie sa nullem; testy obejmuja owner isolation, brak danych, filtrowanie, domyslny zakres 12 tygodni, granice czasu i anulowanie requestu.
-
 ### NB-060 - Dodaj agregacje skladu biblioteki
 
 - Typ: `Feature`
@@ -185,6 +175,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-059 - Dodaj kontrakt i fundament endpointu Analytics
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Application/Common/Interfaces/IBookAnalyticsQueryService.cs`, `Application/Features/BookFeatures/Queries/GetBookAnalytics.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Api/Controllers/BookController.cs`
+- Zaleznosci: `NB-058`
+- Problem: obecny endpoint summary nie zapewnia kontraktu, zakresu czasu ani sekcji potrzebnych osobnej stronie Analytics.
+- Zakres: dodac owner-scoped `GET /api/v1/book/analytics` z parametrami `query`, `from`, `to` i `bucket`; zdefiniowac `generatedAt`, `scope`, `overview` i puste sekcje rozszerzane przez kolejne tickety; wykorzystac `BookSearchCriteriaApplier`; walidowac czas i bucket; agregacje wykonywac w bazie z `AsNoTracking`.
+- Akceptacja: endpoint zwraca tylko dane aktualnego uzytkownika; `query` filtruje overview; `from >= to`, nieznany bucket i zakres ponad 10 lat zwracaja 400; pusta biblioteka zwraca zera i puste tablice; kolekcje nie sa nullem; testy obejmuja owner isolation, brak danych, filtrowanie, domyslny zakres 12 tygodni, granice czasu i anulowanie requestu.
 
 ### NB-058 - Rozszerz parser wyszukiwania o filtry brakujacych danych
 

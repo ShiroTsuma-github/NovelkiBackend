@@ -66,6 +66,14 @@ public partial class BookController : ControllerBase
         return Ok(summary);
     }
 
+    [HttpGet("analytics")]
+    [Authorize]
+    public async Task<IActionResult> GetAnalytics([FromQuery] GetBookAnalyticsQuery query)
+    {
+        var analytics = await _mediator.Send(query);
+        return Ok(analytics);
+    }
+
     [HttpGet("{id:guid}")]
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)

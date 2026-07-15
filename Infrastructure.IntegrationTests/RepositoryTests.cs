@@ -24,6 +24,11 @@ public class RepositoryTests
         return new BookSummaryQueryService(context, new BookSearchCriteriaApplier(context));
     }
 
+    private static BookAnalyticsQueryService CreateAnalyticsQueryService(ApplicationDbContext context)
+    {
+        return new BookAnalyticsQueryService(context, new BookSearchCriteriaApplier(context));
+    }
+
     private static BookExportQueryService CreateExportQueryService(ApplicationDbContext context)
     {
         var criteriaApplier = new BookSearchCriteriaApplier(context);
@@ -34,6 +39,15 @@ public class RepositoryTests
     {
         return context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE Books SET Created = {value}, LastModified = {value} WHERE Id = {bookId}");
+    }
+
+    private static Domain.Models.BookAnalyticsScopeSnapshot AnalyticsScope(string? query = null)
+    {
+        return new Domain.Models.BookAnalyticsScopeSnapshot(
+            query,
+            new DateOnly(2026, 1, 1),
+            new DateOnly(2026, 4, 1),
+            "week");
     }
 
     [Fact]
@@ -282,6 +296,56 @@ public class RepositoryTests
 
             return books.Select(book => book.Id).ToArray();
         }
+    }
+
+    [Fact]
+    public async Task BookAnalytics_ShouldReturnEmptyOverviewAndCollectionsForEmptyLibrary()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var service = CreateAnalyticsQueryService(context);
+        var scope = AnalyticsScope();
+
+        var result = await service.GetAnalyticsAsync(database.UserId, BookSearchCriteria.Empty, scope, CancellationToken.None);
+
+        Assert.Equal(0, result.Overview.TotalBooks);
+        Assert.Equal(0, result.Overview.RatedBooks);
+        Assert.Equal(0, result.Overview.UnratedBooks);
+        Assert.Null(result.Overview.AverageRating);
+        Assert.Empty(result.Composition.StatusByType);
+        Assert.Empty(result.Composition.Genres);
+        Assert.Empty(result.Composition.Tags);
+    }
+
+    [Fact]
+    public async Task BookAnalytics_ShouldScopeOverviewByOwnerAndQuery()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "analytics-other", NormalizedUserName = "ANALYTICS-OTHER" });
+        var matched = TestData.Book(database.UserId, "Analytics Match");
+        matched.Rating = 8;
+        matched.CurrentChapterNumber = 10;
+        var unmatched = TestData.Book(database.UserId, "Analytics Other");
+        unmatched.Rating = null;
+        var otherOwner = TestData.Book(otherOwnerId, "Analytics Match Other Owner");
+        otherOwner.Rating = 10;
+        context.Books.AddRange(matched, unmatched, otherOwner);
+        await context.SaveChangesAsync();
+        var service = CreateAnalyticsQueryService(context);
+
+        var result = await service.GetAnalyticsAsync(
+            database.UserId,
+            BookSearchQueryParser.Parse("title:\"Analytics Match\""),
+            AnalyticsScope("title:\"Analytics Match\""),
+            CancellationToken.None);
+
+        Assert.Equal(1, result.Overview.TotalBooks);
+        Assert.Equal(1, result.Overview.RatedBooks);
+        Assert.Equal(0, result.Overview.UnratedBooks);
+        Assert.Equal(8, result.Overview.AverageRating);
+        Assert.Equal(10, result.Overview.CurrentChapters);
     }
 
     [Fact]
