@@ -592,6 +592,7 @@ function BookCardGrid({
   const showProgress = hasCardField(fields, 'progress')
   const showType = hasCardField(fields, 'type')
   const cardDetailsClass = getCardDetailRowClass({
+    cardsPerRow,
     showAlternativeTitles,
     showAuthor,
     showProgress,
@@ -691,12 +692,14 @@ export function getCardTextSizeClasses(cardsPerRow: number) {
 }
 
 export function getCardDetailRowClass({
+  cardsPerRow,
   showAlternativeTitles,
   showAuthor,
   showProgress,
   showTitle,
   showType,
 }: {
+  cardsPerRow: number
   showAlternativeTitles: boolean
   showAuthor: boolean
   showProgress: boolean
@@ -706,7 +709,7 @@ export function getCardDetailRowClass({
   const rows: string[] = []
 
   if (showTitle) {
-    rows.push('minmax(0,2.5rem)')
+    rows.push(`minmax(0,${getCardTitleRowHeight(cardsPerRow)})`)
   }
 
   if (showAlternativeTitles) {
@@ -722,6 +725,20 @@ export function getCardDetailRowClass({
   }
 
   return rows.length ? `grid-rows-[${rows.join('_')}]` : ''
+}
+
+function getCardTitleRowHeight(cardsPerRow: number) {
+  const normalized = normalizeCardsPerRow(cardsPerRow)
+
+  if (normalized <= 4) {
+    return '3.5rem'
+  }
+
+  if (normalized <= 6) {
+    return '3rem'
+  }
+
+  return '2.5rem'
 }
 
 function Pills({ values }: { values: string[] }) {
