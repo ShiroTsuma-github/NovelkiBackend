@@ -54,13 +54,14 @@ describe('BooksPage', () => {
     expect(container.querySelector('table')).toHaveStyle({ minWidth: '83rem' })
     expect(container.querySelectorAll('col')).toHaveLength(9)
     expect(screen.getByRole('columnheader', { name: /actions/i })).toHaveClass('sticky', 'right-0')
+    expect(screen.queryByRole('columnheader', { name: /^id$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /alternative titles/i })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('1 alternative titles')).toHaveTextContent('+1')
   })
 
   it('keeps all enabled table columns inside a symmetric scroll container', async () => {
     window.localStorage.setItem('novelki.books.columns.v1', JSON.stringify([
-      { id: 'id', visible: true },
       { id: 'title', visible: true },
-      { id: 'alternativeTitles', visible: true },
       { id: 'author', visible: true },
       { id: 'status', visible: true },
       { id: 'type', visible: true },
@@ -86,10 +87,12 @@ describe('BooksPage', () => {
     const scroller = table?.parentElement
     const section = table?.closest('section')
 
-    expect(table).toHaveStyle({ minWidth: '170rem' })
-    expect(container.querySelectorAll('col')).toHaveLength(18)
+    expect(table).toHaveStyle({ minWidth: '147rem' })
+    expect(container.querySelectorAll('col')).toHaveLength(16)
     expect(scroller).toHaveClass('max-w-full', 'overflow-x-auto')
     expect(section).toHaveClass('min-w-0', 'overflow-hidden')
+    expect(screen.queryByRole('columnheader', { name: /^id$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /alternative titles/i })).not.toBeInTheDocument()
   })
 
   it('shows the colon-based rating operator syntax in advanced search help', async () => {
