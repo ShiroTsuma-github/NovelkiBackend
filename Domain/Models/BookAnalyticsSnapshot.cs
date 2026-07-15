@@ -6,7 +6,8 @@ public sealed record BookAnalyticsSnapshot(
     BookAnalyticsOverviewSnapshot Overview,
     BookAnalyticsCompositionSnapshot Composition,
     BookAnalyticsRatingsSnapshot Ratings,
-    BookAnalyticsPlanningSnapshot Planning);
+    BookAnalyticsPlanningSnapshot Planning,
+    BookAnalyticsProgressSnapshot Progress);
 
 public sealed record BookAnalyticsScopeSnapshot(
     string? Query,
@@ -70,3 +71,16 @@ public sealed record BookAnalyticsPrioritiesByStatusSnapshot(
     IReadOnlyList<BookAnalyticsPriorityCountSnapshot> Priorities);
 
 public sealed record BookAnalyticsPriorityCountSnapshot(string Priority, int BookCount);
+
+public sealed record BookAnalyticsProgressSnapshot(
+    IReadOnlyList<BookAnalyticsTypeVolumeSnapshot> TypeVolumes)
+{
+    public static BookAnalyticsProgressSnapshot Empty { get; } = new([]);
+}
+
+public sealed record BookAnalyticsTypeVolumeSnapshot(
+    string Type,
+    int BookCount,
+    decimal CurrentChapters,
+    decimal? AverageCurrentChapter,
+    decimal? MedianCurrentChapter);

@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-062 - Dodaj agregacje objetosci rozdzialow wedlug typu
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
-- Zaleznosci: `NB-059`
-- Problem: frontend nie ma danych do porownania liczby ksiazek, sumy i typowej objetosci rozdzialow per type.
-- Zakres: dodac `progress.typeVolumes` z bookCount, currentChapters, averageCurrentChapter i medianCurrentChapter; mediane policzyc po stronie bazy lub przez udokumentowana, przenosna projekcje.
-- Akceptacja: null current nie zwieksza sumy i nie wchodzi do sredniej/mediany; wartosci dziesietne sa zachowane; typ bez znanych rozdzialow ma zero sumy i null statystyk; testy obejmuja parzysta/nieparzysta liczbe rekordow, remisy, null, wartosci dziesietne, query i owner isolation.
-
 ### NB-063 - Dodaj agregacje aktywnosci czytelniczej
 
 - Typ: `Feature`
@@ -155,6 +145,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-062 - Dodaj agregacje objetosci rozdzialow wedlug typu
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: frontend nie ma danych do porownania liczby ksiazek, sumy i typowej objetosci rozdzialow per type.
+- Zakres: dodac `progress.typeVolumes` z bookCount, currentChapters, averageCurrentChapter i medianCurrentChapter; mediane policzyc po stronie bazy lub przez udokumentowana, przenosna projekcje.
+- Akceptacja: null current nie zwieksza sumy i nie wchodzi do sredniej/mediany; wartosci dziesietne sa zachowane; typ bez znanych rozdzialow ma zero sumy i null statystyk; testy obejmuja parzysta/nieparzysta liczbe rekordow, remisy, null, wartosci dziesietne, query i owner isolation.
 
 ### NB-061 - Dodaj agregacje ocen i priorytetow
 

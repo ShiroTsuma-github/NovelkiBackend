@@ -285,7 +285,8 @@ public class BookQueryHandlerTests
                 new Domain.Models.BookAnalyticsOverviewSnapshot(0, 0, 0, null, 0, 0, 0),
                 Domain.Models.BookAnalyticsCompositionSnapshot.Empty,
                 Domain.Models.BookAnalyticsRatingsSnapshot.Empty,
-                Domain.Models.BookAnalyticsPlanningSnapshot.Empty));
+                Domain.Models.BookAnalyticsPlanningSnapshot.Empty,
+                Domain.Models.BookAnalyticsProgressSnapshot.Empty));
         }
     }
 

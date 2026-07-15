@@ -467,6 +467,81 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldAggregateTypeVolumesWithPortableMedianAndScope()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("13131313-1313-1313-1313-131313131313");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "volumes-other", NormalizedUserName = "VOLUMES-OTHER" });
+
+        var novelLow = TestData.Book(database.UserId, "Volume Scope Novel Low");
+        novelLow.CurrentChapterNumber = 10.5m;
+        var novelHigh = TestData.Book(database.UserId, "Volume Scope Novel High");
+        novelHigh.CurrentChapterNumber = 20.5m;
+        var novelUnknown = TestData.Book(database.UserId, "Volume Scope Novel Unknown");
+        novelUnknown.CurrentChapterNumber = null;
+
+        var mangaTieA = TestData.Book(database.UserId, "Volume Scope Manga Tie A");
+        mangaTieA.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        mangaTieA.CurrentChapterNumber = 3m;
+        var mangaTieB = TestData.Book(database.UserId, "Volume Scope Manga Tie B");
+        mangaTieB.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        mangaTieB.CurrentChapterNumber = 3m;
+        var mangaHigh = TestData.Book(database.UserId, "Volume Scope Manga High");
+        mangaHigh.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        mangaHigh.CurrentChapterNumber = 9m;
+
+        var manhwaUnknown = TestData.Book(database.UserId, "Volume Scope Manhwa Unknown");
+        manhwaUnknown.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+        manhwaUnknown.CurrentChapterNumber = null;
+
+        var unmatched = TestData.Book(database.UserId, "Volume Outside Novel");
+        unmatched.CurrentChapterNumber = 100m;
+        var otherOwner = TestData.Book(otherOwnerId, "Volume Scope Other Owner");
+        otherOwner.CurrentChapterNumber = 100m;
+
+        context.Books.AddRange(
+            novelLow,
+            novelHigh,
+            novelUnknown,
+            mangaTieA,
+            mangaTieB,
+            mangaHigh,
+            manhwaUnknown,
+            unmatched,
+            otherOwner);
+        await context.SaveChangesAsync();
+        var service = CreateAnalyticsQueryService(context);
+
+        var result = await service.GetAnalyticsAsync(
+            database.UserId,
+            BookSearchQueryParser.Parse("title:\"Volume Scope\""),
+            AnalyticsScope("title:\"Volume Scope\""),
+            CancellationToken.None);
+
+        Assert.Equal(7, result.Overview.TotalBooks);
+        Assert.Equal(["Manga", "Novel", "Manhwa"], result.Progress.TypeVolumes.Select(item => item.Type).ToArray());
+
+        var novel = Assert.Single(result.Progress.TypeVolumes, item => item.Type == "Novel");
+        Assert.Equal(3, novel.BookCount);
+        Assert.Equal(31m, novel.CurrentChapters);
+        Assert.Equal(15.5m, novel.AverageCurrentChapter);
+        Assert.Equal(15.5m, novel.MedianCurrentChapter);
+
+        var manga = Assert.Single(result.Progress.TypeVolumes, item => item.Type == "Manga");
+        Assert.Equal(3, manga.BookCount);
+        Assert.Equal(15m, manga.CurrentChapters);
+        Assert.Equal(5m, manga.AverageCurrentChapter);
+        Assert.Equal(3m, manga.MedianCurrentChapter);
+
+        var manhwa = Assert.Single(result.Progress.TypeVolumes, item => item.Type == "Manhwa");
+        Assert.Equal(1, manhwa.BookCount);
+        Assert.Equal(0m, manhwa.CurrentChapters);
+        Assert.Null(manhwa.AverageCurrentChapter);
+        Assert.Null(manhwa.MedianCurrentChapter);
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();
