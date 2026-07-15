@@ -5,6 +5,7 @@ import type {
   AdminBookDto,
   AdminBookListItemDto,
   BookDto,
+  BookAnalyticsDto,
   BookListItemDto,
   BookCoverDto,
   BookImportFinalizeResult,
@@ -52,6 +53,8 @@ export const api = {
     apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(params)}`),
   getBooksSummary: (params: { query?: string }) =>
     apiRequest<BookSummaryDto>(`/book/summary${toQueryString(params)}`),
+  getBookAnalytics: (params: { query?: string; from?: string; to?: string; bucket?: string }) =>
+    apiRequest<BookAnalyticsDto>(`/book/analytics${toQueryString(params)}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),
   getAdminBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
     apiRequest<PaginatedResult<AdminBookListItemDto>>(`/admin/books${toQueryString(params)}`),
