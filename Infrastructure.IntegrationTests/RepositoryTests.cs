@@ -6,6 +6,9 @@ using Infrastructure.Contexts;
 using Infrastructure.IntegrationTests.TestSupport;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using System.Data.Common;
+using System.Text.Json;
 
 namespace Infrastructure.IntegrationTests;
 
@@ -863,6 +866,81 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldKeepQueryCountAndPayloadBoundedForBroadRequest()
+    {
+        using var database = new SqliteTestDatabase();
+        await using (var seedContext = database.CreateContext())
+        {
+            await SeedAnalyticsPerformanceDatasetAsync(
+                seedContext,
+                database.UserId,
+                bookCount: 300,
+                historyPerBook: 4,
+                genreCount: 24,
+                tagCount: 24);
+        }
+
+        var commandCounter = new CountingCommandInterceptor();
+        await using var context = database.CreateContext(commandCounter);
+        var service = CreateAnalyticsQueryService(context);
+
+        var result = await service.GetAnalyticsAsync(
+            database.UserId,
+            BookSearchCriteria.Empty,
+            new Domain.Models.BookAnalyticsScopeSnapshot(null, new DateOnly(2026, 7, 1), new DateOnly(2026, 8, 1), "week"),
+            CancellationToken.None);
+        var json = JsonSerializer.Serialize(result.ToDto());
+
+        Assert.Equal(300, result.Overview.TotalBooks);
+        Assert.True(commandCounter.CommandCount <= 20, $"Analytics executed {commandCounter.CommandCount} SQL commands.");
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 100_000, "Analytics JSON payload exceeded 100 KB.");
+        Assert.NotEmpty(result.Composition.Genres);
+        Assert.NotEmpty(result.Composition.Tags);
+        Assert.NotEmpty(result.Activity.Points);
+        Assert.Equal(result.Overview.TotalBooks, result.LibraryGrowth.Points.Last().CumulativeBooks);
+    }
+
+    [Fact]
+    public async Task BookAnalytics_LargePerformanceHarness_ShouldRunWhenExplicitlyEnabled()
+    {
+        if (!string.Equals(Environment.GetEnvironmentVariable("RUN_ANALYTICS_PERF_TESTS"), "1", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        using var database = new SqliteTestDatabase();
+        await using (var seedContext = database.CreateContext())
+        {
+            await SeedAnalyticsPerformanceDatasetAsync(
+                seedContext,
+                database.UserId,
+                bookCount: 10_000,
+                historyPerBook: 25,
+                genreCount: 200,
+                tagCount: 200);
+        }
+
+        var commandCounter = new CountingCommandInterceptor();
+        await using var context = database.CreateContext(commandCounter);
+        var service = CreateAnalyticsQueryService(context);
+        var started = DateTimeOffset.UtcNow;
+
+        var result = await service.GetAnalyticsAsync(
+            database.UserId,
+            BookSearchCriteria.Empty,
+            new Domain.Models.BookAnalyticsScopeSnapshot(null, new DateOnly(2026, 7, 1), new DateOnly(2026, 8, 1), "week"),
+            CancellationToken.None);
+        var elapsed = DateTimeOffset.UtcNow - started;
+        var json = JsonSerializer.Serialize(result.ToDto());
+
+        Assert.Equal(10_000, result.Overview.TotalBooks);
+        Assert.Equal(250_000, await context.BookProgressHistory.CountAsync());
+        Assert.True(commandCounter.CommandCount <= 20, $"Analytics executed {commandCounter.CommandCount} SQL commands.");
+        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 100_000, "Analytics JSON payload exceeded 100 KB.");
+        Assert.True(elapsed < TimeSpan.FromSeconds(10), $"SQLite harness took {elapsed.TotalMilliseconds:N0} ms.");
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();
@@ -1418,5 +1496,133 @@ public class RepositoryTests
 
         Assert.Single(page);
         Assert.Equal(3, count);
+    }
+
+    private static async Task SeedAnalyticsPerformanceDatasetAsync(
+        ApplicationDbContext context,
+        Guid ownerId,
+        int bookCount,
+        int historyPerBook,
+        int genreCount,
+        int tagCount)
+    {
+        var genres = Enumerable.Range(0, genreCount)
+            .Select(index => TestData.Genre($"Perf Genre {index:000}"))
+            .ToArray();
+        var tags = Enumerable.Range(0, tagCount)
+            .Select(index => TestData.Tag(ownerId, $"perf-tag-{index:000}"))
+            .ToArray();
+        context.Genres.AddRange(genres);
+        context.Tags.AddRange(tags);
+        await context.SaveChangesAsync();
+
+        var genreIds = genres.Select(genre => genre.Id).ToArray();
+        var tagIds = tags.Select(tag => tag.Id).ToArray();
+        context.ChangeTracker.Clear();
+
+        const int batchSize = 500;
+        for (var batchStart = 0; batchStart < bookCount; batchStart += batchSize)
+        {
+            var batchEnd = Math.Min(batchStart + batchSize, bookCount);
+            for (var index = batchStart; index < batchEnd; index++)
+            {
+                var book = TestData.Book(ownerId, $"Perf Analytics Book {index:00000}");
+                book.ContentTypeId = Guid.Parse($"10000000-0000-0000-0000-00000000000{index % 5 + 1}");
+                book.StatusId = Guid.Parse($"20000000-0000-0000-0000-00000000000{index % 6 + 1}");
+                book.Rating = index % 4 == 0 ? null : index % 10 + 1;
+                book.Priority = index % 6 == 0 ? null : index % 5 + 1;
+                book.CurrentChapterNumber = index % 7 == 0 ? null : index % 250 + 1;
+                book.TotalChapters = index % 8 == 0 ? null : 300;
+                book.Description = index % 5 == 0 ? null : $"Performance description {index}";
+                book.BookGenres.Add(new BookGenre { Book = book, GenreId = genreIds[index % genreIds.Length] });
+                book.BookGenres.Add(new BookGenre { Book = book, GenreId = genreIds[(index + 7) % genreIds.Length] });
+                book.BookTags.Add(new BookTag { Book = book, TagId = tagIds[index % tagIds.Length] });
+                book.BookTags.Add(new BookTag { Book = book, TagId = tagIds[(index + 11) % tagIds.Length] });
+                book.Links.Add(new BookLink
+                {
+                    Url = $"https://example.com/{index}",
+                    SourceType = index % 2 == 0 ? "NovelUpdates" : "Manual",
+                    IsPrimary = true
+                });
+                if (index % 3 == 0)
+                {
+                    book.Titles.Add(new BookTitle
+                    {
+                        Title = $"Perf Alt {index:00000}",
+                        NormalizedTitle = MappingExtensions.NormalizeName($"Perf Alt {index:00000}"),
+                        IsPrimary = false,
+                        Source = "Perf"
+                    });
+                }
+
+                book.Cover = new BookCover
+                {
+                    Status = index % 4 == 0 ? BookCoverStatus.Failed : BookCoverStatus.Found,
+                    Source = index % 4 == 0 ? null : BookCoverSource.NovelUpdates,
+                    StoragePath = index % 4 == 0 ? null : $"perf/{index}.jpg"
+                };
+
+                var baseline = new DateTimeOffset(2026, 6, 30, 12, 0, 0, TimeSpan.Zero);
+                for (var historyIndex = 0; historyIndex < historyPerBook; historyIndex++)
+                {
+                    book.ProgressHistory.Add(new BookProgressHistory
+                    {
+                        ChangedAt = historyIndex == 0
+                            ? baseline
+                            : new DateTimeOffset(2026, 7, historyIndex % 28 + 1, 12, 0, 0, TimeSpan.Zero),
+                        ChapterNumber = historyIndex,
+                        ChapterLabel = historyIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                    });
+                }
+
+                context.Books.Add(book);
+            }
+
+            await context.SaveChangesAsync();
+            context.ChangeTracker.Clear();
+        }
+    }
+
+    private sealed class CountingCommandInterceptor : DbCommandInterceptor
+    {
+        public int CommandCount { get; private set; }
+
+        public override InterceptionResult<DbDataReader> ReaderExecuting(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result)
+        {
+            CommandCount++;
+            return base.ReaderExecuting(command, eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<DbDataReader> result,
+            CancellationToken cancellationToken = default)
+        {
+            CommandCount++;
+            return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+        }
+
+        public override InterceptionResult<object> ScalarExecuting(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<object> result)
+        {
+            CommandCount++;
+            return base.ScalarExecuting(command, eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<object>> ScalarExecutingAsync(
+            DbCommand command,
+            CommandEventData eventData,
+            InterceptionResult<object> result,
+            CancellationToken cancellationToken = default)
+        {
+            CommandCount++;
+            return base.ScalarExecutingAsync(command, eventData, result, cancellationToken);
+        }
     }
 }

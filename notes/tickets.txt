@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-066 - Zweryfikuj wydajnosc Analytics i dodaj uzasadnione indeksy
-
-- Typ: `Performance`
-- Priorytet: `P2`
-- Komponent: `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure/Contexts/ApplicationDbContext.cs`, `Infrastructure/Migrations/*`, testy planow PostgreSQL
-- Zaleznosci: `NB-060`, `NB-061`, `NB-062`, `NB-063`, `NB-064`, `NB-065`
-- Problem: agregacje i historia postepu moga powodowac kosztowne skany przy duzej bibliotece.
-- Zakres: przygotowac seed min. 10 000 ksiazek i 250 000 wpisow historii; zmierzyc `EXPLAIN ANALYZE`; dodac tylko indeksy potwierdzone planem, w tym zweryfikowac `Books(OwnerId, Created)` i indeks historii rozszerzony o Id; sprawdzic liczbe zapytan i rozmiar JSON; nie pobierac pelnych encji do pamieci.
-- Akceptacja: domyslny request miesci sie w 500 ms i 100 KB na uzgodnionym PostgreSQL albo raport opisuje zmierzony wyjatek; plan nie ma nieuzasadnionych skanow sekwencyjnych; migracja ma rollback; test/raport obejmuje duza liczbe kategorii, dlugi zakres i owner isolation.
-
 ### NB-067 - Dodaj trase, filtry URL i wspolna karte Analytics
 
 - Typ: `Feature`
@@ -115,6 +105,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-066 - Zweryfikuj wydajnosc Analytics i dodaj uzasadnione indeksy
+
+- Typ: `Performance`
+- Priorytet: `P2`
+- Komponent: `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure/Contexts/ApplicationDbContext.cs`, `Infrastructure/Migrations/*`, testy planow PostgreSQL
+- Zaleznosci: `NB-060`, `NB-061`, `NB-062`, `NB-063`, `NB-064`, `NB-065`
+- Problem: agregacje i historia postepu moga powodowac kosztowne skany przy duzej bibliotece.
+- Zakres: przygotowac seed min. 10 000 ksiazek i 250 000 wpisow historii; zmierzyc `EXPLAIN ANALYZE`; dodac tylko indeksy potwierdzone planem, w tym zweryfikowac `Books(OwnerId, Created)` i indeks historii rozszerzony o Id; sprawdzic liczbe zapytan i rozmiar JSON; nie pobierac pelnych encji do pamieci.
+- Akceptacja: domyslny request miesci sie w 500 ms i 100 KB na uzgodnionym PostgreSQL albo raport opisuje zmierzony wyjatek; plan nie ma nieuzasadnionych skanow sekwencyjnych; migracja ma rollback; test/raport obejmuje duza liczbe kategorii, dlugi zakres i owner isolation.
 
 ### NB-065 - Dodaj agregacje jakosci biblioteki, linkow i okladek
 
