@@ -1,6 +1,6 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
-import { analyticsTooltipProps, DrilldownLink, formatCount, formatPercent, noneQuery, percent } from './chartUtils'
+import { analyticsTooltipProps, DrilldownLink, formatCount, formatPercent, getActiveChartLabel, noneQuery, numberQuery, percent, useBooksDrilldown } from './chartUtils'
 
 type RatingDistributionChartProps = {
   data: BookAnalyticsDto | undefined
@@ -11,6 +11,7 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
   const counts = ratings?.counts ?? []
   const totalBooks = (ratings?.ratedBooks ?? 0) + (ratings?.unratedBooks ?? 0)
   const coverage = percent(ratings?.ratedBooks ?? 0, totalBooks)
+  const openBooks = useBooksDrilldown()
 
   if (!ratings || totalBooks === 0) {
     return <div className="grid min-h-56 place-items-center text-sm text-slate-500">No rating data for this analytics scope.</div>
@@ -31,19 +32,38 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
           </div>
           <DrilldownLink query={noneQuery('rating')}>Unrated: {formatCount(ratings.unratedBooks)}</DrilldownLink>
         </div>
-        <div className="h-64 min-w-0">
+        <div className="analytics-drilldown-chart h-64 min-w-0">
           <ResponsiveContainer>
-            <BarChart data={counts} margin={{ left: 0, right: 8 }}>
+            <BarChart
+              data={counts}
+              margin={{ left: 0, right: 8 }}
+              onClick={(event) => {
+                const rating = Number(getActiveChartLabel(event))
+                if (Number.isFinite(rating)) {
+                  openBooks(numberQuery('rating', rating))
+                }
+              }}
+            >
               <XAxis dataKey="rating" tickLine={false} />
               <YAxis allowDecimals={false} tickLine={false} />
               <Tooltip {...analyticsTooltipProps} formatter={(value, _name, item) => [`${formatCount(Number(value))} books`, `Rating ${item.payload.rating}`]} />
               <Bar dataKey="bookCount" name="Books" radius={[6, 6, 0, 0]}>
                 {counts.map((item) => (
-                  <Cell fill={item.bookCount > 0 ? '#7c3aed' : '#334155'} key={item.rating} />
+                  <Cell
+                    fill={item.bookCount > 0 ? '#7c3aed' : '#334155'}
+                    key={item.rating}
+                  />
                 ))}
               </Bar>
             </BarChart>
           </ResponsiveContainer>
+          <div className="sr-only">
+            {counts.map((item) => (
+              <DrilldownLink key={item.rating} query={numberQuery('rating', item.rating)}>
+                Open rating {item.rating} books
+              </DrilldownLink>
+            ))}
+          </div>
         </div>
       </div>
     </div>

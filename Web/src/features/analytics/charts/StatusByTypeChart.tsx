@@ -1,6 +1,6 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
-import { analyticsTooltipProps, chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, normalizedPercent, percent } from './chartUtils'
+import { analyticsTooltipProps, chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, getActiveChartLabel, normalizedPercent, percent, useBooksDrilldown } from './chartUtils'
 
 type StatusByTypeChartProps = {
   data: BookAnalyticsDto | undefined
@@ -8,12 +8,17 @@ type StatusByTypeChartProps = {
 
 export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
   const items = data?.composition.statusByType ?? []
+  const openBooks = useBooksDrilldown()
   const statuses = Array.from(new Set(items.flatMap((item) => item.statuses.map((status) => status.status))))
   const chartData = items.map((item) => {
     const row: Record<string, number | string> = { type: item.type, totalBooks: item.totalBooks }
+    const countsByStatus = Object.fromEntries(item.statuses.map((status) => [status.status, status.bookCount]))
+    const displayPercents = distributeStackedPercents(statuses.map((status) => countsByStatus[status] ?? 0), item.totalBooks)
     for (const status of statuses) {
-      const count = item.statuses.find((entry) => entry.status === status)?.bookCount ?? 0
-      row[status] = normalizedPercent(count, item.totalBooks)
+      const statusIndex = statuses.indexOf(status)
+      const count = countsByStatus[status] ?? 0
+      row[status] = displayPercents[statusIndex]
+      row[`${status}Percent`] = normalizedPercent(count, item.totalBooks)
       row[`${status}Count`] = count
     }
 
@@ -26,34 +31,120 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
 
   return (
     <div className="grid gap-4">
-      <div className="h-72 w-full min-w-0" data-testid="status-by-type-chart">
+      <div className="analytics-drilldown-chart h-72 w-full min-w-0" data-testid="status-by-type-chart">
         <ResponsiveContainer>
-          <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>
+          <BarChart
+            data={chartData}
+            layout="vertical"
+            margin={{ left: 8, right: 16 }}
+            onClick={(event) => {
+              const type = getActiveChartLabel(event)
+              if (typeof type === 'string') {
+                openBooks(fieldQuery('type', type))
+              }
+            }}
+          >
             <XAxis domain={[0, 100]} tickFormatter={(value) => formatPercent(Number(value))} type="number" />
             <YAxis dataKey="type" tickLine={false} type="category" width={96} />
             <Tooltip
               {...analyticsTooltipProps}
               formatter={(value, name, item) => [
-                `${formatPercent(Number(value))} (${formatCount(Number(item.payload[`${String(name)}Count`] ?? 0))} books)`,
+                `${formatPercent(Number(item.payload[`${String(name)}Percent`] ?? value))} (${formatCount(Number(item.payload[`${String(name)}Count`] ?? 0))} books)`,
                 String(name),
               ]}
             />
             {statuses.map((status, index) => (
-              <Bar dataKey={status} fill={chartColors[index % chartColors.length]} key={status} stackId="books" />
+              <Bar
+                className="analytics-drilldown-shape"
+                dataKey={status}
+                fill={chartColors[index % chartColors.length]}
+                key={status}
+                stackId="books"
+                onClick={(entry, _index, event) => {
+                  event.stopPropagation()
+                  const payload = getChartPayload(entry)
+                  const type = payload.type
+                  const count = payload[`${status}Count`]
+                  if (typeof type === 'string' && Number(count) > 0) {
+                    openBooks(`${fieldQuery('type', type)} ${fieldQuery('status', status)}`)
+                  }
+                }}
+              />
             ))}
           </BarChart>
         </ResponsiveContainer>
+        <div className="sr-only">
+          {items.map((item) => (
+            <DrilldownLink key={item.type} query={fieldQuery('type', item.type)}>
+              Open {item.type} books
+            </DrilldownLink>
+          ))}
+          {items.flatMap((item) => item.statuses.map((status) => (
+            <DrilldownLink key={`${item.type}-${status.status}`} query={`${fieldQuery('type', item.type)} ${fieldQuery('status', status.status)}`}>
+              Open {item.type} {status.status} books
+            </DrilldownLink>
+          )))}
+        </div>
       </div>
       <div className="grid gap-2">
         {items.map((item) => (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.type}>
-            <DrilldownLink query={fieldQuery('type', item.type)}>{item.type}</DrilldownLink>
+            <span className="font-semibold text-slate-950">{item.type}</span>
             <span className="text-slate-500">{formatCount(item.totalBooks)} books</span>
           </div>
         ))}
       </div>
     </div>
   )
+}
+
+function getChartPayload(entry: unknown): Record<string, unknown> {
+  if (entry && typeof entry === 'object' && 'payload' in entry && entry.payload && typeof entry.payload === 'object') {
+    return entry.payload as Record<string, unknown>
+  }
+
+  return {}
+}
+
+export function distributeStackedPercents(counts: number[], total: number, minimumPositivePercent = 3) {
+  if (total <= 0) {
+    return counts.map(() => 0)
+  }
+
+  const rawPercents = counts.map((count) => normalizedPercent(count, total))
+  const positiveIndexes = rawPercents
+    .map((value, index) => ({ value, index }))
+    .filter((item) => item.value > 0)
+  if (!positiveIndexes.length) {
+    return rawPercents
+  }
+
+  const minimum = positiveIndexes.length * minimumPositivePercent >= 100
+    ? 100 / positiveIndexes.length
+    : minimumPositivePercent
+  const small = positiveIndexes.filter((item) => item.value < minimum)
+  const large = positiveIndexes.filter((item) => item.value >= minimum)
+  const fixedSmallTotal = small.length * minimum
+  const largeRawTotal = large.reduce((sum, item) => sum + item.value, 0)
+  const remainingForLarge = Math.max(0, 100 - fixedSmallTotal)
+  const result = rawPercents.map((value) => value > 0 ? value : 0)
+
+  for (const item of small) {
+    result[item.index] = minimum
+  }
+
+  if (large.length && largeRawTotal > 0) {
+    for (const item of large) {
+      result[item.index] = (item.value / largeRawTotal) * remainingForLarge
+    }
+  } else if (small.length) {
+    const equal = 100 / small.length
+    for (const item of small) {
+      result[item.index] = equal
+    }
+  }
+
+  return result
 }
 
 export function statusByTypeRows(data?: BookAnalyticsDto) {
