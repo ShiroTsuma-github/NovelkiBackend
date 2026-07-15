@@ -278,15 +278,15 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
           <>
             <div className="grid gap-4 md:grid-cols-4">
               <SummaryCard label="File" value={session.fileName} />
-              <SummaryCard label="Rows" value={String(importStats.totalRows)} />
-              <SummaryCard label="Positive" value={String(importStats.validRows)} />
-              <SummaryCard label="Negative" value={String(importStats.invalidRowsCount)} tone={importStats.invalidRowsCount ? 'warn' : 'ok'} />
+              <SummaryCard label="Rows" value={formatImportCount(importStats.totalRows)} />
+              <SummaryCard label="Positive" value={formatImportCount(importStats.validRows)} />
+              <SummaryCard label="Negative" value={formatImportCount(importStats.invalidRowsCount)} tone={importStats.invalidRowsCount ? 'warn' : 'ok'} />
             </div>
 
             <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-slate-100">Progress</div>
-                <div className="text-sm text-slate-300">{importStats.validRows} / {importStats.totalRows} valid</div>
+                <div className="text-sm text-slate-300">{formatImportCount(importStats.validRows)} / {formatImportCount(importStats.totalRows)} valid</div>
               </div>
               <div className="h-3 overflow-hidden rounded-full bg-slate-800">
                 <div
@@ -378,8 +378,8 @@ function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalize
   return (
     <div className="grid min-h-0 gap-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <SummaryCard label="Imported" value={String(result.importedCount)} tone="ok" />
-        <SummaryCard label="Skipped" value={String(result.skippedCount)} tone={result.skippedCount ? 'warn' : 'neutral'} />
+        <SummaryCard label="Imported" value={formatImportCount(result.importedCount)} tone="ok" />
+        <SummaryCard label="Skipped" value={formatImportCount(result.skippedCount)} tone={result.skippedCount ? 'warn' : 'neutral'} />
       </div>
 
       {result.errors.length ? (
@@ -395,7 +395,7 @@ function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalize
           <p className="text-sm text-slate-400">Saved titles from this CSV finalization.</p>
         </div>
         {result.importedBooks.length ? (
-          <div className="overflow-hidden rounded-xl border border-slate-800">
+          <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-xl border border-slate-800">
             <table className="w-full border-collapse text-left text-sm">
               <thead className="bg-slate-950 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
@@ -632,6 +632,10 @@ function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value:
       <div className="truncate text-base font-semibold">{value}</div>
     </div>
   )
+}
+
+function formatImportCount(value: number) {
+  return new Intl.NumberFormat('en-US').format(value)
 }
 
 function LabeledInput({

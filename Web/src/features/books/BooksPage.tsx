@@ -467,9 +467,9 @@ function BookSummaryPanel({
         </Link>
       </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        <SummaryMetricCard label="Total books" value={String(summary.totalBooks)} />
-        <SummaryMetricCard label="Rated" value={String(summary.ratedBooks)} />
-        <SummaryMetricCard label="Unrated" value={String(summary.unratedBooks)} />
+        <SummaryMetricCard label="Total books" value={formatBookCount(summary.totalBooks)} />
+        <SummaryMetricCard label="Rated" value={formatBookCount(summary.ratedBooks)} />
+        <SummaryMetricCard label="Unrated" value={formatBookCount(summary.unratedBooks)} />
         <SummaryMetricCard label="Average rating" value={formatAverageRating(summary.averageRating)} />
         <SummaryMetricCard label="Current chapters" value={formatChapterCount(summary.currentChapters)} />
       </div>
@@ -482,7 +482,7 @@ function BookSummaryPanel({
           <div className="grid gap-4 xl:grid-cols-2">
             <SummaryCompactSection
               title="Status distribution"
-              items={summary.statusCounts.map((status) => ({ label: status.status, value: String(status.count) }))}
+              items={summary.statusCounts.map((status) => ({ label: status.status, value: formatBookCount(status.count) }))}
             />
             <SummaryCompactTypeSection items={summary.typeCounts} />
           </div>
@@ -547,7 +547,7 @@ function SummaryTypeDetails({ items }: { items: BookSummaryTypeCountDto[] }) {
         <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3" key={item.type}>
           <div className="flex items-center justify-between gap-3">
             <div className="font-semibold text-slate-950">{item.type}</div>
-            <div className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{item.bookCount} books</div>
+            <div className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{formatBookCount(item.bookCount)} books</div>
           </div>
           <div className="mt-2 text-sm text-slate-600">Current chapters: {formatChapterCount(item.currentChapters)}</div>
         </div>
@@ -828,12 +828,16 @@ export function formatAverageRating(value?: number | null) {
   return value == null ? '-' : value.toFixed(1)
 }
 
+export function formatBookCount(value?: number | null) {
+  return value == null ? '-' : new Intl.NumberFormat('en-US').format(value)
+}
+
 export function formatChapterCount(value?: number | null) {
   if (value == null) {
     return '-'
   }
 
-  return Number.isInteger(value) ? String(value) : value.toFixed(1)
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(value)
 }
 
 export function formatDate(value?: string | null) {
