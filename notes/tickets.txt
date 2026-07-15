@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-060 - Dodaj agregacje skladu biblioteki
-
-- Typ: `Feature`
-- Priorytet: `P2`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
-- Zaleznosci: `NB-059`
-- Problem: API nie zwraca danych do porownania statusow w typach ani rankingow gatunkow i tagow.
-- Zakres: dodac `composition.statusByType`, `composition.genres` i `composition.tags`; liczyc relacje wielowartosciowe raz na ksiazke; zwracac bookCount i shareOfBooks; rankingi sortowac malejaco, stabilnie po nazwie; przygotowac dane do Top N i Other.
-- Akceptacja: status-by-type zawiera total typu i wszystkie wystepujace statusy; gatunek/tag nie liczy tej samej ksiazki dwa razy; mianownikiem udzialu jest liczba filtrowanych ksiazek; tagi sa ograniczone do wlasciciela; puste relacje zwracaja puste tablice; testy obejmuja wiele gatunkow/tagow, duplikaty relacji, remisy, filtry i owner isolation.
-
 ### NB-061 - Dodaj agregacje ocen i priorytetow
 
 - Typ: `Feature`
@@ -185,6 +175,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Problem: obecny endpoint summary nie zapewnia kontraktu, zakresu czasu ani sekcji potrzebnych osobnej stronie Analytics.
 - Zakres: dodac owner-scoped `GET /api/v1/book/analytics` z parametrami `query`, `from`, `to` i `bucket`; zdefiniowac `generatedAt`, `scope`, `overview` i puste sekcje rozszerzane przez kolejne tickety; wykorzystac `BookSearchCriteriaApplier`; walidowac czas i bucket; agregacje wykonywac w bazie z `AsNoTracking`.
 - Akceptacja: endpoint zwraca tylko dane aktualnego uzytkownika; `query` filtruje overview; `from >= to`, nieznany bucket i zakres ponad 10 lat zwracaja 400; pusta biblioteka zwraca zera i puste tablice; kolekcje nie sa nullem; testy obejmuja owner isolation, brak danych, filtrowanie, domyslny zakres 12 tygodni, granice czasu i anulowanie requestu.
+
+### NB-060 - Dodaj agregacje skladu biblioteki
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie zwraca danych do porownania statusow w typach ani rankingow gatunkow i tagow.
+- Zakres: dodac `composition.statusByType`, `composition.genres` i `composition.tags`; liczyc relacje wielowartosciowe raz na ksiazke; zwracac bookCount i shareOfBooks; rankingi sortowac malejaco, stabilnie po nazwie; przygotowac dane do Top N i Other.
+- Akceptacja: status-by-type zawiera total typu i wszystkie wystepujace statusy; gatunek/tag nie liczy tej samej ksiazki dwa razy; mianownikiem udzialu jest liczba filtrowanych ksiazek; tagi sa ograniczone do wlasciciela; puste relacje zwracaja puste tablice; testy obejmuja wiele gatunkow/tagow, duplikaty relacji, remisy, filtry i owner isolation.
 
 ### NB-058 - Rozszerz parser wyszukiwania o filtry brakujacych danych
 

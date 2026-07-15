@@ -349,6 +349,62 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookAnalytics_ShouldAggregateCompositionByStatusTypeGenresAndTags()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var otherOwnerId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "composition-other", NormalizedUserName = "COMPOSITION-OTHER" });
+        var fantasy = TestData.Genre("Fantasy");
+        var drama = TestData.Genre("Drama");
+        var favorite = TestData.Tag(database.UserId, "favorite");
+        var backlog = TestData.Tag(database.UserId, "backlog");
+        var otherOwnerTag = TestData.Tag(otherOwnerId, "favorite");
+        context.Genres.AddRange(fantasy, drama);
+        context.Tags.AddRange(favorite, backlog, otherOwnerTag);
+
+        var novelReading = TestData.Book(database.UserId, "Novel Reading");
+        novelReading.BookGenres.Add(new BookGenre { Book = novelReading, Genre = fantasy });
+        novelReading.BookGenres.Add(new BookGenre { Book = novelReading, Genre = drama });
+        novelReading.BookTags.Add(new BookTag { Book = novelReading, Tag = favorite });
+        novelReading.BookTags.Add(new BookTag { Book = novelReading, Tag = backlog });
+
+        var novelCompleted = TestData.Book(database.UserId, "Novel Completed");
+        novelCompleted.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        novelCompleted.BookGenres.Add(new BookGenre { Book = novelCompleted, Genre = fantasy });
+        novelCompleted.BookTags.Add(new BookTag { Book = novelCompleted, Tag = favorite });
+
+        var mangaReading = TestData.Book(database.UserId, "Manga Reading");
+        mangaReading.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        mangaReading.BookTags.Add(new BookTag { Book = mangaReading, Tag = backlog });
+
+        var otherOwnerBook = TestData.Book(otherOwnerId, "Other Owner Composition");
+        otherOwnerBook.BookGenres.Add(new BookGenre { Book = otherOwnerBook, Genre = fantasy });
+        otherOwnerBook.BookTags.Add(new BookTag { Book = otherOwnerBook, Tag = otherOwnerTag });
+
+        context.Books.AddRange(novelReading, novelCompleted, mangaReading, otherOwnerBook);
+        await context.SaveChangesAsync();
+        var service = CreateAnalyticsQueryService(context);
+
+        var result = await service.GetAnalyticsAsync(database.UserId, BookSearchCriteria.Empty, AnalyticsScope(), CancellationToken.None);
+
+        Assert.Equal(3, result.Overview.TotalBooks);
+        var novel = Assert.Single(result.Composition.StatusByType, item => item.Type == "Novel");
+        Assert.Equal(2, novel.TotalBooks);
+        Assert.Contains(novel.Statuses, status => status.Status == "Reading" && status.BookCount == 1);
+        Assert.Contains(novel.Statuses, status => status.Status == "Completed" && status.BookCount == 1);
+        var manga = Assert.Single(result.Composition.StatusByType, item => item.Type == "Manga");
+        Assert.Equal(1, manga.TotalBooks);
+        Assert.Contains(manga.Statuses, status => status.Status == "Reading" && status.BookCount == 1);
+
+        Assert.Equal(["Fantasy", "Drama"], result.Composition.Genres.Select(item => item.Name).ToArray());
+        Assert.Equal(2, result.Composition.Genres[0].BookCount);
+        Assert.Equal(2d / 3d, result.Composition.Genres[0].ShareOfBooks, precision: 6);
+        Assert.Equal(["backlog", "favorite"], result.Composition.Tags.Select(item => item.Name).ToArray());
+        Assert.All(result.Composition.Tags, item => Assert.Equal(2, item.BookCount));
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSearchAcrossFieldValuesAndDictionaryFields()
     {
         using var database = new SqliteTestDatabase();
