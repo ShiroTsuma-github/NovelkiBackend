@@ -587,6 +587,7 @@ describe('BooksPage', () => {
     const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
+    expect(container.querySelector('.app-scrollbar.overflow-x-auto')).toBeTruthy()
     let footer = container.querySelector('section > .border-t.border-slate-200.bg-white')
     expect(footer).toHaveTextContent('Per page')
     expect(container.querySelector('.overflow-x-auto.pb-24')).toBeFalsy()
