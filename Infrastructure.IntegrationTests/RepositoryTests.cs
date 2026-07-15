@@ -9,11 +9,19 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using System.Data.Common;
 using System.Text.Json;
+using Xunit.Abstractions;
 
 namespace Infrastructure.IntegrationTests;
 
 public class RepositoryTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public RepositoryTests(ITestOutputHelper output)
+    {
+        _output = output;
+    }
+
     private static BookReadQueryService CreateReadQueryService(ApplicationDbContext context)
     {
         var criteriaApplier = new BookSearchCriteriaApplier(context);
@@ -883,21 +891,31 @@ public class RepositoryTests
         var commandCounter = new CountingCommandInterceptor();
         await using var context = database.CreateContext(commandCounter);
         var service = CreateAnalyticsQueryService(context);
+        var started = DateTimeOffset.UtcNow;
 
         var result = await service.GetAnalyticsAsync(
             database.UserId,
             BookSearchCriteria.Empty,
             new Domain.Models.BookAnalyticsScopeSnapshot(null, new DateOnly(2026, 7, 1), new DateOnly(2026, 8, 1), "week"),
             CancellationToken.None);
-        var json = JsonSerializer.Serialize(result.ToDto());
+        var elapsed = DateTimeOffset.UtcNow - started;
+        var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result.ToDto()));
+        var artifact = WriteAnalyticsPerformanceArtifact(
+            "bounded",
+            result,
+            commandCounter.CommandCount,
+            elapsed,
+            payloadBytes,
+            progressHistoryCount: await context.BookProgressHistory.CountAsync());
 
         Assert.Equal(300, result.Overview.TotalBooks);
         Assert.True(commandCounter.CommandCount <= 20, $"Analytics executed {commandCounter.CommandCount} SQL commands.");
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 100_000, "Analytics JSON payload exceeded 100 KB.");
+        Assert.True(payloadBytes <= 100_000, "Analytics JSON payload exceeded 100 KB.");
         Assert.NotEmpty(result.Composition.Genres);
         Assert.NotEmpty(result.Composition.Tags);
         Assert.NotEmpty(result.Activity.Points);
         Assert.Equal(result.Overview.TotalBooks, result.LibraryGrowth.Points.Last().CumulativeBooks);
+        _output.WriteLine($"Analytics performance artifact: {artifact}");
     }
 
     [Fact]
@@ -931,13 +949,22 @@ public class RepositoryTests
             new Domain.Models.BookAnalyticsScopeSnapshot(null, new DateOnly(2026, 7, 1), new DateOnly(2026, 8, 1), "week"),
             CancellationToken.None);
         var elapsed = DateTimeOffset.UtcNow - started;
-        var json = JsonSerializer.Serialize(result.ToDto());
+        var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result.ToDto()));
+        var progressHistoryCount = await context.BookProgressHistory.CountAsync();
+        var artifact = WriteAnalyticsPerformanceArtifact(
+            "large",
+            result,
+            commandCounter.CommandCount,
+            elapsed,
+            payloadBytes,
+            progressHistoryCount);
 
         Assert.Equal(10_000, result.Overview.TotalBooks);
-        Assert.Equal(250_000, await context.BookProgressHistory.CountAsync());
+        Assert.Equal(250_000, progressHistoryCount);
         Assert.True(commandCounter.CommandCount <= 20, $"Analytics executed {commandCounter.CommandCount} SQL commands.");
-        Assert.True(System.Text.Encoding.UTF8.GetByteCount(json) <= 100_000, "Analytics JSON payload exceeded 100 KB.");
+        Assert.True(payloadBytes <= 100_000, "Analytics JSON payload exceeded 100 KB.");
         Assert.True(elapsed < TimeSpan.FromSeconds(10), $"SQLite harness took {elapsed.TotalMilliseconds:N0} ms.");
+        _output.WriteLine($"Analytics performance artifact: {artifact}");
     }
 
     [Fact]
@@ -1581,6 +1608,75 @@ public class RepositoryTests
             await context.SaveChangesAsync();
             context.ChangeTracker.Clear();
         }
+    }
+
+    private string WriteAnalyticsPerformanceArtifact(
+        string scenario,
+        Domain.Models.BookAnalyticsSnapshot snapshot,
+        int commandCount,
+        TimeSpan elapsed,
+        int payloadBytes,
+        int progressHistoryCount)
+    {
+        var root = FindRepositoryRoot();
+        var outputDirectory = Path.Combine(root, "TestResults");
+        Directory.CreateDirectory(outputDirectory);
+        var path = Path.Combine(outputDirectory, $"analytics-performance-NB-066-{scenario}.json");
+        var artifact = new
+        {
+            Scenario = scenario,
+            GeneratedAt = DateTimeOffset.UtcNow,
+            ElapsedMilliseconds = Math.Round(elapsed.TotalMilliseconds, 2),
+            SqlCommandCount = commandCount,
+            PayloadBytes = payloadBytes,
+            Limits = new
+            {
+                MaxSqlCommands = 20,
+                MaxPayloadBytes = 100_000,
+                MaxLargeHarnessMilliseconds = 10_000
+            },
+            DataSet = new
+            {
+                Books = snapshot.Overview.TotalBooks,
+                ProgressHistory = progressHistoryCount,
+                RatedBooks = snapshot.Ratings.RatedBooks,
+                UnratedBooks = snapshot.Ratings.UnratedBooks,
+                CurrentChapters = snapshot.Overview.CurrentChapters
+            },
+            Buckets = new
+            {
+                ActivityPoints = snapshot.Activity.Points.Count,
+                LibraryGrowthPoints = snapshot.LibraryGrowth.Points.Count
+            },
+            Categories = new
+            {
+                StatusByType = snapshot.Composition.StatusByType.Count,
+                Genres = snapshot.Composition.Genres.Count,
+                Tags = snapshot.Composition.Tags.Count,
+                TypeVolumes = snapshot.Progress.TypeVolumes.Count,
+                LinkSources = snapshot.Quality.LinkSources.Count,
+                CoverStatuses = snapshot.Quality.CoverStatuses.Count,
+                CoverSources = snapshot.Quality.CoverSources.Count
+            }
+        };
+
+        File.WriteAllText(path, JsonSerializer.Serialize(artifact, new JsonSerializerOptions { WriteIndented = true }));
+        _output.WriteLine($"Elapsed: {elapsed.TotalMilliseconds:N0} ms");
+        _output.WriteLine($"SQL commands: {commandCount}");
+        _output.WriteLine($"Payload: {payloadBytes:N0} bytes");
+        _output.WriteLine($"Books: {snapshot.Overview.TotalBooks:N0}, progress history: {progressHistoryCount:N0}");
+        return path;
+    }
+
+    private static string FindRepositoryRoot()
+    {
+        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, ".git")))
+        {
+            directory = directory.Parent;
+        }
+
+        return directory?.FullName ?? AppContext.BaseDirectory;
     }
 
     private sealed class CountingCommandInterceptor : DbCommandInterceptor
