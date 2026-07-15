@@ -12,7 +12,7 @@ import { renderWithProviders } from '@/test/render'
 import { AnalyticsPage } from './AnalyticsPage'
 import { libraryGrowthChartPoints } from './charts/LibraryGrowthChart'
 import { readingActivityChartPoints } from './charts/ReadingActivityChart'
-import { statusByTypeRows } from './charts/StatusByTypeChart'
+import { distributeStackedPercents, statusByTypeRows } from './charts/StatusByTypeChart'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -410,6 +410,28 @@ describe('AnalyticsPage', () => {
     expect(rows.flat()).not.toContain('100.00000000000001%')
   })
 
+  it('keeps tiny positive status by type segments large enough to click', () => {
+    const displayPercents = distributeStackedPercents([499, 1], 500)
+
+    expect(displayPercents[1]).toBeGreaterThanOrEqual(3)
+    expect(Math.round(displayPercents.reduce((sum, value) => sum + value, 0))).toBe(100)
+
+    const rows = statusByTypeRows(createAnalytics({
+      composition: {
+        statusByType: [{
+          type: 'Manga',
+          totalBooks: 500,
+          statuses: [
+            { status: 'Reading', bookCount: 499 },
+            { status: 'On Hold', bookCount: 1 },
+          ],
+        }],
+      },
+    }))
+
+    expect(rows).toContainEqual(['Manga', 'On Hold', '1', '0.2%'])
+  })
+
   it('exposes text-equivalent data tables where raw data adds value', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     const user = userEvent.setup()
@@ -516,9 +538,10 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByText('10%')).toBeInTheDocument()
+    expect(document.querySelector('.analytics-drilldown-chart')).toBeTruthy()
     expect(screen.getAllByText('Unrated: 9')).toHaveLength(1)
     expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
-    expect(screen.queryByRole('link', { name: /^10: 1/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open rating 10 books/i })).toHaveAttribute('href', '/books?query=rating%3A10')
     expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
   })
 
@@ -570,11 +593,13 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByText('Book count by type')).toBeInTheDocument()
     expect(screen.getByText('Current chapters by type')).toBeInTheDocument()
+    expect(document.querySelectorAll('.analytics-drilldown-chart').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText(/Current chapters: 120.5/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Manga' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open manga books by count/i })).toHaveAttribute('href', '/books?query=type%3AManga')
+    expect(screen.getByRole('link', { name: /open manga books by current chapters/i })).toHaveAttribute('href', '/books?query=type%3AManga')
   })
 
-  it('keeps status by type drill-down focused on content types only', async () => {
+  it('exposes status by type drill-down links for chart segments', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
       composition: {
         statusByType: [{
@@ -590,9 +615,12 @@ describe('AnalyticsPage', () => {
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
-    expect(await screen.findByRole('link', { name: 'Manga' })).toHaveAttribute('href', '/books?query=type%3AManga')
-    expect(screen.queryByRole('link', { name: /Reading: 2/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Completed: 1/i })).not.toBeInTheDocument()
+    expect(await screen.findByText('Manga')).toBeInTheDocument()
+    expect(screen.getByTestId('status-by-type-chart')).toHaveClass('analytics-drilldown-chart')
+    expect(screen.queryByRole('link', { name: 'Manga' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /open manga books$/i })).toHaveAttribute('href', '/books?query=type%3AManga')
+    expect(screen.getByRole('link', { name: /open manga reading books/i })).toHaveAttribute('href', '/books?query=type%3AManga%20status%3AReading')
+    expect(screen.getByRole('link', { name: /open manga completed books/i })).toHaveAttribute('href', '/books?query=type%3AManga%20status%3ACompleted')
   })
 
   it('estimates reading time from shared localStorage without refetching', async () => {

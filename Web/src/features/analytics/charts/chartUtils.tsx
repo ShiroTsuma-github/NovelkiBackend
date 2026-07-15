@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { addDays, addMonths, addWeeks, format, parseISO } from 'date-fns'
 
 export const chartColors = ['#0891b2', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#65a30d', '#0f766e']
@@ -70,6 +70,20 @@ export function DrilldownLink({ children, className = '', query }: { children: R
       <span aria-hidden="true" className="text-xs">↗</span>
     </Link>
   )
+}
+
+export function useBooksDrilldown() {
+  const navigate = useNavigate()
+  return (query: string) => navigate(booksHref(query))
+}
+
+export function getActiveChartLabel(event: unknown) {
+  if (event && typeof event === 'object' && 'activeLabel' in event) {
+    const label = event.activeLabel
+    return typeof label === 'string' || typeof label === 'number' ? label : null
+  }
+
+  return null
 }
 
 export type AnalyticsDateBucket = 'day' | 'week' | 'month'

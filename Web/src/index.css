@@ -143,3 +143,10 @@ a {
 .analytics-chart-surface :where(.recharts-wrapper, .recharts-surface) {
   -webkit-tap-highlight-color: transparent;
 }
+
+.analytics-chart-surface .analytics-drilldown-chart,
+.analytics-chart-surface .analytics-drilldown-chart :where(.recharts-wrapper, .recharts-surface, .recharts-layer, path, rect, circle),
+.analytics-chart-surface .analytics-drilldown-shape,
+.analytics-chart-surface .analytics-drilldown-shape :where(path, rect, circle) {
+  cursor: pointer;
+}
