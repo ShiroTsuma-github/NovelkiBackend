@@ -30,7 +30,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
       </p>
       <div className="h-56 min-w-0" aria-label="Library growth trend">
         <ResponsiveContainer>
-          <LineChart data={points}>
+          <LineChart data={displayPoints}>
             <XAxis dataKey="date" tickLine={false} />
             <YAxis allowDecimals={false} tickLine={false} />
             <Tooltip
