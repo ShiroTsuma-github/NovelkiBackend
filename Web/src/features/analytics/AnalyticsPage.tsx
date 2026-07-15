@@ -6,6 +6,8 @@ import type { BookAnalyticsDto } from '@/api/types'
 import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
+import { StatusByTypeChart, statusByTypeRows } from './charts/StatusByTypeChart'
+import { relationRows, TopRelationsChart } from './charts/TopRelationsChart'
 import { extractAnalyticsDateFilters } from './dateQueryFilters'
 
 type AnalyticsBucket = 'day' | 'week' | 'month'
@@ -119,30 +121,43 @@ export function AnalyticsPage() {
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-2">
         <AnalyticsChartCard
-          columns={['Type', 'Status', 'Books']}
-          description="Compact matrix of statuses inside each content type."
+          columns={['Type', 'Status', 'Books', 'Share of type']}
+          description="100% stacked bars showing how statuses split inside each content type."
           emptyMessage="No status/type data for this analytics scope."
-          isEmpty={!isInitialLoading && !statusRows(data).length}
+          isEmpty={!isInitialLoading && !statusByTypeRows(data).length}
           isError={analyticsQuery.isError && !!data}
           isLoading={isInitialLoading}
-          rows={statusRows(data)}
+          rows={statusByTypeRows(data)}
           title="Status by type"
           onRetry={() => analyticsQuery.refetch()}
         >
-          <StatusByTypePreview data={data} />
+          <StatusByTypeChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
-          columns={['Date', 'Events', 'Books touched', 'Chapters advanced']}
-          description="Progress activity grouped by the selected bucket."
-          emptyMessage="No reading activity in the selected date range."
-          isEmpty={!isInitialLoading && !activityRows(data).length}
+          columns={['Genre', 'Books', 'Share of books', 'Bucket']}
+          description="Top genres by matching books, with smaller categories grouped into Other."
+          emptyMessage="No genre data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.composition.genres.length)}
           isError={analyticsQuery.isError && !!data}
           isLoading={isInitialLoading}
-          rows={activityRows(data)}
-          title="Reading activity"
+          rows={relationRows(data?.composition.genres ?? [])}
+          title="Top genres"
           onRetry={() => analyticsQuery.refetch()}
         >
-          <ActivityPreview data={data} />
+          <TopRelationsChart field="genre" items={data?.composition.genres ?? []} title="Genres" />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Tag', 'Books', 'Share of books', 'Bucket']}
+          description="Top tags by matching books, with smaller categories grouped into Other."
+          emptyMessage="No tag data for this analytics scope."
+          isEmpty={!isInitialLoading && !(data?.composition.tags.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={relationRows(data?.composition.tags ?? [])}
+          title="Top tags"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <TopRelationsChart field="tag" items={data?.composition.tags ?? []} title="Tags" />
         </AnalyticsChartCard>
       </div>
     </div>
@@ -154,45 +169,6 @@ function MetricCard({ label, loading, value }: { label: string; loading: boolean
     <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-slate-950">{loading ? <span className="inline-block h-8 w-16 animate-pulse rounded bg-slate-200" /> : value}</div>
-    </div>
-  )
-}
-
-function StatusByTypePreview({ data }: { data?: BookAnalyticsDto }) {
-  const items = data?.composition.statusByType ?? []
-  return (
-    <div className="grid gap-3">
-      {items.slice(0, 8).map((item) => (
-        <div className="grid gap-2" key={item.type}>
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-semibold text-slate-950">{item.type}</span>
-            <span className="text-slate-500">{item.totalBooks} books</span>
-          </div>
-          <div className="flex min-w-0 flex-wrap gap-2">
-            {item.statuses.map((status) => (
-              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-sm" key={`${item.type}-${status.status}`}>
-                {status.status}: {status.bookCount}
-              </span>
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function ActivityPreview({ data }: { data?: BookAnalyticsDto }) {
-  const points = data?.activity.points ?? []
-  return (
-    <div className="grid gap-2">
-      {points.slice(-8).map((point) => (
-        <div className="grid gap-1 rounded-md bg-white px-3 py-2 text-sm shadow-sm" key={point.date}>
-          <div className="font-semibold text-slate-950">{point.date}</div>
-          <div className="text-slate-600">
-            {point.progressEvents} events, {point.booksTouched} books, {formatChapterCount(point.chaptersAdvanced)} chapters
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -258,19 +234,4 @@ function getAnalyticsEmptyMessage(data: BookAnalyticsDto | undefined, query: str
   return query.trim()
     ? 'No books match the current analytics filters.'
     : 'Your library is empty. Add books to populate analytics.'
-}
-
-function statusRows(data?: BookAnalyticsDto) {
-  return (data?.composition.statusByType ?? []).flatMap((item) =>
-    item.statuses.map((status) => [item.type, status.status, status.bookCount]),
-  )
-}
-
-function activityRows(data?: BookAnalyticsDto) {
-  return (data?.activity.points ?? []).map((point) => [
-    point.date,
-    point.progressEvents,
-    point.booksTouched,
-    formatChapterCount(point.chaptersAdvanced),
-  ])
 }

@@ -119,8 +119,57 @@ describe('AnalyticsPage', () => {
     await screen.findByText('Status by type')
     await user.click(screen.getAllByRole('button', { name: /view data/i })[0])
 
-    expect(screen.getByRole('columnheader', { name: /type/i })).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Type' })).toBeInTheDocument()
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
+  })
+
+  it('renders composition charts with Other buckets and drill-down links', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      composition: {
+        genres: [
+          { name: 'Fantasy', bookCount: 8, shareOfBooks: 80 },
+          { name: 'Slice of Life', bookCount: 6, shareOfBooks: 60 },
+          { name: 'Mystery', bookCount: 4, shareOfBooks: 40 },
+          { name: 'Action', bookCount: 3, shareOfBooks: 30 },
+          { name: 'Drama', bookCount: 2, shareOfBooks: 20 },
+          { name: 'Very Long Genre Name That Must Stay Readable', bookCount: 1, shareOfBooks: 10 },
+        ],
+        tags: [
+          { name: 'favorite', bookCount: 5, shareOfBooks: 50 },
+          { name: 'slow burn', bookCount: 3, shareOfBooks: 30 },
+        ],
+      },
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByRole('link', { name: 'Fantasy' })).toHaveAttribute('href', '/books?query=genre%3AFantasy')
+    expect(await screen.findByRole('link', { name: 'slow burn' })).toHaveAttribute('href', '/books?query=tag%3A%22slow%20burn%22')
+    expect(await screen.findByText('Other')).toBeInTheDocument()
+
+    await user.click(screen.getAllByRole('button', { name: /view data/i })[1])
+    expect(screen.getByRole('cell', { name: /grouped remainder/i })).toBeInTheDocument()
+  })
+
+  it('renders empty composition card states without hiding other cards', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      composition: {
+        statusByType: [{
+          type: 'Novel',
+          totalBooks: 1,
+          statuses: [{ status: 'Reading', bookCount: 1 }],
+        }],
+        genres: [],
+        tags: [],
+      },
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText('Novel')).toBeInTheDocument()
+    expect(screen.getByText('No genre data for this analytics scope.')).toBeInTheDocument()
+    expect(screen.getByText('No tag data for this analytics scope.')).toBeInTheDocument()
   })
 
   it('keeps analytics type labels readable against their calculated background', async () => {
@@ -132,7 +181,11 @@ describe('AnalyticsPage', () => {
   })
 })
 
-function createAnalytics(overrides: Partial<BookAnalyticsDto['overview']> = {}): BookAnalyticsDto {
+type AnalyticsOverrides = Partial<BookAnalyticsDto['overview']> & {
+  composition?: Partial<BookAnalyticsDto['composition']>
+}
+
+function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
   const overview = {
     totalBooks: 10,
     ratedBooks: 8,
@@ -142,6 +195,19 @@ function createAnalytics(overrides: Partial<BookAnalyticsDto['overview']> = {}):
     booksWithKnownCurrentChapter: 9,
     booksWithoutKnownCurrentChapter: 1,
     ...overrides,
+  }
+  const composition = {
+    statusByType: overview.totalBooks > 0 ? [{
+      type: 'Novel',
+      totalBooks: 6,
+      statuses: [
+        { status: 'Reading', bookCount: 4 },
+        { status: 'Completed', bookCount: 2 },
+      ],
+    }] : [],
+    genres: overview.totalBooks > 0 ? [{ name: 'Fantasy', bookCount: 6, shareOfBooks: 60 }] : [],
+    tags: overview.totalBooks > 0 ? [{ name: 'favorite', bookCount: 4, shareOfBooks: 40 }] : [],
+    ...overrides.composition,
   }
 
   return {
@@ -153,18 +219,7 @@ function createAnalytics(overrides: Partial<BookAnalyticsDto['overview']> = {}):
       bucket: 'week',
     },
     overview,
-    composition: {
-      statusByType: overview.totalBooks > 0 ? [{
-        type: 'Novel',
-        totalBooks: 6,
-        statuses: [
-          { status: 'Reading', bookCount: 4 },
-          { status: 'Completed', bookCount: 2 },
-        ],
-      }] : [],
-      genres: [],
-      tags: [],
-    },
+    composition,
     ratings: {
       ratedBooks: overview.ratedBooks,
       unratedBooks: overview.unratedBooks,
