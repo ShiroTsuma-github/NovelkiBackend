@@ -1,6 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto, BookAnalyticsLibraryGrowthPointDto } from '@/api/types'
-import { DrilldownLink, fieldQuery, formatCount } from './chartUtils'
+import { dateRangeForBucket, DrilldownLink, fieldQuery, formatCount, formatDateRange } from './chartUtils'
 
 type LibraryGrowthChartProps = {
   data: BookAnalyticsDto | undefined
@@ -9,7 +9,8 @@ type LibraryGrowthChartProps = {
 export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
   const points = data?.libraryGrowth.points ?? []
   const openingCount = data?.libraryGrowth.openingCount ?? 0
-  const displayPoints = compactGrowthPoints(points)
+  const bucket = data?.scope.bucket ?? 'day'
+  const displayPoints = compactGrowthPoints(points, bucket)
 
   if (!points.length) {
     return (
@@ -61,7 +62,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
 }
 
 export function libraryGrowthRows(data?: BookAnalyticsDto) {
-  return compactGrowthPoints(data?.libraryGrowth.points ?? []).map((point) => [
+  return compactGrowthPoints(data?.libraryGrowth.points ?? [], data?.scope.bucket ?? 'day').map((point) => [
     point.label,
     formatCount(point.booksAdded),
     formatCount(point.cumulativeBooks),
@@ -69,27 +70,29 @@ export function libraryGrowthRows(data?: BookAnalyticsDto) {
   ])
 }
 
-function compactGrowthPoints(points: BookAnalyticsLibraryGrowthPointDto[]) {
-  return points.reduce<Array<BookAnalyticsLibraryGrowthPointDto & { label: string }>>((rows, point) => {
+function compactGrowthPoints(points: BookAnalyticsLibraryGrowthPointDto[], bucket: string) {
+  return points.reduce<Array<BookAnalyticsLibraryGrowthPointDto & { label: string; endExclusive: string }>>((rows, point) => {
+    const period = dateRangeForBucket(point.date, bucket)
     const isEmpty = point.booksAdded === 0 && point.byType.length === 0
     const previous = rows.at(-1)
     if (isEmpty && previous && previous.booksAdded === 0 && previous.byType.length === 0 && previous.cumulativeBooks === point.cumulativeBooks) {
-      previous.label = `${previous.label.split(' - ')[0]} - ${point.date}`
+      previous.endExclusive = period.end
+      previous.label = formatDateRange(previous.date, previous.endExclusive)
       return rows
     }
 
-    rows.push({ ...point, label: point.date })
+    rows.push({ ...point, label: formatDateRange(period.start, period.end), endExclusive: period.end })
     return rows
   }, [])
 }
 
-function typeSummary(point: BookAnalyticsLibraryGrowthPointDto) {
+function typeSummary(point: BookAnalyticsLibraryGrowthPointDto & { endExclusive?: string }) {
   if (!point.byType.length) {
     return <span>No additions by type.</span>
   }
 
   return point.byType.map((item) => (
-    <DrilldownLink key={item.type} query={`${fieldQuery('type', item.type)} created:=${point.date}`}>
+    <DrilldownLink key={item.type} query={`${fieldQuery('type', item.type)} created:>=${point.date} created:<${point.endExclusive ?? point.date}`}>
       {item.type}: {formatCount(item.bookCount)}
     </DrilldownLink>
   ))

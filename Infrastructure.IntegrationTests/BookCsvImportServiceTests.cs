@@ -1,9 +1,11 @@
 using Application.Common.Interfaces;
 using Application.Common.DTOs.Book;
+using Application.Common;
 using Domain.Associations;
 using Domain.Entities;
 using FluentValidation;
 using Infrastructure.IntegrationTests.TestSupport;
+using Infrastructure.Persistence;
 using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Text;
@@ -194,6 +196,7 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal("The Novel", savedBook.PrimaryTitle);
         Assert.NotNull(savedBook.Author);
         Assert.Equal("Toika", savedBook.Author!.PrimaryName);
+        Assert.NotNull(savedBook.AuthorId);
         Assert.Equal(2, savedBook.BookTags.Count);
         Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "favorite");
         Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "action");
@@ -205,6 +208,16 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal(BookCoverStatus.Pending, savedBook.Cover!.Status);
         Assert.Equal(savedBook.Id, queue.BookIds[0]);
         Assert.Equal("line1\nline2", savedBook.Notes);
+
+        var analytics = await new BookAnalyticsQueryService(context, new BookSearchCriteriaApplier(context)).GetAnalyticsAsync(
+            database.UserId,
+            BookSearchQueryParser.Parse("title:\"The Novel\""),
+            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"The Novel\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), "week"),
+            CancellationToken.None);
+
+        var authorCompleteness = Assert.Single(analytics.Quality.FieldCompleteness, item => item.Field == "author");
+        Assert.Equal(1, authorCompleteness.BookCount);
+        Assert.Equal(1d, authorCompleteness.ShareOfBooks, precision: 6);
     }
 
     [Fact]

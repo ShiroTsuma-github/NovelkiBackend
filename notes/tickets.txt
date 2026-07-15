@@ -26,6 +26,15 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 
 ## Done
 
+### User reported issues - Analytics follow-up
+
+- Typ: `UX/data correctness regression`
+- Priorytet: `P1`
+- Komponent: `Web/src/features/analytics/*`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, CSV import regression
+- Problem: status chart nadal mogl pokazac float noise, linki drill-down byly niejednoznaczne, activity/growth prowadzily do pustych query dat, layout/kolory byly odczuwalnie zmienione przez masonry columns, metadata author raportowal 0, kolejnosc kart wymagala przeniesienia chapter volume wyzej, zakresy dat byly zbyt techniczne, a rating distribution nadal wyswietlal liste ratingow 1..10.
+- Zakres: dodano `date-fns`, angielskie formatowanie zakresow dat, jawne oznaczenie drill-down linkow ikona i tooltipem, usunieto linki z reading activity, growth uzywa zakresow `created:>=... created:<...`, status chart zaokragla dane przed renderem, rating zostawia tylko Unrated, analytics author jest liczony po relacji autora, layout wrocil do dwoch niezaleznych kolumn grid bez CSS columns, a import CSV ma regresje potwierdzajaca AuthorId i analytics author completeness.
+- Akceptacja: testy obejmuja brak `100.00000000000001%`, poprawne growth query range, brak `updated:=...` linkow z activity, angielskie zakresy dat, brak rating listy 1..10 pod wykresem oraz import author -> analytics author completeness.
+
 ### Reported issues - Analytics i tabele listy
 
 - Typ: `UX regression`

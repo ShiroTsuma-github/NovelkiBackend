@@ -124,6 +124,26 @@ describe('AnalyticsPage', () => {
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
   })
 
+  it('rounds status percentages before rendering table values', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      composition: {
+        statusByType: [{
+          type: 'Novel',
+          totalBooks: 10,
+          statuses: [{ status: 'Reading', bookCount: 10 }],
+        }],
+      },
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    await user.click(await screen.findByRole('button', { name: /view data for status by type/i }))
+
+    expect(screen.getByRole('cell', { name: '100%' })).toBeInTheDocument()
+    expect(screen.queryByText(/100\.00000000000001%/)).not.toBeInTheDocument()
+  })
+
   it('exposes text-equivalent data tables where raw data adds value', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     const user = userEvent.setup()
@@ -227,6 +247,7 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByText('10%')).toBeInTheDocument()
     expect(screen.getAllByText('Unrated: 9').length).toBeGreaterThan(1)
     expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
+    expect(screen.queryByRole('link', { name: /^10: 1/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
   })
 
@@ -344,12 +365,17 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01&bucket=week' })
 
     expect(await screen.findByText(/Chapters advanced: 9,999/i)).toBeInTheDocument()
-    expect(screen.getAllByText('2026-01-01 - 2026-01-08').length).toBeGreaterThan(1)
+    expect(screen.getAllByText('January 1–14, 2026').length).toBeGreaterThan(1)
     expect(screen.getByText(/\+1,000,000 added/i)).toBeInTheDocument()
     expect(screen.getByText(/No additions by type/i)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /January 15/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Novel: 1,000,000/i })).toHaveAttribute(
+      'href',
+      '/books?query=type%3ANovel%20created%3A%3E%3D2026-01-15%20created%3A%3C2026-01-22',
+    )
 
     await user.click(screen.getByRole('button', { name: /view data for library growth/i }))
-    expect(screen.getByRole('cell', { name: '2026-01-01 - 2026-01-08' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'January 1–14, 2026' })).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'No additions' })).toBeInTheDocument()
   })
 
