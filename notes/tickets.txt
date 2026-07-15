@@ -13,16 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-065 - Dodaj agregacje jakosci biblioteki, linkow i okladek
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/BookLink.cs`, `Domain/Entities/BookCover.cs`, `Infrastructure.IntegrationTests/*`
-- Zaleznosci: `NB-059`
-- Problem: API nie pokazuje brakow metadanych, zrodel linkow ani stanu pipeline okladek.
-- Zakres: dodac `quality.fieldCompleteness`, `linkSources`, `coverStatuses` i `coverSources`; kompletnosc liczyc per ksiazka dla autora, opisu, gatunku, tagu, oceny, priorytetu, total chapters, linku, alternatywnego tytulu i uzytecznej okladki; uzyteczna okladka wymaga Found/Uploaded i obrazu lub miniatury.
-- Akceptacja: wszystkie wskazniki maja wspolny mianownik filtrowanych ksiazek; wiele linkow nie zawyza coverage; ranking source liczy linki i rozne ksiazki; cover bez pliku nie jest uzyteczny; testy obejmuja puste teksty, wiele relacji, statusy okladki, brak storage path, filtry i owner isolation.
-
 ### NB-066 - Zweryfikuj wydajnosc Analytics i dodaj uzasadnione indeksy
 
 - Typ: `Performance`
@@ -125,6 +115,16 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-065 - Dodaj agregacje jakosci biblioteki, linkow i okladek
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Domain/Models/BookAnalyticsSnapshot.cs`, `Application/Common/DTOs/Book/BookAnalyticsDto.cs`, `Infrastructure/Persistence/BookAnalyticsQueryService.cs`, `Domain/Entities/BookLink.cs`, `Domain/Entities/BookCover.cs`, `Infrastructure.IntegrationTests/*`
+- Zaleznosci: `NB-059`
+- Problem: API nie pokazuje brakow metadanych, zrodel linkow ani stanu pipeline okladek.
+- Zakres: dodac `quality.fieldCompleteness`, `linkSources`, `coverStatuses` i `coverSources`; kompletnosc liczyc per ksiazka dla autora, opisu, gatunku, tagu, oceny, priorytetu, total chapters, linku, alternatywnego tytulu i uzytecznej okladki; uzyteczna okladka wymaga Found/Uploaded i obrazu lub miniatury.
+- Akceptacja: wszystkie wskazniki maja wspolny mianownik filtrowanych ksiazek; wiele linkow nie zawyza coverage; ranking source liczy linki i rozne ksiazki; cover bez pliku nie jest uzyteczny; testy obejmuja puste teksty, wiele relacji, statusy okladki, brak storage path, filtry i owner isolation.
 
 ### NB-064 - Dodaj agregacje wzrostu biblioteki
 

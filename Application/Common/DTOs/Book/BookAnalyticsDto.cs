@@ -11,6 +11,7 @@ public sealed record BookAnalyticsDto
     public BookAnalyticsProgressDto Progress { get; init; } = new();
     public BookAnalyticsActivityDto Activity { get; init; } = new();
     public BookAnalyticsLibraryGrowthDto LibraryGrowth { get; init; } = new();
+    public BookAnalyticsQualityDto Quality { get; init; } = new();
 }
 
 public sealed record BookAnalyticsScopeDto
@@ -136,4 +137,41 @@ public sealed record BookAnalyticsTypeCountDto
 {
     public required string Type { get; init; }
     public int BookCount { get; init; }
+}
+
+public sealed record BookAnalyticsQualityDto
+{
+    public IReadOnlyList<BookAnalyticsFieldCompletenessDto> FieldCompleteness { get; init; } = [];
+    public IReadOnlyList<BookAnalyticsLinkSourceDto> LinkSources { get; init; } = [];
+    public IReadOnlyList<BookAnalyticsCoverStatusDto> CoverStatuses { get; init; } = [];
+    public IReadOnlyList<BookAnalyticsCoverSourceDto> CoverSources { get; init; } = [];
+}
+
+public sealed record BookAnalyticsFieldCompletenessDto
+{
+    public required string Field { get; init; }
+    public int BookCount { get; init; }
+    public double ShareOfBooks { get; init; }
+}
+
+public sealed record BookAnalyticsLinkSourceDto
+{
+    public required string Source { get; init; }
+    public int LinkCount { get; init; }
+    public int BookCount { get; init; }
+    public double ShareOfBooks { get; init; }
+}
+
+public sealed record BookAnalyticsCoverStatusDto
+{
+    public required string Status { get; init; }
+    public int BookCount { get; init; }
+    public double ShareOfBooks { get; init; }
+}
+
+public sealed record BookAnalyticsCoverSourceDto
+{
+    public required string Source { get; init; }
+    public int BookCount { get; init; }
+    public double ShareOfBooks { get; init; }
 }

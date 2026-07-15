@@ -9,7 +9,8 @@ public sealed record BookAnalyticsSnapshot(
     BookAnalyticsPlanningSnapshot Planning,
     BookAnalyticsProgressSnapshot Progress,
     BookAnalyticsActivitySnapshot Activity,
-    BookAnalyticsLibraryGrowthSnapshot LibraryGrowth);
+    BookAnalyticsLibraryGrowthSnapshot LibraryGrowth,
+    BookAnalyticsQualitySnapshot Quality);
 
 public sealed record BookAnalyticsScopeSnapshot(
     string? Query,
@@ -113,3 +114,41 @@ public sealed record BookAnalyticsLibraryGrowthPointSnapshot(
     IReadOnlyList<BookAnalyticsTypeCountSnapshot> ByType);
 
 public sealed record BookAnalyticsTypeCountSnapshot(string Type, int BookCount);
+
+public sealed record BookAnalyticsQualitySnapshot(
+    IReadOnlyList<BookAnalyticsFieldCompletenessSnapshot> FieldCompleteness,
+    IReadOnlyList<BookAnalyticsLinkSourceSnapshot> LinkSources,
+    IReadOnlyList<BookAnalyticsCoverStatusSnapshot> CoverStatuses,
+    IReadOnlyList<BookAnalyticsCoverSourceSnapshot> CoverSources)
+{
+    public static IReadOnlyList<string> FieldNames { get; } =
+    [
+        "author",
+        "description",
+        "genre",
+        "tag",
+        "rating",
+        "priority",
+        "totalChapters",
+        "link",
+        "alternateTitle",
+        "usableCover"
+    ];
+
+    public static BookAnalyticsQualitySnapshot Empty { get; } = new(CreateEmptyFieldCompleteness(), [], [], []);
+
+    public static IReadOnlyList<BookAnalyticsFieldCompletenessSnapshot> CreateEmptyFieldCompleteness()
+    {
+        return FieldNames
+            .Select(field => new BookAnalyticsFieldCompletenessSnapshot(field, 0, 0))
+            .ToList();
+    }
+}
+
+public sealed record BookAnalyticsFieldCompletenessSnapshot(string Field, int BookCount, double ShareOfBooks);
+
+public sealed record BookAnalyticsLinkSourceSnapshot(string Source, int LinkCount, int BookCount, double ShareOfBooks);
+
+public sealed record BookAnalyticsCoverStatusSnapshot(string Status, int BookCount, double ShareOfBooks);
+
+public sealed record BookAnalyticsCoverSourceSnapshot(string Source, int BookCount, double ShareOfBooks);
