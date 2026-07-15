@@ -304,6 +304,7 @@ function DateRangeChooser({
   const [isOpen, setIsOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const accountStartDate = getAccountStartDate()
+  const today = getToday()
   const fromDate = parseDateInput(filters.from)
   const toInclusiveDate = getInclusiveToDate(filters.to)
   const selectedRange: DateRange = { from: fromDate, to: toInclusiveDate }
@@ -367,13 +368,18 @@ function DateRangeChooser({
   }
 
   function applyCalendarDay(day: Date) {
-    if (day < accountStartDate) {
+    if (day < accountStartDate || day > today) {
       return
     }
 
     if (!rangeSelectionAnchor) {
       setRangeSelectionAnchor(day)
-      setCalendarRange({ from: day })
+      setCalendarRange({ from: day, to: day })
+      onChange((current) => ({
+        ...current,
+        from: toDateInputValue(day),
+        to: toDateInputValue(addDays(day, 1)),
+      }))
       return
     }
 
@@ -408,9 +414,11 @@ function DateRangeChooser({
         }}
       >
         <span className="truncate">{display.label}</span>
-        <span className="shrink-0 rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-300">
-          {display.toLabel}
-        </span>
+        {display.toLabel ? (
+          <span className="shrink-0 rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-300">
+            {display.toLabel}
+          </span>
+        ) : null}
       </button>
       {isOpen ? (
         <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-950 p-3 text-slate-100 shadow-xl">
@@ -441,11 +449,11 @@ function DateRangeChooser({
           </div>
           <DayPicker
             classNames={dayPickerClassNames}
-            defaultMonth={calendarRange?.from ?? fromDate}
-            disabled={{ before: accountStartDate }}
+            defaultMonth={subMonths(today, 1)}
+            disabled={{ before: accountStartDate, after: today }}
             mode="range"
             numberOfMonths={2}
-            selected={calendarRange}
+            selected={rangeSelectionAnchor ? { from: rangeSelectionAnchor } : calendarRange}
             onDayClick={applyCalendarDay}
           />
         </div>
@@ -502,7 +510,7 @@ function defaultToDate() {
 }
 
 function defaultFromDate() {
-  return toDateInputValue(maxDate(subMonths(getToday(), 3), getAccountStartDate()))
+  return toDateInputValue(getDefaultFromDate(getToday(), getAccountStartDate()))
 }
 
 function toDateInputValue(date: Date) {
@@ -533,8 +541,9 @@ function getAccountStartDate() {
   return date
 }
 
-function maxDate(left: Date, right: Date) {
-  return left > right ? left : right
+function getDefaultFromDate(today: Date, accountStartDate: Date) {
+  const lastThreeMonths = subMonths(today, 3)
+  return accountStartDate > lastThreeMonths ? accountStartDate : lastThreeMonths
 }
 
 function getPresetFromDate(
@@ -566,6 +575,16 @@ function getDateRangeDisplay(filters: ReturnType<typeof getAnalyticsFilters>, ac
   const from = parseDateInput(filters.from)
   const toInclusive = getInclusiveToDate(filters.to)
   const today = getToday()
+  if (isSameDay(from, toInclusive)) {
+    const label = format(from, 'MMM d, yyyy')
+    return {
+      label,
+      presetLabel: undefined,
+      toLabel: null,
+      title: label,
+    }
+  }
+
   const preset = analyticsRangePresets.find((item) =>
     !isPresetDisabled(item, today, accountStartDate) &&
     isSameDay(from, getPresetFromDate(item, today, accountStartDate)) &&
@@ -603,7 +622,7 @@ const dayPickerClassNames = {
   range_middle: 'rounded-none bg-cyan-500/20 text-cyan-100',
   range_end: 'rounded-r-full bg-cyan-400 text-slate-950',
   outside: 'text-slate-600',
-  disabled: 'text-slate-700',
+  disabled: 'text-slate-700 opacity-40 line-through',
 }
 
 function getAnalyticsEmptyMessage(data: BookAnalyticsDto | undefined, query: string) {

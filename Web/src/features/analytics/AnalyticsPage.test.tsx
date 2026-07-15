@@ -78,6 +78,23 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('Today')).toBeInTheDocument()
   })
 
+  it('defaults analytics to beginning when the account is newer than three months', async () => {
+    const today = getTodayForTest()
+    const accountStart = subMonths(today, 1)
+    const toExclusive = addDays(today, 1)
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    setStoredSession({ ...testSession, createdAt: accountStart.toISOString() })
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics' })
+
+    expect(await screen.findByText('Status by type')).toBeInTheDocument()
+    expect(api.getBookAnalytics).toHaveBeenCalledWith(expect.objectContaining({
+      from: toDateInputValueForTest(accountStart),
+      to: toDateInputValueForTest(toExclusive),
+    }))
+    expect(screen.getByRole('button', { name: /date range: beginning/i })).toHaveAttribute('title', `${format(accountStart, 'MMM d, yyyy')} – ${format(today, 'MMM d, yyyy')}`)
+  })
+
   it('opens themed preset choices above the calendar and applies a preset range', async () => {
     const today = getTodayForTest()
     const from = subMonths(today, 1)
@@ -109,18 +126,26 @@ describe('AnalyticsPage', () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     setStoredSession({ ...testSession, createdAt: '2025-12-15T10:30:00Z' })
     const user = userEvent.setup()
+    const today = getTodayForTest()
+    const start = subMonths(today, 1)
+    const end = addDays(start, 13)
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     await screen.findByText('Status by type')
     await user.click(screen.getByRole('button', { name: /date range/i }))
-    await user.click(screen.getByRole('button', { name: /wednesday, january 7th, 2026/i }))
-    await user.click(screen.getByRole('button', { name: /tuesday, january 20th, 2026/i }))
+    await user.click(screen.getByRole('button', { name: dayButtonMatcher(start) }))
+
+    const pendingButton = screen.getByRole('button', { name: new RegExp(`date range: ${format(start, 'MMM d, yyyy')}`, 'i') })
+    expect(pendingButton).toHaveAttribute('title', format(start, 'MMM d, yyyy'))
+    expect(pendingButton).not.toHaveTextContent('Today')
+
+    await user.click(screen.getByRole('button', { name: dayButtonMatcher(end) }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
     await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
-      from: '2026-01-07',
-      to: '2026-01-21',
+      from: toDateInputValueForTest(start),
+      to: toDateInputValueForTest(addDays(end, 1)),
     })))
 
     await user.click(screen.getByRole('button', { name: /date range/i }))
@@ -134,24 +159,27 @@ describe('AnalyticsPage', () => {
 
   it('disables calendar days before the account creation date', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
-    setStoredSession({ ...testSession, createdAt: '2026-01-10T10:30:00Z' })
+    const today = getTodayForTest()
+    const accountStart = addDays(today, -2)
+    setStoredSession({ ...testSession, createdAt: accountStart.toISOString() })
     const user = userEvent.setup()
 
-    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-10&to=2026-02-01' })
+    renderWithProviders(<AnalyticsPage />, { route: `/analytics?from=${toDateInputValueForTest(accountStart)}&to=${toDateInputValueForTest(addDays(today, 1))}` })
 
     await screen.findByText('Status by type')
     await user.click(screen.getByRole('button', { name: /date range/i }))
 
-    expect(screen.getByRole('button', { name: /wednesday, january 7th, 2026/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: dayButtonMatcher(addDays(accountStart, -1)) })).toBeDisabled()
+    expect(screen.getByRole('button', { name: dayButtonMatcher(addDays(today, 1)) })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Last 2 years' })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Last 1 year' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Last 6 months' })).not.toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Last 6 months' })).toBeDisabled()
 
     await user.click(screen.getByRole('button', { name: 'Beginning' }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
     await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
-      from: '2026-01-10',
+      from: toDateInputValueForTest(accountStart),
     })))
   })
 
@@ -174,6 +202,9 @@ describe('AnalyticsPage', () => {
   it('starts a fresh custom range after a preset before updating the end date', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
     const user = userEvent.setup()
+    const today = getTodayForTest()
+    const start = subMonths(today, 1)
+    const end = addDays(start, 11)
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
@@ -184,15 +215,17 @@ describe('AnalyticsPage', () => {
     expect(screen.getByRole('button', { name: /date range: last 6 months/i })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /date range/i }))
-    await user.click(screen.getByRole('button', { name: /monday, february 9th, 2026/i }))
-    expect(screen.getByRole('button', { name: /date range: last 6 months/i })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: dayButtonMatcher(start) }))
+    const pendingButton = screen.getByRole('button', { name: new RegExp(`date range: ${format(start, 'MMM d, yyyy')}`, 'i') })
+    expect(pendingButton).toHaveAttribute('title', format(start, 'MMM d, yyyy'))
+    expect(pendingButton).not.toHaveTextContent('Today')
 
-    await user.click(screen.getByRole('button', { name: /friday, february 20th, 2026/i }))
+    await user.click(screen.getByRole('button', { name: dayButtonMatcher(end) }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
     await waitFor(() => expect(api.getBookAnalytics).toHaveBeenLastCalledWith(expect.objectContaining({
-      from: '2026-02-09',
-      to: '2026-02-21',
+      from: toDateInputValueForTest(start),
+      to: toDateInputValueForTest(addDays(end, 1)),
     })))
   })
 
@@ -680,6 +713,18 @@ function toDateInputValueForTest(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function dayButtonName(date: Date) {
+  return format(date, 'EEEE, MMMM do, yyyy')
+}
+
+function dayButtonMatcher(date: Date) {
+  return new RegExp(`^${escapeRegExp(dayButtonName(date))}`)
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
