@@ -72,9 +72,6 @@ export function AnalyticsPage() {
       </div>
 
       <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <p className="text-sm text-slate-600">
-          Query uses the same filters as Books search. From/To filters books by created date and affects every metric and chart.
-        </p>
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem_9rem_auto]">
           <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-700">
             Query
@@ -103,10 +100,10 @@ export function AnalyticsPage() {
       </section>
 
       {analyticsQuery.isError && !data ? (
-        <section className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-900 shadow-sm">
+        <section className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-4 text-rose-100 shadow-sm">
           <h2 className="text-sm font-semibold">Could not load analytics.</h2>
-          <p className="mt-1 text-sm">Check filters and retry the request.</p>
-          <button className="mt-3 rounded-md bg-rose-700 px-3 py-2 text-sm font-semibold text-white hover:bg-rose-800" type="button" onClick={() => analyticsQuery.refetch()}>
+          <p className="mt-1 text-sm text-rose-200">Check filters and retry the request.</p>
+          <button className="mt-3 rounded-md border border-rose-400/50 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-50 hover:bg-rose-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70" type="button" onClick={() => analyticsQuery.refetch()}>
             Retry
           </button>
         </section>
