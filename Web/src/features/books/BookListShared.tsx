@@ -7,10 +7,10 @@ import { inputClass } from '@/components/app/FormField'
 export const bookListPageSizeOptions = [20, 50, 100, 500]
 
 const compactPaginationButtonClass =
-  'inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-xl font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950'
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-xl font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
 
 const compactActivePaginationButtonClass =
-  'inline-flex min-h-10 min-w-10 items-center justify-center rounded-full bg-slate-900 px-3 text-xl font-medium text-white shadow-sm'
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-slate-900 px-3 text-xl font-medium text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
 
 export function useBookListUrlState(
   searchParams: URLSearchParams,
@@ -200,7 +200,7 @@ export function BookListFooter({
             <span>Per page</span>
             <span className="relative inline-flex">
               <select
-                className={`${inputClass} h-10 w-24 appearance-none bg-white pr-9 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+                className={`${inputClass} min-h-11 w-24 appearance-none bg-white pr-9 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
                 value={pageSize}
                 onChange={(event) => setPageSize(event.target.value)}
               >
@@ -280,7 +280,7 @@ export function ScrollShortcutButtons({
       {showBackToTop ? (
         <button
           aria-label="Back to top"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
           type="button"
           onClick={onBackToTop}
         >
@@ -290,7 +290,7 @@ export function ScrollShortcutButtons({
       {showGoDown ? (
         <button
           aria-label="Go to bottom"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
           type="button"
           onClick={onGoDown}
         >
@@ -395,7 +395,7 @@ function PageGapJump({
             aria-invalid={!isValid && value.length > 0 ? 'true' : undefined}
             data-gap-id={gapId}
             aria-label="Page number"
-            className={`${inputClass} h-10 w-full bg-white text-center ${!isValid && value.length > 0 ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+            className={`${inputClass} min-h-11 w-full bg-white text-center ${!isValid && value.length > 0 ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
             inputMode="numeric"
             max={totalPages}
             min={1}

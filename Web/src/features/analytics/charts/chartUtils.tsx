@@ -37,7 +37,10 @@ export function quoteQueryValue(value: string) {
 
 export function DrilldownLink({ children, query }: { children: ReactNode; query: string }) {
   return (
-    <Link className="font-semibold text-cyan-300 underline-offset-4 hover:underline" to={booksHref(query)}>
+    <Link
+      className="inline-flex min-h-11 items-center rounded-md px-2 font-semibold text-cyan-700 underline-offset-4 hover:text-cyan-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+      to={booksHref(query)}
+    >
       {children}
     </Link>
   )

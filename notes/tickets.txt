@@ -13,36 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-042 - Dodaj wykresy trendow biblioteki
-
-- Typ: `Feature gap`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/analytics/charts/ReadingActivityChart.tsx`, `LibraryGrowthChart.tsx`, filtry zakresu czasu
-- Zaleznosci: `NB-063`, `NB-064`, `NB-067`
-- Problem: strona nie pokazuje wiarygodnego obrazu wzrostu kolekcji i aktywnosci w czasie.
-- Zakres: wdrozyc mockupy 10-11; reading activity pokazuje progressEvents i booksTouched, a chaptersAdvanced w tooltipie/tabeli; library growth pokazuje cumulative total i serie typow; filtry czasu dobieraja day/week/month zgodnie z planem.
-- Akceptacja: zmiana zakresu aktualizuje URL i obie karty; puste buckety nie przerywaja linii; import ma widoczny skok; tooltip rozroznia eventy, ksiazki i rozdzialy; testy obejmuja pusta historie, jeden punkt, zmiane bucketa, duzy zakres, loading/refetch i mobile.
-
-### NB-071 - Dodaj frontendowe wykresy jakosci biblioteki
-
-- Typ: `Feature`
-- Priorytet: `P3`
-- Komponent: `Web/src/features/analytics/charts/MetadataCompletenessChart.tsx`, `LinkSourcesChart.tsx`, `CoverAvailabilityChart.tsx`
-- Zaleznosci: `NB-065`, `NB-067`
-- Problem: frontend nie pokazuje kolejek brakujacych metadanych, linkow ani problemow z okladkami.
-- Zakres: wdrozyc mockupy 12-14; completeness jako procenty per field, link sources jako ranking plus coverage, covers jako statusy plus top providers; copy ma opisywac narzedzie porzadkowania, nie ocene uzytkownika.
-- Akceptacja: brak relacji pokazuje 0%, nie blad; linkCount i bookCount sa rozroznione; Found/Uploaded bez pliku nie udaje usable cover; Failed/NotFound/Pending maja osobne akcje; testy obejmuja zera, 100%, wiele linkow, nieznane source/status, dlugie etykiety i mobile.
-
-### NB-072 - Utwardz responsywnosc, dostepnosc i drill-down Analytics
-
-- Typ: `Accessibility / UX`
-- Priorytet: `P2`
-- Komponent: `Web/src/features/analytics/AnalyticsChartCard.tsx`, `Web/src/features/analytics/charts/*`, `Web/src/features/books/BookListShared.tsx`, routing Analytics/Books
-- Zaleznosci: `NB-041`, `NB-068`, `NB-069`, `NB-070`, `NB-042`, `NB-071`
-- Problem: tooltip i kolor nie wystarczaja uzytkownikom klawiatury/czytnika ekranu, a wykres bez przejscia do rekordow nie pomaga uporzadkowac biblioteki.
-- Zakres: dodac do wszystkich 12 kart `View data` z tabela HTML, aria, focus i obsluge klawiatury; zdefiniowac mapowanie kategorii na query `/books`; sprawdzic layout i formaty na desktop/mobile oraz zoom 200%; znaczenie serii nie moze zalezec tylko od koloru.
-- Akceptacja: wszystkie 12 aktywnych wykresow maja tekstowy odpowiednik; drill-down zachowuje znaki specjalne i filtry; elementy maja widoczny focus i min. 44px target na mobile; Playwright sprawdza 1440x900, 1024x768, 390x844 i zoom 200%; testy obejmuja klawiature, czytnikowe nazwy, dlugie etykiety, 0/1/9999/1000000 oraz brak poziomego scrolla.
-
 ## Navigation And Global UI
 
 ### NB-054 - Przebuduj stylistycznie frontend wedlug spojnych guidelineow wizualnych
@@ -55,6 +25,36 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Akceptacja: istnieje jednoznaczny zestaw guidelineow zastosowany w glownych ekranach; nowe style sa spojne miedzy lista, formularzem, detalem i adminem; UI dziala na desktop/mobile; testy obejmuja co najmniej regresje podstawowych interakcji oraz weryfikacje kluczowych stanow ekranow po redesignie.
 
 ## Done
+
+### NB-072 - Utwardz responsywnosc, dostepnosc i drill-down Analytics
+
+- Typ: `Accessibility / UX`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/analytics/AnalyticsChartCard.tsx`, `Web/src/features/analytics/charts/*`, `Web/src/features/books/BookListShared.tsx`, routing Analytics/Books
+- Zaleznosci: `NB-041`, `NB-068`, `NB-069`, `NB-070`, `NB-042`, `NB-071`
+- Problem: tooltip i kolor nie wystarczaja uzytkownikom klawiatury/czytnika ekranu, a wykres bez przejscia do rekordow nie pomaga uporzadkowac biblioteki.
+- Zakres: dodac do wszystkich 12 kart `View data` z tabela HTML, aria, focus i obsluge klawiatury; zdefiniowac mapowanie kategorii na query `/books`; sprawdzic layout i formaty na desktop/mobile oraz zoom 200%; znaczenie serii nie moze zalezec tylko od koloru.
+- Akceptacja: wszystkie 12 aktywnych wykresow maja tekstowy odpowiednik; drill-down zachowuje znaki specjalne i filtry; elementy maja widoczny focus i min. 44px target na mobile; Playwright sprawdza 1440x900, 1024x768, 390x844 i zoom 200%; testy obejmuja klawiature, czytnikowe nazwy, dlugie etykiety, 0/1/9999/1000000 oraz brak poziomego scrolla.
+
+### NB-071 - Dodaj frontendowe wykresy jakosci biblioteki
+
+- Typ: `Feature`
+- Priorytet: `P3`
+- Komponent: `Web/src/features/analytics/charts/MetadataCompletenessChart.tsx`, `LinkSourcesChart.tsx`, `CoverAvailabilityChart.tsx`
+- Zaleznosci: `NB-065`, `NB-067`
+- Problem: frontend nie pokazuje kolejek brakujacych metadanych, linkow ani problemow z okladkami.
+- Zakres: wdrozyc mockupy 12-14; completeness jako procenty per field, link sources jako ranking plus coverage, covers jako statusy plus top providers; copy ma opisywac narzedzie porzadkowania, nie ocene uzytkownika.
+- Akceptacja: brak relacji pokazuje 0%, nie blad; linkCount i bookCount sa rozroznione; Found/Uploaded bez pliku nie udaje usable cover; Failed/NotFound/Pending maja osobne akcje; testy obejmuja zera, 100%, wiele linkow, nieznane source/status, dlugie etykiety i mobile.
+
+### NB-042 - Dodaj wykresy trendow biblioteki
+
+- Typ: `Feature gap`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/analytics/charts/ReadingActivityChart.tsx`, `LibraryGrowthChart.tsx`, filtry zakresu czasu
+- Zaleznosci: `NB-063`, `NB-064`, `NB-067`
+- Problem: strona nie pokazuje wiarygodnego obrazu wzrostu kolekcji i aktywnosci w czasie.
+- Zakres: wdrozyc mockupy 10-11; reading activity pokazuje progressEvents i booksTouched, a chaptersAdvanced w tooltipie/tabeli; library growth pokazuje cumulative total i serie typow; filtry czasu dobieraja day/week/month zgodnie z planem.
+- Akceptacja: zmiana zakresu aktualizuje URL i obie karty; puste buckety nie przerywaja linii; import ma widoczny skok; tooltip rozroznia eventy, ksiazki i rozdzialy; testy obejmuja pusta historie, jeden punkt, zmiane bucketa, duzy zakres, loading/refetch i mobile.
 
 ### NB-070 - Dodaj chapter volume i estimated reading time
 

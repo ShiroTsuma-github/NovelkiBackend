@@ -118,10 +118,43 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     await screen.findByText('Status by type')
-    await user.click(screen.getAllByRole('button', { name: /view data/i })[0])
+    await user.click(screen.getByRole('button', { name: /view data for status by type/i }))
 
     expect(screen.getByRole('columnheader', { name: 'Type' })).toBeInTheDocument()
     expect(document.querySelector('.overflow-x-hidden')).toBeTruthy()
+  })
+
+  it('exposes text-equivalent data tables for all analytics cards', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    const buttons = await screen.findAllByRole('button', { name: /view data for/i })
+    expect(buttons).toHaveLength(12)
+
+    for (const button of buttons) {
+      await user.click(button)
+      expect(button).toHaveAttribute('aria-expanded', 'true')
+    }
+
+    expect(screen.getByText('Status by type data table')).toBeInTheDocument()
+    expect(screen.getByText('Cover availability data table')).toBeInTheDocument()
+  })
+
+  it('toggles card data with keyboard and keeps screen-reader names specific', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    const button = await screen.findByRole('button', { name: /view data for reading activity/i })
+    button.focus()
+    await user.keyboard('{Enter}')
+
+    expect(button).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Reading activity data table')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /hide data for reading activity/i })).toBeInTheDocument()
   })
 
   it('renders composition charts with Other buckets and drill-down links', async () => {
@@ -129,6 +162,7 @@ describe('AnalyticsPage', () => {
       composition: {
         genres: [
           { name: 'Fantasy', bookCount: 8, shareOfBooks: 80 },
+          { name: 'Drama "Special" / 2026', bookCount: 7, shareOfBooks: 70 },
           { name: 'Slice of Life', bookCount: 6, shareOfBooks: 60 },
           { name: 'Mystery', bookCount: 4, shareOfBooks: 40 },
           { name: 'Action', bookCount: 3, shareOfBooks: 30 },
@@ -146,10 +180,11 @@ describe('AnalyticsPage', () => {
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByRole('link', { name: 'Fantasy' })).toHaveAttribute('href', '/books?query=genre%3AFantasy')
+    expect(await screen.findByRole('link', { name: 'Drama "Special" / 2026' })).toHaveAttribute('href', '/books?query=genre%3A%22Drama%20%5C%22Special%5C%22%20%2F%202026%22')
     expect(await screen.findByRole('link', { name: 'slow burn' })).toHaveAttribute('href', '/books?query=tag%3A%22slow%20burn%22')
     expect(await screen.findByText('Other')).toBeInTheDocument()
 
-    await user.click(screen.getAllByRole('button', { name: /view data/i })[1])
+    await user.click(screen.getByRole('button', { name: /view data for top genres/i }))
     expect(screen.getByRole('cell', { name: /grouped remainder/i })).toBeInTheDocument()
   })
 
@@ -191,7 +226,7 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByText('10%')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
-    await user.click(screen.getAllByRole('button', { name: /view data/i })[3])
+    await user.click(screen.getByRole('button', { name: /view data for rating distribution/i }))
     expect(screen.getByRole('cell', { name: 'Unrated' })).toBeInTheDocument()
   })
 
@@ -280,6 +315,77 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('No chapter data to estimate reading time.')).toBeInTheDocument()
   })
 
+  it('renders reading activity and library growth trends for empty buckets, one point, and import jumps', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      activity: {
+        points: [{
+          date: '2026-01-01',
+          progressEvents: 1,
+          booksTouched: 1,
+          chaptersAdvanced: 9_999,
+        }],
+      },
+      libraryGrowth: {
+        openingCount: 1,
+        points: [
+          { date: '2026-01-01', booksAdded: 0, cumulativeBooks: 1, byType: [] },
+          { date: '2026-01-08', booksAdded: 1_000_000, cumulativeBooks: 1_000_001, byType: [{ type: 'Novel', bookCount: 1_000_000 }] },
+        ],
+      },
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01&bucket=week' })
+
+    expect(await screen.findByText(/Chapters advanced: 9,999/i)).toBeInTheDocument()
+    expect(screen.getByText(/\+1,000,000 added/i)).toBeInTheDocument()
+    expect(screen.getByText(/No additions by type/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /view data for library growth/i }))
+    expect(screen.getByRole('cell', { name: 'No additions' })).toBeInTheDocument()
+  })
+
+  it('renders quality charts with zero, full, unknown, and long-label buckets', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      totalBooks: 10,
+      quality: {
+        fieldCompleteness: [
+          { field: 'author', bookCount: 10, shareOfBooks: 100 },
+          { field: 'usableCover', bookCount: 0, shareOfBooks: 0 },
+        ],
+        linkSources: [
+          { source: 'Very Long Source Name With Symbols ~!@#$%^&*() And Spaces', linkCount: 99, bookCount: 4, shareOfBooks: 40 },
+          { source: '', linkCount: 1, bookCount: 1, shareOfBooks: 10 },
+        ],
+        coverStatuses: [
+          { status: 'Found', bookCount: 3, shareOfBooks: 30 },
+          { status: 'Uploaded', bookCount: 2, shareOfBooks: 20 },
+          { status: 'Failed', bookCount: 1, shareOfBooks: 10 },
+          { status: 'NotFound', bookCount: 1, shareOfBooks: 10 },
+          { status: 'Pending', bookCount: 1, shareOfBooks: 10 },
+          { status: 'Mystery', bookCount: 2, shareOfBooks: 20 },
+        ],
+        coverSources: [
+          { source: 'NovelUpdates', bookCount: 5, shareOfBooks: 50 },
+          { source: '', bookCount: 1, shareOfBooks: 10 },
+        ],
+      },
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+
+    expect(await screen.findByText(/Cleanup queue/i)).toBeInTheDocument()
+    expect(screen.getByText(/Usable covers are counted only/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '10 books' })).toHaveAttribute('href', '/books?query=cover%3Anone')
+    expect(screen.getByText(/Unknown status bucket: 2 books/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Very Long Source Name/i })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /view data for link sources/i }))
+    expect(screen.getByRole('cell', { name: '99' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: '4' })).toBeInTheDocument()
+  })
+
   it('keeps analytics type labels readable against their calculated background', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
 
@@ -294,6 +400,9 @@ type AnalyticsOverrides = Partial<BookAnalyticsDto['overview']> & {
   planning?: Partial<BookAnalyticsDto['planning']>
   progress?: Partial<BookAnalyticsDto['progress']>
   ratings?: Partial<BookAnalyticsDto['ratings']>
+  activity?: Partial<BookAnalyticsDto['activity']>
+  libraryGrowth?: Partial<BookAnalyticsDto['libraryGrowth']>
+  quality?: Partial<BookAnalyticsDto['quality']>
 }
 
 function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
@@ -372,16 +481,33 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
         booksTouched: 2,
         chaptersAdvanced: 18,
       }] : [],
+      ...overrides.activity,
     },
     libraryGrowth: {
       openingCount: 0,
-      points: [],
+      points: overview.totalBooks > 0 ? [
+        { date: '2026-01-01', booksAdded: 0, cumulativeBooks: 4, byType: [] },
+        { date: '2026-01-08', booksAdded: 6, cumulativeBooks: 10, byType: [{ type: 'Novel', bookCount: 6 }] },
+      ] : [],
+      ...overrides.libraryGrowth,
     },
     quality: {
-      fieldCompleteness: [],
-      linkSources: [],
-      coverStatuses: [],
-      coverSources: [],
+      fieldCompleteness: overview.totalBooks > 0 ? [
+        { field: 'author', bookCount: 9, shareOfBooks: 90 },
+        { field: 'genre', bookCount: 6, shareOfBooks: 60 },
+        { field: 'usableCover', bookCount: 4, shareOfBooks: 40 },
+      ] : [],
+      linkSources: overview.totalBooks > 0 ? [
+        { source: 'NovelUpdates', linkCount: 8, bookCount: 6, shareOfBooks: 60 },
+      ] : [],
+      coverStatuses: overview.totalBooks > 0 ? [
+        { status: 'Found', bookCount: 4, shareOfBooks: 40 },
+        { status: 'Pending', bookCount: 2, shareOfBooks: 20 },
+      ] : [],
+      coverSources: overview.totalBooks > 0 ? [
+        { source: 'NovelUpdates', bookCount: 4, shareOfBooks: 40 },
+      ] : [],
+      ...overrides.quality,
     },
   }
 }

@@ -7,9 +7,14 @@ import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
 import { ChapterVolumeChart, chapterVolumeRows } from './charts/ChapterVolumeChart'
+import { CoverAvailabilityChart, coverAvailabilityRows } from './charts/CoverAvailabilityChart'
 import { EstimatedReadingTimeChart, estimatedReadingTimeRows } from './charts/EstimatedReadingTimeChart'
+import { LibraryGrowthChart, libraryGrowthRows } from './charts/LibraryGrowthChart'
+import { LinkSourcesChart, linkSourceRows } from './charts/LinkSourcesChart'
+import { MetadataCompletenessChart, metadataCompletenessRows } from './charts/MetadataCompletenessChart'
 import { PriorityByStatusChart, priorityRows } from './charts/PriorityByStatusChart'
 import { RatingDistributionChart, ratingRows } from './charts/RatingDistributionChart'
+import { ReadingActivityChart, readingActivityRows } from './charts/ReadingActivityChart'
 import { StatusByTypeChart, statusByTypeRows } from './charts/StatusByTypeChart'
 import { relationRows, TopRelationsChart } from './charts/TopRelationsChart'
 import { extractAnalyticsDateFilters } from './dateQueryFilters'
@@ -201,6 +206,71 @@ export function AnalyticsPage() {
           onRetry={() => analyticsQuery.refetch()}
         >
           <ChapterVolumeChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Date', 'Progress events', 'Books touched', 'Chapters advanced']}
+          description="Progress history grouped by the selected time bucket."
+          emptyMessage="No reading activity in this time range."
+          isEmpty={!isInitialLoading && !(data?.activity.points.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={readingActivityRows(data)}
+          title="Reading activity"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <ReadingActivityChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Date', 'Books added', 'Cumulative books', 'By type']}
+          description="Library size over time, including empty buckets and visible import jumps."
+          emptyMessage="No library growth points in this time range."
+          isEmpty={!isInitialLoading && !(data?.libraryGrowth.points.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={libraryGrowthRows(data)}
+          title="Library growth"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <LibraryGrowthChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Field', 'Complete books', 'Coverage', 'Missing books']}
+          description="Coverage per metadata field, intended to guide cleanup work."
+          emptyMessage="0 metadata fields reported for this scope."
+          isEmpty={!isInitialLoading && !(data?.quality.fieldCompleteness.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={metadataCompletenessRows(data)}
+          title="Metadata completeness"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <MetadataCompletenessChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Source', 'Links', 'Books', 'Coverage']}
+          description="Ranks link sources by total links and book coverage."
+          emptyMessage="0 link sources found for this scope."
+          isEmpty={!isInitialLoading && !(data?.quality.linkSources.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={linkSourceRows(data)}
+          title="Link sources"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <LinkSourcesChart data={data} />
+        </AnalyticsChartCard>
+        <AnalyticsChartCard
+          columns={['Kind', 'Bucket', 'Books', 'Coverage']}
+          description="Separates cover statuses from provider coverage."
+          emptyMessage="0 cover records reported for this scope."
+          isEmpty={!isInitialLoading && !(data?.quality.coverStatuses.length || data?.quality.coverSources.length)}
+          isError={analyticsQuery.isError && !!data}
+          isLoading={isInitialLoading}
+          rows={coverAvailabilityRows(data)}
+          title="Cover availability"
+          onRetry={() => analyticsQuery.refetch()}
+        >
+          <CoverAvailabilityChart data={data} />
         </AnalyticsChartCard>
         <AnalyticsChartCard
           columns={['Type', 'Current chapters', 'Minutes / chapter', 'Estimated time']}
