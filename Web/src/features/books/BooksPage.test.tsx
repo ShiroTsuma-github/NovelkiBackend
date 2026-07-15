@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { readReadingTimeSettings, readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
+import { expectReadableTextContrast } from '@/test/contrast'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
@@ -223,6 +224,35 @@ describe('BooksPage', () => {
     expect(screen.getByText('Status distribution')).toBeInTheDocument()
     expect(screen.getByText('Book types')).toBeInTheDocument()
     expect(screen.queryByText('Estimated reading time')).not.toBeInTheDocument()
+  })
+
+  it('moves date query filters into analytics from/to parameters', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooksSummary).mockResolvedValue(createSummary())
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=author%3AToika%20created%3A%3D2026%20updated%3A%3C%3D07.2026' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /summary/i }))
+
+    expect(await screen.findByRole('link', { name: /open analytics/i })).toHaveAttribute(
+      'href',
+      '/analytics?query=author%3AToika&from=2026-01-01&to=2026-08-01',
+    )
+  })
+
+  it('keeps summary book type labels readable against their calculated background', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    vi.mocked(api.getBooksSummary).mockResolvedValue(createSummary())
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /summary/i }))
+
+    expectReadableTextContrast((await screen.findAllByText('Novel'))[0])
   })
 
   it('links summary to analytics without query and preserves shared reading-time settings', async () => {

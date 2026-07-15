@@ -6,6 +6,7 @@ import type { BookAnalyticsDto } from '@/api/types'
 import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
+import { extractAnalyticsDateFilters } from './dateQueryFilters'
 
 type AnalyticsBucket = 'day' | 'week' | 'month'
 
@@ -52,7 +53,7 @@ export function AnalyticsPage() {
           <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-700">
             Query
             <input
-              className={`${inputClass} border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus:border-cyan-500`}
+              className={`${inputClass} border-slate-300 bg-white text-slate-950 placeholder:text-slate-500 focus:border-cyan-500`}
               placeholder="author:Toika rating:>=8"
               value={draftFilters.query}
               onChange={(event) => setDraftFilters((current) => ({ ...current, query: event.target.value }))}
@@ -61,7 +62,7 @@ export function AnalyticsPage() {
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
             From
             <input
-              className={`${inputClass} border-slate-300 bg-white text-slate-900 focus:border-cyan-500`}
+              className={`${inputClass} border-slate-300 bg-white text-slate-950 focus:border-cyan-500`}
               type="date"
               value={draftFilters.from}
               onChange={(event) => setDraftFilters((current) => ({ ...current, from: event.target.value }))}
@@ -70,7 +71,7 @@ export function AnalyticsPage() {
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
             To
             <input
-              className={`${inputClass} border-slate-300 bg-white text-slate-900 focus:border-cyan-500`}
+              className={`${inputClass} border-slate-300 bg-white text-slate-950 focus:border-cyan-500`}
               type="date"
               value={draftFilters.to}
               onChange={(event) => setDraftFilters((current) => ({ ...current, to: event.target.value }))}
@@ -79,7 +80,7 @@ export function AnalyticsPage() {
           <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
             Bucket
             <select
-              className={`${inputClass} border-slate-300 bg-white text-slate-900 focus:border-cyan-500`}
+              className={`${inputClass} border-slate-300 bg-white text-slate-950 focus:border-cyan-500`}
               value={draftFilters.bucket}
               onChange={(event) => setDraftFilters((current) => ({ ...current, bucket: normalizeBucket(event.target.value) }))}
             >
@@ -164,7 +165,7 @@ function StatusByTypePreview({ data }: { data?: BookAnalyticsDto }) {
       {items.slice(0, 8).map((item) => (
         <div className="grid gap-2" key={item.type}>
           <div className="flex items-center justify-between gap-3 text-sm">
-            <span className="font-semibold text-slate-900">{item.type}</span>
+            <span className="font-semibold text-slate-950">{item.type}</span>
             <span className="text-slate-500">{item.totalBooks} books</span>
           </div>
           <div className="flex min-w-0 flex-wrap gap-2">
@@ -186,7 +187,7 @@ function ActivityPreview({ data }: { data?: BookAnalyticsDto }) {
     <div className="grid gap-2">
       {points.slice(-8).map((point) => (
         <div className="grid gap-1 rounded-md bg-white px-3 py-2 text-sm shadow-sm" key={point.date}>
-          <div className="font-semibold text-slate-900">{point.date}</div>
+          <div className="font-semibold text-slate-950">{point.date}</div>
           <div className="text-slate-600">
             {point.progressEvents} events, {point.booksTouched} books, {formatChapterCount(point.chaptersAdvanced)} chapters
           </div>
@@ -197,10 +198,11 @@ function ActivityPreview({ data }: { data?: BookAnalyticsDto }) {
 }
 
 function getAnalyticsFilters(searchParams: URLSearchParams) {
+  const extracted = extractAnalyticsDateFilters(searchParams.get('query') ?? '')
   return {
-    query: searchParams.get('query') ?? '',
-    from: searchParams.get('from') ?? defaultFromDate(),
-    to: searchParams.get('to') ?? defaultToDate(),
+    query: extracted.query,
+    from: searchParams.get('from') ?? extracted.from ?? defaultFromDate(),
+    to: searchParams.get('to') ?? extracted.to ?? defaultToDate(),
     bucket: normalizeBucket(searchParams.get('bucket')),
   }
 }

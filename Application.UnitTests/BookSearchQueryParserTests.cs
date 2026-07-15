@@ -112,12 +112,65 @@ public class BookSearchQueryParserTests
     }
 
     [Theory]
-    [InlineData("createDate:>2026-07-15", BookSearchDateField.Created, BookSearchOperator.GreaterThan, 2026, 7, 15)]
+    [InlineData("createDate:>2026-07-15", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7, 16)]
     [InlineData("createDate:>=15.07.2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7, 15)]
-    [InlineData("createdDate:=5.7.2026", BookSearchDateField.Created, BookSearchOperator.Equal, 2026, 7, 5)]
     [InlineData("updateDate:<15/07/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 15)]
-    [InlineData("lastModified:<=5/7/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThanOrEqual, 2026, 7, 5)]
+    [InlineData("lastModified:<=5/7/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 6)]
     public void Parse_ShouldReadDateFiltersWithSupportedDateFormats(
+        string query,
+        BookSearchDateField expectedField,
+        BookSearchOperator expectedOperator,
+        int year,
+        int month,
+        int day)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        var filter = Assert.Single(criteria.Dates);
+        Assert.Equal(expectedField, filter.Field);
+        Assert.Equal(expectedOperator, filter.Operator);
+        Assert.Equal(new DateOnly(year, month, day), filter.Value);
+        Assert.Empty(criteria.Terms);
+    }
+
+    [Theory]
+    [InlineData("createdDate:=5.7.2026", BookSearchDateField.Created, 2026, 7, 5, 2026, 7, 6)]
+    [InlineData("created:=2026", BookSearchDateField.Created, 2026, 1, 1, 2027, 1, 1)]
+    [InlineData("updateDate:=07.2026", BookSearchDateField.LastModified, 2026, 7, 1, 2026, 8, 1)]
+    [InlineData("updated:=2026-07", BookSearchDateField.LastModified, 2026, 7, 1, 2026, 8, 1)]
+    public void Parse_ShouldExpandEqualDateFiltersToDateRanges(
+        string query,
+        BookSearchDateField expectedField,
+        int startYear,
+        int startMonth,
+        int startDay,
+        int endYear,
+        int endMonth,
+        int endDay)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        Assert.Collection(
+            criteria.Dates,
+            start =>
+            {
+                Assert.Equal(expectedField, start.Field);
+                Assert.Equal(BookSearchOperator.GreaterThanOrEqual, start.Operator);
+                Assert.Equal(new DateOnly(startYear, startMonth, startDay), start.Value);
+            },
+            end =>
+            {
+                Assert.Equal(expectedField, end.Field);
+                Assert.Equal(BookSearchOperator.LessThan, end.Operator);
+                Assert.Equal(new DateOnly(endYear, endMonth, endDay), end.Value);
+            });
+        Assert.Empty(criteria.Terms);
+    }
+
+    [Theory]
+    [InlineData("created:>2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2027, 1, 1)]
+    [InlineData("updated:<=2026-07", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 8, 1)]
+    public void Parse_ShouldReadPartialDateFiltersWithRangeOperators(
         string query,
         BookSearchDateField expectedField,
         BookSearchOperator expectedOperator,

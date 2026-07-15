@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { BookImportFinalizeResult, BookListItemDto, BookSummaryDto, BookSummaryTypeCountDto } from '@/api/types'
+import { extractAnalyticsDateFilters } from '@/features/analytics/dateQueryFilters'
 import {
   buttonClass,
   inputClass,
@@ -545,7 +546,7 @@ function SummaryTypeDetails({ items }: { items: BookSummaryTypeCountDto[] }) {
       {items.map((item) => (
         <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3" key={item.type}>
           <div className="flex items-center justify-between gap-3">
-            <div className="font-semibold text-slate-900">{item.type}</div>
+            <div className="font-semibold text-slate-950">{item.type}</div>
             <div className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700">{item.bookCount} books</div>
           </div>
           <div className="mt-2 text-sm text-slate-600">Current chapters: {formatChapterCount(item.currentChapters)}</div>
@@ -857,8 +858,15 @@ function truncate(value?: string | null) {
 
 function buildAnalyticsHref(query: string) {
   const params = new URLSearchParams()
-  if (query.trim()) {
-    params.set('query', query.trim())
+  const analyticsFilters = extractAnalyticsDateFilters(query)
+  if (analyticsFilters.query) {
+    params.set('query', analyticsFilters.query)
+  }
+  if (analyticsFilters.from) {
+    params.set('from', analyticsFilters.from)
+  }
+  if (analyticsFilters.to) {
+    params.set('to', analyticsFilters.to)
   }
 
   const search = params.toString()
