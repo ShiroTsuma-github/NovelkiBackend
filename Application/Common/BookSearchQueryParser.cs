@@ -30,6 +30,42 @@ public static class BookSearchQueryParser
         ["totalChapters"] = BookSearchNumberField.TotalChapters
     };
 
+    private static readonly Dictionary<string, BookSearchDateField> DateAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["createDate"] = BookSearchDateField.Created,
+        ["created"] = BookSearchDateField.Created,
+        ["createdDate"] = BookSearchDateField.Created,
+        ["updateDate"] = BookSearchDateField.LastModified,
+        ["updated"] = BookSearchDateField.LastModified,
+        ["updatedDate"] = BookSearchDateField.LastModified,
+        ["lastModified"] = BookSearchDateField.LastModified
+    };
+
+    private static readonly Dictionary<string, BookSearchMissingField> MissingAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["rating"] = BookSearchMissingField.Rating,
+        ["priority"] = BookSearchMissingField.Priority,
+        ["author"] = BookSearchMissingField.Author,
+        ["genre"] = BookSearchMissingField.Genre,
+        ["tag"] = BookSearchMissingField.Tag,
+        ["total"] = BookSearchMissingField.TotalChapters,
+        ["chapter"] = BookSearchMissingField.TotalChapters,
+        ["chapters"] = BookSearchMissingField.TotalChapters,
+        ["total-chapters"] = BookSearchMissingField.TotalChapters,
+        ["totalChapters"] = BookSearchMissingField.TotalChapters,
+        ["cover"] = BookSearchMissingField.Cover,
+        ["link"] = BookSearchMissingField.Link
+    };
+
+    private static readonly string[] DateFormats =
+    [
+        "yyyy-MM-dd",
+        "dd.MM.yyyy",
+        "d.M.yyyy",
+        "dd/MM/yyyy",
+        "d/M/yyyy"
+    ];
+
     public static BookSearchCriteria Parse(string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -42,9 +78,23 @@ public static class BookSearchQueryParser
         var terms = new List<string>();
         var fields = new List<BookSearchFieldFilter>();
         var numbers = new List<BookSearchNumberFilter>();
+        var dates = new List<BookSearchDateFilter>();
+        var missing = new List<BookSearchMissingFilter>();
 
         foreach (var token in Tokenize(query))
         {
+            if (TryParseMissingFilter(token, out var missingFilter))
+            {
+                missing.Add(missingFilter);
+                continue;
+            }
+
+            if (TryParseDateFilter(token, out var dateFilter))
+            {
+                dates.Add(dateFilter);
+                continue;
+            }
+
             if (TryParseNumberFilter(token, out var numberFilter))
             {
                 numbers.Add(numberFilter);
@@ -60,7 +110,68 @@ public static class BookSearchQueryParser
             terms.Add(token);
         }
 
-        return new BookSearchCriteria(terms, fields, numbers);
+        return new BookSearchCriteria(terms, fields, numbers, dates, missing);
+    }
+
+    private static bool TryParseMissingFilter(string token, out BookSearchMissingFilter filter)
+    {
+        filter = default!;
+        var separatorIndex = token.IndexOf(':');
+        if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
+        {
+            return false;
+        }
+
+        var fieldName = token[..separatorIndex];
+        var value = Unquote(token[(separatorIndex + 1)..].Trim());
+        if (!value.Equals("none", StringComparison.OrdinalIgnoreCase) ||
+            !MissingAliases.TryGetValue(fieldName, out var field))
+        {
+            return false;
+        }
+
+        filter = new BookSearchMissingFilter(field);
+        return true;
+    }
+
+    private static bool TryParseDateFilter(string token, out BookSearchDateFilter filter)
+    {
+        filter = default!;
+        var separatorIndex = token.IndexOf(':');
+        if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
+        {
+            return false;
+        }
+
+        var fieldName = token[..separatorIndex];
+        var valueText = token[(separatorIndex + 1)..].Trim();
+        if (!DateAliases.TryGetValue(fieldName, out var field))
+        {
+            return false;
+        }
+
+        var parsedOperator = BookSearchOperator.Equal;
+        var hasOperator = false;
+        foreach (var op in new[] { ">=", "<=", ">", "<", "=" })
+        {
+            if (!valueText.StartsWith(op, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            valueText = valueText[op.Length..].Trim();
+            parsedOperator = ToOperator(op);
+            hasOperator = true;
+            break;
+        }
+
+        if (!hasOperator || !TryParseDateOnly(Unquote(valueText), out var value))
+        {
+            return false;
+        }
+
+        filter = new BookSearchDateFilter(field, parsedOperator, value);
+        return true;
     }
 
     private static bool TryParseFieldFilter(string token, out BookSearchFieldFilter filter)
@@ -253,6 +364,16 @@ public static class BookSearchQueryParser
         }
 
         return value;
+    }
+
+    private static bool TryParseDateOnly(string value, out DateOnly date)
+    {
+        return DateOnly.TryParseExact(
+            value,
+            DateFormats,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.None,
+            out date);
     }
 
     private static string NormalizeAliases(string query)

@@ -13,15 +13,6 @@ problem z kolumnami (w niektorych przypadkach sa zbyt blisko albo nachodza na ac
 
 Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznosci, ale kazdy ticket ma zostac wdrozony jako osobny commit.
 
-### NB-058 - Rozszerz parser wyszukiwania o filtry brakujacych danych
-
-- Typ: `Feature`
-- Priorytet: `P2`
-- Komponent: `Application/Common/BookSearchQueryParser.cs`, `Domain/Repositories/BookSearchCriteria.cs`, `Infrastructure/Persistence/BookSearchCriteriaApplier.cs`, `Application.UnitTests/BookSearchQueryParserTests.cs`, `Infrastructure.IntegrationTests/*`
-- Problem: wykresy kompletnosci i kategorie Unrated/Unset nie moga otworzyc odpowiadajacej listy ksiazek, bo parser nie umie filtrowac wartosci pustych i brakujacych relacji.
-- Zakres: dodac skladnie `rating:none`, `priority:none`, `author:none`, `genre:none`, `tag:none`, `total:none`, `cover:none` i `link:none`; zachowac dotychczasowe filtry tekstowe i porownania liczbowe; zdefiniowac `none` jako null, pusty tekst albo brak relacji zgodnie z typem pola.
-- Akceptacja: kazdy filtr `none` zwraca tylko ksiazki z brakujaca wartoscia/relacja aktualnego uzytkownika; `genre:none` i `tag:none` nie myla pustej relacji z niepasujaca nazwa; nieznane pole lub niepoprawne uzycie `none` daje dotychczasowy kontrolowany blad parsera; testy obejmuja laczenie `none` z innymi filtrami, cudzyslowy, wielkosc liter, pusta biblioteke i owner isolation.
-
 ### NB-059 - Dodaj kontrakt i fundament endpointu Analytics
 
 - Typ: `Feature`
@@ -201,3 +192,14 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 - Problem: frontend zawiera rosnaca ilosc logiki widokowej i stanow lokalnych, co utrudnia dalszy rozwoj mimo ze UI ma pozostac wizualnie identyczne.
 - Zakres: uproscic strukture komponentow, wydzielic powtarzalne hooki/helpers i ograniczyc nadmiar odpowiedzialnosci duzych plikow bez zmiany layoutu, copy i interakcji uzytkownika.
 - Akceptacja: widok i zachowanie ekranow pozostaja bez zmian; refaktor zmniejsza zlozonosc co najmniej w glownych ekranach books/import/admin; snapshoty lub testy komponentow chronia przed regresja wygladu; testy obejmuja kluczowe flow uzytkownika przed i po refaktorze.
+
+## Done
+
+### NB-058 - Rozszerz parser wyszukiwania o filtry brakujacych danych
+
+- Typ: `Feature`
+- Priorytet: `P2`
+- Komponent: `Application/Common/BookSearchQueryParser.cs`, `Domain/Repositories/BookSearchCriteria.cs`, `Infrastructure/Persistence/BookSearchCriteriaApplier.cs`, `Application.UnitTests/BookSearchQueryParserTests.cs`, `Infrastructure.IntegrationTests/*`
+- Problem: wykresy kompletnosci i kategorie Unrated/Unset nie moga otworzyc odpowiadajacej listy ksiazek, bo parser nie umie filtrowac wartosci pustych i brakujacych relacji.
+- Zakres: dodac skladnie `rating:none`, `priority:none`, `author:none`, `genre:none`, `tag:none`, `total:none`, `cover:none` i `link:none`; zachowac dotychczasowe filtry tekstowe i porownania liczbowe; zdefiniowac `none` jako null, pusty tekst albo brak relacji zgodnie z typem pola.
+- Akceptacja: kazdy filtr `none` zwraca tylko ksiazki z brakujaca wartoscia/relacja aktualnego uzytkownika; `genre:none` i `tag:none` nie myla pustej relacji z niepasujaca nazwa; nieznane pole lub niepoprawne uzycie `none` daje dotychczasowy kontrolowany blad parsera; testy obejmuja laczenie `none` z innymi filtrami, cudzyslowy, wielkosc liter, pusta biblioteke i owner isolation.
