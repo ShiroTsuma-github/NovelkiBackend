@@ -56,9 +56,7 @@ const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
 const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
 
 const bookColumns: ColumnDefinition<BookListItemDto>[] = [
-  { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
-  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-72', render: (book) => <span className="block truncate font-medium text-slate-950">{book.primaryTitle}</span> },
-  { id: 'alternativeTitles', label: 'Alternative titles', defaultVisible: false, widthClass: 'w-56', render: (book) => formatList(book.alternativeTitles) },
+  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-72', render: (book) => <TitleCell book={book} /> },
   { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-44', render: (book) => <span className="block truncate">{book.author ?? '-'}</span> },
   { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-32', render: (book) => book.status },
   { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-24', render: (book) => book.contentType },
@@ -741,6 +739,28 @@ function Pills({ values }: { values: string[] }) {
       ))}
       {hiddenCount > 0 ? (
         <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">+{hiddenCount} more</span>
+      ) : null}
+    </div>
+  )
+}
+
+function TitleCell({ book }: { book: BookListItemDto }) {
+  const alternativeCount = book.alternativeTitlesCount ?? book.alternativeTitles.length
+  const alternativeTitle = book.alternativeTitles.length
+    ? `Alternative titles: ${book.alternativeTitles.join(', ')}`
+    : `${alternativeCount} alternative titles`
+
+  return (
+    <div className="flex min-w-0 items-center gap-2">
+      <span className="block min-w-0 truncate font-medium text-slate-950">{book.primaryTitle}</span>
+      {alternativeCount > 0 ? (
+        <span
+          aria-label={`${alternativeCount} alternative titles`}
+          className="shrink-0 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500"
+          title={alternativeTitle}
+        >
+          +{alternativeCount}
+        </span>
       ) : null}
     </div>
   )
