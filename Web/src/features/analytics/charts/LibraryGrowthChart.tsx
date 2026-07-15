@@ -9,6 +9,7 @@ type LibraryGrowthChartProps = {
 export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
   const points = data?.libraryGrowth.points ?? []
   const openingCount = data?.libraryGrowth.openingCount ?? 0
+  const displayPoints = compactGrowthPoints(points)
 
   if (!points.length) {
     return (
@@ -41,10 +42,10 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
         </ResponsiveContainer>
       </div>
       <div className="grid gap-2">
-        {points.map((point) => (
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={point.date}>
+        {displayPoints.map((point) => (
+          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={point.label}>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <span className="font-semibold text-slate-950">{point.date}</span>
+              <span className="font-semibold text-slate-950">{point.label}</span>
               <span className="text-slate-700">
                 +{formatCount(point.booksAdded)} added · {formatCount(point.cumulativeBooks)} cumulative
               </span>
@@ -60,12 +61,26 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
 }
 
 export function libraryGrowthRows(data?: BookAnalyticsDto) {
-  return (data?.libraryGrowth.points ?? []).map((point) => [
-    point.date,
+  return compactGrowthPoints(data?.libraryGrowth.points ?? []).map((point) => [
+    point.label,
     formatCount(point.booksAdded),
     formatCount(point.cumulativeBooks),
     point.byType.length ? point.byType.map((item) => `${item.type}: ${formatCount(item.bookCount)}`).join(', ') : 'No additions',
   ])
+}
+
+function compactGrowthPoints(points: BookAnalyticsLibraryGrowthPointDto[]) {
+  return points.reduce<Array<BookAnalyticsLibraryGrowthPointDto & { label: string }>>((rows, point) => {
+    const isEmpty = point.booksAdded === 0 && point.byType.length === 0
+    const previous = rows.at(-1)
+    if (isEmpty && previous && previous.booksAdded === 0 && previous.byType.length === 0 && previous.cumulativeBooks === point.cumulativeBooks) {
+      previous.label = `${previous.label.split(' - ')[0]} - ${point.date}`
+      return rows
+    }
+
+    rows.push({ ...point, label: point.date })
+    return rows
+  }, [])
 }
 
 function typeSummary(point: BookAnalyticsLibraryGrowthPointDto) {

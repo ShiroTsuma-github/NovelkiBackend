@@ -29,6 +29,9 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
           <div className="mt-3 text-sm text-slate-500">
             Avg {ratings.averageRating == null ? '-' : ratings.averageRating.toFixed(1)}
           </div>
+          <div className="mt-1 text-sm font-semibold text-slate-700">
+            Unrated: {formatCount(ratings.unratedBooks)}
+          </div>
         </div>
         <div className="h-64 min-w-0">
           <ResponsiveContainer>
@@ -64,7 +67,7 @@ export function ratingRows(data?: BookAnalyticsDto) {
   }
 
   return [
-    ...ratings.counts.map((item) => [String(item.rating), formatCount(item.bookCount), 'Rated']),
-    ['Unrated', formatCount(ratings.unratedBooks), 'Missing rating'],
+    ...ratings.counts.map((item) => [String(item.rating), formatCount(item.bookCount)]),
+    ['Unrated', formatCount(ratings.unratedBooks)],
   ]
 }

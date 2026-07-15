@@ -17,7 +17,7 @@ const missingFieldQueries: Record<string, string> = {
 }
 
 export function MetadataCompletenessChart({ data }: MetadataCompletenessChartProps) {
-  const items = data?.quality.fieldCompleteness ?? []
+  const items = [...(data?.quality.fieldCompleteness ?? [])].sort((left, right) => left.shareOfBooks - right.shareOfBooks || left.field.localeCompare(right.field))
   const totalBooks = data?.overview.totalBooks ?? 0
 
   if (!items.length) {
@@ -44,7 +44,7 @@ export function MetadataCompletenessChart({ data }: MetadataCompletenessChartPro
               <div className="h-full rounded-full bg-cyan-600" style={{ width: `${Math.min(100, Math.max(0, item.shareOfBooks))}%` }} />
             </div>
             <div className="text-sm text-slate-600">
-              Missing: {query && missingCount > 0 ? (
+              Complete {formatCount(item.bookCount)} of {formatCount(totalBooks)} books. Missing: {query && missingCount > 0 ? (
                 <DrilldownLink query={query}>{formatCount(missingCount)} books</DrilldownLink>
               ) : `${formatCount(missingCount)} books`}
             </div>
@@ -57,7 +57,7 @@ export function MetadataCompletenessChart({ data }: MetadataCompletenessChartPro
 
 export function metadataCompletenessRows(data?: BookAnalyticsDto) {
   const totalBooks = data?.overview.totalBooks ?? 0
-  return (data?.quality.fieldCompleteness ?? []).map((item) => [
+  return [...(data?.quality.fieldCompleteness ?? [])].sort((left, right) => left.shareOfBooks - right.shareOfBooks || left.field.localeCompare(right.field)).map((item) => [
     formatFieldName(item.field),
     formatCount(item.bookCount),
     formatPercent(item.shareOfBooks),

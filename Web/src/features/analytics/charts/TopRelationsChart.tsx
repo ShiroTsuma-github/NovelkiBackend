@@ -45,7 +45,6 @@ export function relationRows(items: BookAnalyticsRelationCountDto[]) {
     item.name,
     formatCount(item.bookCount),
     formatPercent(item.shareOfBooks),
-    item.isOther ? 'Grouped remainder' : 'Top category',
   ])
 }
 

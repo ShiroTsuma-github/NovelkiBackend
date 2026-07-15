@@ -26,6 +26,15 @@ Zrodlo wymagan: `books-analytics-plan.md`. Kolejnosc ponizej uwzglednia zaleznos
 
 ## Done
 
+### Reported issues - Analytics i tabele listy
+
+- Typ: `UX regression`
+- Priorytet: `P2`
+- Komponent: `Web/src/features/analytics/*`, `Web/src/features/books/BookDataTable.tsx`
+- Problem: reported issues wskazywaly nieczytelne procenty, zbedne tabele danych, nadmiarowe kolumny Bucket, dlugie rozwijane tabele, zerowe okresy trendow, mylace metadata completeness, nielogiczna kolejnosc cleanup blockow, rozciaganie kart obok siebie oraz nachodzenie kolumn na Actions.
+- Zakres: zaadresowano wszystkie punkty z sekcji Reported issues: normalizacja procentow, mocniejszy kontrast View data, usuniecie View data z rating/priority, usuniecie Bucket z tabel, kompresja zerowych okresow, jednoznaczne complete/missing metadata, cleanup nizej w kolejnosci, scrollowane tabele danych, masonry columns dla kart oraz sticky Actions w tabeli ksiazek/admina.
+- Akceptacja: testy obejmuja brak niepotrzebnych View data, brak Bucket, kompresje zakresow, Unrated bez data box, sticky Actions i brak regresji build/typecheck.
+
 ### NB-072 - Utwardz responsywnosc, dostepnosc i drill-down Analytics
 
 - Typ: `Accessibility / UX`
