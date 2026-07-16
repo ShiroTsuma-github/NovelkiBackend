@@ -554,6 +554,7 @@ function ExpandedImportRowEditor({
   sessionId: string
   onSessionChange: (session: BookImportSessionDto) => void
 }) {
+  const formEndRef = useRef<HTMLDivElement | null>(null)
   const [draft, setDraft] = useState<BookImportRowUpdateRequest>({
     primaryTitle: row.primaryTitle ?? '',
     authorName: row.authorName ?? '',
@@ -587,6 +588,29 @@ function ExpandedImportRowEditor({
       rawImportedLine: row.rawImportedLine ?? '',
     })
   }, [row])
+
+  useEffect(() => {
+    let frame = 0
+    let cancelled = false
+
+    const scrollAfterLayout = (attempt: number) => {
+      if (cancelled) {
+        return
+      }
+
+      scrollElementIntoNearestImportScroller(formEndRef.current)
+      if (attempt < 6) {
+        frame = requestAnimationFrame(() => scrollAfterLayout(attempt + 1))
+      }
+    }
+
+    frame = requestAnimationFrame(() => scrollAfterLayout(0))
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [])
 
   const mutation = useMutation({
     mutationFn: () => api.updateBookImportRow(sessionId, row.rowId, draft),
@@ -636,8 +660,33 @@ function ExpandedImportRowEditor({
         <LabeledTextarea error={fieldError('notes')} label="Notes" value={draft.notes ?? ''} onChange={(value) => update('notes', value)} />
         <LabeledTextarea error={fieldError('description')} label="Description" value={draft.description ?? ''} onChange={(value) => update('description', value)} />
       </div>
+      <div ref={formEndRef} aria-hidden="true" />
     </ImportRowShell>
   )
+}
+
+function scrollElementIntoNearestImportScroller(element: HTMLElement | null) {
+  const scroller = element?.closest('.import-rows-scroll')
+  if (!(element instanceof HTMLElement) || !(scroller instanceof HTMLElement)) {
+    if (typeof element?.scrollIntoView === 'function') {
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+    return
+  }
+
+  const elementBox = element.getBoundingClientRect()
+  const scrollerBox = scroller.getBoundingClientRect()
+  const bottomOverflow = elementBox.bottom - scrollerBox.bottom
+  const topOverflow = scrollerBox.top - elementBox.top
+
+  if (bottomOverflow > 0) {
+    scroller.scrollTop += bottomOverflow + 8
+    return
+  }
+
+  if (topOverflow > 0) {
+    scroller.scrollTop -= topOverflow + 8
+  }
 }
 
 function ImportRowShell({
@@ -662,7 +711,7 @@ function ImportRowShell({
   const busy = savePending || deletePending
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
+    <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4" data-testid={`import-row-${row.rowId}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid min-w-0 flex-1 gap-1">
           <button className="inline-flex items-center gap-2 text-left text-sm font-semibold text-amber-300" type="button" onClick={onToggle}>
@@ -673,9 +722,6 @@ function ImportRowShell({
             <span className="block max-w-full truncate md:line-clamp-2 md:whitespace-normal">
               {row.primaryTitle?.trim() || 'Untitled row'}
             </span>
-          </div>
-          <div className="line-clamp-2 max-w-full text-xs text-slate-400">
-            {row.errors.join(' ')}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
