@@ -17,65 +17,48 @@ public sealed class BookSearchCriteriaApplier
 
     public IQueryable<Book> Apply(IQueryable<Book> query, BookSearchCriteria criteria)
     {
-        foreach (string term in criteria.Terms)
-        {
-            query = ApplyGeneralTextSearch(query, term);
-        }
+        query = criteria.Terms.Aggregate(query, ApplyGeneralTextSearch);
 
-        foreach (BookSearchFieldFilter filter in criteria.Fields)
+        query = criteria.Fields.Aggregate(query, (current, filter) => filter.Field switch
         {
-            query = filter.Field switch
-            {
-                BookSearchField.Title => ApplyTitleSearch(query, filter.Values),
-                BookSearchField.Author => ApplyAuthorSearch(query, filter.Values),
-                BookSearchField.Tag => ApplyTagSearch(query, filter.Values),
-                BookSearchField.Genre => ApplyGenreSearch(query, filter.Values),
-                BookSearchField.Status => ApplyStatusSearch(query, filter.Values),
-                BookSearchField.Type => ApplyTypeSearch(query, filter.Values),
-                _ => query
-            };
-        }
+            BookSearchField.Title => ApplyTitleSearch(current, filter.Values),
+            BookSearchField.Author => ApplyAuthorSearch(current, filter.Values),
+            BookSearchField.Tag => ApplyTagSearch(current, filter.Values),
+            BookSearchField.Genre => ApplyGenreSearch(current, filter.Values),
+            BookSearchField.Status => ApplyStatusSearch(current, filter.Values),
+            BookSearchField.Type => ApplyTypeSearch(current, filter.Values),
+            _ => current
+        });
 
-        foreach (BookSearchNumberFilter filter in criteria.Numbers)
+        query = criteria.Numbers.Aggregate(query, (current, filter) => filter.Field switch
         {
-            query = filter.Field switch
-            {
-                BookSearchNumberField.Rating => ApplyRating(query, filter.Operator, filter.Value),
-                BookSearchNumberField.Priority => ApplyPriority(query, filter.Operator, filter.Value),
-                BookSearchNumberField.CurrentChapter => ApplyCurrentChapter(query, filter.Operator, filter.Value),
-                BookSearchNumberField.TotalChapters => ApplyTotalChapters(query, filter.Operator, filter.Value),
-                _ => query
-            };
-        }
+            BookSearchNumberField.Rating => ApplyRating(current, filter.Operator, filter.Value),
+            BookSearchNumberField.Priority => ApplyPriority(current, filter.Operator, filter.Value),
+            BookSearchNumberField.CurrentChapter => ApplyCurrentChapter(current, filter.Operator, filter.Value),
+            BookSearchNumberField.TotalChapters => ApplyTotalChapters(current, filter.Operator, filter.Value),
+            _ => current
+        });
 
-        foreach (BookSearchDateFilter filter in criteria.Dates)
+        query = criteria.Dates.Aggregate(query, (current, filter) => filter.Field switch
         {
-            query = filter.Field switch
-            {
-                BookSearchDateField.Created => ApplyCreatedDate(query, filter.Operator, filter.Value),
-                BookSearchDateField.LastModified => ApplyLastModifiedDate(query, filter.Operator, filter.Value),
-                _ => query
-            };
-        }
+            BookSearchDateField.Created => ApplyCreatedDate(current, filter.Operator, filter.Value),
+            BookSearchDateField.LastModified => ApplyLastModifiedDate(current, filter.Operator, filter.Value),
+            _ => current
+        });
 
-        foreach (BookSearchMissingFilter filter in criteria.Missing)
+        return criteria.Missing.Aggregate(query, (current, filter) => filter.Field switch
         {
-            query = filter.Field switch
-            {
-                BookSearchMissingField.Rating => query.Where(book => book.Rating == null),
-                BookSearchMissingField.Priority => query.Where(book => book.Priority == null),
-                BookSearchMissingField.Author => query.Where(book => book.Author == null),
-                BookSearchMissingField.Genre => query.Where(book => !book.BookGenres.Any()),
-                BookSearchMissingField.Tag => query.Where(book => !book.BookTags.Any()),
-                BookSearchMissingField.CurrentChapter => query.Where(book => book.CurrentChapterNumber == null),
-                BookSearchMissingField.TotalChapters => query.Where(book => book.TotalChapters == null),
-                BookSearchMissingField.Cover => query.Where(book => book.Cover == null),
-                BookSearchMissingField.Link => query.Where(book => !book.Links.Any()),
-                _ => query
-            };
-        }
-
-        return query;
+            BookSearchMissingField.Rating => current.Where(book => book.Rating == null),
+            BookSearchMissingField.Priority => current.Where(book => book.Priority == null),
+            BookSearchMissingField.Author => current.Where(book => book.Author == null),
+            BookSearchMissingField.Genre => current.Where(book => !book.BookGenres.Any()),
+            BookSearchMissingField.Tag => current.Where(book => !book.BookTags.Any()),
+            BookSearchMissingField.CurrentChapter => current.Where(book => book.CurrentChapterNumber == null),
+            BookSearchMissingField.TotalChapters => current.Where(book => book.TotalChapters == null),
+            BookSearchMissingField.Cover => current.Where(book => book.Cover == null),
+            BookSearchMissingField.Link => current.Where(book => !book.Links.Any()),
+            _ => current
+        });
     }
 
     private IQueryable<Book> ApplyGeneralTextSearch(IQueryable<Book> query, string term)

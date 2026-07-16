@@ -107,13 +107,8 @@ internal static class PredicateExpression
     public static Expression<Func<T, bool>>? OrAll<T>(
         IEnumerable<Expression<Func<T, bool>>> predicates)
     {
-        Expression<Func<T, bool>>? combined = null;
-        foreach (Expression<Func<T, bool>> predicate in predicates)
-        {
-            combined = combined == null ? predicate : Or(combined, predicate);
-        }
-
-        return combined;
+        return predicates.Aggregate<Expression<Func<T, bool>>, Expression<Func<T, bool>>?>(null,
+            (current, predicate) => current == null ? predicate : Or(current, predicate));
     }
 
     private static Expression<Func<T, bool>> Combine<T>(
@@ -135,20 +130,12 @@ internal static class PredicateExpression
         return new ParameterReplaceVisitor(source, target).Visit(expression)!;
     }
 
-    private sealed class ParameterReplaceVisitor : ExpressionVisitor
+    private sealed class ParameterReplaceVisitor(ParameterExpression source, ParameterExpression target)
+        : ExpressionVisitor
     {
-        private readonly ParameterExpression _source;
-        private readonly ParameterExpression _target;
-
-        public ParameterReplaceVisitor(ParameterExpression source, ParameterExpression target)
-        {
-            _source = source;
-            _target = target;
-        }
-
         protected override Expression VisitParameter(ParameterExpression node)
         {
-            return node == _source ? _target : base.VisitParameter(node);
+            return node == source ? target : base.VisitParameter(node);
         }
     }
 }
