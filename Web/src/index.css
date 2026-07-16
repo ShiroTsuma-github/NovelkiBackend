@@ -959,8 +959,64 @@ select.ui-control {
   cursor: pointer;
 }
 
+.analytics-priority-heading {
+  color: var(--qs-muted);
+  font-weight: 650;
+}
+
+.analytics-calendar-day {
+  color: var(--qs-muted);
+}
+
+.analytics-calendar-day-button {
+  color: inherit;
+}
+
+.analytics-calendar-day-button:hover {
+  color: var(--qs-text);
+  background: var(--qs-surface-hover);
+}
+
+.analytics-calendar-day--today {
+  color: var(--qs-accent-strong);
+}
+
+.analytics-calendar-day--outside,
+.analytics-calendar-day--disabled {
+  color: var(--qs-subtle);
+}
+
+.analytics-calendar-day--selected {
+  color: var(--qs-bg);
+  background: var(--qs-accent);
+}
+
+.analytics-calendar-day--range-middle {
+  color: var(--qs-text);
+  background: #343a68;
+}
+
+.analytics-calendar-day--range-start,
+.analytics-calendar-day--range-end {
+  color: var(--qs-bg);
+  background: var(--qs-accent);
+}
+
+.analytics-calendar-day--selected .analytics-calendar-day-button,
+.analytics-calendar-day--range-start .analytics-calendar-day-button,
+.analytics-calendar-day--range-middle .analytics-calendar-day-button,
+.analytics-calendar-day--range-end .analytics-calendar-day-button {
+  color: inherit;
+  background: transparent;
+}
+
 .analytics-heat {
   border: 1px solid var(--qs-border);
+}
+
+.analytics-heat .analytics-heat-value,
+.analytics-heat .analytics-heat-value:hover {
+  color: inherit;
 }
 
 .analytics-heat--high {
