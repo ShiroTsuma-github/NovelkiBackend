@@ -1,6 +1,7 @@
 namespace Infrastructure.Contexts;
 
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, Guid>
 {
@@ -25,7 +26,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<ContentType> ContentTypes { get; set; }
     public DbSet<Tag> Tags { get; set; }
 
-    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new CancellationToken())
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new())
     {
         foreach (var entry in ChangeTracker.Entries<BaseAuditableEntity>())
         {
@@ -269,18 +270,60 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         modelBuilder.Entity<ContentType>().HasData(
             new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000001"), Name = "Novel", Slug = "novel" },
             new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000002"), Name = "Manga", Slug = "manga" },
-            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000003"), Name = "Manhwa", Slug = "manhwa" },
-            new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000004"), Name = "Manhua", Slug = "manhua" },
+            new ContentType
+            {
+                Id = Guid.Parse("10000000-0000-0000-0000-000000000003"), Name = "Manhwa", Slug = "manhwa"
+            },
+            new ContentType
+            {
+                Id = Guid.Parse("10000000-0000-0000-0000-000000000004"), Name = "Manhua", Slug = "manhua"
+            },
             new ContentType { Id = Guid.Parse("10000000-0000-0000-0000-000000000005"), Name = "Other", Slug = "other" }
         );
 
         modelBuilder.Entity<Status>().HasData(
-            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000001"), Name = "Reading", Slug = "reading", SortOrder = 10 },
-            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000002"), Name = "Completed", Slug = "completed", SortOrder = 20 },
-            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000003"), Name = "Plan To Read", Slug = "plan-to-read", SortOrder = 30 },
-            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000004"), Name = "On Hold", Slug = "on-hold", SortOrder = 40 },
-            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000005"), Name = "Dropped", Slug = "dropped", SortOrder = 50 },
-            new Status { Id = Guid.Parse("20000000-0000-0000-0000-000000000006"), Name = "Unknown", Slug = "unknown", SortOrder = 60 }
+            new Status
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000001"),
+                Name = "Reading",
+                Slug = "reading",
+                SortOrder = 10
+            },
+            new Status
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000002"),
+                Name = "Completed",
+                Slug = "completed",
+                SortOrder = 20
+            },
+            new Status
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000003"),
+                Name = "Plan To Read",
+                Slug = "plan-to-read",
+                SortOrder = 30
+            },
+            new Status
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000004"),
+                Name = "On Hold",
+                Slug = "on-hold",
+                SortOrder = 40
+            },
+            new Status
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000005"),
+                Name = "Dropped",
+                Slug = "dropped",
+                SortOrder = 50
+            },
+            new Status
+            {
+                Id = Guid.Parse("20000000-0000-0000-0000-000000000006"),
+                Name = "Unknown",
+                Slug = "unknown",
+                SortOrder = 60
+            }
         );
     }
 }

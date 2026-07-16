@@ -7,6 +7,9 @@ using Domain.Repositories;
 
 namespace Application.UnitTests;
 
+using Common.DTOs.Author;
+using Common.DTOs.Tag;
+
 public class AutocompleteFeatureTests
 {
     private static readonly Guid OwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
@@ -20,7 +23,8 @@ public class AutocompleteFeatureTests
         await repository.AddAsync(author, CancellationToken.None);
         var handler = new SearchAuthorsQueryHandler(repository);
 
-        var result = await handler.Handle(new SearchAuthorsQuery("耳", 10), CancellationToken.None);
+        var result =
+            await handler.Handle(new SearchAuthorsQuery("耳", 10), CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal("Er Gen", result.First().PrimaryName);
@@ -30,11 +34,14 @@ public class AutocompleteFeatureTests
     public async Task SearchTags_ShouldReturnOnlyCurrentUsersTags()
     {
         var repository = new FakeTagRepository();
-        await repository.AddAsync(new Tag { OwnerId = OwnerId, Name = "favorite", NormalizedName = "FAVORITE" }, CancellationToken.None);
-        await repository.AddAsync(new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" }, CancellationToken.None);
+        await repository.AddAsync(new Tag { OwnerId = OwnerId, Name = "favorite", NormalizedName = "FAVORITE" },
+            CancellationToken.None);
+        await repository.AddAsync(new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" },
+            CancellationToken.None);
         var handler = new SearchTagsQueryHandler(repository, new FakeUser());
 
-        var result = await handler.Handle(new SearchTagsQuery("fav", 10), CancellationToken.None);
+        var result =
+            await handler.Handle(new SearchTagsQuery("fav", 10), CancellationToken.None);
 
         Assert.Single(result);
         Assert.Equal("favorite", result.First().Name);
@@ -61,8 +68,16 @@ public class AutocompleteFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(_authors.FirstOrDefault(a => a.Id == id));
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(_authors.FirstOrDefault(a => a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
+        public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_authors.FirstOrDefault(a => a.Id == id));
+        }
+
+        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_authors.FirstOrDefault(a =>
+                a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
+        }
 
         public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
         {
@@ -74,7 +89,10 @@ public class AutocompleteFeatureTests
                 .ToList());
         }
 
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeTagRepository : ITagRepository
@@ -87,15 +105,22 @@ public class AutocompleteFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names, CancellationToken cancellationToken)
+        public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,
+            CancellationToken cancellationToken)
         {
             var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToList();
-            return Task.FromResult<IEnumerable<Tag>>(_tags.Where(t => t.OwnerId == ownerId && normalizedNames.Contains(t.NormalizedName)).ToList());
+            return Task.FromResult<IEnumerable<Tag>>(_tags
+                .Where(t => t.OwnerId == ownerId && normalizedNames.Contains(t.NormalizedName)).ToList());
         }
 
-        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) => Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
+        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_tags.FirstOrDefault(t =>
+                t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
+        }
 
-        public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take, CancellationToken cancellationToken)
+        public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
+            CancellationToken cancellationToken)
         {
             var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Tag>>(_tags
@@ -104,6 +129,9 @@ public class AutocompleteFeatureTests
                 .ToList());
         }
 
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

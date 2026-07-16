@@ -1,10 +1,12 @@
 ﻿namespace Api.Controllers;
 
+using Application.Common.DTOs.Status;
+using Application.Common.Models;
 using Application.Features.StatusFeatures.Commands;
 using Application.Features.StatusFeatures.Queries.GetStatus;
 
 [ApiController]
-[Route("api/v1/status")]
+[Route(ApiRoutes.Status)]
 public class StatusController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -15,7 +17,7 @@ public class StatusController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<IActionResult> Create([FromBody] CreateStatusCommand command)
     {
         var status = await _mediator.Send(command);
@@ -23,7 +25,7 @@ public class StatusController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = status.Id }, status);
     }
 
-    [HttpGet()]
+    [HttpGet]
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllStatusesQuery getAllStatuses)
     {
@@ -32,7 +34,7 @@ public class StatusController : ControllerBase
         return Ok(statuses);
     }
 
-    [HttpGet("{id:guid}")]
+    [HttpGet(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -41,7 +43,7 @@ public class StatusController : ControllerBase
         return Ok(statusDto);
     }
 
-    [HttpGet("{id:guid}/details")]
+    [HttpGet(ApiRouteTemplates.IdDetails)]
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
@@ -50,7 +52,7 @@ public class StatusController : ControllerBase
         return Ok(statusDto);
     }
 
-    [HttpGet("by-name/{name}")]
+    [HttpGet(ApiRouteTemplates.ByName)]
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
@@ -59,7 +61,7 @@ public class StatusController : ControllerBase
         return Ok(statusDto);
     }
 
-    [HttpGet("by-name/{name}/details")]
+    [HttpGet(ApiRouteTemplates.ByNameDetails)]
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
@@ -68,8 +70,8 @@ public class StatusController : ControllerBase
         return Ok(statusDto);
     }
 
-    [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [HttpPut(ApiRouteTemplates.Id)]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<IActionResult> Update(Guid id, UpdateStatusCommand updateStatus)
     {
         updateStatus.Id = id;
@@ -78,8 +80,8 @@ public class StatusController : ControllerBase
         return Ok(statusDto);
     }
 
-    [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [HttpDelete(ApiRouteTemplates.Id)]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _mediator.Send(new DeleteStatusCommand(id));

@@ -1,6 +1,6 @@
 namespace Application.Features.BookFeatures.Commands;
 
-using Application.Common.Interfaces;
+using Common.Interfaces;
 
 public sealed record DeleteBooksByOwnerCommand(Guid OwnerId) : IRequest<AdminLibraryPurgeResult>;
 

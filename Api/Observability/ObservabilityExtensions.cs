@@ -10,6 +10,9 @@ using Serilog.Sinks.OpenTelemetry;
 
 public static class ObservabilityExtensions
 {
+    private const string OtlpEndpointVariable = "OTEL_EXPORTER_OTLP_ENDPOINT";
+    private const string DeploymentEnvironmentAttribute = "deployment.environment";
+
     public static void AddObservability(this WebApplicationBuilder builder)
     {
         builder.Host.UseSerilog((context, services, logger) =>
@@ -21,7 +24,7 @@ public static class ObservabilityExtensions
                 .Enrich.WithProperty("Application", "NovelkiBackend")
                 .Enrich.WithProperty("ServiceName", GetServiceName(context.Configuration));
 
-            var endpoint = context.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+            var endpoint = context.Configuration[OtlpEndpointVariable];
             if (!string.IsNullOrWhiteSpace(endpoint))
             {
                 logger.WriteTo.OpenTelemetry(options =>
@@ -32,7 +35,7 @@ public static class ObservabilityExtensions
                     options.ResourceAttributes = new Dictionary<string, object>
                     {
                         ["service.name"] = GetServiceName(context.Configuration),
-                        ["deployment.environment"] = context.HostingEnvironment.EnvironmentName
+                        [DeploymentEnvironmentAttribute] = context.HostingEnvironment.EnvironmentName
                     };
                 });
             }
@@ -43,7 +46,7 @@ public static class ObservabilityExtensions
                 .AddService(GetServiceName(builder.Configuration))
                 .AddAttributes(new Dictionary<string, object>
                 {
-                    ["deployment.environment"] = builder.Environment.EnvironmentName
+                    [DeploymentEnvironmentAttribute] = builder.Environment.EnvironmentName
                 }))
             .WithTracing(tracing =>
             {
@@ -90,30 +93,24 @@ public static class ObservabilityExtensions
 
     private static void AddOtlpTracingExporter(TracerProviderBuilder tracing, IConfiguration configuration)
     {
-        var endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+        var endpoint = configuration[OtlpEndpointVariable];
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             return;
         }
 
-        tracing.AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(endpoint);
-        });
+        tracing.AddOtlpExporter(options => { options.Endpoint = new Uri(endpoint); });
     }
 
     private static void AddOtlpMetricsExporter(MeterProviderBuilder metrics, IConfiguration configuration)
     {
-        var endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+        var endpoint = configuration[OtlpEndpointVariable];
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             return;
         }
 
-        metrics.AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(endpoint);
-        });
+        metrics.AddOtlpExporter(options => { options.Endpoint = new Uri(endpoint); });
     }
 
     private static string GetDbSystem(IDbCommand command)
@@ -137,9 +134,13 @@ public static class ObservabilityExtensions
         return "database";
     }
 
-    private static string GetServiceName(IConfiguration configuration) =>
-        configuration["OTEL_SERVICE_NAME"] ?? "novelki-api";
+    private static string GetServiceName(IConfiguration configuration)
+    {
+        return configuration["OTEL_SERVICE_NAME"] ?? "novelki-api";
+    }
 
-    public static bool IsHealthCheckPath(PathString path) =>
-        path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
+    public static bool IsHealthCheckPath(PathString path)
+    {
+        return path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
+    }
 }

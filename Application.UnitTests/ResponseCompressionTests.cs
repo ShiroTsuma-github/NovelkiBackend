@@ -14,18 +14,22 @@ public class ResponseCompressionTests
     {
         var builder = Host.CreateApplicationBuilder();
         var dependencyInjection = typeof(Program).Assembly.GetType("Api.DependencyInjection")
-            ?? throw new InvalidOperationException("Api dependency injection type was not found.");
+                                  ?? throw new InvalidOperationException(
+                                      "Api dependency injection type was not found.");
         var addWebServices = dependencyInjection.GetMethod(
-            "AddWebServices",
-            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-            ?? throw new InvalidOperationException("AddWebServices extension method was not found.");
+                                 "AddWebServices",
+                                 BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+                             ?? throw new InvalidOperationException(
+                                 "AddWebServices extension method was not found.");
 
         addWebServices.Invoke(null, [builder]);
 
         using var provider = builder.Services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<ResponseCompressionOptions>>().Value;
-        var brotliOptions = provider.GetRequiredService<IOptions<BrotliCompressionProviderOptions>>().Value;
-        var gzipOptions = provider.GetRequiredService<IOptions<GzipCompressionProviderOptions>>().Value;
+        var brotliOptions =
+            provider.GetRequiredService<IOptions<BrotliCompressionProviderOptions>>().Value;
+        var gzipOptions =
+            provider.GetRequiredService<IOptions<GzipCompressionProviderOptions>>().Value;
         var compressionProviderTypes = options.Providers
             .Cast<object>()
             .Select(compressionProviderFactory => compressionProviderFactory

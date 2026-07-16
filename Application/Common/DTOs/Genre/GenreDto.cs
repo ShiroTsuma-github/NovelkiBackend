@@ -1,4 +1,3 @@
-
 namespace Application.Common.DTOs.Genre;
 
 public class GenreDto

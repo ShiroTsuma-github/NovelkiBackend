@@ -24,7 +24,7 @@ public class DeleteBookHandler : IRequestHandler<DeleteBookCommand>
     public async Task Handle(DeleteBookCommand request, CancellationToken cancellationToken)
     {
         var book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
-            ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
         var storagePath = book.Cover?.StoragePath;
         await _repository.DeleteAsync(request.Id, _user.RequiredId, cancellationToken);
         await _storage.DeleteIfExistsAsync(storagePath, cancellationToken);

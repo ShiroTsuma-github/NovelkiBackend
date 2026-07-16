@@ -1,10 +1,12 @@
 ﻿namespace Api.Controllers;
 
+using Application.Common.DTOs.Genre;
+using Application.Common.Models;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.GenreFeatures.Queries.GetGenre;
 
 [ApiController]
-[Route("api/v1/genre")]
+[Route(ApiRoutes.Genre)]
 public class GenreController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -15,7 +17,7 @@ public class GenreController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<IActionResult> Create([FromBody] CreateGenreCommand command)
     {
         var genre = await _mediator.Send(command);
@@ -23,7 +25,7 @@ public class GenreController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = genre.Id }, genre);
     }
 
-    [HttpGet()]
+    [HttpGet]
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllGenresQuery getAllGenres)
     {
@@ -32,7 +34,7 @@ public class GenreController : ControllerBase
         return Ok(genres);
     }
 
-    [HttpGet("{id:guid}")]
+    [HttpGet(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -41,7 +43,7 @@ public class GenreController : ControllerBase
         return Ok(genreDto);
     }
 
-    [HttpGet("{id:guid}/details")]
+    [HttpGet(ApiRouteTemplates.IdDetails)]
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
@@ -50,7 +52,7 @@ public class GenreController : ControllerBase
         return Ok(genreDto);
     }
 
-    [HttpGet("by-name/{name}")]
+    [HttpGet(ApiRouteTemplates.ByName)]
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
@@ -59,7 +61,7 @@ public class GenreController : ControllerBase
         return Ok(genreDto);
     }
 
-    [HttpGet("by-name/{name}/details")]
+    [HttpGet(ApiRouteTemplates.ByNameDetails)]
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
@@ -68,8 +70,8 @@ public class GenreController : ControllerBase
         return Ok(genreDto);
     }
 
-    [HttpPut("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [HttpPut(ApiRouteTemplates.Id)]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<IActionResult> Update(Guid id, UpdateGenreCommand updateGenre)
     {
         updateGenre.Id = id;
@@ -78,8 +80,8 @@ public class GenreController : ControllerBase
         return Ok(genre);
     }
 
-    [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "Admin")]
+    [HttpDelete(ApiRouteTemplates.Id)]
+    [Authorize(Roles = AuthorizationRoles.Admin)]
     public async Task<IActionResult> Delete(Guid id)
     {
         await _mediator.Send(new DeleteGenreCommand(id));

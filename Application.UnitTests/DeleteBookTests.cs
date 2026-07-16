@@ -21,11 +21,7 @@ public class DeleteBookTests
             NormalizedPrimaryTitle = "NOVEL",
             ContentTypeId = Guid.NewGuid(),
             StatusId = Guid.NewGuid(),
-            Cover = new BookCover
-            {
-                StoragePath = "owner/book.jpg",
-                MimeType = "image/jpeg"
-            }
+            Cover = new BookCover { StoragePath = "owner/book.jpg", MimeType = "image/jpeg" }
         };
         var repository = new FakeBookRepository(book);
         var storage = new FakeBookCoverStorage();
@@ -48,8 +44,8 @@ public class DeleteBookTests
             new FakeBookListCacheInvalidator(),
             new FakeUser());
 
-        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(
-            () => handler.Handle(new DeleteBookCommand(Guid.NewGuid()), CancellationToken.None));
+        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(() =>
+            handler.Handle(new DeleteBookCommand(Guid.NewGuid()), CancellationToken.None));
     }
 
     private sealed class FakeUser : IUser
@@ -74,25 +70,53 @@ public class DeleteBookTests
 
         public Guid? DeletedBookId { get; private set; }
 
-        public Task AddAsync(Book book, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task AddAsync(Book book, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
         {
             DeletedBookId = _book?.OwnerId == ownerId ? id : null;
             return Task.CompletedTask;
         }
 
-        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(_book?.Id == id && _book.OwnerId == ownerId ? _book : null);
-        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
-        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_book?.Id == id && _book.OwnerId == ownerId ? _book : null);
+        }
+
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Book?>(null);
+        }
+
+        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeBookCoverStorage : IBookCoverStorage
     {
         public string? DeletedPath { get; private set; }
 
-        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
+            string? contentType, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
         {

@@ -7,6 +7,6 @@ public class EntityNotFoundException<TEntity, TKey> : Exception
     {
         Id = id;
     }
-    public TKey Id { get; }
 
+    public TKey Id { get; }
 }

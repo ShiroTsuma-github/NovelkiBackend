@@ -1,7 +1,7 @@
 namespace Application.Features.BookFeatures.Validators;
 
 using Application.Common.DTOs.Book;
-using Application.Features.BookFeatures.Commands;
+using Commands;
 using System.Linq.Expressions;
 
 public class CreateBookCommandValidator : AbstractValidator<CreateBookCommand>
@@ -117,7 +117,7 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
             .Must(x => currentChapterNumberValue(x) <= totalChaptersValue(x))
             .When(x => currentChapterNumberValue(x).HasValue && totalChaptersValue(x).HasValue)
             .WithName("CurrentChapterNumber")
-            .WithMessage("Current chapter cannot be greater than total chapters.");
+            .WithMessage(BookValidationMessages.CurrentChapterCannotExceedTotal);
 
         RuleFor(currentChapterLabel)
             .MaximumLength(100);
@@ -151,17 +151,20 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
                     }
                     else if (title.Title.Length > 500)
                     {
-                        context.AddFailure($"AlternativeTitles[{index}].Title", "Title must be 500 characters or fewer.");
+                        context.AddFailure($"AlternativeTitles[{index}].Title",
+                            "Title must be 500 characters or fewer.");
                     }
 
                     if (title.Language?.Length > 10)
                     {
-                        context.AddFailure($"AlternativeTitles[{index}].Language", "Language must be 10 characters or fewer.");
+                        context.AddFailure($"AlternativeTitles[{index}].Language",
+                            "Language must be 10 characters or fewer.");
                     }
 
                     if (title.Source?.Length > 50)
                     {
-                        context.AddFailure($"AlternativeTitles[{index}].Source", "Source must be 50 characters or fewer.");
+                        context.AddFailure($"AlternativeTitles[{index}].Source",
+                            "Source must be 50 characters or fewer.");
                     }
 
                     index++;

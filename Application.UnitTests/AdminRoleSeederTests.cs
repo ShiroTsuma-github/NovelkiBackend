@@ -1,11 +1,12 @@
+namespace Application.UnitTests;
+
+using Common;
 using Infrastructure.Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-
-namespace Application.UnitTests;
 
 public class AdminRoleSeederTests
 {
@@ -15,19 +16,23 @@ public class AdminRoleSeederTests
         var user = new User { Id = Guid.NewGuid(), Email = "admin@example.com", UserName = "admin" };
         var roleManager = CreateRoleManager();
         var userManager = CreateUserManager();
-        roleManager.Setup(manager => manager.RoleExistsAsync(AdminRoleSeeder.AdminRole)).ReturnsAsync(false);
-        roleManager.Setup(manager => manager.CreateAsync(It.Is<IdentityRole<Guid>>(role => role.Name == AdminRoleSeeder.AdminRole))).ReturnsAsync(IdentityResult.Success);
+        roleManager.Setup(manager => manager.RoleExistsAsync(AuthorizationRoles.Admin)).ReturnsAsync(false);
+        roleManager.Setup(manager =>
+                manager.CreateAsync(It.Is<IdentityRole<Guid>>(role => role.Name == AuthorizationRoles.Admin)))
+            .ReturnsAsync(IdentityResult.Success);
         userManager.Setup(manager => manager.FindByEmailAsync("admin@example.com")).ReturnsAsync(user);
-        userManager.Setup(manager => manager.IsInRoleAsync(user, AdminRoleSeeder.AdminRole)).ReturnsAsync(false);
-        userManager.Setup(manager => manager.AddToRoleAsync(user, AdminRoleSeeder.AdminRole)).ReturnsAsync(IdentityResult.Success);
-        var seeder = CreateSeeder(roleManager.Object, userManager.Object, [" admin@example.com ", "", "missing@example.com"]);
+        userManager.Setup(manager => manager.IsInRoleAsync(user, AuthorizationRoles.Admin)).ReturnsAsync(false);
+        userManager.Setup(manager => manager.AddToRoleAsync(user, AuthorizationRoles.Admin))
+            .ReturnsAsync(IdentityResult.Success);
+        var seeder = CreateSeeder(roleManager.Object, userManager.Object,
+            [" admin@example.com ", "", "missing@example.com"]);
 
         await seeder.StartAsync(CancellationToken.None);
 
         roleManager.Verify(manager => manager.CreateAsync(It.IsAny<IdentityRole<Guid>>()), Times.Once);
         userManager.Verify(manager => manager.FindByEmailAsync("admin@example.com"), Times.Once);
         userManager.Verify(manager => manager.FindByEmailAsync("missing@example.com"), Times.Once);
-        userManager.Verify(manager => manager.AddToRoleAsync(user, AdminRoleSeeder.AdminRole), Times.Once);
+        userManager.Verify(manager => manager.AddToRoleAsync(user, AuthorizationRoles.Admin), Times.Once);
     }
 
     [Fact]
@@ -35,7 +40,7 @@ public class AdminRoleSeederTests
     {
         var roleManager = CreateRoleManager();
         var userManager = CreateUserManager();
-        roleManager.Setup(manager => manager.RoleExistsAsync(AdminRoleSeeder.AdminRole)).ReturnsAsync(false);
+        roleManager.Setup(manager => manager.RoleExistsAsync(AuthorizationRoles.Admin)).ReturnsAsync(false);
         roleManager.Setup(manager => manager.CreateAsync(It.IsAny<IdentityRole<Guid>>()))
             .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "boom" }));
         var seeder = CreateSeeder(roleManager.Object, userManager.Object, ["admin@example.com"]);
@@ -52,9 +57,9 @@ public class AdminRoleSeederTests
         var user = new User { Id = Guid.NewGuid(), Email = "admin@example.com", UserName = "admin" };
         var roleManager = CreateRoleManager();
         var userManager = CreateUserManager();
-        roleManager.Setup(manager => manager.RoleExistsAsync(AdminRoleSeeder.AdminRole)).ReturnsAsync(true);
+        roleManager.Setup(manager => manager.RoleExistsAsync(AuthorizationRoles.Admin)).ReturnsAsync(true);
         userManager.Setup(manager => manager.FindByEmailAsync("admin@example.com")).ReturnsAsync(user);
-        userManager.Setup(manager => manager.IsInRoleAsync(user, AdminRoleSeeder.AdminRole)).ReturnsAsync(true);
+        userManager.Setup(manager => manager.IsInRoleAsync(user, AuthorizationRoles.Admin)).ReturnsAsync(true);
         var seeder = CreateSeeder(roleManager.Object, userManager.Object, ["admin@example.com"]);
 
         await seeder.StartAsync(CancellationToken.None);
@@ -63,16 +68,19 @@ public class AdminRoleSeederTests
         userManager.Verify(manager => manager.AddToRoleAsync(It.IsAny<User>(), It.IsAny<string>()), Times.Never);
     }
 
-    private static AdminRoleSeeder CreateSeeder(RoleManager<IdentityRole<Guid>> roleManager, UserManager<User> userManager, string[] adminEmails)
+    private static AdminRoleSeeder CreateSeeder(RoleManager<IdentityRole<Guid>> roleManager,
+        UserManager<User> userManager, string[] adminEmails)
     {
         var services = new ServiceCollection();
         services.AddSingleton(roleManager);
         services.AddSingleton(userManager);
         var configuration = new ConfigurationBuilder()
-            .AddInMemoryCollection(adminEmails.Select((email, index) => new KeyValuePair<string, string?>($"Admin:Emails:{index}", email)))
+            .AddInMemoryCollection(adminEmails.Select((email, index) =>
+                new KeyValuePair<string, string?>($"Admin:Emails:{index}", email)))
             .Build();
 
-        return new AdminRoleSeeder(services.BuildServiceProvider(), configuration, NullLogger<AdminRoleSeeder>.Instance);
+        return new AdminRoleSeeder(services.BuildServiceProvider(), configuration,
+            NullLogger<AdminRoleSeeder>.Instance);
     }
 
     private static Mock<RoleManager<IdentityRole<Guid>>> CreateRoleManager()

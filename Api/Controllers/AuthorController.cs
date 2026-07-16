@@ -3,7 +3,7 @@ namespace Api.Controllers;
 using Application.Features.AuthorFeatures.Queries;
 
 [ApiController]
-[Route("api/v1/author")]
+[Route(ApiRoutes.Author)]
 public class AuthorController : ControllerBase
 {
     private readonly IMediator _mediator;

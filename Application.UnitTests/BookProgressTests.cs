@@ -44,7 +44,8 @@ public class BookProgressTests
         var repository = new FakeBookRepository(book);
         var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
-        await handler.Handle(new UpdateBookProgressCommand(book.Id, 10, "10", "same chapter note"), CancellationToken.None);
+        await handler.Handle(new UpdateBookProgressCommand(book.Id, 10, "10", "same chapter note"),
+            CancellationToken.None);
 
         Assert.Equal(10, book.CurrentChapterNumber);
         Assert.Single(book.ProgressHistory);
@@ -57,8 +58,8 @@ public class BookProgressTests
         var repository = new FakeBookRepository(null);
         var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
-        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(
-            () => handler.Handle(new UpdateBookProgressCommand(Guid.NewGuid(), 20, null, null), CancellationToken.None));
+        await Assert.ThrowsAsync<EntityNotFoundException<Book, Guid>>(() =>
+            handler.Handle(new UpdateBookProgressCommand(Guid.NewGuid(), 20, null, null), CancellationToken.None));
     }
 
     private static Book CreateBook()
@@ -97,12 +98,34 @@ public class BookProgressTests
 
         public bool Saved { get; private set; }
 
-        public Task AddAsync(Book book, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(_book?.OwnerId == ownerId ? _book : null);
-        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
-        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber, string? currentChapterLabel, string? comment, CancellationToken cancellationToken)
+        public Task AddAsync(Book book, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_book?.OwnerId == ownerId ? _book : null);
+        }
+
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Book?>(null);
+        }
+
+        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber,
+            string? currentChapterLabel, string? comment, CancellationToken cancellationToken)
         {
             if (_book == null || _book.OwnerId != ownerId)
             {
@@ -138,6 +161,9 @@ public class BookProgressTests
 
     private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
     {
-        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

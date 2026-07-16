@@ -1,6 +1,8 @@
 namespace Infrastructure.BookCovers;
 
 using System.Net;
+using System.Net.Sockets;
+using FluentValidation;
 
 public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
 {
@@ -13,21 +15,23 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
         _storage = storage;
     }
 
-    public async Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+    public async Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl,
+        CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var imageUri) ||
-            imageUri.Scheme is not ("http" or "https"))
+            !imageUri.IsHttpOrHttps())
         {
-            throw new FluentValidation.ValidationException("Image URL must be an absolute HTTP or HTTPS URL.");
+            throw new ValidationException(BookCoverValidationMessages.InvalidRemoteUrl);
         }
 
         await EnsureRemoteHostAllowedAsync(imageUri, cancellationToken);
 
-        using var client = _httpClientFactory.CreateClient("BookCoverImages");
-        using var response = await client.GetAsync(imageUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var client = _httpClientFactory.CreateClient(BookCoverHttpClients.Images);
+        using var response =
+            await client.GetAsync(imageUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
-            throw new FluentValidation.ValidationException($"Image URL returned HTTP {(int)response.StatusCode}.");
+            throw new ValidationException($"Image URL returned HTTP {(int)response.StatusCode}.");
         }
 
         await using var imageStream = await response.Content.ReadAsStreamAsync(cancellationToken);
@@ -44,7 +48,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
     {
         if (imageUri.IsLoopback)
         {
-            throw new FluentValidation.ValidationException("Image URL host is not allowed.");
+            throw new ValidationException(BookCoverValidationMessages.RemoteHostNotAllowed);
         }
 
         var addresses = IPAddress.TryParse(imageUri.Host, out var literalAddress)
@@ -52,7 +56,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
             : await Dns.GetHostAddressesAsync(imageUri.Host, cancellationToken);
         if (addresses.Length == 0 || addresses.Any(IsBlockedAddress))
         {
-            throw new FluentValidation.ValidationException("Image URL host is not allowed.");
+            throw new ValidationException(BookCoverValidationMessages.RemoteHostNotAllowed);
         }
     }
 
@@ -77,7 +81,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
         }
 
         var bytes = address.GetAddressBytes();
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        if (address.AddressFamily == AddressFamily.InterNetwork)
         {
             return bytes[0] == 10 ||
                    bytes[0] == 127 ||
@@ -86,7 +90,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
                    (bytes[0] == 192 && bytes[1] == 168);
         }
 
-        if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+        if (address.AddressFamily == AddressFamily.InterNetworkV6)
         {
             return (bytes[0] & 0xfe) == 0xfc;
         }

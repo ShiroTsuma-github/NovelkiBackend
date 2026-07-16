@@ -31,7 +31,8 @@ public class JwtTokenGeneratorTests
         Assert.NotNull(token);
         Assert.Equal(UserId, token.UserId);
         var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token.AccessToken);
-        Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.NameIdentifier && claim.Value == UserId.ToString());
+        Assert.Contains(jwt.Claims,
+            claim => claim.Type == ClaimTypes.NameIdentifier && claim.Value == UserId.ToString());
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Name && claim.Value == "reader");
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Email && claim.Value == "reader@example.com");
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");

@@ -1,6 +1,6 @@
 namespace Application.Features.TypeFeatures.Commands;
 
-using Application.Common;
+using Common;
 using Application.Common.DTOs.Type;
 
 public record CreateTypeCommand(string Name, string? Description) : IRequest<TypeDto>;

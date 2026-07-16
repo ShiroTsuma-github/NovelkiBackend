@@ -4,11 +4,11 @@ using Application.Features.AccountFeatures.Commands;
 using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
-[Route("api/v1/account")]
+[Route(ApiRoutes.Account)]
 public class AccountController : ControllerBase
 {
-    private readonly IMediator _mediator;
     private readonly ILogger<AccountController> _logger;
+    private readonly IMediator _mediator;
 
     public AccountController(IMediator mediator, ILogger<AccountController> logger)
     {
@@ -17,16 +17,17 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("register")]
-    [EnableRateLimiting(Api.DependencyInjection.AccountAuthRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Register(RegisterUserCommand registerUserCommand)
     {
         var response = await _mediator.Send(registerUserCommand);
-        _logger.LogInformation("User registered. UserId={UserId} Username={Username}", response.Id, registerUserCommand.Username);
+        _logger.LogInformation("User registered. UserId={UserId} Username={Username}", response.Id,
+            registerUserCommand.Username);
         return Ok(response);
     }
 
     [HttpPost("login")]
-    [EnableRateLimiting(Api.DependencyInjection.AccountAuthRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Login(LoginUserCommand loginUserCommand)
     {
         var response = await _mediator.Send(loginUserCommand);

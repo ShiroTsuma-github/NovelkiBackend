@@ -1,6 +1,6 @@
 namespace Application.Features.StatusFeatures.Commands;
 
-using Application.Common;
+using Common;
 using Application.Common.DTOs.Status;
 
 public record CreateStatusCommand(string Name, string? Description) : IRequest<StatusDto>;

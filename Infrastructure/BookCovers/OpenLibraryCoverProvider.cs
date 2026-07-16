@@ -15,7 +15,8 @@ public sealed class OpenLibraryCoverProvider : IBookCoverProvider
     {
         foreach (var title in BookCoverProviderHelpers.EnumerateTitles(book))
         {
-            using var response = await _httpClient.GetAsync($"/search.json?title={Uri.EscapeDataString(title)}&limit=5&fields=title,cover_i", cancellationToken);
+            using var response = await _httpClient.GetAsync(
+                $"/search.json?title={Uri.EscapeDataString(title)}&limit=5&fields=title,cover_i", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
@@ -23,7 +24,8 @@ public sealed class OpenLibraryCoverProvider : IBookCoverProvider
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            if (!document.RootElement.TryGetProperty("docs", out var docs) || docs.ValueKind != JsonValueKind.Array)
+            if (!document.RootElement.TryGetProperty("docs", out var docs) ||
+                docs.ValueKind != JsonValueKind.Array)
             {
                 continue;
             }
@@ -32,7 +34,8 @@ public sealed class OpenLibraryCoverProvider : IBookCoverProvider
             {
                 if (item.TryGetProperty("cover_i", out var coverId) && coverId.TryGetInt32(out var id))
                 {
-                    return new BookCoverCandidate(BookCoverSource.OpenLibrary, $"https://covers.openlibrary.org/b/id/{id}-L.jpg");
+                    return new BookCoverCandidate(BookCoverSource.OpenLibrary,
+                        $"https://covers.openlibrary.org/b/id/{id}-L.jpg");
                 }
             }
         }

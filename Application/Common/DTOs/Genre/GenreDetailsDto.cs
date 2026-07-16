@@ -1,5 +1,5 @@
 namespace Application.Common.DTOs.Genre;
 
-using Application.Common.DTOs.Book;
+using Book;
 
 public class GenreDetailsDto : BookCollectionDetailsDto;

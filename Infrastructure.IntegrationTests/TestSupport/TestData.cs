@@ -12,38 +12,22 @@ public static class TestData
 
     public static Author Author(string name)
     {
-        var author = new Author
-        {
-            PrimaryName = name,
-            NormalizedPrimaryName = MappingExtensions.NormalizeName(name)
-        };
+        var author = new Author { PrimaryName = name, NormalizedPrimaryName = MappingExtensions.NormalizeName(name) };
         author.Names.Add(new AuthorName
         {
-            Name = name,
-            NormalizedName = MappingExtensions.NormalizeName(name),
-            IsPrimary = true,
-            Source = "Test"
+            Name = name, NormalizedName = MappingExtensions.NormalizeName(name), IsPrimary = true, Source = "Test"
         });
         return author;
     }
 
     public static Genre Genre(string name)
     {
-        return new Genre
-        {
-            Name = name,
-            NormalizedName = MappingExtensions.NormalizeName(name)
-        };
+        return new Genre { Name = name, NormalizedName = MappingExtensions.NormalizeName(name) };
     }
 
     public static Tag Tag(Guid ownerId, string name)
     {
-        return new Tag
-        {
-            OwnerId = ownerId,
-            Name = name,
-            NormalizedName = MappingExtensions.NormalizeName(name)
-        };
+        return new Tag { OwnerId = ownerId, Name = name, NormalizedName = MappingExtensions.NormalizeName(name) };
     }
 
     public static Book Book(Guid ownerId, string title, Author? author = null)
@@ -62,7 +46,8 @@ public static class TestData
         return book;
     }
 
-    public static async Task<Book> AddBookAsync(ApplicationDbContext context, Guid ownerId, string title, Author? author = null)
+    public static async Task<Book> AddBookAsync(ApplicationDbContext context, Guid ownerId, string title,
+        Author? author = null)
     {
         var book = Book(ownerId, title, author);
         context.Books.Add(book);

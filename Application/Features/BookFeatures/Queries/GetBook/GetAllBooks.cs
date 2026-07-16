@@ -1,14 +1,14 @@
 namespace Application.Features.BookFeatures.Queries.GetBook;
 
-using Application.Common.Interfaces;
+using Common.Interfaces;
 using Application.Common.DTOs.Book;
 
 public record GetAllBooksQuery(
     int Skip = 0,
     int Take = 100,
     string? Query = null,
-    string? SortBy = "lastModified",
-    string? SortDirection = "desc",
+    string? SortBy = BookSortFields.LastModified,
+    string? SortDirection = SortDirections.Descending,
     bool AdvanceCycle = false) : IRequest<PaginatedResult<BookListItemDto>>;
 
 public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedResult<BookListItemDto>>
@@ -24,29 +24,35 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
         _user = user;
     }
 
-    public async Task<PaginatedResult<BookListItemDto>> Handle(GetAllBooksQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<BookListItemDto>> Handle(GetAllBooksQuery request,
+        CancellationToken cancellationToken)
     {
         var ownerId = _user.RequiredId;
         var criteria = BookSearchQueryParser.Parse(request.Query);
         var effectiveSortDirection = request.AdvanceCycle && IsCyclicSort(request.SortBy)
-            ? await _queryService.GetNextCycleSortDirectionAsync(ownerId, criteria, request.SortBy!, request.SortDirection, cancellationToken)
+            ? await _queryService.GetNextCycleSortDirectionAsync(ownerId, criteria, request.SortBy!,
+                request.SortDirection, cancellationToken)
             : request.SortDirection;
-        var cached = await _cache.GetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, effectiveSortDirection, cancellationToken);
+        var cached = await _cache.GetBooksAsync(ownerId, request.Skip, request.Take,
+            request.Query, request.SortBy, effectiveSortDirection, cancellationToken);
         if (cached != null)
         {
             return cached;
         }
 
-        var books = await _queryService.GetBooksAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, effectiveSortDirection, cancellationToken);
+        var books = await _queryService.GetBooksAsync(ownerId, criteria, request.Skip,
+            request.Take, request.SortBy, effectiveSortDirection, cancellationToken);
         var total = await _queryService.GetBookCountAsync(ownerId, criteria, cancellationToken);
         var result = PaginatedResult<BookListItemDto>.Create(request.Skip, request.Take, total, books);
-        await _cache.SetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy, effectiveSortDirection, result, cancellationToken);
+        await _cache.SetBooksAsync(ownerId, request.Skip, request.Take, request.Query, request.SortBy,
+            effectiveSortDirection, result, cancellationToken);
         return result;
     }
 
     private static bool IsCyclicSort(string? sortBy)
     {
-        return sortBy?.Trim().ToLowerInvariant() is "status" or "type" or "contenttype";
+        return sortBy?.Trim().ToLowerInvariant() is
+            BookSortFields.Status or BookSortFields.Type or BookSortFields.ContentTypeAlias;
     }
 }
 
@@ -54,8 +60,8 @@ public record GetAllBooksForExportQuery(
     int Skip = 0,
     int Take = 100,
     string? Query = null,
-    string? SortBy = "lastModified",
-    string? SortDirection = "desc") : IRequest<PaginatedResult<BookDto>>;
+    string? SortBy = BookSortFields.LastModified,
+    string? SortDirection = SortDirections.Descending) : IRequest<PaginatedResult<BookDto>>;
 
 public sealed class GetBooksForExportQueryHandler : IRequestHandler<GetAllBooksForExportQuery, PaginatedResult<BookDto>>
 {
@@ -68,10 +74,12 @@ public sealed class GetBooksForExportQueryHandler : IRequestHandler<GetAllBooksF
         _user = user;
     }
 
-    public async Task<PaginatedResult<BookDto>> Handle(GetAllBooksForExportQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<BookDto>> Handle(GetAllBooksForExportQuery request,
+        CancellationToken cancellationToken)
     {
         var ownerId = _user.RequiredId;
         var criteria = BookSearchQueryParser.Parse(request.Query);
-        return await _queryService.GetBooksForExportAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
+        return await _queryService.GetBooksForExportAsync(ownerId, criteria, request.Skip, request.Take, request.SortBy,
+            request.SortDirection, cancellationToken);
     }
 }

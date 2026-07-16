@@ -22,7 +22,8 @@ public class MiscControllerAndHealthTests
     {
         var mediator = new Mock<IMediator>();
         var payload = new[] { new AuthorDto { Id = Guid.NewGuid(), PrimaryName = "Author" } };
-        mediator.Setup(mock => mock.Send(It.IsAny<SearchAuthorsQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(payload);
+        mediator.Setup(mock => mock.Send(It.IsAny<SearchAuthorsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
         var controller = new AuthorController(mediator.Object);
         var query = new SearchAuthorsQuery("auth", 5);
 
@@ -37,7 +38,8 @@ public class MiscControllerAndHealthTests
     {
         var mediator = new Mock<IMediator>();
         var payload = new[] { new TagDto { Id = Guid.NewGuid(), Name = "favorite" } };
-        mediator.Setup(mock => mock.Send(It.IsAny<SearchTagsQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(payload);
+        mediator.Setup(mock => mock.Send(It.IsAny<SearchTagsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
         var controller = new TagController(mediator.Object);
         var query = new SearchTagsQuery("fav", 5);
 
@@ -50,7 +52,7 @@ public class MiscControllerAndHealthTests
     [Fact]
     public async Task DatabaseReadyHealthCheck_ShouldReturnHealthy_WhenDatabaseCanConnect()
     {
-        await using var context = await CreateContextAsync(openConnection: true);
+        await using var context = await CreateContextAsync(true);
         var healthCheck = new DatabaseReadyHealthCheck(context);
 
         var result = await healthCheck.CheckHealthAsync(new HealthCheckContext(), CancellationToken.None);
@@ -99,7 +101,7 @@ public class MiscControllerAndHealthTests
         return new ApplicationDbContext(options, new FakeUser());
     }
 
-    private sealed class FakeUser : Application.Common.Interfaces.IUser
+    private sealed class FakeUser : Common.Interfaces.IUser
     {
         public Guid? Id => Guid.NewGuid();
         public Guid RequiredId => Id!.Value;

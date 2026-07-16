@@ -12,6 +12,8 @@ using FluentValidation;
 
 namespace Application.UnitTests;
 
+using FluentValidation.Results;
+
 public class BookFeatureTests
 {
     private static readonly Guid OwnerId = Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
@@ -22,14 +24,16 @@ public class BookFeatureTests
     public async Task CreateBook_ShouldStorePrimaryAndAlternativeTitles()
     {
         var fixture = CreateFixture();
-        var command = ValidCreateCommand(alternativeTitles: new[] { new BookTitleInput("Everyone Else is a Returnee") });
+        var command = ValidCreateCommand(new[] { new BookTitleInput("Everyone Else is a Returnee") });
 
         await fixture.Handler.Handle(command, CancellationToken.None);
 
         Assert.NotNull(fixture.BookRepository.LastBook);
         Assert.Equal("Na Bbaego Da Gwihwanja", fixture.BookRepository.LastBook.PrimaryTitle);
-        Assert.Contains(fixture.BookRepository.LastBook.Titles, t => t.IsPrimary && t.Title == "Na Bbaego Da Gwihwanja");
-        Assert.Contains(fixture.BookRepository.LastBook.Titles, t => !t.IsPrimary && t.Title == "Everyone Else is a Returnee");
+        Assert.Contains(fixture.BookRepository.LastBook.Titles,
+            t => t.IsPrimary && t.Title == "Na Bbaego Da Gwihwanja");
+        Assert.Contains(fixture.BookRepository.LastBook.Titles,
+            t => !t.IsPrimary && t.Title == "Everyone Else is a Returnee");
         Assert.NotNull(fixture.BookRepository.LastBook.Cover);
         Assert.Equal(BookCoverStatus.Pending, fixture.BookRepository.LastBook.Cover.Status);
         Assert.Equal(fixture.BookRepository.LastBook.Id, fixture.BookCoverQueue.QueuedBookId);
@@ -85,8 +89,8 @@ public class BookFeatureTests
         });
         var command = ValidCreateCommand();
 
-        await Assert.ThrowsAsync<EntityAlreadyExistsException<Book, Guid>>(
-            () => fixture.Handler.Handle(command, CancellationToken.None));
+        await Assert.ThrowsAsync<EntityAlreadyExistsException<Book, Guid>>(() =>
+            fixture.Handler.Handle(command, CancellationToken.None));
     }
 
     [Fact]
@@ -192,10 +196,7 @@ public class BookFeatureTests
             null,
             null,
             null,
-            null)
-        {
-            AdminScope = true
-        };
+            null) { AdminScope = true };
 
         await handler.Handle(command, CancellationToken.None);
 
@@ -266,7 +267,8 @@ public class BookFeatureTests
             TotalChapters = 10
         };
         fixture.BookRepository.Seed(book);
-        var handler = new UpdateBookProgressHandler(fixture.BookRepository, new FakeBookListCacheInvalidator(), new FakeUser());
+        var handler =
+            new UpdateBookProgressHandler(fixture.BookRepository, new FakeBookListCacheInvalidator(), new FakeUser());
 
         await Assert.ThrowsAsync<ValidationException>(() =>
             handler.Handle(new UpdateBookProgressCommand(book.Id, 11, "11", "too much"), CancellationToken.None));
@@ -299,7 +301,8 @@ public class BookFeatureTests
         var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "TotalChapters" && e.ErrorMessage == "Total chapters must be greater than 0.");
+        Assert.Contains(result.Errors,
+            e => e.PropertyName == "TotalChapters" && e.ErrorMessage == "Total chapters must be greater than 0.");
     }
 
     [Fact]
@@ -360,7 +363,8 @@ public class BookFeatureTests
         var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title must be 500 characters or fewer.");
+        Assert.Contains(result.Errors,
+            e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title must be 500 characters or fewer.");
         Assert.Contains(result.Errors, e => e.PropertyName == "AuthorName");
         Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterLabel");
         Assert.Contains(result.Errors, e => e.PropertyName == "Description");
@@ -373,7 +377,6 @@ public class BookFeatureTests
     {
         var validator = new CreateBookCommandValidator();
         var command = ValidCreateCommand(
-            alternativeTitles:
             [
                 new BookTitleInput(" ", "pl", "Manual"),
                 new BookTitleInput(new string('t', 501), new string('l', 11), new string('s', 51))
@@ -428,8 +431,11 @@ public class BookFeatureTests
         var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterLabel" && e.ErrorMessage == "Chapter label must be 100 characters or fewer.");
-        Assert.Contains(result.Errors, e => e.PropertyName == "Comment" && e.ErrorMessage == "Comment must be 1000 characters or fewer.");
+        Assert.Contains(result.Errors,
+            e => e.PropertyName == "CurrentChapterLabel" &&
+                 e.ErrorMessage == "Chapter label must be 100 characters or fewer.");
+        Assert.Contains(result.Errors,
+            e => e.PropertyName == "Comment" && e.ErrorMessage == "Comment must be 1000 characters or fewer.");
     }
 
     [Fact]
@@ -447,7 +453,8 @@ public class BookFeatureTests
             TotalChapters = 0
         };
         fixture.BookRepository.Seed(book);
-        var handler = new UpdateBookProgressHandler(fixture.BookRepository, new FakeBookListCacheInvalidator(), new FakeUser());
+        var handler =
+            new UpdateBookProgressHandler(fixture.BookRepository, new FakeBookListCacheInvalidator(), new FakeUser());
 
         await handler.Handle(new UpdateBookProgressCommand(book.Id, 11, "11", null), CancellationToken.None);
 
@@ -467,17 +474,17 @@ public class BookFeatureTests
                 3,
                 [
                     new Domain.Models.BookStatusCountSnapshot("Reading", 2),
-                    new Domain.Models.BookStatusCountSnapshot("Completed", 2),
+                    new Domain.Models.BookStatusCountSnapshot("Completed", 2)
                 ],
                 [
-                    new Domain.Models.BookTypeSummarySnapshot("Novel", 3, 900),
+                    new Domain.Models.BookTypeSummarySnapshot("Novel", 3, 900)
                 ],
                 [
-                    new Domain.Models.BookGenreCountSnapshot("Fantasy", 2),
+                    new Domain.Models.BookGenreCountSnapshot("Fantasy", 2)
                 ],
                 [
                     new Domain.Models.BookRatingCountSnapshot(8, 1),
-                    new Domain.Models.BookRatingCountSnapshot(9, 2),
+                    new Domain.Models.BookRatingCountSnapshot(9, 2)
                 ])
         };
         var handler = new GetBookSummaryHandler(summaryQueryService, new FakeUser());
@@ -530,26 +537,30 @@ public class BookFeatureTests
         string? currentChapterLabel = null)
     {
         return new CreateBookCommand(
-            PrimaryTitle: "Na Bbaego Da Gwihwanja",
-            ContentTypeId: ContentTypeId,
-            StatusId: StatusId,
-            AuthorId: null,
-            AuthorName: authorName,
-            AlternativeTitles: alternativeTitles,
-            GenreIds: null,
-            Tags: tags,
-            TotalChapters: null,
-            CurrentChapterNumber: currentChapterNumber,
-            CurrentChapterLabel: currentChapterLabel,
-            Rating: 9,
-            Priority: 1,
-            Description: null,
-            Notes: null,
-            RawImportedLine: null,
-            Links: links);
+            "Na Bbaego Da Gwihwanja",
+            ContentTypeId,
+            StatusId,
+            null,
+            authorName,
+            alternativeTitles,
+            null,
+            tags,
+            null,
+            currentChapterNumber,
+            currentChapterLabel,
+            9,
+            1,
+            null,
+            null,
+            null,
+            links);
     }
 
-    private sealed record Fixture(FakeBookRepository BookRepository, FakeAuthorRepository AuthorRepository, FakeBookCoverQueue BookCoverQueue, CreateBookHandler Handler);
+    private sealed record Fixture(
+        FakeBookRepository BookRepository,
+        FakeAuthorRepository AuthorRepository,
+        FakeBookCoverQueue BookCoverQueue,
+        CreateBookHandler Handler);
 
     private sealed class FakeUser : IUser
     {
@@ -578,12 +589,33 @@ public class BookFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
-        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(LastBook?.Id == id ? LastBook : null);
-        public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => GetByIdAsync(id, ownerId, cancellationToken);
-        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => GetByIdAsync(id, cancellationToken);
-        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken)
+        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(LastBook?.Id == id && LastBook.OwnerId == ownerId ? LastBook : null);
+        }
+
+        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(LastBook?.Id == id ? LastBook : null);
+        }
+
+        public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return GetByIdAsync(id, ownerId, cancellationToken);
+        }
+
+        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return GetByIdAsync(id, cancellationToken);
+        }
+
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId,
+            CancellationToken cancellationToken)
         {
             var normalized = MappingExtensions.NormalizeName(name);
             var match = LastBook != null &&
@@ -593,7 +625,12 @@ public class BookFeatureTests
                          LastBook.Titles.Any(t => t.NormalizedTitle == normalized));
             return Task.FromResult(match ? LastBook : null);
         }
-        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(LastBook == null ? 0 : 1);
+
+        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(LastBook == null ? 0 : 1);
+        }
+
         public Task ReplaceEditableCollectionsAsync(
             Guid bookId,
             IEnumerable<BookTitle> titles,
@@ -658,7 +695,8 @@ public class BookFeatureTests
 
             LastBook.CurrentChapterNumber = currentChapterNumber;
             LastBook.CurrentChapterLabel = currentChapterLabel;
-            if (currentChapterNumber.HasValue || !string.IsNullOrWhiteSpace(currentChapterLabel) || !string.IsNullOrWhiteSpace(comment))
+            if (currentChapterNumber.HasValue || !string.IsNullOrWhiteSpace(currentChapterLabel) ||
+                !string.IsNullOrWhiteSpace(comment))
             {
                 LastBook.ProgressHistory.Add(new BookProgressHistory
                 {
@@ -693,14 +731,18 @@ public class BookFeatureTests
 
     private sealed class FakeBookListCacheInvalidator : IBookListCacheInvalidator
     {
-        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeBookSummaryQueryService : IBookSummaryQueryService
     {
         public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
 
-        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
+        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(Summary);
         }
@@ -716,46 +758,149 @@ public class BookFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(Authors.FirstOrDefault(a => a.Id == id));
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(Authors.FirstOrDefault(a => a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
-        public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Author>>(Authors.Take(take));
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Authors.FirstOrDefault(a => a.Id == id));
+        }
+
+        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Authors.FirstOrDefault(a =>
+                a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
+        }
+
+        public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Author>>(Authors.Take(take));
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeTypeRepository : ITypeRepository
     {
         private readonly ContentType _type = new() { Id = ContentTypeId, Name = "Novel", Slug = "novel" };
-        public Task AddAsync(ContentType type, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task DeleteAsync(Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<IEnumerable<ContentType>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<ContentType>>(new[] { _type });
-        public Task<ContentType?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<ContentType?>(id == ContentTypeId ? _type : null);
-        public Task<ContentType?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult<ContentType?>(_type);
-        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(1);
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task AddAsync(ContentType type, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IEnumerable<ContentType>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<ContentType>>(new[] { _type });
+        }
+
+        public Task<ContentType?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<ContentType?>(id == ContentTypeId ? _type : null);
+        }
+
+        public Task<ContentType?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<ContentType?>(_type);
+        }
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(1);
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeStatusRepository : IStatusRepository
     {
         private readonly Status _status = new() { Id = StatusId, Name = "Reading", Slug = "reading" };
-        public Task AddAsync(Status status, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task DeleteAsync(Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Status>>(new[] { _status });
-        public Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<Status?>(id == StatusId ? _status : null);
-        public Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult<Status?>(_status);
-        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(1);
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+        public Task AddAsync(Status status, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Status>>(new[] { _status });
+        }
+
+        public Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Status?>(id == StatusId ? _status : null);
+        }
+
+        public Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Status?>(_status);
+        }
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(1);
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeGenreRepository : IGenreRepository
     {
-        public Task AddAsync(Genre genre, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task DeleteAsync(Guid id, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task<IEnumerable<Genre>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Genre>>(Array.Empty<Genre>());
-        public Task<Genre?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<Genre?>(null);
-        public Task<IEnumerable<Genre>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Genre>>(Array.Empty<Genre>());
-        public Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult<Genre?>(null);
-        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task AddAsync(Genre genre, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task<IEnumerable<Genre>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Genre>>(Array.Empty<Genre>());
+        }
+
+        public Task<Genre?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Genre?>(null);
+        }
+
+        public Task<IEnumerable<Genre>> GetByIdsAsync(IEnumerable<Guid> ids, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Genre>>(Array.Empty<Genre>());
+        }
+
+        public Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Genre?>(null);
+        }
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeTagRepository : ITagRepository
@@ -768,14 +913,29 @@ public class BookFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names, CancellationToken cancellationToken)
+        public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,
+            CancellationToken cancellationToken)
         {
             var normalized = names.Select(MappingExtensions.NormalizeName).ToList();
-            return Task.FromResult<IEnumerable<Tag>>(_tags.Where(t => t.OwnerId == ownerId && normalized.Contains(t.NormalizedName)).ToList());
+            return Task.FromResult<IEnumerable<Tag>>(_tags
+                .Where(t => t.OwnerId == ownerId && normalized.Contains(t.NormalizedName)).ToList());
         }
 
-        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken) => Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
-        public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Tag>>(_tags.Take(take));
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_tags.FirstOrDefault(t =>
+                t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
+        }
+
+        public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Tag>>(_tags.Take(take));
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

@@ -41,7 +41,12 @@ public class BookControllerTests
             0,
             20,
             1,
-            [new BookListItemDto { Id = Guid.NewGuid(), PrimaryTitle = "Book", ContentType = "Novel", Status = "Reading" }]);
+            [
+                new BookListItemDto
+                {
+                    Id = Guid.NewGuid(), PrimaryTitle = "Book", ContentType = "Novel", Status = "Reading"
+                }
+            ]);
         var mediator = new Mock<IMediator>();
         mediator.Setup(mock => mock.Send(query, It.IsAny<CancellationToken>())).ReturnsAsync(expected);
         var controller = CreateController(mediator.Object);
@@ -109,9 +114,7 @@ public class BookControllerTests
     {
         var expected = new BookImportSessionDto
         {
-            SessionId = Guid.NewGuid(),
-            FileName = "books.csv",
-            Rows = Array.Empty<BookImportRowDto>()
+            SessionId = Guid.NewGuid(), FileName = "books.csv", Rows = Array.Empty<BookImportRowDto>()
         };
         var importService = new Mock<IBookCsvImportService>();
         importService
@@ -132,9 +135,7 @@ public class BookControllerTests
         var sessionId = Guid.NewGuid();
         var expected = new BookImportFinalizeResultDto
         {
-            ImportedCount = 2,
-            SkippedCount = 1,
-            Errors = ["Line 4 skipped"]
+            ImportedCount = 2, SkippedCount = 1, Errors = ["Line 4 skipped"]
         };
         var importService = new Mock<IBookCsvImportService>();
         importService
@@ -173,16 +174,25 @@ public class BookControllerTests
             FileName = "books.csv",
             Rows = [new BookImportRowDto { RowId = rowId, LineNumber = 2, IsValid = true, PrimaryTitle = "Book" }]
         };
-        var request = new UpdateBookImportRowRequest("Book", null, "Novel", "Reading", null, null, null, null, null, null, null, null, null);
+        var request = new UpdateBookImportRowRequest("Book", null, "Novel", "Reading", null, null, null, null, null,
+            null, null, null, null);
         var importService = new Mock<IBookCsvImportService>();
-        importService.Setup(service => service.GetSessionAsync(sessionId, CancellationToken.None)).ReturnsAsync(expected);
-        importService.Setup(service => service.UpdateRowAsync(sessionId, rowId, request, CancellationToken.None)).ReturnsAsync(expected);
-        importService.Setup(service => service.DeleteRowAsync(sessionId, rowId, CancellationToken.None)).ReturnsAsync(expected);
+        importService.Setup(service => service.GetSessionAsync(sessionId, CancellationToken.None))
+            .ReturnsAsync(expected);
+        importService.Setup(service => service.UpdateRowAsync(sessionId, rowId, request, CancellationToken.None))
+            .ReturnsAsync(expected);
+        importService.Setup(service => service.DeleteRowAsync(sessionId, rowId, CancellationToken.None))
+            .ReturnsAsync(expected);
         var controller = CreateController(importService: importService.Object);
 
-        Assert.Same(expected, Assert.IsType<OkObjectResult>(await controller.GetImportSession(sessionId, CancellationToken.None)).Value);
-        Assert.Same(expected, Assert.IsType<OkObjectResult>(await controller.UpdateImportRow(sessionId, rowId, request, CancellationToken.None)).Value);
-        Assert.Same(expected, Assert.IsType<OkObjectResult>(await controller.DeleteImportRow(sessionId, rowId, CancellationToken.None)).Value);
+        Assert.Same(expected,
+            Assert.IsType<OkObjectResult>(await controller.GetImportSession(sessionId, CancellationToken.None)).Value);
+        Assert.Same(expected,
+            Assert.IsType<OkObjectResult>(await controller.UpdateImportRow(sessionId, rowId, request,
+                CancellationToken.None)).Value);
+        Assert.Same(expected,
+            Assert.IsType<OkObjectResult>(await controller.DeleteImportRow(sessionId, rowId, CancellationToken.None))
+                .Value);
     }
 
     [Fact]
@@ -273,14 +283,19 @@ public class BookControllerTests
         var bookId = Guid.NewGuid();
         var expected = Cover("Found");
         var mediator = new Mock<IMediator>();
-        mediator.Setup(mock => mock.Send(new SetBookCoverFromUrlCommand(bookId, "https://example.com/cover.jpg"), It.IsAny<CancellationToken>())).ReturnsAsync(expected);
-        mediator.Setup(mock => mock.Send(new RefreshBookCoverCommand(bookId), It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+        mediator.Setup(mock => mock.Send(new SetBookCoverFromUrlCommand(bookId, "https://example.com/cover.jpg"),
+            It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+        mediator.Setup(mock => mock.Send(new RefreshBookCoverCommand(bookId), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
         var controller = CreateController(mediator.Object);
 
-        Assert.Same(expected, Assert.IsType<OkObjectResult>(await controller.SetCoverFromUrl(bookId, new SetBookCoverFromUrlRequest("https://example.com/cover.jpg"))).Value);
+        Assert.Same(expected,
+            Assert.IsType<OkObjectResult>(await controller.SetCoverFromUrl(bookId,
+                new SetBookCoverFromUrlRequest("https://example.com/cover.jpg"))).Value);
         Assert.Same(expected, Assert.IsType<AcceptedResult>(await controller.RefreshCover(bookId)).Value);
         Assert.IsType<NoContentResult>(await controller.DeleteCover(bookId));
-        mediator.Verify(mock => mock.Send(new DeleteBookCoverCommand(bookId), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(new DeleteBookCoverCommand(bookId), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -311,7 +326,8 @@ public class BookControllerTests
         var bookId = Guid.NewGuid();
         var mediator = new Mock<IMediator>();
         mediator
-            .Setup(m => m.Send(It.Is<GetBookCoverThumbnailFileQuery>(q => q.BookId == bookId), It.IsAny<CancellationToken>()))
+            .Setup(m => m.Send(It.Is<GetBookCoverThumbnailFileQuery>(q => q.BookId == bookId),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new BookCoverFileResult(
                 new MemoryStream(Encoding.UTF8.GetBytes("thumb")),
                 "image/jpeg",
@@ -334,13 +350,7 @@ public class BookControllerTests
         var importService = new Mock<IBookCsvImportService>();
         var exportService = new Mock<IBookCsvExportService>();
         var logger = new Mock<ILogger<BookController>>();
-        var firstPage = new PaginatedResult<BookDto>
-        {
-            Skip = 0,
-            Take = 1,
-            Total = 2,
-            Data = [Book("Placeholder")]
-        };
+        var firstPage = new PaginatedResult<BookDto> { Skip = 0, Take = 1, Total = 2, Data = [Book("Placeholder")] };
         var fullPage = new PaginatedResult<BookDto>
         {
             Skip = 0,
@@ -348,8 +358,8 @@ public class BookControllerTests
             Total = 2,
             Data =
             [
-                Book("Alpha, Book", author: "Toika", notes: "Line 1\nLine 2"),
-                Book("Beta", tags: ["favorite", "mystery"]),
+                Book("Alpha, Book", "Toika", notes: "Line 1\nLine 2"),
+                Book("Beta", tags: ["favorite", "mystery"])
             ]
         };
         mediator
@@ -368,8 +378,12 @@ public class BookControllerTests
 
         Assert.Equal("books-export.csv", file.FileDownloadName);
         Assert.Equal("exported,csv\n", csv);
-        mediator.Verify(mock => mock.Send(new GetAllBooksForExportQuery(0, 1, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
-        mediator.Verify(mock => mock.Send(new GetAllBooksForExportQuery(0, 2, "author:Toika", "title", "asc"), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(
+            mock => mock.Send(new GetAllBooksForExportQuery(0, 1, "author:Toika", "title", "asc"),
+                It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(
+            mock => mock.Send(new GetAllBooksForExportQuery(0, 2, "author:Toika", "title", "asc"),
+                It.IsAny<CancellationToken>()), Times.Once);
         exportService.Verify(service => service.Build(fullPage.Data), Times.Once);
     }
 
@@ -379,14 +393,16 @@ public class BookControllerTests
         var mediator = new Mock<IMediator>();
         var exportService = new Mock<IBookCsvExportService>();
         var emptyPage = new PaginatedResult<BookDto> { Skip = 0, Take = 1, Total = 0, Data = [] };
-        mediator.Setup(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(emptyPage);
+        mediator.Setup(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(emptyPage);
         exportService.Setup(service => service.Build(emptyPage.Data)).Returns("headers\n");
         var controller = CreateController(mediator.Object, exportService: exportService.Object);
 
         var result = await controller.ExportBooks(null, null, null);
 
         Assert.Equal("headers\n", Encoding.UTF8.GetString(Assert.IsType<FileContentResult>(result).FileContents));
-        mediator.Verify(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()), Times.Once);
+        mediator.Verify(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]
@@ -404,21 +420,21 @@ public class BookControllerTests
             StatusCounts =
             [
                 new BookSummaryStatusCountDto { Status = "Reading", Count = 2 },
-                new BookSummaryStatusCountDto { Status = "Completed", Count = 1 },
+                new BookSummaryStatusCountDto { Status = "Completed", Count = 1 }
             ],
             TypeCounts =
             [
-                new BookSummaryTypeCountDto { Type = "Novel", BookCount = 3, CurrentChapters = 480 },
+                new BookSummaryTypeCountDto { Type = "Novel", BookCount = 3, CurrentChapters = 480 }
             ],
             GenreCounts =
             [
-                new BookSummaryGenreCountDto { Genre = "Fantasy", BookCount = 2 },
+                new BookSummaryGenreCountDto { Genre = "Fantasy", BookCount = 2 }
             ],
             RatingCounts =
             [
                 new BookSummaryRatingCountDto { Rating = 8, BookCount = 1 },
-                new BookSummaryRatingCountDto { Rating = 9, BookCount = 1 },
-            ],
+                new BookSummaryRatingCountDto { Rating = 9, BookCount = 1 }
+            ]
         };
         var mediator = new Mock<IMediator>();
         mediator
@@ -472,13 +488,15 @@ public class BookControllerTests
         var mediator = new Mock<IMediator>();
         var controller = CreateController(mediator.Object);
 
-        var progress = await controller.UpdateProgress(bookId, new UpdateBookProgressCommand(Guid.Empty, 12, "12", "done"));
+        var progress =
+            await controller.UpdateProgress(bookId, new UpdateBookProgressCommand(Guid.Empty, 12, "12", "done"));
         var delete = await controller.Delete(bookId);
 
         Assert.IsType<NoContentResult>(progress);
         Assert.IsType<NoContentResult>(delete);
         mediator.Verify(mock => mock.Send(
-            It.Is<UpdateBookProgressCommand>(command => command.Id == bookId && command.CurrentChapterNumber == 12 && command.Comment == "done"),
+            It.Is<UpdateBookProgressCommand>(command =>
+                command.Id == bookId && command.CurrentChapterNumber == 12 && command.Comment == "done"),
             It.IsAny<CancellationToken>()), Times.Once);
         mediator.Verify(mock => mock.Send(new DeleteBookCommand(bookId), It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -494,10 +512,7 @@ public class BookControllerTests
             exportService ?? Mock.Of<IBookCsvExportService>(),
             NullLogger<BookController>.Instance)
         {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext()
-            }
+            ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }
         };
     }
 
@@ -507,8 +522,7 @@ public class BookControllerTests
         var stream = new MemoryStream(bytes);
         return new FormFile(stream, 0, bytes.Length, "file", fileName)
         {
-            Headers = new HeaderDictionary(),
-            ContentType = contentType
+            Headers = new HeaderDictionary(), ContentType = contentType
         };
     }
 
@@ -535,18 +549,13 @@ public class BookControllerTests
             Genres = genres?.ToList() ?? [],
             Tags = tags?.ToList() ?? [],
             Links = [],
-            Notes = notes,
+            Notes = notes
         };
     }
 
     private static BookCoverDto Cover(string status)
     {
-        return new BookCoverDto
-        {
-            Id = Guid.NewGuid(),
-            Status = status,
-            MimeType = "image/jpeg"
-        };
+        return new BookCoverDto { Id = Guid.NewGuid(), Status = status, MimeType = "image/jpeg" };
     }
 
     private static CreateBookCommand CreateBookCommand(string title)

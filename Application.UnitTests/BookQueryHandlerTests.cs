@@ -20,7 +20,8 @@ public class BookQueryHandlerTests
         var service = new FakeBookListQueryService();
         var handler = new GetBooksQueryHandler(service, cache, new FakeUser());
 
-        var result = await handler.Handle(new GetAllBooksQuery(0, 10, "title:Cached", "title", "asc"), CancellationToken.None);
+        var result =
+            await handler.Handle(new GetAllBooksQuery(0, 10, "title:Cached", "title", "asc"), CancellationToken.None);
 
         Assert.Same(cached, result);
         Assert.False(service.GetBooksCalled);
@@ -32,13 +33,12 @@ public class BookQueryHandlerTests
         var cache = new FakeBookListCache();
         var service = new FakeBookListQueryService
         {
-            Books = [ListItem("Reading")],
-            Count = 1,
-            NextCycleSortDirection = "Completed"
+            Books = [ListItem("Reading")], Count = 1, NextCycleSortDirection = "Completed"
         };
         var handler = new GetBooksQueryHandler(service, cache, new FakeUser());
 
-        var result = await handler.Handle(new GetAllBooksQuery(0, 10, "status:reading", "status", "Reading", AdvanceCycle: true), CancellationToken.None);
+        var result = await handler.Handle(
+            new GetAllBooksQuery(0, 10, "status:reading", "status", "Reading", true), CancellationToken.None);
 
         Assert.Single(result.Data);
         Assert.Equal("Completed", service.SortDirectionUsed);
@@ -51,12 +51,24 @@ public class BookQueryHandlerTests
     {
         var service = new FakeBookListQueryService
         {
-            AdminBooks = [new AdminBookListItemDto { Id = Guid.NewGuid(), PrimaryTitle = "Admin", ContentType = "Novel", Status = "Reading", OwnerId = OwnerId }],
+            AdminBooks =
+            [
+                new AdminBookListItemDto
+                {
+                    Id = Guid.NewGuid(),
+                    PrimaryTitle = "Admin",
+                    ContentType = "Novel",
+                    Status = "Reading",
+                    OwnerId = OwnerId
+                }
+            ],
             AdminCount = 1
         };
         var handler = new GetAllAdminBooksHandler(service);
 
-        var result = await handler.Handle(new GetAllAdminBooksQuery(5, 10, "status:reading", "title", "asc"), CancellationToken.None);
+        var result =
+            await handler.Handle(new GetAllAdminBooksQuery(5, 10, "status:reading", "title", "asc"),
+                CancellationToken.None);
 
         Assert.Equal(5, result.Skip);
         Assert.Equal(10, result.Take);
@@ -70,7 +82,9 @@ public class BookQueryHandlerTests
         var exportService = new FakeBookExportQueryService();
         var handler = new GetBooksForExportQueryHandler(exportService, new FakeUser());
 
-        var result = await handler.Handle(new GetAllBooksForExportQuery(2, 3, "rating:>=8", "rating", "desc"), CancellationToken.None);
+        var result =
+            await handler.Handle(new GetAllBooksForExportQuery(2, 3, "rating:>=8", "rating", "desc"),
+                CancellationToken.None);
 
         Assert.Equal(OwnerId, exportService.OwnerId);
         Assert.Equal(2, exportService.Skip);
@@ -149,7 +163,8 @@ public class BookQueryHandlerTests
         var service = new FakeBookAnalyticsQueryService();
         var handler = new GetBookAnalyticsHandler(service, new FakeUser());
 
-        var result = await handler.Handle(new GetBookAnalyticsQuery(Query: "rating:none"), CancellationToken.None);
+        var result =
+            await handler.Handle(new GetBookAnalyticsQuery("rating:none"), CancellationToken.None);
 
         Assert.Equal(OwnerId, service.OwnerId);
         Assert.Equal("rating:none", service.Scope!.Query);
@@ -202,10 +217,8 @@ public class BookQueryHandlerTests
     public async Task GetBookAnalytics_ShouldClampFromToAccountCreationDate()
     {
         var service = new FakeBookAnalyticsQueryService();
-        var handler = new GetBookAnalyticsHandler(service, new FakeUser
-        {
-            CreatedAt = DateTimeOffset.Parse("2026-01-10T10:30:00Z")
-        });
+        var handler = new GetBookAnalyticsHandler(service,
+            new FakeUser { CreatedAt = DateTimeOffset.Parse("2026-01-10T10:30:00Z") });
 
         await handler.Handle(new GetBookAnalyticsQuery(
             From: new DateOnly(1900, 1, 1),
@@ -220,10 +233,7 @@ public class BookQueryHandlerTests
     {
         return new BookListItemDto
         {
-            Id = Guid.NewGuid(),
-            PrimaryTitle = title,
-            ContentType = "Novel",
-            Status = "Reading"
+            Id = Guid.NewGuid(), PrimaryTitle = title, ContentType = "Novel", Status = "Reading"
         };
     }
 
@@ -245,12 +255,14 @@ public class BookQueryHandlerTests
         public PaginatedResult<BookListItemDto>? Stored { get; private set; }
         public string? StoredSortDirection { get; private set; }
 
-        public Task<PaginatedResult<BookListItemDto>?> GetBooksAsync(Guid ownerId, int skip, int take, string? query, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        public Task<PaginatedResult<BookListItemDto>?> GetBooksAsync(Guid ownerId, int skip, int take, string? query,
+            string? sortBy, string? sortDirection, CancellationToken cancellationToken)
         {
             return Task.FromResult(Cached);
         }
 
-        public Task SetBooksAsync(Guid ownerId, int skip, int take, string? query, string? sortBy, string? sortDirection, PaginatedResult<BookListItemDto> value, CancellationToken cancellationToken)
+        public Task SetBooksAsync(Guid ownerId, int skip, int take, string? query, string? sortBy,
+            string? sortDirection, PaginatedResult<BookListItemDto> value, CancellationToken cancellationToken)
         {
             Stored = value;
             StoredSortDirection = sortDirection;
@@ -268,17 +280,36 @@ public class BookQueryHandlerTests
         public string? SortDirectionUsed { get; private set; }
         public bool GetBooksCalled { get; private set; }
 
-        public Task<IReadOnlyCollection<BookListItemDto>> GetBooksAsync(Guid ownerId, BookSearchCriteria criteria, int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        public Task<IReadOnlyCollection<BookListItemDto>> GetBooksAsync(Guid ownerId, BookSearchCriteria criteria,
+            int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
         {
             GetBooksCalled = true;
             SortDirectionUsed = sortDirection;
             return Task.FromResult(Books);
         }
 
-        public Task<int> GetBookCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(Count);
-        public Task<IReadOnlyCollection<AdminBookListItemDto>> GetAdminBooksAsync(BookSearchCriteria criteria, int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken) => Task.FromResult(AdminBooks);
-        public Task<int> GetAdminBookCountAsync(BookSearchCriteria criteria, CancellationToken cancellationToken) => Task.FromResult(AdminCount);
-        public Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy, string? currentSortDirection, CancellationToken cancellationToken) => Task.FromResult(NextCycleSortDirection);
+        public Task<int> GetBookCountAsync(Guid ownerId, BookSearchCriteria criteria,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Count);
+        }
+
+        public Task<IReadOnlyCollection<AdminBookListItemDto>> GetAdminBooksAsync(BookSearchCriteria criteria, int skip,
+            int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(AdminBooks);
+        }
+
+        public Task<int> GetAdminBookCountAsync(BookSearchCriteria criteria, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(AdminCount);
+        }
+
+        public Task<string?> GetNextCycleSortDirectionAsync(Guid ownerId, BookSearchCriteria criteria, string sortBy,
+            string? currentSortDirection, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(NextCycleSortDirection);
+        }
     }
 
     private sealed class FakeBookExportQueryService : IBookExportQueryService
@@ -289,14 +320,18 @@ public class BookQueryHandlerTests
         public string? SortBy { get; private set; }
         public string? SortDirection { get; private set; }
 
-        public Task<PaginatedResult<BookDto>> GetBooksForExportAsync(Guid ownerId, BookSearchCriteria criteria, int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
+        public Task<PaginatedResult<BookDto>> GetBooksForExportAsync(Guid ownerId, BookSearchCriteria criteria,
+            int skip, int take, string? sortBy, string? sortDirection, CancellationToken cancellationToken)
         {
             OwnerId = ownerId;
             Skip = skip;
             Take = take;
             SortBy = sortBy;
             SortDirection = sortDirection;
-            return Task.FromResult(PaginatedResult<BookDto>.Create(skip, take, 1, [new BookDto { Id = Guid.NewGuid(), PrimaryTitle = "Export", ContentType = "Novel", Status = "Reading" }]));
+            return Task.FromResult(PaginatedResult<BookDto>.Create(skip, take, 1,
+            [
+                new BookDto { Id = Guid.NewGuid(), PrimaryTitle = "Export", ContentType = "Novel", Status = "Reading" }
+            ]));
         }
     }
 
@@ -336,18 +371,73 @@ public class BookQueryHandlerTests
             _book = book;
         }
 
-        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(_book?.Id == id && _book.OwnerId == ownerId ? _book : null);
-        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(_book?.Id == id ? _book : null);
-        public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
-        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
-        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId, CancellationToken cancellationToken) => Task.FromResult<Book?>(null);
-        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(0);
-        public Task<decimal?> GetTotalChaptersAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.FromResult<decimal?>(null);
-        public Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber, string? currentChapterLabel, string? comment, CancellationToken cancellationToken) => Task.FromResult(false);
-        public Task AddAsync(Book book, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task ReplaceEditableCollectionsAsync(Guid bookId, IEnumerable<BookTitle> titles, IEnumerable<BookLink> links, IEnumerable<Guid> genreIds, IEnumerable<Guid> tagIds, BookProgressHistory? progressHistory, CancellationToken cancellationToken) => Task.CompletedTask;
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_book?.Id == id && _book.OwnerId == ownerId ? _book : null);
+        }
+
+        public Task<Book?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_book?.Id == id ? _book : null);
+        }
+
+        public Task<Book?> GetForUpdateAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Book?>(null);
+        }
+
+        public Task<Book?> GetForUpdateAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Book?>(null);
+        }
+
+        public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Book?>(null);
+        }
+
+        public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
+        }
+
+        public Task<decimal?> GetTotalChaptersAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<decimal?>(null);
+        }
+
+        public Task<bool> UpdateProgressAsync(Guid id, Guid ownerId, decimal? currentChapterNumber,
+            string? currentChapterLabel, string? comment, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(false);
+        }
+
+        public Task AddAsync(Book book, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ReplaceEditableCollectionsAsync(Guid bookId, IEnumerable<BookTitle> titles,
+            IEnumerable<BookLink> links, IEnumerable<Guid> genreIds, IEnumerable<Guid> tagIds,
+            BookProgressHistory? progressHistory, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

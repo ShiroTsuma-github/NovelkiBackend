@@ -15,7 +15,8 @@ public sealed class JikanBookCoverProvider : IBookCoverProvider
     {
         foreach (var title in BookCoverProviderHelpers.EnumerateTitles(book))
         {
-            using var response = await _httpClient.GetAsync($"/v4/manga?q={Uri.EscapeDataString(title)}&limit=5", cancellationToken);
+            using var response =
+                await _httpClient.GetAsync($"/v4/manga?q={Uri.EscapeDataString(title)}&limit=5", cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
@@ -23,7 +24,8 @@ public sealed class JikanBookCoverProvider : IBookCoverProvider
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            if (!document.RootElement.TryGetProperty("data", out var data) || data.ValueKind != JsonValueKind.Array)
+            if (!document.RootElement.TryGetProperty("data", out var data) ||
+                data.ValueKind != JsonValueKind.Array)
             {
                 continue;
             }
@@ -31,7 +33,7 @@ public sealed class JikanBookCoverProvider : IBookCoverProvider
             foreach (var item in data.EnumerateArray())
             {
                 var imageUrl = BookCoverJson.TryGetString(item, "images", "jpg", "large_image_url")
-                    ?? BookCoverJson.TryGetString(item, "images", "jpg", "image_url");
+                               ?? BookCoverJson.TryGetString(item, "images", "jpg", "image_url");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.Jikan, imageUrl);
@@ -41,5 +43,4 @@ public sealed class JikanBookCoverProvider : IBookCoverProvider
 
         return null;
     }
-
 }

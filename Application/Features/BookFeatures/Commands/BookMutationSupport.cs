@@ -33,7 +33,7 @@ internal static class BookMutationSupport
         if (authorId.HasValue)
         {
             return await authorRepository.GetByIdAsync(authorId.Value, cancellationToken)
-                ?? throw new EntityNotFoundException<Author, Guid>(authorId.Value);
+                   ?? throw new EntityNotFoundException<Author, Guid>(authorId.Value);
         }
 
         if (string.IsNullOrWhiteSpace(authorName))
@@ -85,12 +85,7 @@ internal static class BookMutationSupport
                 continue;
             }
 
-            var tag = new Tag
-            {
-                OwnerId = ownerId,
-                Name = name,
-                NormalizedName = normalized
-            };
+            var tag = new Tag { OwnerId = ownerId, Name = name, NormalizedName = normalized };
             await tagRepository.AddAsync(tag, cancellationToken);
             existingTags.Add(tag);
         }
@@ -119,7 +114,8 @@ internal static class BookMutationSupport
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private static IEnumerable<string> EnumerateTitles(string primaryTitle, IEnumerable<BookTitleInput>? alternativeTitles)
+    private static IEnumerable<string> EnumerateTitles(string primaryTitle,
+        IEnumerable<BookTitleInput>? alternativeTitles)
     {
         yield return primaryTitle;
 

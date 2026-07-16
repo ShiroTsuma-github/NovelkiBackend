@@ -11,7 +11,7 @@ public class BookCsvExportServiceTests
         var service = new BookCsvExportService();
 
         var csv = service.Build([
-            Book("Alpha \"Quoted\"", notes: "A,B"),
+            Book("Alpha \"Quoted\"", notes: "A,B")
         ]);
 
         Assert.Contains("\"Alpha \"\"Quoted\"\"\"", csv);
@@ -24,7 +24,7 @@ public class BookCsvExportServiceTests
         var service = new BookCsvExportService();
 
         var csv = service.Build([
-            Book("=HYPERLINK(\"https://evil.example\")", author: "+cmd", tags: ["@tag"], notes: "-payload"),
+            Book("=HYPERLINK(\"https://evil.example\")", "+cmd", ["@tag"], "-payload")
         ]);
 
         Assert.Contains("'=HYPERLINK", csv);
@@ -53,7 +53,7 @@ public class BookCsvExportServiceTests
             Genres = [],
             Tags = tags?.ToList() ?? [],
             Links = [],
-            Notes = notes,
+            Notes = notes
         };
     }
 }

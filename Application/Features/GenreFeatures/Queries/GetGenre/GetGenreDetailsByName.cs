@@ -16,7 +16,7 @@ public class GetGenreDetailsByNameQueryHandler : IRequestHandler<GetGenreDetails
     public async Task<GenreDetailsDto> Handle(GetGenreDetailsByNameQuery request, CancellationToken cancellationToken)
     {
         var genre = await _genreRepository.GetByNameAsync(request.Name, cancellationToken)
-            ?? throw new EntityNotFoundException<Genre, string>(request.Name);
+                    ?? throw new EntityNotFoundException<Genre, string>(request.Name);
 
         return genre.ToDetailsDto();
     }

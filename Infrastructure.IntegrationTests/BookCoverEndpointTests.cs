@@ -84,6 +84,7 @@ public class BookCoverEndpointTests
     private sealed class BookCoverApiFactory : WebApplicationFactory<Program>
     {
         private readonly SqliteConnection _connection = new("DataSource=:memory:");
+
         private readonly ServiceProvider _sqliteServices = new ServiceCollection()
             .AddEntityFrameworkSqlite()
             .BuildServiceProvider();
@@ -127,7 +128,8 @@ public class BookCoverEndpointTests
                 services.AddScoped<IUser, TestUser>();
                 services
                     .AddAuthentication(TestAuthHandler.AuthenticationScheme)
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.AuthenticationScheme, _ => { });
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.AuthenticationScheme,
+                        _ => { });
                 services.Configure<AuthenticationOptions>(options =>
                 {
                     options.DefaultAuthenticateScheme = TestAuthHandler.AuthenticationScheme;
@@ -139,11 +141,9 @@ public class BookCoverEndpointTests
 
         public HttpClient CreateAuthenticatedClient()
         {
-            var client = CreateClient(new WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false
-            });
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
+            var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
             return client;
         }
 
@@ -156,7 +156,8 @@ public class BookCoverEndpointTests
             book.Cover = new BookCover
             {
                 Status = BookCoverStatus.NotFound,
-                FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata."
+                FailureReason =
+                    "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata."
             };
             context.Books.Add(book);
             await context.SaveChangesAsync();
@@ -206,7 +207,8 @@ public class BookCoverEndpointTests
 
     private sealed class FakeRemoteImageService : IBookCoverRemoteImageService
     {
-        public Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+        public Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(new BookCoverStoredFiles(
                 new BookCoverStoredVariant("test/cover.jpg", "image/jpeg", 123, 900, 1350),
@@ -249,8 +251,7 @@ public class BookCoverEndpointTests
         {
             var claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, UserId.ToString()),
-                new Claim(ClaimTypes.Name, "reader"),
+                new Claim(ClaimTypes.NameIdentifier, UserId.ToString()), new Claim(ClaimTypes.Name, "reader"),
                 new Claim(ClaimTypes.Email, "reader@example.com")
             };
             var identity = new ClaimsIdentity(claims, AuthenticationScheme);

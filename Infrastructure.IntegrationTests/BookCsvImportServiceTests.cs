@@ -12,6 +12,9 @@ using System.Text;
 
 namespace Infrastructure.IntegrationTests;
 
+using Contexts;
+using Domain.Models;
+
 public class BookCsvImportServiceTests
 {
     [Fact]
@@ -22,9 +25,9 @@ public class BookCsvImportServiceTests
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType
-Only Title,Novel
-""");
+                                     primaryTitle,contentType
+                                     Only Title,Novel
+                                     """);
 
         var exception = await Assert.ThrowsAsync<ValidationException>(() =>
             service.CreateSessionAsync(stream, "books.csv", CancellationToken.None));
@@ -41,11 +44,11 @@ Only Title,Novel
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,rating,priority,notes
- Existing Book , Toika , Novel , Reading , fantasy; favorite , 10 , 11 , 11 , 0 , one|two
- Existing Book , Toika , Novel , Reading , fantasy , 10 , 5 , 8 , 1 , keep
- New Book , , InvalidType , MissingStatus , , nope , -1 , x , 7 , 
-""");
+                                     primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,rating,priority,notes
+                                      Existing Book , Toika , Novel , Reading , fantasy; favorite , 10 , 11 , 11 , 0 , one|two
+                                      Existing Book , Toika , Novel , Reading , fantasy , 10 , 5 , 8 , 1 , keep
+                                      New Book , , InvalidType , MissingStatus , , nope , -1 , x , 7 , 
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, " import.csv ", CancellationToken.None);
 
@@ -54,23 +57,33 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal(0, session.ValidRows);
         Assert.False(session.CanFinalize);
         Assert.Equal(["Novel", "Manga", "Manhwa", "Manhua", "Other"], session.AvailableContentTypes);
-        Assert.Equal(["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"], session.AvailableStatuses);
+        Assert.Equal(["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"],
+            session.AvailableStatuses);
 
         var existingRows = session.Rows.Where(row => row.PrimaryTitle == "Existing Book").ToList();
         Assert.Equal(2, existingRows.Count);
-        Assert.All(existingRows, row => Assert.Contains("Duplicate title with the same content type inside this import session.", row.Errors));
-        Assert.Contains(existingRows.SelectMany(row => row.Errors), error => error.Contains("already exists in your library."));
+        Assert.All(existingRows,
+            row => Assert.Contains("Duplicate title with the same content type inside this import session.",
+                row.Errors));
+        Assert.Contains(existingRows.SelectMany(row => row.Errors),
+            error => error.Contains("already exists in your library."));
         Assert.Equal("one\ntwo", existingRows[0].Notes);
 
         var invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "New Book");
-        Assert.Contains("Content type is required and must exist. Allowed values: Novel, Manga, Manhwa, Manhua, Other.", invalidRow.Errors);
-        Assert.Contains("Status is required and must exist. Allowed values: Reading, Completed, Plan To Read, On Hold, Dropped, Unknown.", invalidRow.Errors);
+        Assert.Contains("Content type is required and must exist. Allowed values: Novel, Manga, Manhwa, Manhua, Other.",
+            invalidRow.Errors);
+        Assert.Contains(
+            "Status is required and must exist. Allowed values: Reading, Completed, Plan To Read, On Hold, Dropped, Unknown.",
+            invalidRow.Errors);
         Assert.Contains("TotalChapters must be a valid number.", invalidRow.Errors);
         Assert.Contains("Current chapter number cannot be negative.", invalidRow.Errors);
         Assert.Contains("Rating must be a valid integer.", invalidRow.Errors);
         Assert.Contains("Priority must be between 1 and 5.", invalidRow.Errors);
-        Assert.Contains("Content type is required and must exist. Allowed values: Novel, Manga, Manhwa, Manhua, Other.", invalidRow.FieldErrors["contentType"]);
-        Assert.Contains("Status is required and must exist. Allowed values: Reading, Completed, Plan To Read, On Hold, Dropped, Unknown.", invalidRow.FieldErrors["status"]);
+        Assert.Contains("Content type is required and must exist. Allowed values: Novel, Manga, Manhwa, Manhua, Other.",
+            invalidRow.FieldErrors["contentType"]);
+        Assert.Contains(
+            "Status is required and must exist. Allowed values: Reading, Completed, Plan To Read, On Hold, Dropped, Unknown.",
+            invalidRow.FieldErrors["status"]);
         Assert.Contains("TotalChapters must be a valid number.", invalidRow.FieldErrors["totalChapters"]);
         Assert.Contains("Current chapter number cannot be negative.", invalidRow.FieldErrors["currentChapterNumber"]);
         Assert.Contains("Rating must be a valid integer.", invalidRow.FieldErrors["rating"]);
@@ -85,9 +98,9 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status
- ,Novel,Reading
-""");
+                                     primaryTitle,contentType,status
+                                      ,Novel,Reading
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
         var row = Assert.Single(session.Rows);
@@ -104,14 +117,15 @@ primaryTitle,contentType,status
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status
-Book,Invalid,Missing
-""");
+                                     primaryTitle,contentType,status
+                                     Book,Invalid,Missing
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
         Assert.Equal(["Novel", "Manga", "Manhwa", "Manhua", "Other"], session.AvailableContentTypes);
-        Assert.Equal(["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"], session.AvailableStatuses);
+        Assert.Equal(["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"],
+            session.AvailableStatuses);
     }
 
     [Fact]
@@ -122,9 +136,9 @@ Book,Invalid,Missing
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status,totalChapters,currentChapterNumber,rating,priority
-Bad Book,Novel,Reading,10,11,11,0
-""");
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber,rating,priority
+                                     Bad Book,Novel,Reading,10,11,11,0
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
         var row = Assert.Single(session.Rows);
@@ -165,9 +179,9 @@ Bad Book,Novel,Reading,10,11,11,0
         var service = CreateService(context, database.UserId, queue, cacheInvalidator);
 
         using var stream = CreateCsv("""
-primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,currentChapterLabel,rating,priority,description,notes,rawImportedLine
- The Novel , Toika , Novel , Reading , favorite; action; favorite , 200 , 49 , Progress: 49 , 8 , 2 , Desc , line1|line2 , source line
-""");
+                                     primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,currentChapterLabel,rating,priority,description,notes,rawImportedLine
+                                      The Novel , Toika , Novel , Reading , favorite; action; favorite , 200 , 49 , Progress: 49 , 8 , 2 , Desc , line1|line2 , source line
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
@@ -209,15 +223,21 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         Assert.Equal(savedBook.Id, queue.BookIds[0]);
         Assert.Equal("line1\nline2", savedBook.Notes);
 
-        var analytics = await new BookAnalyticsQueryService(context, new BookSearchCriteriaApplier(context)).GetAnalyticsAsync(
-            database.UserId,
-            BookSearchQueryParser.Parse("title:\"The Novel\""),
-            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"The Novel\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), "week"),
-            CancellationToken.None);
+        var analytics =
+            await new BookAnalyticsQueryService(context, new BookSearchCriteriaApplier(context)).GetAnalyticsAsync(
+                database.UserId,
+                BookSearchQueryParser.Parse("title:\"The Novel\""),
+                new BookAnalyticsScopeSnapshot(
+                    "title:\"The Novel\"",
+                    DateOnly.FromDateTime(savedBook.Created.UtcDateTime),
+                    DateOnly.FromDateTime(savedBook.Created.UtcDateTime).AddDays(1),
+                    "week"),
+                CancellationToken.None);
 
-        var authorCompleteness = Assert.Single(analytics.Quality.FieldCompleteness, item => item.Field == "author");
+        var authorCompleteness =
+            Assert.Single(analytics.Quality.FieldCompleteness, item => item.Field == "author");
         Assert.Equal(1, authorCompleteness.BookCount);
-        Assert.Equal(1d, authorCompleteness.ShareOfBooks, precision: 6);
+        Assert.Equal(1d, authorCompleteness.ShareOfBooks, 6);
     }
 
     [Fact]
@@ -228,9 +248,9 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,authorName,contentType,status,tags
- The   Novel , Er    Gen , Novel , Plan   To Read , favorite   tag; action    tag
-""");
+                                     primaryTitle,authorName,contentType,status,tags
+                                      The   Novel , Er    Gen , Novel , Plan   To Read , favorite   tag; action    tag
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
         var row = Assert.Single(session.Rows);
@@ -264,16 +284,18 @@ primaryTitle,authorName,contentType,status,tags
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status
-New Book,Novel,Reading
-Existing Book,Novel,Reading
-""");
+                                     primaryTitle,contentType,status
+                                     New Book,Novel,Reading
+                                     Existing Book,Novel,Reading
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
         var invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "Existing Book");
 
-        var fixedSession = await service.DeleteRowAsync(session.SessionId, invalidRow.RowId, CancellationToken.None);
-        var result = await service.FinalizeAsync(fixedSession.SessionId, CancellationToken.None);
+        var fixedSession =
+            await service.DeleteRowAsync(session.SessionId, invalidRow.RowId, CancellationToken.None);
+        var
+            result = await service.FinalizeAsync(fixedSession.SessionId, CancellationToken.None);
 
         Assert.Equal(1, result.ImportedCount);
         Assert.Equal(0, result.SkippedCount);
@@ -290,9 +312,9 @@ Existing Book,Novel,Reading
         var service = CreateService(context, database.UserId, queue, cacheInvalidator);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status,totalChapters,currentChapterNumber
-Invalid Book,Novel,Reading,10,11
-""");
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber
+                                     Invalid Book,Novel,Reading,10,11
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
@@ -311,14 +333,15 @@ Invalid Book,Novel,Reading,10,11
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status,totalChapters,currentChapterNumber
-Valid Book,Novel,Reading,12,10
-Invalid Book,Novel,Reading,10,11
-""");
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber
+                                     Valid Book,Novel,Reading,12,10
+                                     Invalid Book,Novel,Reading,10,11
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
-        var updatedSession = await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
+        var updatedSession =
+            await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
 
         Assert.Equal(1, updatedSession.TotalRows);
         Assert.Equal(1, updatedSession.ValidRows);
@@ -335,13 +358,14 @@ Invalid Book,Novel,Reading,10,11
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status,totalChapters,currentChapterNumber
-Valid Book,Novel,Reading,12,10
-""");
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber
+                                     Valid Book,Novel,Reading,12,10
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
-        var updatedSession = await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
+        var updatedSession =
+            await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
 
         Assert.Equal(1, updatedSession.TotalRows);
         Assert.Equal(1, updatedSession.ValidRows);
@@ -357,9 +381,9 @@ Valid Book,Novel,Reading,12,10
         var service = CreateService(context, database.UserId);
 
         using var stream = CreateCsv("""
-primaryTitle,contentType,status
-Book,Novel,Reading
-""");
+                                     primaryTitle,contentType,status
+                                     Book,Novel,Reading
+                                     """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
@@ -370,7 +394,7 @@ Book,Novel,Reading
     }
 
     private static BookCsvImportService CreateService(
-        Infrastructure.Contexts.ApplicationDbContext context,
+        ApplicationDbContext context,
         Guid ownerId,
         TrackingBookCoverQueue? queue = null,
         TrackingCacheInvalidator? cacheInvalidator = null)
@@ -385,7 +409,8 @@ Book,Novel,Reading
     private static MemoryStream CreateCsv(string content)
     {
         var normalized = content.Replace("\r\n", "\n", StringComparison.Ordinal);
-        return new MemoryStream(Encoding.UTF8.GetBytes(normalized.Replace("\n", Environment.NewLine, StringComparison.Ordinal)));
+        return new MemoryStream(
+            Encoding.UTF8.GetBytes(normalized.Replace("\n", Environment.NewLine, StringComparison.Ordinal)));
     }
 
     private sealed class TrackingBookCoverQueue : IBookCoverQueue

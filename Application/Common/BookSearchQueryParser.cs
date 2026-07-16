@@ -16,19 +16,20 @@ public static class BookSearchQueryParser
         ["contentType"] = BookSearchField.Type
     };
 
-    private static readonly Dictionary<string, BookSearchNumberField> NumberAliases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["rating"] = BookSearchNumberField.Rating,
-        ["priority"] = BookSearchNumberField.Priority,
-        ["current"] = BookSearchNumberField.CurrentChapter,
-        ["currentChapter"] = BookSearchNumberField.CurrentChapter,
-        ["progress"] = BookSearchNumberField.CurrentChapter,
-        ["chapter"] = BookSearchNumberField.TotalChapters,
-        ["chapters"] = BookSearchNumberField.TotalChapters,
-        ["total"] = BookSearchNumberField.TotalChapters,
-        ["total-chapters"] = BookSearchNumberField.TotalChapters,
-        ["totalChapters"] = BookSearchNumberField.TotalChapters
-    };
+    private static readonly Dictionary<string, BookSearchNumberField> NumberAliases =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["rating"] = BookSearchNumberField.Rating,
+            ["priority"] = BookSearchNumberField.Priority,
+            ["current"] = BookSearchNumberField.CurrentChapter,
+            ["currentChapter"] = BookSearchNumberField.CurrentChapter,
+            ["progress"] = BookSearchNumberField.CurrentChapter,
+            ["chapter"] = BookSearchNumberField.TotalChapters,
+            ["chapters"] = BookSearchNumberField.TotalChapters,
+            ["total"] = BookSearchNumberField.TotalChapters,
+            ["total-chapters"] = BookSearchNumberField.TotalChapters,
+            ["totalChapters"] = BookSearchNumberField.TotalChapters
+        };
 
     private static readonly Dictionary<string, BookSearchDateField> DateAliases = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -41,21 +42,26 @@ public static class BookSearchQueryParser
         ["lastModified"] = BookSearchDateField.LastModified
     };
 
-    private static readonly Dictionary<string, BookSearchMissingField> MissingAliases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["rating"] = BookSearchMissingField.Rating,
-        ["priority"] = BookSearchMissingField.Priority,
-        ["author"] = BookSearchMissingField.Author,
-        ["genre"] = BookSearchMissingField.Genre,
-        ["tag"] = BookSearchMissingField.Tag,
-        ["total"] = BookSearchMissingField.TotalChapters,
-        ["chapter"] = BookSearchMissingField.TotalChapters,
-        ["chapters"] = BookSearchMissingField.TotalChapters,
-        ["total-chapters"] = BookSearchMissingField.TotalChapters,
-        ["totalChapters"] = BookSearchMissingField.TotalChapters,
-        ["cover"] = BookSearchMissingField.Cover,
-        ["link"] = BookSearchMissingField.Link
-    };
+    private static readonly Dictionary<string, BookSearchMissingField> MissingAliases =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["rating"] = BookSearchMissingField.Rating,
+            ["priority"] = BookSearchMissingField.Priority,
+            ["author"] = BookSearchMissingField.Author,
+            ["genre"] = BookSearchMissingField.Genre,
+            ["tag"] = BookSearchMissingField.Tag,
+            ["current"] = BookSearchMissingField.CurrentChapter,
+            ["currentChapter"] = BookSearchMissingField.CurrentChapter,
+            ["progress"] = BookSearchMissingField.CurrentChapter,
+            ["total"] = BookSearchMissingField.TotalChapters,
+            ["chapter"] = BookSearchMissingField.TotalChapters,
+            ["chapters"] = BookSearchMissingField.TotalChapters,
+            ["total-chapters"] = BookSearchMissingField.TotalChapters,
+            ["totalChapters"] = BookSearchMissingField.TotalChapters,
+            ["cover"] = BookSearchMissingField.Cover,
+            ["link"] = BookSearchMissingField.Link,
+            ["links"] = BookSearchMissingField.Link
+        };
 
     private static readonly string[] DateFormats =
     [
@@ -273,14 +279,17 @@ public static class BookSearchQueryParser
         return true;
     }
 
-    private static BookSearchOperator ToOperator(string op) => op switch
+    private static BookSearchOperator ToOperator(string op)
     {
-        ">" => BookSearchOperator.GreaterThan,
-        ">=" => BookSearchOperator.GreaterThanOrEqual,
-        "<" => BookSearchOperator.LessThan,
-        "<=" => BookSearchOperator.LessThanOrEqual,
-        _ => BookSearchOperator.Equal
-    };
+        return op switch
+        {
+            ">" => BookSearchOperator.GreaterThan,
+            ">=" => BookSearchOperator.GreaterThanOrEqual,
+            "<" => BookSearchOperator.LessThan,
+            "<=" => BookSearchOperator.LessThanOrEqual,
+            _ => BookSearchOperator.Equal
+        };
+    }
 
     private static IEnumerable<string> Tokenize(string query)
     {
@@ -451,14 +460,18 @@ public static class BookSearchQueryParser
     {
         return op switch
         {
-            BookSearchOperator.Equal => [
+            BookSearchOperator.Equal =>
+            [
                 new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start),
                 new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)
             ],
-            BookSearchOperator.GreaterThan => [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.EndExclusive)],
-            BookSearchOperator.GreaterThanOrEqual => [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start)],
+            BookSearchOperator.GreaterThan =>
+                [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.EndExclusive)],
+            BookSearchOperator.GreaterThanOrEqual =>
+                [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start)],
             BookSearchOperator.LessThan => [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.Start)],
-            BookSearchOperator.LessThanOrEqual => [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)],
+            BookSearchOperator.LessThanOrEqual =>
+                [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)],
             _ => [new BookSearchDateFilter(field, op, period.Start)]
         };
     }

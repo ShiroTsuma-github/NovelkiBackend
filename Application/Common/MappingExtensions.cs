@@ -2,7 +2,10 @@ namespace Application.Common;
 
 public static partial class MappingExtensions
 {
-    public static string NormalizeName(string value) => CollapseWhitespace(value).ToUpperInvariant();
+    public static string NormalizeName(string value)
+    {
+        return CollapseWhitespace(value).ToUpperInvariant();
+    }
 
     public static string CollapseWhitespace(string value)
     {

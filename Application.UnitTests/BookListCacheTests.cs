@@ -13,7 +13,8 @@ public class BookListCacheTests
     {
         var cache = new BookListCache(new FakeDistributedCache(), NullLogger<BookListCache>.Instance);
 
-        var result = await cache.GetBooksAsync(Guid.NewGuid(), 0, 20, null, null, null, CancellationToken.None);
+        var result =
+            await cache.GetBooksAsync(Guid.NewGuid(), 0, 20, null, null, null, CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -44,8 +45,10 @@ public class BookListCacheTests
             ]
         };
 
-        await cache.SetBooksAsync(ownerId, 0, 20, "  title:lord  ", " LastModified ", " DESC ", expected, CancellationToken.None);
-        var result = await cache.GetBooksAsync(ownerId, 0, 20, "title:lord", "lastmodified", "desc", CancellationToken.None);
+        await cache.SetBooksAsync(ownerId, 0, 20, "  title:lord  ", " LastModified ", " DESC ", expected,
+            CancellationToken.None);
+        var result = await cache.GetBooksAsync(ownerId, 0, 20, "title:lord",
+            "lastmodified", "desc", CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(expected.Total, result.Total);
@@ -61,25 +64,21 @@ public class BookListCacheTests
         var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
         var initial = new PaginatedResult<BookListItemDto>
         {
-            Skip = 0,
-            Take = 20,
-            Total = 1,
-            Data = [CreateBookDto("Old Result")]
+            Skip = 0, Take = 20, Total = 1, Data = [CreateBookDto("Old Result")]
         };
         var refreshed = new PaginatedResult<BookListItemDto>
         {
-            Skip = 0,
-            Take = 20,
-            Total = 1,
-            Data = [CreateBookDto("New Result")]
+            Skip = 0, Take = 20, Total = 1, Data = [CreateBookDto("New Result")]
         };
 
         await cache.SetBooksAsync(ownerId, 0, 20, "query", "title", "asc", initial, CancellationToken.None);
         await cache.InvalidateBooksAsync(ownerId, CancellationToken.None);
 
-        var oldLookup = await cache.GetBooksAsync(ownerId, 0, 20, "query", "title", "asc", CancellationToken.None);
+        var oldLookup =
+            await cache.GetBooksAsync(ownerId, 0, 20, "query", "title", "asc", CancellationToken.None);
         await cache.SetBooksAsync(ownerId, 0, 20, "query", "title", "asc", refreshed, CancellationToken.None);
-        var newLookup = await cache.GetBooksAsync(ownerId, 0, 20, "query", "title", "asc", CancellationToken.None);
+        var newLookup =
+            await cache.GetBooksAsync(ownerId, 0, 20, "query", "title", "asc", CancellationToken.None);
 
         Assert.Null(oldLookup);
         Assert.NotNull(newLookup);
@@ -122,7 +121,8 @@ public class BookListCacheTests
         var expected = PaginatedResult<BookListItemDto>.Create(0, 10, 1, [CreateBookDto("Whitespace")]);
 
         await cache.SetBooksAsync(ownerId, 0, 10, "   ", null, null, expected, CancellationToken.None);
-        var result = await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
+        var result =
+            await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("Whitespace", result.Data[0].PrimaryTitle);
@@ -147,24 +147,53 @@ public class BookListCacheTests
         private readonly Dictionary<string, byte[]> _entries = new(StringComparer.Ordinal);
 
         public IReadOnlyDictionary<string, string> StringEntries =>
-            _entries.ToDictionary(pair => pair.Key, pair => System.Text.Encoding.UTF8.GetString(pair.Value), StringComparer.Ordinal);
+            _entries.ToDictionary(pair => pair.Key, pair => System.Text.Encoding.UTF8.GetString(pair.Value),
+                StringComparer.Ordinal);
 
         public IReadOnlyCollection<string> StringKeys => _entries.Keys.ToArray();
 
-        public byte[]? Get(string key) => _entries.TryGetValue(key, out var value) ? value : null;
-        public Task<byte[]?> GetAsync(string key, CancellationToken token = default) => Task.FromResult(Get(key));
-        public void Refresh(string key) { }
-        public Task RefreshAsync(string key, CancellationToken token = default) => Task.CompletedTask;
-        public void Remove(string key) => _entries.Remove(key);
+        public byte[]? Get(string key)
+        {
+            return _entries.TryGetValue(key, out var value) ? value : null;
+        }
+
+        public Task<byte[]?> GetAsync(string key, CancellationToken token = default)
+        {
+            return Task.FromResult(Get(key));
+        }
+
+        public void Refresh(string key)
+        {
+        }
+
+        public Task RefreshAsync(string key, CancellationToken token = default)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void Remove(string key)
+        {
+            _entries.Remove(key);
+        }
+
         public Task RemoveAsync(string key, CancellationToken token = default)
         {
             _entries.Remove(key);
             return Task.CompletedTask;
         }
 
-        public void Set(string key, byte[] value, DistributedCacheEntryOptions options) => _entries[key] = value;
-        public void SetString(string key, string value) => _entries[key] = System.Text.Encoding.UTF8.GetBytes(value);
-        public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options, CancellationToken token = default)
+        public void Set(string key, byte[] value, DistributedCacheEntryOptions options)
+        {
+            _entries[key] = value;
+        }
+
+        public void SetString(string key, string value)
+        {
+            _entries[key] = System.Text.Encoding.UTF8.GetBytes(value);
+        }
+
+        public Task SetAsync(string key, byte[] value, DistributedCacheEntryOptions options,
+            CancellationToken token = default)
         {
             _entries[key] = value;
             return Task.CompletedTask;

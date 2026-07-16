@@ -14,6 +14,8 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructure.IntegrationTests;
 
+using Domain.Entities;
+
 public class IdentityServiceTests
 {
     [Fact]
@@ -22,14 +24,18 @@ public class IdentityServiceTests
         using var host = new IdentityTestHost();
         var service = host.GetRequiredService<IdentityService>();
 
-        var created = await service.RegisterUser(new RegisterDto("new-reader", "new-reader@example.com", "Strong1!"), CancellationToken.None);
+        var created =
+            await service.RegisterUser(new RegisterDto("new-reader", "new-reader@example.com", "Strong1!"),
+                CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, created.Id);
         Assert.Equal("new-reader", created.Name);
         await Assert.ThrowsAsync<UsernameTakenException>(() =>
-            service.RegisterUser(new RegisterDto("new-reader", "other@example.com", "Strong1!"), CancellationToken.None));
+            service.RegisterUser(new RegisterDto("new-reader", "other@example.com", "Strong1!"),
+                CancellationToken.None));
         await Assert.ThrowsAsync<EmailInUseException>(() =>
-            service.RegisterUser(new RegisterDto("other-reader", "new-reader@example.com", "Strong1!"), CancellationToken.None));
+            service.RegisterUser(new RegisterDto("other-reader", "new-reader@example.com", "Strong1!"),
+                CancellationToken.None));
     }
 
     [Fact]
@@ -49,9 +55,11 @@ public class IdentityServiceTests
     {
         using var host = new IdentityTestHost();
         var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("login-reader", "login@example.com", "Strong1!"), CancellationToken.None);
+        await service.RegisterUser(new RegisterDto("login-reader", "login@example.com", "Strong1!"),
+            CancellationToken.None);
 
-        var response = await service.LoginUser(new LoginDto("login-reader", null, "Strong1!"), CancellationToken.None);
+        var response =
+            await service.LoginUser(new LoginDto("login-reader", null, "Strong1!"), CancellationToken.None);
 
         Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(response.RefreshToken));
@@ -65,7 +73,8 @@ public class IdentityServiceTests
     {
         using var host = new IdentityTestHost();
         var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("password-reader", "password@example.com", "Strong1!"), CancellationToken.None);
+        await service.RegisterUser(new RegisterDto("password-reader", "password@example.com", "Strong1!"),
+            CancellationToken.None);
 
         await Assert.ThrowsAsync<EntityNotFoundException<User, string>>(() =>
             service.LoginUser(new LoginDto("missing-reader", null, "Strong1!"), CancellationToken.None));
@@ -78,8 +87,10 @@ public class IdentityServiceTests
     {
         using var host = new IdentityTestHost();
         var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("refresh-reader", "refresh@example.com", "Strong1!"), CancellationToken.None);
-        var login = await service.LoginUser(new LoginDto(null, "refresh@example.com", "Strong1!"), CancellationToken.None);
+        await service.RegisterUser(new RegisterDto("refresh-reader", "refresh@example.com", "Strong1!"),
+            CancellationToken.None);
+        var login = await service.LoginUser(new LoginDto(null, "refresh@example.com", "Strong1!"),
+            CancellationToken.None);
 
         var refreshed = await service.RefreshTokenAsync(login.RefreshToken, CancellationToken.None);
 
@@ -87,8 +98,8 @@ public class IdentityServiceTests
         Assert.False(string.IsNullOrWhiteSpace(refreshed.AccessToken));
         await using var context = host.CreateContext();
         var tokens = (await context.RefreshTokens
-            .Where(token => token.UserId == login.UserId)
-            .ToListAsync())
+                .Where(token => token.UserId == login.UserId)
+                .ToListAsync())
             .OrderBy(token => token.Created)
             .ToList();
         Assert.Equal(2, tokens.Count);
@@ -102,8 +113,10 @@ public class IdentityServiceTests
     {
         using var host = new IdentityTestHost();
         var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("expired-reader", "expired@example.com", "Strong1!"), CancellationToken.None);
-        var login = await service.LoginUser(new LoginDto("expired-reader", null, "Strong1!"), CancellationToken.None);
+        await service.RegisterUser(new RegisterDto("expired-reader", "expired@example.com", "Strong1!"),
+            CancellationToken.None);
+        var login =
+            await service.LoginUser(new LoginDto("expired-reader", null, "Strong1!"), CancellationToken.None);
         await using (var context = host.CreateContext())
         {
             var stored = await context.RefreshTokens.SingleAsync(token => token.UserId == login.UserId);
@@ -125,8 +138,10 @@ public class IdentityServiceTests
     {
         using var host = new IdentityTestHost();
         var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("logout-reader", "logout@example.com", "Strong1!"), CancellationToken.None);
-        var login = await service.LoginUser(new LoginDto("logout-reader", null, "Strong1!"), CancellationToken.None);
+        await service.RegisterUser(new RegisterDto("logout-reader", "logout@example.com", "Strong1!"),
+            CancellationToken.None);
+        var login =
+            await service.LoginUser(new LoginDto("logout-reader", null, "Strong1!"), CancellationToken.None);
 
         await service.RevokeRefreshTokenAsync(null, CancellationToken.None);
         await service.RevokeRefreshTokenAsync(login.RefreshToken, CancellationToken.None);

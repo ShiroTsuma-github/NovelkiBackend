@@ -83,7 +83,8 @@ internal static class BookCoverMutationSupport
             await storage.DeleteIfExistsAsync(change.PreviousStoragePath, cancellationToken);
         }
 
-        if (!string.Equals(change.PreviousThumbnailStoragePath, stored.Thumbnail.StoragePath, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(change.PreviousThumbnailStoragePath, stored.Thumbnail.StoragePath,
+                StringComparison.OrdinalIgnoreCase))
         {
             await storage.DeleteIfExistsAsync(change.PreviousThumbnailStoragePath, cancellationToken);
         }

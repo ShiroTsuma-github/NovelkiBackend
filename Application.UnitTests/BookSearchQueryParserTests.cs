@@ -8,13 +8,19 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldReadTermsFieldsQuotedValuesAndNumbers()
     {
-        var criteria = BookSearchQueryParser.Parse("martial title:\"Lord of Mysteries\" tag:favorite rating>=8 current<120");
+        var criteria =
+            BookSearchQueryParser.Parse("martial title:\"Lord of Mysteries\" tag:favorite rating>=8 current<120");
 
         Assert.Equal(new[] { "martial" }, criteria.Terms);
-        Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Title && f.Values.SequenceEqual(["Lord of Mysteries"]));
+        Assert.Contains(criteria.Fields,
+            f => f.Field == BookSearchField.Title && f.Values.SequenceEqual(["Lord of Mysteries"]));
         Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Tag && f.Values.SequenceEqual(["favorite"]));
-        Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.GreaterThanOrEqual && f.Value == 8);
-        Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.CurrentChapter && f.Operator == BookSearchOperator.LessThan && f.Value == 120);
+        Assert.Contains(criteria.Numbers,
+            f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.GreaterThanOrEqual &&
+                 f.Value == 8);
+        Assert.Contains(criteria.Numbers,
+            f => f.Field == BookSearchNumberField.CurrentChapter && f.Operator == BookSearchOperator.LessThan &&
+                 f.Value == 120);
     }
 
     [Fact]
@@ -29,10 +35,13 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldReadMultipleValuesInSingleFieldFilter()
     {
-        var criteria = BookSearchQueryParser.Parse("genre:fantasy,\"slice of life\" tag:\"to read soon\",favorite");
+        var criteria =
+            BookSearchQueryParser.Parse("genre:fantasy,\"slice of life\" tag:\"to read soon\",favorite");
 
-        Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Genre && f.Values.SequenceEqual(["fantasy", "slice of life"]));
-        Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Tag && f.Values.SequenceEqual(["to read soon", "favorite"]));
+        Assert.Contains(criteria.Fields,
+            f => f.Field == BookSearchField.Genre && f.Values.SequenceEqual(["fantasy", "slice of life"]));
+        Assert.Contains(criteria.Fields,
+            f => f.Field == BookSearchField.Tag && f.Values.SequenceEqual(["to read soon", "favorite"]));
     }
 
     [Fact]
@@ -40,8 +49,10 @@ public class BookSearchQueryParserTests
     {
         var criteria = BookSearchQueryParser.Parse("rating:8 priority:2");
 
-        Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.Equal && f.Value == 8);
-        Assert.Contains(criteria.Numbers, f => f.Field == BookSearchNumberField.Priority && f.Operator == BookSearchOperator.Equal && f.Value == 2);
+        Assert.Contains(criteria.Numbers,
+            f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.Equal && f.Value == 8);
+        Assert.Contains(criteria.Numbers,
+            f => f.Field == BookSearchNumberField.Priority && f.Operator == BookSearchOperator.Equal && f.Value == 2);
         Assert.Empty(criteria.Fields);
     }
 
@@ -97,9 +108,13 @@ public class BookSearchQueryParserTests
     [InlineData("author:'none'", BookSearchMissingField.Author)]
     [InlineData("genre:none", BookSearchMissingField.Genre)]
     [InlineData("tag:none", BookSearchMissingField.Tag)]
+    [InlineData("current:none", BookSearchMissingField.CurrentChapter)]
+    [InlineData("currentChapter:none", BookSearchMissingField.CurrentChapter)]
+    [InlineData("progress:none", BookSearchMissingField.CurrentChapter)]
     [InlineData("total:none", BookSearchMissingField.TotalChapters)]
     [InlineData("cover:none", BookSearchMissingField.Cover)]
     [InlineData("link:none", BookSearchMissingField.Link)]
+    [InlineData("links:none", BookSearchMissingField.Link)]
     public void Parse_ShouldReadMissingValueFilters(string query, BookSearchMissingField expectedField)
     {
         var criteria = BookSearchQueryParser.Parse(query);
@@ -112,8 +127,10 @@ public class BookSearchQueryParserTests
     }
 
     [Theory]
-    [InlineData("createDate:>2026-07-15", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7, 16)]
-    [InlineData("createDate:>=15.07.2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7, 15)]
+    [InlineData("createDate:>2026-07-15", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7,
+        16)]
+    [InlineData("createDate:>=15.07.2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7,
+        15)]
     [InlineData("updateDate:<15/07/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 15)]
     [InlineData("lastModified:<=5/7/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 6)]
     public void Parse_ShouldReadDateFiltersWithSupportedDateFormats(
@@ -213,7 +230,8 @@ public class BookSearchQueryParserTests
     [Theory]
     [InlineData("total chapters>=200", BookSearchOperator.GreaterThanOrEqual, 200)]
     [InlineData("total-chapters<200", BookSearchOperator.LessThan, 200)]
-    public void Parse_ShouldAcceptTotalChapterAliasesWithoutColon(string query, BookSearchOperator expectedOperator, decimal expectedValue)
+    public void Parse_ShouldAcceptTotalChapterAliasesWithoutColon(string query, BookSearchOperator expectedOperator,
+        decimal expectedValue)
     {
         var criteria = BookSearchQueryParser.Parse(query);
 

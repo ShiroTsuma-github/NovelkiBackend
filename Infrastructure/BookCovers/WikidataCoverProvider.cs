@@ -20,7 +20,9 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
                         "  ?item wdt:P18 ?image.\n" +
                         "}\n" +
                         "LIMIT 1";
-            using var response = await _httpClient.GetAsync($"/sparql?format=json&query={Uri.EscapeDataString(query)}", cancellationToken);
+            using var response =
+                await _httpClient.GetAsync($"/sparql?format=json&query={Uri.EscapeDataString(query)}",
+                    cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
@@ -51,5 +53,4 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
     {
         return value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal);
     }
-
 }

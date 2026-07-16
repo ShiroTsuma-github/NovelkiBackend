@@ -4,6 +4,9 @@ using System.Text.Json;
 
 public sealed class GoogleBooksCoverProvider : IBookCoverProvider
 {
+    private const string VolumeInfoProperty = "volumeInfo";
+    private const string ImageLinksProperty = "imageLinks";
+
     private readonly HttpClient _httpClient;
 
     public GoogleBooksCoverProvider(HttpClient httpClient)
@@ -15,7 +18,9 @@ public sealed class GoogleBooksCoverProvider : IBookCoverProvider
     {
         foreach (var title in BookCoverProviderHelpers.EnumerateTitles(book))
         {
-            using var response = await _httpClient.GetAsync($"/books/v1/volumes?q={Uri.EscapeDataString($"intitle:{title}")}&maxResults=5&projection=lite", cancellationToken);
+            using var response = await _httpClient.GetAsync(
+                $"/books/v1/volumes?q={Uri.EscapeDataString($"intitle:{title}")}&maxResults=5&projection=lite",
+                cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
@@ -23,27 +28,29 @@ public sealed class GoogleBooksCoverProvider : IBookCoverProvider
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            if (!document.RootElement.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+            if (!document.RootElement.TryGetProperty("items", out var items) ||
+                items.ValueKind != JsonValueKind.Array)
             {
                 continue;
             }
 
             foreach (var item in items.EnumerateArray())
             {
-                var imageUrl = BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "extraLarge")
-                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "large")
-                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "medium")
-                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "small")
-                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "thumbnail")
-                    ?? BookCoverJson.TryGetString(item, "volumeInfo", "imageLinks", "smallThumbnail");
+                var imageUrl = BookCoverJson.TryGetString(item, VolumeInfoProperty, ImageLinksProperty, "extraLarge")
+                               ?? BookCoverJson.TryGetString(item, VolumeInfoProperty, ImageLinksProperty, "large")
+                               ?? BookCoverJson.TryGetString(item, VolumeInfoProperty, ImageLinksProperty, "medium")
+                               ?? BookCoverJson.TryGetString(item, VolumeInfoProperty, ImageLinksProperty, "small")
+                               ?? BookCoverJson.TryGetString(item, VolumeInfoProperty, ImageLinksProperty, "thumbnail")
+                               ?? BookCoverJson.TryGetString(item, VolumeInfoProperty, ImageLinksProperty,
+                                   "smallThumbnail");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
-                    return new BookCoverCandidate(BookCoverSource.GoogleBooks, imageUrl.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase));
+                    return new BookCoverCandidate(BookCoverSource.GoogleBooks,
+                        imageUrl.Replace("http://", "https://", StringComparison.OrdinalIgnoreCase));
                 }
             }
         }
 
         return null;
     }
-
 }

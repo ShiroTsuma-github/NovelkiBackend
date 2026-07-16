@@ -16,7 +16,7 @@ public class GetGenreQueryHandler : IRequestHandler<GetGenreQuery, GenreDto>
     public async Task<GenreDto> Handle(GetGenreQuery request, CancellationToken cancellationToken)
     {
         var genre = await _genreRepository.GetByIdAsync(request.Id, cancellationToken)
-            ?? throw new EntityNotFoundException<Genre, Guid>(request.Id);
+                    ?? throw new EntityNotFoundException<Genre, Guid>(request.Id);
 
         return genre.ToDto();
     }

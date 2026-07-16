@@ -34,7 +34,8 @@ public class BookCoverRepository : IBookCoverRepository
             .ThenInclude(b => b.Titles)
             .Include(c => c.Book)
             .ThenInclude(b => b.Links)
-            .Where(c => c.Status == BookCoverStatus.Pending && (c.LastAttemptAt == null || c.LastAttemptAt < retryBefore))
+            .Where(c => c.Status == BookCoverStatus.Pending &&
+                        (c.LastAttemptAt == null || c.LastAttemptAt < retryBefore))
             .OrderBy(c => c.Created)
             .Take(take)
             .ToListAsync(cancellationToken);

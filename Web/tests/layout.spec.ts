@@ -136,10 +136,68 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
   await expectFitsViewportWidth(page.getByText('Additional').locator('xpath=ancestor::section[1]'))
 })
 
+test('csv import invalid rows panel keeps usable height in the browser layout', async ({ page }) => {
+  await page.goto('/books')
+  await page.getByRole('button', { name: /import csv/i }).click()
+  await page.locator('input[type="file"]').setInputFiles({
+    name: 'invalid-books.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('primaryTitle,contentType,status\nBroken,Wrong,Reading\n'),
+  })
+
+  const invalidRowsPanel = page.getByTestId('import-invalid-rows-panel')
+  await expect(invalidRowsPanel).toBeVisible()
+
+  const viewport = page.viewportSize()
+  expect(viewport).not.toBeNull()
+
+  const panelBox = await requiredBox(invalidRowsPanel)
+  expect(panelBox.height).toBeGreaterThan(viewport!.height * 0.3)
+  expect(panelBox.height).toBeGreaterThan(180)
+
+  const dialogBox = await requiredBox(page.getByTestId('import-dialog-panel'))
+  expect(dialogBox.height).toBeLessThanOrEqual(viewport!.height - 8)
+  await expectNoVerticalDocumentOverflow(page)
+
+  if (viewport!.width >= 1024) {
+    await page.getByRole('button', { name: /edit row/i }).first().click()
+    const updatedPanelBox = await requiredBox(invalidRowsPanel)
+    const notesBox = await requiredBox(page.getByLabel('Notes'))
+
+    expect(notesBox.y).toBeGreaterThanOrEqual(updatedPanelBox.y)
+    expect(notesBox.y + notesBox.height).toBeLessThanOrEqual(updatedPanelBox.y + updatedPanelBox.height)
+
+    await page.getByRole('button', { name: /collapse/i }).click()
+    await page.locator('.import-rows-scroll').evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await expect(page.getByTestId('import-row-layout-row-80')).toBeVisible()
+    await page.getByTestId('import-row-layout-row-80').getByRole('button', { name: /edit row/i }).click()
+
+    await expect.poll(async () => {
+      const bottomRowPanelBox = await requiredBox(invalidRowsPanel)
+      const bottomRowNotesBox = await requiredBox(page.getByLabel('Notes'))
+
+      return bottomRowNotesBox.y >= bottomRowPanelBox.y
+        && bottomRowNotesBox.y + bottomRowNotesBox.height <= bottomRowPanelBox.y + bottomRowPanelBox.height
+    }).toBe(true)
+
+    const bottomRowPanelBox = await requiredBox(invalidRowsPanel)
+    const bottomRowNotesBox = await requiredBox(page.getByLabel('Notes'))
+    expect(bottomRowNotesBox.y).toBeGreaterThanOrEqual(bottomRowPanelBox.y)
+    expect(bottomRowNotesBox.y + bottomRowNotesBox.height).toBeLessThanOrEqual(bottomRowPanelBox.y + bottomRowPanelBox.height)
+  }
+})
+
 async function mockApi(page: Page) {
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
     const path = url.pathname.replace('/api/v1/', '')
+
+    if (path === 'book/import/sessions') {
+      await route.fulfill({ json: invalidImportSession })
+      return
+    }
 
     if (path === 'book') {
       await route.fulfill({ json: { skip: 0, take: 20, total: books.length, data: books } })
@@ -167,11 +225,53 @@ async function mockApi(page: Page) {
   })
 }
 
+const invalidImportSession = {
+  sessionId: 'layout-session',
+  fileName: 'invalid-books.csv',
+  totalRows: 80,
+  validRows: 0,
+  invalidRows: 80,
+  canFinalize: false,
+  availableContentTypes: ['Novel', 'Manga'],
+  availableStatuses: ['Reading', 'Completed'],
+  rows: Array.from({ length: 80 }, (_unused, index) => ({
+    rowId: `layout-row-${index + 1}`,
+    lineNumber: index + 2,
+    isValid: false,
+    primaryTitle: `Broken imported title ${index + 1}`,
+    authorName: null,
+    contentType: 'Wrong',
+    status: 'Reading',
+    tags: null,
+    totalChapters: null,
+    currentChapterNumber: null,
+    currentChapterLabel: null,
+    rating: null,
+    priority: null,
+    description: null,
+    notes: null,
+    rawImportedLine: null,
+    errors: ['Content type is required and must exist.'],
+    fieldErrors: {
+      contentType: ['Content type is required and must exist.'],
+    },
+  })),
+}
+
 async function expectNoHorizontalOverflow(page: Page) {
   const hasOverflow = await page.evaluate(() => {
     const root = document.documentElement
     const body = document.body
     return root.scrollWidth > root.clientWidth + 1 || body.scrollWidth > body.clientWidth + 1
+  })
+  expect(hasOverflow).toBe(false)
+}
+
+async function expectNoVerticalDocumentOverflow(page: Page) {
+  const hasOverflow = await page.evaluate(() => {
+    const root = document.documentElement
+    const body = document.body
+    return root.scrollHeight > root.clientHeight + 1 || body.scrollHeight > body.clientHeight + 1
   })
   expect(hasOverflow).toBe(false)
 }
