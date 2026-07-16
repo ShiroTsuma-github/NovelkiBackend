@@ -166,6 +166,26 @@ test('csv import invalid rows panel keeps usable height in the browser layout', 
 
     expect(notesBox.y).toBeGreaterThanOrEqual(updatedPanelBox.y)
     expect(notesBox.y + notesBox.height).toBeLessThanOrEqual(updatedPanelBox.y + updatedPanelBox.height)
+
+    await page.getByRole('button', { name: /collapse/i }).click()
+    await page.locator('.import-rows-scroll').evaluate((element) => {
+      element.scrollTop = element.scrollHeight
+    })
+    await expect(page.getByTestId('import-row-layout-row-80')).toBeVisible()
+    await page.getByTestId('import-row-layout-row-80').getByRole('button', { name: /edit row/i }).click()
+
+    await expect.poll(async () => {
+      const bottomRowPanelBox = await requiredBox(invalidRowsPanel)
+      const bottomRowNotesBox = await requiredBox(page.getByLabel('Notes'))
+
+      return bottomRowNotesBox.y >= bottomRowPanelBox.y
+        && bottomRowNotesBox.y + bottomRowNotesBox.height <= bottomRowPanelBox.y + bottomRowPanelBox.height
+    }).toBe(true)
+
+    const bottomRowPanelBox = await requiredBox(invalidRowsPanel)
+    const bottomRowNotesBox = await requiredBox(page.getByLabel('Notes'))
+    expect(bottomRowNotesBox.y).toBeGreaterThanOrEqual(bottomRowPanelBox.y)
+    expect(bottomRowNotesBox.y + bottomRowNotesBox.height).toBeLessThanOrEqual(bottomRowPanelBox.y + bottomRowPanelBox.height)
   }
 })
 

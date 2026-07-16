@@ -257,7 +257,7 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(2)
+    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: /edit row/i }))
 
     const typeInput = screen.getByLabelText(/^Type/)
@@ -316,7 +316,7 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(2)
+    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(1)
     expect(screen.queryByText('Suggestions: Novel, Manga')).not.toBeInTheDocument()
     expect(screen.queryByText('Suggestions: Reading, Completed')).not.toBeInTheDocument()
   })
