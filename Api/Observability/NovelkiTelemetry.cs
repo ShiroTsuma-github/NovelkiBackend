@@ -5,8 +5,9 @@ using System.Diagnostics.Metrics;
 
 public static class NovelkiTelemetry
 {
-    public const string ActivitySourceName = "NovelkiBackend.Api";
-    public const string MeterName = "NovelkiBackend.Api";
+    public const string ServiceName = "NovelkiBackend.Api";
+    public const string ActivitySourceName = ServiceName;
+    public const string MeterName = ServiceName;
 
     public static readonly ActivitySource ActivitySource = new(ActivitySourceName);
     public static readonly Meter Meter = new(MeterName);

@@ -1,40 +1,43 @@
 namespace Infrastructure.Services;
 
-using Application.Common;
-using Application.Common.DTOs.Book;
-using Application.Common.Interfaces;
-using Domain.Associations;
-using FluentValidation;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.VisualBasic.FileIO;
 using System.Collections.Concurrent;
+using Application.Common.DTOs.Book;
+using FluentValidation;
+using Microsoft.VisualBasic.FileIO;
 
 public sealed class BookCsvImportService : IBookCsvImportService
 {
-    private static readonly string[] RequiredColumns = ["primaryTitle", "contentType", "status"];
+    private const string ImportRowNotFoundMessage = "Import row not found.";
+
+    private static readonly string[] RequiredColumns =
+    [
+        BookCsvColumns.PrimaryTitle,
+        BookCsvColumns.ContentType,
+        BookCsvColumns.Status
+    ];
 
     private static readonly string[] TemplateColumns =
     [
-        "primaryTitle",
-        "authorName",
-        "contentType",
-        "status",
-        "tags",
-        "totalChapters",
-        "currentChapterNumber",
-        "currentChapterLabel",
-        "rating",
-        "priority",
-        "description",
-        "notes",
-        "rawImportedLine"
+        BookCsvColumns.PrimaryTitle,
+        BookCsvColumns.AuthorName,
+        BookCsvColumns.ContentType,
+        BookCsvColumns.Status,
+        BookCsvColumns.Tags,
+        BookCsvColumns.TotalChapters,
+        BookCsvColumns.CurrentChapterNumber,
+        BookCsvColumns.CurrentChapterLabel,
+        BookCsvColumns.Rating,
+        BookCsvColumns.Priority,
+        BookCsvColumns.Description,
+        BookCsvColumns.Notes,
+        BookCsvColumns.RawImportedLine
     ];
 
     private static readonly ConcurrentDictionary<Guid, ImportSession> Sessions = new();
-
-    private readonly ApplicationDbContext _context;
     private readonly IBookCoverQueue _bookCoverQueue;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
+
+    private readonly ApplicationDbContext _context;
     private readonly IUser _user;
 
     public BookCsvImportService(
@@ -67,7 +70,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         if (parser.EndOfData)
         {
-            throw new ValidationException("CSV file is empty.");
+            throw new ValidationException(BookCsvValidationMessages.EmptyFile);
         }
 
         var headers = parser.ReadFields();
@@ -143,7 +146,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
     {
         var session = GetOwnedSession(sessionId);
         var row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
-                  ?? throw new ValidationException("Import row not found.");
+                  ?? throw new ValidationException(ImportRowNotFoundMessage);
 
         BookCsvImportRowMapper.ApplyRequest(row, request);
 
@@ -158,7 +161,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var removed = session.Rows.RemoveAll(item => item.RowId == rowId);
         if (removed == 0)
         {
-            throw new ValidationException("Import row not found.");
+            throw new ValidationException(ImportRowNotFoundMessage);
         }
 
         await RevalidateSessionAsync(session, cancellationToken);
@@ -338,7 +341,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             if (string.IsNullOrWhiteSpace(row.PrimaryTitle))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle", "Primary title is required.");
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.PrimaryTitle,
+                    "Primary title is required.");
             }
 
             var normalizedContentType = string.IsNullOrWhiteSpace(row.ContentType)
@@ -350,37 +354,39 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             if (normalizedContentType == null || !validTypes.Contains(normalizedContentType))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "contentType",
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.ContentType,
                     $"Content type is required and must exist. Allowed values: {string.Join(", ", types.Select(type => type.Name))}.");
             }
 
             if (normalizedStatus == null || !validStatuses.Contains(normalizedStatus))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "status",
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.Status,
                     $"Status is required and must exist. Allowed values: {string.Join(", ", statusNames)}.");
             }
 
             var totalChapters =
-                BookCsvImportRowMapper.ParseDecimal(row, row.TotalChapters, "totalChapters", nameof(row.TotalChapters));
+                BookCsvImportRowMapper.ParseDecimal(row, row.TotalChapters, BookCsvColumns.TotalChapters,
+                    nameof(row.TotalChapters));
             var currentChapterNumber = BookCsvImportRowMapper.ParseDecimal(row, row.CurrentChapterNumber,
-                "currentChapterNumber", nameof(row.CurrentChapterNumber));
-            _ = BookCsvImportRowMapper.ParseInt(row, row.Rating, "rating", nameof(row.Rating), 1, 10);
-            _ = BookCsvImportRowMapper.ParseInt(row, row.Priority, "priority", nameof(row.Priority), 1, 5);
+                BookCsvColumns.CurrentChapterNumber, nameof(row.CurrentChapterNumber));
+            _ = BookCsvImportRowMapper.ParseInt(row, row.Rating, BookCsvColumns.Rating, nameof(row.Rating), 1, 10);
+            _ = BookCsvImportRowMapper.ParseInt(row, row.Priority, BookCsvColumns.Priority, nameof(row.Priority), 1, 5);
 
             if (currentChapterNumber.HasValue && currentChapterNumber < 0)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "currentChapterNumber",
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.CurrentChapterNumber,
                     "Current chapter number cannot be negative.");
             }
 
             if (totalChapters.HasValue && totalChapters < 0)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "totalChapters", "Total chapters cannot be negative.");
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.TotalChapters,
+                    "Total chapters cannot be negative.");
             }
 
             if (totalChapters.HasValue && currentChapterNumber.HasValue && currentChapterNumber > totalChapters)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "currentChapterNumber",
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.CurrentChapterNumber,
                     "Current chapter number cannot exceed total chapters.");
             }
 
@@ -391,7 +397,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                     MappingExtensions.NormalizeName(row.PrimaryTitle),
                     typeIdsByName[normalizedContentType])))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle",
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.PrimaryTitle,
                     "A book with this title and content type already exists in your library.");
             }
         }
@@ -408,7 +414,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         {
             foreach (var row in duplicateGroup)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle",
+                BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.PrimaryTitle,
                     "Duplicate title with the same content type inside this import session.");
             }
         }

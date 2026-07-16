@@ -117,7 +117,7 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
             .Must(x => currentChapterNumberValue(x) <= totalChaptersValue(x))
             .When(x => currentChapterNumberValue(x).HasValue && totalChaptersValue(x).HasValue)
             .WithName("CurrentChapterNumber")
-            .WithMessage("Current chapter cannot be greater than total chapters.");
+            .WithMessage(BookValidationMessages.CurrentChapterCannotExceedTotal);
 
         RuleFor(currentChapterLabel)
             .MaximumLength(100);

@@ -2,8 +2,10 @@ namespace Domain.Exceptions;
 
 public class IdentityOperationFailedException : Exception
 {
+    public const string DefaultMessage = "Identity operation failed.";
+
     public IdentityOperationFailedException(IEnumerable<string> errors)
-        : base("Identity operation failed.")
+        : base(DefaultMessage)
     {
         Errors = errors.ToArray();
     }

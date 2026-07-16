@@ -17,11 +17,21 @@ using System.Text;
 
 public static class DependencyInjection
 {
+    private const string JwtSection = "Jwt";
+    private const string JwtKey = "Key";
+    private const string JwtIssuer = "Issuer";
+    private const string JwtAudience = "Audience";
+    private const string DatabaseConnectionString = "DB";
+    private const string RedisConnectionString = "Redis";
+    private const string BookCoversSection = "BookCovers";
+    private const string BookCoverS3Section = "BookCovers:S3";
+    private const string DefaultS3Region = "garage";
+
     public static void AddInfrastructureServices(this IHostApplicationBuilder builder)
     {
-        var jwtSettings = builder.Configuration.GetSection("Jwt");
+        var jwtSettings = builder.Configuration.GetSection(JwtSection);
 
-        var keyString = jwtSettings["Key"];
+        var keyString = jwtSettings[JwtKey];
         if (keyString == null)
         {
             throw new ArgumentNullException(nameof(keyString));
@@ -29,8 +39,8 @@ public static class DependencyInjection
 
         var key = Encoding.UTF8.GetBytes(keyString);
 
-        var connectionString = builder.Configuration.GetConnectionString("DB");
-        var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+        var connectionString = builder.Configuration.GetConnectionString(DatabaseConnectionString);
+        var redisConnectionString = builder.Configuration.GetConnectionString(RedisConnectionString);
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseNpgsql(connectionString,
@@ -62,8 +72,8 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBookCsvImportService, BookCsvImportService>();
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 
-        builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
-        var s3Options = builder.Configuration.GetSection("BookCovers:S3").Get<BookCoverS3Options>();
+        builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection(BookCoversSection));
+        var s3Options = builder.Configuration.GetSection(BookCoverS3Section).Get<BookCoverS3Options>();
         if (!string.IsNullOrWhiteSpace(s3Options?.Endpoint) &&
             !string.IsNullOrWhiteSpace(s3Options.AccessKey) &&
             !string.IsNullOrWhiteSpace(s3Options.SecretKey) &&
@@ -76,7 +86,9 @@ public static class DependencyInjection
                 {
                     ServiceURL = s3Options.Endpoint,
                     ForcePathStyle = true,
-                    AuthenticationRegion = string.IsNullOrWhiteSpace(s3Options.Region) ? "garage" : s3Options.Region
+                    AuthenticationRegion = string.IsNullOrWhiteSpace(s3Options.Region)
+                        ? DefaultS3Region
+                        : s3Options.Region
                 };
                 return new AmazonS3Client(credentials, config);
             });
@@ -96,42 +108,42 @@ public static class DependencyInjection
         builder.Services.AddHostedService<BookCoverBackgroundService>();
         builder.Services.AddHttpClient<IBookCoverProvider, BookLinkMetadataCoverProvider>(client =>
         {
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent);
         });
         builder.Services.AddHttpClient<IBookCoverProvider, AniListBookCoverProvider>(client =>
         {
             client.BaseAddress = new Uri("https://graphql.anilist.co");
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent);
         });
         builder.Services.AddHttpClient<IBookCoverProvider, JikanBookCoverProvider>(client =>
         {
             client.BaseAddress = new Uri("https://api.jikan.moe");
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent);
         });
         builder.Services.AddHttpClient<IBookCoverProvider, GoogleBooksCoverProvider>(client =>
         {
             client.BaseAddress = new Uri("https://www.googleapis.com");
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent);
         });
         builder.Services.AddHttpClient<IBookCoverProvider, OpenLibraryCoverProvider>(client =>
         {
             client.BaseAddress = new Uri("https://openlibrary.org");
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent);
         });
         builder.Services.AddHttpClient<IBookCoverProvider, WikidataCoverProvider>(client =>
         {
             client.BaseAddress = new Uri("https://query.wikidata.org");
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent);
         });
-        builder.Services.AddHttpClient("BookCoverImages",
-                client => { client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0"); })
+        builder.Services.AddHttpClient(BookCoverHttpClients.Images,
+                client => { client.DefaultRequestHeaders.UserAgent.ParseAdd(BookCoverOptions.DefaultUserAgent); })
             .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IUser, CurrentUser>();
 
         builder.Services.Configure<JwtSettings>(
-            builder.Configuration.GetSection("Jwt"));
+            builder.Configuration.GetSection(JwtSection));
         builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
         builder.Services.AddScoped<IIdentityService, IdentityService>();
@@ -160,8 +172,8 @@ public static class DependencyInjection
                     ValidateAudience = true,
                     ValidateLifetime = true,
                     ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtSettings["Issuer"],
-                    ValidAudience = jwtSettings["Audience"],
+                    ValidIssuer = jwtSettings[JwtIssuer],
+                    ValidAudience = jwtSettings[JwtAudience],
                     IssuerSigningKey = new SymmetricSecurityKey(key),
                     ClockSkew = TimeSpan.Zero
                 };

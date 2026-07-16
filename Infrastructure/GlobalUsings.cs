@@ -1,4 +1,5 @@
 ﻿global using Application.Common.Interfaces;
+global using Application.Common;
 global using Domain.Entities;
 global using Infrastructure.Contexts;
 global using Microsoft.EntityFrameworkCore;

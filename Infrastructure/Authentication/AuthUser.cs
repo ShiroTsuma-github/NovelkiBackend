@@ -16,6 +16,5 @@ public class AuthUser : IUser
 
     public bool Valid { get; set; }
 
-    public Guid RequiredId => Id ?? throw new UnauthorizedAccessException(
-        "Attempted to access required user ID when the user was not logged in or the claim was missing.");
+    public Guid RequiredId => Id ?? throw new UnauthorizedAccessException(UserErrorMessages.RequiredIdUnavailable);
 }

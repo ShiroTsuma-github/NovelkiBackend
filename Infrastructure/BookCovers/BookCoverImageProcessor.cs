@@ -1,7 +1,8 @@
 namespace Infrastructure.BookCovers;
 
+using FluentValidation;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 
@@ -28,7 +29,7 @@ internal static class BookCoverImageProcessor
         var format = Image.DetectFormat(input.Bytes);
         if (format == null || !AllowedFormats.Contains(format.Name))
         {
-            throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");
+            throw new ValidationException(BookCoverValidationMessages.UnsupportedImageFormat);
         }
 
         try
@@ -43,11 +44,11 @@ internal static class BookCoverImageProcessor
         }
         catch (UnknownImageFormatException)
         {
-            throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");
+            throw new ValidationException(BookCoverValidationMessages.UnsupportedImageFormat);
         }
         catch (InvalidImageContentException)
         {
-            throw new FluentValidation.ValidationException("Cover file must be a valid image.");
+            throw new ValidationException("Cover file must be a valid image.");
         }
     }
 
@@ -59,10 +60,11 @@ internal static class BookCoverImageProcessor
     {
         using var prepared = RenderOnWhiteBackground(source, targetWidth);
         await using var output = new MemoryStream();
-        await prepared.SaveAsJpegAsync(output, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality = quality },
+        await prepared.SaveAsJpegAsync(output, new JpegEncoder { Quality = quality },
             cancellationToken);
 
-        return new BookCoverStoredVariantContent(output.ToArray(), "image/jpeg", prepared.Width, prepared.Height);
+        return new BookCoverStoredVariantContent(output.ToArray(), BookCoverMediaTypes.Jpeg, prepared.Width,
+            prepared.Height);
     }
 
     private static Image<Rgb24> RenderOnWhiteBackground(Image<Rgba32> source, int targetWidth)

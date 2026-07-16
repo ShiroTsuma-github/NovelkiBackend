@@ -1,28 +1,28 @@
 namespace Application.Common;
 
-using Application.Common.DTOs.Book;
-using Interfaces;
+using DTOs.Book;
 
 public sealed class BookCsvExportService : IBookCsvExportService
 {
+    private static readonly string[] Columns =
+    [
+        BookCsvColumns.PrimaryTitle,
+        BookCsvColumns.Author,
+        BookCsvColumns.ContentType,
+        BookCsvColumns.Status,
+        BookCsvColumns.CurrentChapterNumber,
+        BookCsvColumns.CurrentChapterLabel,
+        BookCsvColumns.TotalChapters,
+        BookCsvColumns.Rating,
+        BookCsvColumns.Priority,
+        BookCsvColumns.Genres,
+        BookCsvColumns.Tags,
+        BookCsvColumns.Notes
+    ];
+
     public string Build(IReadOnlyCollection<BookDto> books)
     {
-        var rows = new List<string>
-        {
-            string.Join(',',
-                "primaryTitle",
-                "author",
-                "contentType",
-                "status",
-                "currentChapterNumber",
-                "currentChapterLabel",
-                "totalChapters",
-                "rating",
-                "priority",
-                "genres",
-                "tags",
-                "notes")
-        };
+        var rows = new List<string> { string.Join(',', Columns) };
 
         rows.AddRange(books.Select(book => string.Join(',',
             Escape(book.PrimaryTitle),
