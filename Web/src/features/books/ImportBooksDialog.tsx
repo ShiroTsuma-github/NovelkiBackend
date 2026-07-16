@@ -380,7 +380,7 @@ function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalize
       </div>
 
       {result.errors.length ? (
-        <Surface as="div" className="grid gap-2 p-4 text-sm" tone="warning">
+        <Surface as="div" className="grid gap-2 p-4 text-sm" tone="danger">
           <div className="font-semibold">Partial import messages</div>
           {result.errors.map((error) => <p key={error}>{error}</p>)}
         </Surface>
@@ -746,7 +746,7 @@ function ImportRowShell({
         </div>
       </div>
 
-      <Surface as="div" className="grid gap-2 p-3 text-sm" tone="warning">
+      <Surface as="div" className="grid gap-2 p-3 text-sm" tone="danger">
         {row.errors.map((error) => <p key={error}>{error}</p>)}
       </Surface>
 

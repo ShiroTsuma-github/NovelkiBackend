@@ -73,8 +73,31 @@ test('books table layout has no horizontal overflow and keeps controls in viewpo
     await expectInViewport(page.getByRole('table'))
   }
 
-  await page.getByRole('button', { name: /columns/i }).click()
-  const popup = page.getByText('Visible columns').locator('..').locator('..')
+  await page.reload()
+  await expect(page.getByRole('table')).toBeVisible()
+  const initialPopupPositions = await page.evaluate(async () => {
+    const button = Array.from(document.querySelectorAll('button'))
+      .find((element) => element.textContent?.trim() === 'Columns')
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error('Expected the Columns button after refresh.')
+    }
+
+    button.click()
+    const positions: Array<{ left: number; top: number }> = []
+    for (let frame = 0; frame < 3; frame += 1) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      const popup = document.querySelector('[data-testid="column-settings-popup"]')
+      if (!(popup instanceof HTMLElement)) {
+        throw new Error('Expected the columns popup to be visible.')
+      }
+      const rect = popup.getBoundingClientRect()
+      positions.push({ left: Math.round(rect.left), top: Math.round(rect.top) })
+    }
+    return positions
+  })
+  expect(new Set(initialPopupPositions.map(({ left, top }) => `${left}:${top}`)).size).toBe(1)
+
+  const popup = page.getByTestId('column-settings-popup')
   await expectInViewport(popup)
   await expectNoHorizontalOverflow(page)
 })
@@ -222,6 +245,9 @@ test('analytics layout exposes chart structure without page overflow', async ({ 
   await page.goto('/analytics')
   await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible()
   await expect(page.getByText('Status by type')).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: 'Unset' })).toHaveCSS('color', 'rgb(154, 165, 180)')
+  await expect(page.getByTestId('priority-heatmap').getByRole('link', { name: '4', exact: true }))
+    .toHaveCSS('color', 'rgb(8, 10, 16)')
 
   await expectNoHorizontalOverflow(page)
   await expectFitsViewportWidth(page.locator('main'))
@@ -231,6 +257,13 @@ test('analytics layout exposes chart structure without page overflow', async ({ 
   const statusByTypeCard = page.getByText('Status by type').locator('xpath=ancestor::section[1]')
   await expectMinHeight(statusByTypeCard, 220)
   await expectInViewport(page.getByRole('button', { name: /date range/i }))
+
+  await page.getByRole('button', { name: /date range/i }).click()
+  const rangeMiddle = page.locator('.analytics-calendar-day--range-middle')
+    .filter({ has: page.locator('.analytics-calendar-day-button') })
+    .first()
+  await expect(rangeMiddle).toHaveCSS('background-color', 'rgb(52, 58, 104)')
+  await expect(rangeMiddle.locator('.analytics-calendar-day-button')).toHaveCSS('color', 'rgb(238, 242, 247)')
 })
 
 test('progress dialog exposes error state through DOM and stays centered', async ({ page }) => {
@@ -271,6 +304,11 @@ test('csv import invalid rows panel keeps usable height in the browser layout', 
 
   const invalidRowsPanel = page.getByTestId('import-invalid-rows-panel')
   await expect(invalidRowsPanel).toBeVisible()
+  const rowErrorSurface = page.getByText('Content type is required and must exist.')
+    .first()
+    .locator('xpath=ancestor::*[contains(@class, "ui-surface")][1]')
+  await expect(rowErrorSurface).toHaveClass(/ui-surface--danger/)
+  await expect(rowErrorSurface).toHaveCSS('background-color', 'rgb(67, 26, 35)')
 
   const viewport = page.viewportSize()
   expect(viewport).not.toBeNull()

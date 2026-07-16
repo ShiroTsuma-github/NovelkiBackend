@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown, RefreshCw, Settings2 } from 'lucide-react'
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { buttonVariants } from '@/components/app/DesignSystem'
 
 const columnPopupWidthPx = 320
@@ -46,7 +46,7 @@ export function ColumnSettingsPopup<T>({
   const buttonRef = useRef<HTMLButtonElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) {
       return
     }
@@ -84,6 +84,21 @@ export function ColumnSettingsPopup<T>({
     }
   }, [open])
 
+  function togglePopup() {
+    if (open) {
+      setOpen(false)
+      return
+    }
+
+    const rect = buttonRef.current?.getBoundingClientRect()
+    if (!rect) {
+      return
+    }
+
+    setPosition(getColumnPopupPosition(rect, window.innerWidth, window.innerHeight))
+    setOpen(true)
+  }
+
   function toggleColumn(id: string) {
     onChange(preferences.map((preference) => (
       preference.id === id ? { ...preference, visible: !preference.visible } : preference
@@ -110,10 +125,12 @@ export function ColumnSettingsPopup<T>({
   return (
     <div className="inline-block text-left" ref={containerRef}>
       <button
+        aria-expanded={open}
+        aria-haspopup="dialog"
         ref={buttonRef}
         className={buttonVariants.ghost}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={togglePopup}
       >
         <Settings2 className="h-4 w-4" />
         Columns
@@ -121,6 +138,8 @@ export function ColumnSettingsPopup<T>({
       {open ? (
         <div
           className="ui-popover fixed grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto p-4 text-left normal-case tracking-normal"
+          data-testid="column-settings-popup"
+          role="dialog"
           style={position}
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">

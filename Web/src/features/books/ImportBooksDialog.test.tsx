@@ -257,7 +257,8 @@ describe('ImportBooksDialog', () => {
       },
     })
 
-    expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(1)
+    const [rowError] = await screen.findAllByText(/Content type is required and must exist\./)
+    expect(rowError.closest('.ui-surface')).toHaveClass('ui-surface--danger')
     fireEvent.click(screen.getByRole('button', { name: /edit row/i }))
 
     const typeInput = screen.getByLabelText(/^Type/)
@@ -445,7 +446,8 @@ describe('ImportBooksDialog', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /finalize import/i }))
 
-    expect(await screen.findByText('Partial import messages')).toBeInTheDocument()
+    const partialMessages = await screen.findByText('Partial import messages')
+    expect(partialMessages.closest('.ui-surface')).toHaveClass('ui-surface--danger')
     expect(screen.getByText("Line 3: title 'Existing Book' already exists for content type 'Novel'.")).toBeInTheDocument()
     expect(screen.getByText('Skipped')).toBeInTheDocument()
   })
