@@ -32,12 +32,12 @@ public class ErrorHandlingMiddleware
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/json";
-        var statusCode = HttpStatusCode.InternalServerError;
-        var title = "An unexpected error occurred.";
-        var detail = "Please try again later.";
+        HttpStatusCode statusCode = HttpStatusCode.InternalServerError;
+        string title = "An unexpected error occurred.";
+        string detail = "Please try again later.";
         object? errors = null;
 
-        switch(exception)
+        switch (exception)
         {
             case EntityNotFoundException<User, string>:
                 statusCode = HttpStatusCode.NotFound;
@@ -171,7 +171,9 @@ public class ErrorHandlingMiddleware
                 detail = "An internal server error occurred. Please check the logs.";
                 _logger.LogError(exception, "Server (500) unhandled error: {Message}", exception.Message);
                 break;
-        };
+        }
+
+        ;
 
         context.Response.StatusCode = (int)statusCode;
         var errorResponse = new
@@ -184,7 +186,7 @@ public class ErrorHandlingMiddleware
             errors
         };
 
-        var json = JsonSerializer.Serialize(errorResponse);
+        string json = JsonSerializer.Serialize(errorResponse);
         await context.Response.WriteAsync(json);
     }
 }

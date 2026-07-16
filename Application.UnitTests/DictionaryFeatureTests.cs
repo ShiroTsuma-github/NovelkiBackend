@@ -10,24 +10,38 @@ using Domain.Repositories;
 
 namespace Application.UnitTests;
 
+using Common.DTOs.Status;
+using Common.DTOs.Type;
+using Common.Models;
+
 public class DictionaryFeatureTests
 {
     [Fact]
     public async Task StatusHandlers_ShouldCoverCrudQueriesAndDetails()
     {
         var repository = new FakeStatusRepository();
-        var created = await new CreateStatusCommandHandler(repository)
+        StatusDto created = await new CreateStatusCommandHandler(repository)
             .Handle(new CreateStatusCommand("Paused", "Waiting"), CancellationToken.None);
 
         Assert.Equal("Paused", created.Name);
         await Assert.ThrowsAsync<EntityAlreadyExistsException<Status, Guid>>(() =>
-            new CreateStatusCommandHandler(repository).Handle(new CreateStatusCommand("paused", null), CancellationToken.None));
+            new CreateStatusCommandHandler(repository).Handle(new CreateStatusCommand("paused", null),
+                CancellationToken.None));
 
-        var all = await new GetAllStatusesQueryHandler(repository).Handle(new GetAllStatusesQuery(0, 10), CancellationToken.None);
-        var byId = await new GetStatusQueryHandler(repository).Handle(new GetStatusQuery(created.Id), CancellationToken.None);
-        var byName = await new GetStatusByNameQueryHandler(repository).Handle(new GetStatusByNameQuery("Paused"), CancellationToken.None);
-        var details = await new GetStatusDetailsQueryHandler(repository).Handle(new GetStatusDetailsQuery(created.Id), CancellationToken.None);
-        var detailsByName = await new GetStatusDetailsByNameQueryHandler(repository).Handle(new GetStatusDetailsByNameQuery("Paused"), CancellationToken.None);
+        PaginatedResult<StatusDto> all =
+            await new GetAllStatusesQueryHandler(repository).Handle(new GetAllStatusesQuery(0, 10),
+                CancellationToken.None);
+        StatusDto byId =
+            await new GetStatusQueryHandler(repository).Handle(new GetStatusQuery(created.Id), CancellationToken.None);
+        StatusDto byName =
+            await new GetStatusByNameQueryHandler(repository).Handle(new GetStatusByNameQuery("Paused"),
+                CancellationToken.None);
+        StatusDetailsDto details =
+            await new GetStatusDetailsQueryHandler(repository).Handle(new GetStatusDetailsQuery(created.Id),
+                CancellationToken.None);
+        StatusDetailsDto detailsByName =
+            await new GetStatusDetailsByNameQueryHandler(repository).Handle(new GetStatusDetailsByNameQuery("Paused"),
+                CancellationToken.None);
 
         Assert.Single(all.Data);
         Assert.Equal(created.Id, byId.Id);
@@ -35,11 +49,13 @@ public class DictionaryFeatureTests
         Assert.Equal(created.Id, details.Id);
         Assert.Equal(created.Id, detailsByName.Id);
 
-        var updated = await new UpdateStatusCommandHandler(repository)
-            .Handle(new UpdateStatusCommand { Id = created.Id, Name = "On Hold", Description = "Later" }, CancellationToken.None);
+        StatusDto updated = await new UpdateStatusCommandHandler(repository)
+            .Handle(new UpdateStatusCommand { Id = created.Id, Name = "On Hold", Description = "Later" },
+                CancellationToken.None);
         Assert.Equal("On Hold", updated.Name);
 
-        await new DeleteStatusCommandHandler(repository).Handle(new DeleteStatusCommand(created.Id), CancellationToken.None);
+        await new DeleteStatusCommandHandler(repository).Handle(new DeleteStatusCommand(created.Id),
+            CancellationToken.None);
         Assert.Equal(0, await repository.GetCountAsync(CancellationToken.None));
     }
 
@@ -47,18 +63,27 @@ public class DictionaryFeatureTests
     public async Task TypeHandlers_ShouldCoverCrudQueriesAndDetails()
     {
         var repository = new FakeTypeRepository();
-        var created = await new CreateTypeCommandHandler(repository)
+        TypeDto created = await new CreateTypeCommandHandler(repository)
             .Handle(new CreateTypeCommand("Audio", "Narrated"), CancellationToken.None);
 
         Assert.Equal("Audio", created.Name);
         await Assert.ThrowsAsync<EntityAlreadyExistsException<ContentType, Guid>>(() =>
-            new CreateTypeCommandHandler(repository).Handle(new CreateTypeCommand("audio", null), CancellationToken.None));
+            new CreateTypeCommandHandler(repository).Handle(new CreateTypeCommand("audio", null),
+                CancellationToken.None));
 
-        var all = await new GetAllTypesQueryHandler(repository).Handle(new GetAllTypesQuery(0, 10), CancellationToken.None);
-        var byId = await new GetTypeQueryHandler(repository).Handle(new GetTypeQuery(created.Id), CancellationToken.None);
-        var byName = await new GetTypeByNameQueryHandler(repository).Handle(new GetTypeByNameQuery("Audio"), CancellationToken.None);
-        var details = await new GetTypeDetailsQueryHandler(repository).Handle(new GetTypeDetailsQuery(created.Id), CancellationToken.None);
-        var detailsByName = await new GetTypeDetailsByNameQueryHandler(repository).Handle(new GetTypeDetailsByNameQuery("Audio"), CancellationToken.None);
+        PaginatedResult<TypeDto> all =
+            await new GetAllTypesQueryHandler(repository).Handle(new GetAllTypesQuery(0, 10), CancellationToken.None);
+        TypeDto byId =
+            await new GetTypeQueryHandler(repository).Handle(new GetTypeQuery(created.Id), CancellationToken.None);
+        TypeDto byName =
+            await new GetTypeByNameQueryHandler(repository).Handle(new GetTypeByNameQuery("Audio"),
+                CancellationToken.None);
+        TypeDetailsDto details =
+            await new GetTypeDetailsQueryHandler(repository).Handle(new GetTypeDetailsQuery(created.Id),
+                CancellationToken.None);
+        TypeDetailsDto detailsByName =
+            await new GetTypeDetailsByNameQueryHandler(repository).Handle(new GetTypeDetailsByNameQuery("Audio"),
+                CancellationToken.None);
 
         Assert.Single(all.Data);
         Assert.Equal(created.Id, byId.Id);
@@ -66,11 +91,13 @@ public class DictionaryFeatureTests
         Assert.Equal(created.Id, details.Id);
         Assert.Equal(created.Id, detailsByName.Id);
 
-        var updated = await new UpdateTypeCommandHandler(repository)
-            .Handle(new UpdateTypeCommand { Id = created.Id, Name = "Audiobook", Description = "Spoken" }, CancellationToken.None);
+        TypeDto updated = await new UpdateTypeCommandHandler(repository)
+            .Handle(new UpdateTypeCommand { Id = created.Id, Name = "Audiobook", Description = "Spoken" },
+                CancellationToken.None);
         Assert.Equal("Audiobook", updated.Name);
 
-        await new DeleteTypeCommandHandler(repository).Handle(new DeleteTypeCommand(created.Id), CancellationToken.None);
+        await new DeleteTypeCommandHandler(repository).Handle(new DeleteTypeCommand(created.Id),
+            CancellationToken.None);
         Assert.Equal(0, await repository.GetCountAsync(CancellationToken.None));
     }
 
@@ -78,19 +105,38 @@ public class DictionaryFeatureTests
     public void DictionaryValidators_ShouldRejectBlankNames()
     {
         Assert.False(new CreateStatusCommandValidator().Validate(new CreateStatusCommand("", null)).IsValid);
-        Assert.False(new UpdateStatusCommandValidator().Validate(new UpdateStatusCommand { Id = Guid.NewGuid(), Name = "" }).IsValid);
+        Assert.False(new UpdateStatusCommandValidator()
+            .Validate(new UpdateStatusCommand { Id = Guid.NewGuid(), Name = "" }).IsValid);
         Assert.False(new CreateTypeCommandValidator().Validate(new CreateTypeCommand("", null)).IsValid);
-        Assert.False(new UpdateTypeCommandValidator().Validate(new UpdateTypeCommand { Id = Guid.NewGuid(), Name = "" }).IsValid);
+        Assert.False(new UpdateTypeCommandValidator().Validate(new UpdateTypeCommand { Id = Guid.NewGuid(), Name = "" })
+            .IsValid);
     }
 
     private sealed class FakeStatusRepository : IStatusRepository
     {
         private readonly List<Status> _statuses = [];
 
-        public Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(_statuses.FirstOrDefault(status => status.Id == id));
-        public Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(_statuses.FirstOrDefault(status => string.Equals(status.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)));
-        public Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<Status>>(_statuses.Skip(Skip).Take(Take).ToList());
-        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(_statuses.Count);
+        public Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_statuses.FirstOrDefault(status => status.Id == id));
+        }
+
+        public Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_statuses.FirstOrDefault(status =>
+                string.Equals(status.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)));
+        }
+
+        public Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Status>>(_statuses.Skip(Skip).Take(Take).ToList());
+        }
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_statuses.Count);
+        }
+
         public Task AddAsync(Status status, CancellationToken cancellationToken)
         {
             _statuses.Add(status);
@@ -103,17 +149,37 @@ public class DictionaryFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class FakeTypeRepository : ITypeRepository
     {
         private readonly List<ContentType> _types = [];
 
-        public Task<ContentType?> GetByIdAsync(Guid id, CancellationToken cancellationToken) => Task.FromResult(_types.FirstOrDefault(type => type.Id == id));
-        public Task<ContentType?> GetByNameAsync(string name, CancellationToken cancellationToken) => Task.FromResult(_types.FirstOrDefault(type => string.Equals(type.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)));
-        public Task<IEnumerable<ContentType>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken) => Task.FromResult<IEnumerable<ContentType>>(_types.Skip(Skip).Take(Take).ToList());
-        public Task<int> GetCountAsync(CancellationToken cancellationToken) => Task.FromResult(_types.Count);
+        public Task<ContentType?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_types.FirstOrDefault(type => type.Id == id));
+        }
+
+        public Task<ContentType?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_types.FirstOrDefault(type =>
+                string.Equals(type.Name, name.Trim(), StringComparison.OrdinalIgnoreCase)));
+        }
+
+        public Task<IEnumerable<ContentType>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<ContentType>>(_types.Skip(Skip).Take(Take).ToList());
+        }
+
+        public Task<int> GetCountAsync(CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_types.Count);
+        }
+
         public Task AddAsync(ContentType type, CancellationToken cancellationToken)
         {
             _types.Add(type);
@@ -126,6 +192,9 @@ public class DictionaryFeatureTests
             return Task.CompletedTask;
         }
 
-        public Task SaveAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task SaveAsync(CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

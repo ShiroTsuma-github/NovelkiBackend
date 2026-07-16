@@ -17,12 +17,12 @@ public sealed class BookSearchCriteriaApplier
 
     public IQueryable<Book> Apply(IQueryable<Book> query, BookSearchCriteria criteria)
     {
-        foreach (var term in criteria.Terms)
+        foreach (string term in criteria.Terms)
         {
             query = ApplyGeneralTextSearch(query, term);
         }
 
-        foreach (var filter in criteria.Fields)
+        foreach (BookSearchFieldFilter filter in criteria.Fields)
         {
             query = filter.Field switch
             {
@@ -36,7 +36,7 @@ public sealed class BookSearchCriteriaApplier
             };
         }
 
-        foreach (var filter in criteria.Numbers)
+        foreach (BookSearchNumberFilter filter in criteria.Numbers)
         {
             query = filter.Field switch
             {
@@ -48,7 +48,7 @@ public sealed class BookSearchCriteriaApplier
             };
         }
 
-        foreach (var filter in criteria.Dates)
+        foreach (BookSearchDateFilter filter in criteria.Dates)
         {
             query = filter.Field switch
             {
@@ -58,7 +58,7 @@ public sealed class BookSearchCriteriaApplier
             };
         }
 
-        foreach (var filter in criteria.Missing)
+        foreach (BookSearchMissingFilter filter in criteria.Missing)
         {
             query = filter.Field switch
             {
@@ -80,7 +80,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyGeneralTextSearch(IQueryable<Book> query, string term)
     {
-        var authorMatch = PredicateExpression.And<Book>(
+        Expression<Func<Book, bool>> authorMatch = PredicateExpression.And<Book>(
             book => book.Author != null,
             PredicateExpression.Or(
                 _textSearch.Match<Book>(
@@ -93,7 +93,7 @@ public sealed class BookSearchCriteriaApplier
                     name => name.NormalizedName,
                     term)));
 
-        var predicate = PredicateExpression.OrAll(
+        Expression<Func<Book, bool>>? predicate = PredicateExpression.OrAll(
         [
             _textSearch.Match<Book>(
                 book => book.PrimaryTitle,
@@ -112,7 +112,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyTitleSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = searches.Select(search => PredicateExpression.Or(
+        IEnumerable<Expression<Func<Book, bool>>> predicates = searches.Select(search => PredicateExpression.Or(
             _textSearch.Match<Book>(
                 book => book.PrimaryTitle,
                 book => book.NormalizedPrimaryTitle,
@@ -128,7 +128,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyAuthorSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = searches.Select(search => PredicateExpression.And<Book>(
+        IEnumerable<Expression<Func<Book, bool>>> predicates = searches.Select(search => PredicateExpression.And<Book>(
             book => book.Author != null,
             PredicateExpression.Or(
                 _textSearch.Match<Book>(
@@ -146,7 +146,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyTagSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = searches.Select(search =>
+        IEnumerable<Expression<Func<Book, bool>>> predicates = searches.Select(search =>
             _textSearch.AnyMatch<Book, BookTag>(
                 book => book.BookTags,
                 bookTag => bookTag.Tag.Name,
@@ -158,7 +158,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyGenreSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = searches.Select(search =>
+        IEnumerable<Expression<Func<Book, bool>>> predicates = searches.Select(search =>
             _textSearch.AnyMatch<Book, BookGenre>(
                 book => book.BookGenres,
                 bookGenre => bookGenre.Genre.Name,
@@ -170,7 +170,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyStatusSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = searches.Select(search =>
+        IEnumerable<Expression<Func<Book, bool>>> predicates = searches.Select(search =>
             _textSearch.Match<Book>(
                 book => book.Status.Name,
                 book => book.Status.Name.ToUpper(),
@@ -181,7 +181,7 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyTypeSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = searches.Select(search =>
+        IEnumerable<Expression<Func<Book, bool>>> predicates = searches.Select(search =>
             _textSearch.Match<Book>(
                 book => book.ContentType.Name,
                 book => book.ContentType.Name.ToUpper(),
@@ -194,7 +194,7 @@ public sealed class BookSearchCriteriaApplier
         IQueryable<Book> query,
         IEnumerable<Expression<Func<Book, bool>>> predicates)
     {
-        var combined = PredicateExpression.OrAll(predicates);
+        Expression<Func<Book, bool>>? combined = PredicateExpression.OrAll(predicates);
         return combined == null ? query : query.Where(combined);
     }
 
@@ -202,23 +202,31 @@ public sealed class BookSearchCriteriaApplier
     {
         if (!_supportsILike)
         {
-            var sqliteValue = (double)value;
+            double sqliteValue = (double)value;
             return op switch
             {
-                BookSearchOperator.GreaterThan => query.Where(book => book.Rating != null && book.Rating.Value > sqliteValue),
-                BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Rating != null && book.Rating.Value >= sqliteValue),
-                BookSearchOperator.LessThan => query.Where(book => book.Rating != null && book.Rating.Value < sqliteValue),
-                BookSearchOperator.LessThanOrEqual => query.Where(book => book.Rating != null && book.Rating.Value <= sqliteValue),
+                BookSearchOperator.GreaterThan => query.Where(book =>
+                    book.Rating != null && book.Rating.Value > sqliteValue),
+                BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                    book.Rating != null && book.Rating.Value >= sqliteValue),
+                BookSearchOperator.LessThan => query.Where(book =>
+                    book.Rating != null && book.Rating.Value < sqliteValue),
+                BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                    book.Rating != null && book.Rating.Value <= sqliteValue),
                 _ => query.Where(book => book.Rating != null && book.Rating.Value == sqliteValue)
             };
         }
 
         return op switch
         {
-            BookSearchOperator.GreaterThan => query.Where(book => book.Rating != null && (decimal)book.Rating.Value > value),
-            BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Rating != null && (decimal)book.Rating.Value >= value),
-            BookSearchOperator.LessThan => query.Where(book => book.Rating != null && (decimal)book.Rating.Value < value),
-            BookSearchOperator.LessThanOrEqual => query.Where(book => book.Rating != null && (decimal)book.Rating.Value <= value),
+            BookSearchOperator.GreaterThan => query.Where(book =>
+                book.Rating != null && (decimal)book.Rating.Value > value),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                book.Rating != null && (decimal)book.Rating.Value >= value),
+            BookSearchOperator.LessThan =>
+                query.Where(book => book.Rating != null && (decimal)book.Rating.Value < value),
+            BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                book.Rating != null && (decimal)book.Rating.Value <= value),
             _ => query.Where(book => book.Rating != null && (decimal)book.Rating.Value == value)
         };
     }
@@ -227,23 +235,31 @@ public sealed class BookSearchCriteriaApplier
     {
         if (!_supportsILike)
         {
-            var sqliteValue = (double)value;
+            double sqliteValue = (double)value;
             return op switch
             {
-                BookSearchOperator.GreaterThan => query.Where(book => book.Priority != null && book.Priority.Value > sqliteValue),
-                BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Priority != null && book.Priority.Value >= sqliteValue),
-                BookSearchOperator.LessThan => query.Where(book => book.Priority != null && book.Priority.Value < sqliteValue),
-                BookSearchOperator.LessThanOrEqual => query.Where(book => book.Priority != null && book.Priority.Value <= sqliteValue),
+                BookSearchOperator.GreaterThan => query.Where(book =>
+                    book.Priority != null && book.Priority.Value > sqliteValue),
+                BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                    book.Priority != null && book.Priority.Value >= sqliteValue),
+                BookSearchOperator.LessThan => query.Where(book =>
+                    book.Priority != null && book.Priority.Value < sqliteValue),
+                BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                    book.Priority != null && book.Priority.Value <= sqliteValue),
                 _ => query.Where(book => book.Priority != null && book.Priority.Value == sqliteValue)
             };
         }
 
         return op switch
         {
-            BookSearchOperator.GreaterThan => query.Where(book => book.Priority != null && (decimal)book.Priority.Value > value),
-            BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Priority != null && (decimal)book.Priority.Value >= value),
-            BookSearchOperator.LessThan => query.Where(book => book.Priority != null && (decimal)book.Priority.Value < value),
-            BookSearchOperator.LessThanOrEqual => query.Where(book => book.Priority != null && (decimal)book.Priority.Value <= value),
+            BookSearchOperator.GreaterThan => query.Where(book =>
+                book.Priority != null && (decimal)book.Priority.Value > value),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                book.Priority != null && (decimal)book.Priority.Value >= value),
+            BookSearchOperator.LessThan => query.Where(book =>
+                book.Priority != null && (decimal)book.Priority.Value < value),
+            BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                book.Priority != null && (decimal)book.Priority.Value <= value),
             _ => query.Where(book => book.Priority != null && (decimal)book.Priority.Value == value)
         };
     }
@@ -252,10 +268,14 @@ public sealed class BookSearchCriteriaApplier
     {
         return op switch
         {
-            BookSearchOperator.GreaterThan => query.Where(book => book.CurrentChapterNumber != null && book.CurrentChapterNumber > value),
-            BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.CurrentChapterNumber != null && book.CurrentChapterNumber >= value),
-            BookSearchOperator.LessThan => query.Where(book => book.CurrentChapterNumber != null && book.CurrentChapterNumber < value),
-            BookSearchOperator.LessThanOrEqual => query.Where(book => book.CurrentChapterNumber != null && book.CurrentChapterNumber <= value),
+            BookSearchOperator.GreaterThan => query.Where(book =>
+                book.CurrentChapterNumber != null && book.CurrentChapterNumber > value),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                book.CurrentChapterNumber != null && book.CurrentChapterNumber >= value),
+            BookSearchOperator.LessThan => query.Where(book =>
+                book.CurrentChapterNumber != null && book.CurrentChapterNumber < value),
+            BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                book.CurrentChapterNumber != null && book.CurrentChapterNumber <= value),
             _ => query.Where(book => book.CurrentChapterNumber != null && book.CurrentChapterNumber == value)
         };
     }
@@ -264,17 +284,21 @@ public sealed class BookSearchCriteriaApplier
     {
         return op switch
         {
-            BookSearchOperator.GreaterThan => query.Where(book => book.TotalChapters != null && book.TotalChapters > value),
-            BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.TotalChapters != null && book.TotalChapters >= value),
-            BookSearchOperator.LessThan => query.Where(book => book.TotalChapters != null && book.TotalChapters < value),
-            BookSearchOperator.LessThanOrEqual => query.Where(book => book.TotalChapters != null && book.TotalChapters <= value),
+            BookSearchOperator.GreaterThan => query.Where(book =>
+                book.TotalChapters != null && book.TotalChapters > value),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                book.TotalChapters != null && book.TotalChapters >= value),
+            BookSearchOperator.LessThan =>
+                query.Where(book => book.TotalChapters != null && book.TotalChapters < value),
+            BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                book.TotalChapters != null && book.TotalChapters <= value),
             _ => query.Where(book => book.TotalChapters != null && book.TotalChapters == value)
         };
     }
 
     private IQueryable<Book> ApplyCreatedDate(IQueryable<Book> query, BookSearchOperator op, DateOnly value)
     {
-        var (start, nextDay) = ToUtcDateBounds(value);
+        (DateTimeOffset start, DateTimeOffset nextDay) = ToUtcDateBounds(value);
         if (_supportsILike)
         {
             return op switch
@@ -287,21 +311,26 @@ public sealed class BookSearchCriteriaApplier
             };
         }
 
-        var startText = ToSqliteDateTimeOffsetString(start);
-        var nextDayText = ToSqliteDateTimeOffsetString(nextDay);
+        string startText = ToSqliteDateTimeOffsetString(start);
+        string nextDayText = ToSqliteDateTimeOffsetString(nextDay);
         return op switch
         {
-            BookSearchOperator.GreaterThan => query.Where(book => string.Compare(book.Created.ToString(), nextDayText) >= 0),
-            BookSearchOperator.GreaterThanOrEqual => query.Where(book => string.Compare(book.Created.ToString(), startText) >= 0),
+            BookSearchOperator.GreaterThan => query.Where(book =>
+                string.Compare(book.Created.ToString(), nextDayText) >= 0),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                string.Compare(book.Created.ToString(), startText) >= 0),
             BookSearchOperator.LessThan => query.Where(book => string.Compare(book.Created.ToString(), startText) < 0),
-            BookSearchOperator.LessThanOrEqual => query.Where(book => string.Compare(book.Created.ToString(), nextDayText) < 0),
-            _ => query.Where(book => string.Compare(book.Created.ToString(), startText) >= 0 && string.Compare(book.Created.ToString(), nextDayText) < 0)
+            BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                string.Compare(book.Created.ToString(), nextDayText) < 0),
+            _ => query.Where(book =>
+                string.Compare(book.Created.ToString(), startText) >= 0 &&
+                string.Compare(book.Created.ToString(), nextDayText) < 0)
         };
     }
 
     private IQueryable<Book> ApplyLastModifiedDate(IQueryable<Book> query, BookSearchOperator op, DateOnly value)
     {
-        var (start, nextDay) = ToUtcDateBounds(value);
+        (DateTimeOffset start, DateTimeOffset nextDay) = ToUtcDateBounds(value);
         if (_supportsILike)
         {
             return op switch
@@ -314,15 +343,21 @@ public sealed class BookSearchCriteriaApplier
             };
         }
 
-        var startText = ToSqliteDateTimeOffsetString(start);
-        var nextDayText = ToSqliteDateTimeOffsetString(nextDay);
+        string startText = ToSqliteDateTimeOffsetString(start);
+        string nextDayText = ToSqliteDateTimeOffsetString(nextDay);
         return op switch
         {
-            BookSearchOperator.GreaterThan => query.Where(book => string.Compare(book.LastModified.ToString(), nextDayText) >= 0),
-            BookSearchOperator.GreaterThanOrEqual => query.Where(book => string.Compare(book.LastModified.ToString(), startText) >= 0),
-            BookSearchOperator.LessThan => query.Where(book => string.Compare(book.LastModified.ToString(), startText) < 0),
-            BookSearchOperator.LessThanOrEqual => query.Where(book => string.Compare(book.LastModified.ToString(), nextDayText) < 0),
-            _ => query.Where(book => string.Compare(book.LastModified.ToString(), startText) >= 0 && string.Compare(book.LastModified.ToString(), nextDayText) < 0)
+            BookSearchOperator.GreaterThan => query.Where(book =>
+                string.Compare(book.LastModified.ToString(), nextDayText) >= 0),
+            BookSearchOperator.GreaterThanOrEqual => query.Where(book =>
+                string.Compare(book.LastModified.ToString(), startText) >= 0),
+            BookSearchOperator.LessThan => query.Where(book =>
+                string.Compare(book.LastModified.ToString(), startText) < 0),
+            BookSearchOperator.LessThanOrEqual => query.Where(book =>
+                string.Compare(book.LastModified.ToString(), nextDayText) < 0),
+            _ => query.Where(book =>
+                string.Compare(book.LastModified.ToString(), startText) >= 0 &&
+                string.Compare(book.LastModified.ToString(), nextDayText) < 0)
         };
     }
 

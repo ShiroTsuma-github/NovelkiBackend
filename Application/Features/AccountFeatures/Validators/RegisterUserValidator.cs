@@ -1,6 +1,6 @@
 ﻿namespace Application.Features.AccountFeatures.Validators;
 
-using Application.Features.AccountFeatures.Commands;
+using Commands;
 
 public class RegisterUserCommandValidator : AbstractValidator<RegisterUserCommand>
 {
@@ -16,7 +16,9 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
         RuleFor(x => x.Email)
             .NotEmpty().WithMessage("Email address is required.")
             .EmailAddress().WithMessage("A valid email address is required.")
-            .MaximumLength(100).WithMessage("Email can't be longer than 100 characters. In case this is your real email contact administrator.");
+            .MaximumLength(100)
+            .WithMessage(
+                "Email can't be longer than 100 characters. In case this is your real email contact administrator.");
 
         RuleFor(x => x.Password)
             .NotEmpty().WithMessage("Password is required.")
@@ -25,6 +27,7 @@ public class RegisterUserCommandValidator : AbstractValidator<RegisterUserComman
             .Matches("[A-Z]").WithMessage("Password must contain at least one uppercase letter.")
             .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
             .Matches("[0-9]").WithMessage("Password must contain at least one number.")
-            .Matches("[^a-zA-Z0-9]").WithMessage("Password must contain at least one non-alphanumeric character (e.g., !, @, #).");
+            .Matches("[^a-zA-Z0-9]")
+            .WithMessage("Password must contain at least one non-alphanumeric character (e.g., !, @, #).");
     }
 }

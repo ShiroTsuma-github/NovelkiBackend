@@ -1,6 +1,6 @@
 ﻿namespace Application.Features.AccountFeatures.Commands;
 
-using Application.Common.DTOs.User;
+using Common.DTOs.User;
 
 public sealed record LoginUserCommand : IRequest<TokenResponse>
 {
@@ -20,7 +20,9 @@ public class LoginUserHandler : IRequestHandler<LoginUserCommand, TokenResponse>
 
     public async Task<TokenResponse> Handle(LoginUserCommand request, CancellationToken cancellationToken)
     {
-        var token = await _identityService.LoginUser(new LoginDto(request.Username, request.Email, request.Password), cancellationToken);
+        TokenResponse token =
+            await _identityService.LoginUser(new LoginDto(request.Username, request.Email, request.Password),
+                cancellationToken);
         return token;
     }
 }

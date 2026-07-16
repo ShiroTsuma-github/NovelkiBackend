@@ -33,23 +33,23 @@ public class BookCoverEndpointTests
     public async Task SetCoverFromUrl_ShouldUpdateExistingNotFoundCover()
     {
         await using var factory = new BookCoverApiFactory();
-        var bookId = await factory.SeedBookWithNotFoundCoverAsync();
-        using var client = factory.CreateAuthenticatedClient();
+        Guid bookId = await factory.SeedBookWithNotFoundCoverAsync();
+        using HttpClient client = factory.CreateAuthenticatedClient();
 
-        var response = await client.PutAsJsonAsync(
+        HttpResponseMessage response = await client.PutAsJsonAsync(
             $"/api/v1/book/{bookId}/cover/url",
             new SetBookCoverFromUrlRequest("https://example.com/cover.jpg"));
 
-        var body = await response.Content.ReadAsStringAsync();
+        string body = await response.Content.ReadAsStringAsync();
         Assert.True(response.IsSuccessStatusCode, $"Expected success, got {(int)response.StatusCode}: {body}");
-        var cover = await response.Content.ReadFromJsonAsync<BookCoverDto>();
+        BookCoverDto? cover = await response.Content.ReadFromJsonAsync<BookCoverDto>();
         Assert.NotNull(cover);
         Assert.Equal("Uploaded", cover.Status);
         Assert.Equal("ManualUrl", cover.Source);
 
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var stored = await context.BookCovers.SingleAsync(c => c.BookId == bookId);
+        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        BookCover stored = await context.BookCovers.SingleAsync(c => c.BookId == bookId);
         Assert.Equal(BookCoverStatus.Uploaded, stored.Status);
         Assert.Equal(BookCoverSource.ManualUrl, stored.Source);
         Assert.Equal("test/cover.jpg", stored.StoragePath);
@@ -61,22 +61,22 @@ public class BookCoverEndpointTests
     public async Task SetCoverFromUrl_ShouldCreateCover_WhenBookHasNoCoverRow()
     {
         await using var factory = new BookCoverApiFactory();
-        var bookId = await factory.SeedBookWithoutCoverAsync();
-        using var client = factory.CreateAuthenticatedClient();
+        Guid bookId = await factory.SeedBookWithoutCoverAsync();
+        using HttpClient client = factory.CreateAuthenticatedClient();
 
-        var response = await client.PutAsJsonAsync(
+        HttpResponseMessage response = await client.PutAsJsonAsync(
             $"/api/v1/book/{bookId}/cover/url",
             new SetBookCoverFromUrlRequest("https://example.com/cover.jpg"));
 
-        var body = await response.Content.ReadAsStringAsync();
+        string body = await response.Content.ReadAsStringAsync();
         Assert.True(response.IsSuccessStatusCode, $"Expected success, got {(int)response.StatusCode}: {body}");
-        var cover = await response.Content.ReadFromJsonAsync<BookCoverDto>();
+        BookCoverDto? cover = await response.Content.ReadFromJsonAsync<BookCoverDto>();
         Assert.NotNull(cover);
         Assert.Equal("Uploaded", cover.Status);
 
-        await using var scope = factory.Services.CreateAsyncScope();
-        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        var stored = await context.BookCovers.SingleAsync(c => c.BookId == bookId);
+        await using AsyncServiceScope scope = factory.Services.CreateAsyncScope();
+        ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        BookCover stored = await context.BookCovers.SingleAsync(c => c.BookId == bookId);
         Assert.Equal(BookCoverStatus.Uploaded, stored.Status);
         Assert.Equal(BookCoverSource.ManualUrl, stored.Source);
     }
@@ -84,6 +84,7 @@ public class BookCoverEndpointTests
     private sealed class BookCoverApiFactory : WebApplicationFactory<Program>
     {
         private readonly SqliteConnection _connection = new("DataSource=:memory:");
+
         private readonly ServiceProvider _sqliteServices = new ServiceCollection()
             .AddEntityFrameworkSqlite()
             .BuildServiceProvider();
@@ -127,7 +128,8 @@ public class BookCoverEndpointTests
                 services.AddScoped<IUser, TestUser>();
                 services
                     .AddAuthentication(TestAuthHandler.AuthenticationScheme)
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.AuthenticationScheme, _ => { });
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.AuthenticationScheme,
+                        _ => { });
                 services.Configure<AuthenticationOptions>(options =>
                 {
                     options.DefaultAuthenticateScheme = TestAuthHandler.AuthenticationScheme;
@@ -139,24 +141,23 @@ public class BookCoverEndpointTests
 
         public HttpClient CreateAuthenticatedClient()
         {
-            var client = CreateClient(new WebApplicationFactoryClientOptions
-            {
-                AllowAutoRedirect = false
-            });
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
+            HttpClient client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
             return client;
         }
 
         public async Task<Guid> SeedBookWithNotFoundCoverAsync()
         {
             await EnsureCreatedAsync();
-            await using var scope = Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var book = TestData.Book(UserId, "No Cover Found");
+            await using AsyncServiceScope scope = Services.CreateAsyncScope();
+            ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Book book = TestData.Book(UserId, "No Cover Found");
             book.Cover = new BookCover
             {
                 Status = BookCoverStatus.NotFound,
-                FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata."
+                FailureReason =
+                    "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata."
             };
             context.Books.Add(book);
             await context.SaveChangesAsync();
@@ -166,9 +167,9 @@ public class BookCoverEndpointTests
         public async Task<Guid> SeedBookWithoutCoverAsync()
         {
             await EnsureCreatedAsync();
-            await using var scope = Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var book = TestData.Book(UserId, "No Cover Row");
+            await using AsyncServiceScope scope = Services.CreateAsyncScope();
+            ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            Book book = TestData.Book(UserId, "No Cover Row");
             context.Books.Add(book);
             await context.SaveChangesAsync();
             return book.Id;
@@ -176,8 +177,8 @@ public class BookCoverEndpointTests
 
         private async Task EnsureCreatedAsync()
         {
-            await using var scope = Services.CreateAsyncScope();
-            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await using AsyncServiceScope scope = Services.CreateAsyncScope();
+            ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await context.Database.EnsureCreatedAsync();
             if (!await context.Users.AnyAsync(u => u.Id == UserId))
             {
@@ -206,7 +207,8 @@ public class BookCoverEndpointTests
 
     private sealed class FakeRemoteImageService : IBookCoverRemoteImageService
     {
-        public Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+        public Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult(new BookCoverStoredFiles(
                 new BookCoverStoredVariant("test/cover.jpg", "image/jpeg", 123, 900, 1350),
@@ -247,10 +249,9 @@ public class BookCoverEndpointTests
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            var claims = new[]
+            Claim[] claims = new[]
             {
-                new Claim(ClaimTypes.NameIdentifier, UserId.ToString()),
-                new Claim(ClaimTypes.Name, "reader"),
+                new Claim(ClaimTypes.NameIdentifier, UserId.ToString()), new Claim(ClaimTypes.Name, "reader"),
                 new Claim(ClaimTypes.Email, "reader@example.com")
             };
             var identity = new ClaimsIdentity(claims, AuthenticationScheme);

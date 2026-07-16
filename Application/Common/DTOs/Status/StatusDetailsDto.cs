@@ -1,5 +1,5 @@
 namespace Application.Common.DTOs.Status;
 
-using Application.Common.DTOs.Book;
+using Book;
 
 public class StatusDetailsDto : BookCollectionDetailsDto;

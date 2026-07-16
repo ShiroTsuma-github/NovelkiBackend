@@ -28,13 +28,14 @@ public class BookCoverRepository : IBookCoverRepository
 
     public async Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken)
     {
-        var retryBefore = DateTimeOffset.UtcNow.AddMinutes(-15);
+        DateTimeOffset retryBefore = DateTimeOffset.UtcNow.AddMinutes(-15);
         return await _context.BookCovers
             .Include(c => c.Book)
             .ThenInclude(b => b.Titles)
             .Include(c => c.Book)
             .ThenInclude(b => b.Links)
-            .Where(c => c.Status == BookCoverStatus.Pending && (c.LastAttemptAt == null || c.LastAttemptAt < retryBefore))
+            .Where(c => c.Status == BookCoverStatus.Pending &&
+                        (c.LastAttemptAt == null || c.LastAttemptAt < retryBefore))
             .OrderBy(c => c.Created)
             .Take(take)
             .ToListAsync(cancellationToken);

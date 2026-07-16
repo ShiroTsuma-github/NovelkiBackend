@@ -1,6 +1,6 @@
 ﻿namespace Application.Features.AccountFeatures.Commands;
 
-using Application.Common.DTOs.User;
+using Common.DTOs.User;
 
 public sealed record RegisterUserCommand : IRequest<RegisterResponse>
 {
@@ -13,10 +13,14 @@ public class RegisterUserHandler : IRequestHandler<RegisterUserCommand, Register
 {
     private readonly IIdentityService _identityService;
 
-    public RegisterUserHandler(IIdentityService identityService) => _identityService = identityService;
+    public RegisterUserHandler(IIdentityService identityService)
+    {
+        _identityService = identityService;
+    }
 
     public async Task<RegisterResponse> Handle(RegisterUserCommand request, CancellationToken cancellationToken)
     {
-        return await _identityService.RegisterUser(new RegisterDto(request.Username, request.Email, request.Password), cancellationToken);
+        return await _identityService.RegisterUser(new RegisterDto(request.Username, request.Email, request.Password),
+            cancellationToken);
     }
 }

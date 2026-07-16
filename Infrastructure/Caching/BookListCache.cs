@@ -2,7 +2,7 @@ namespace Infrastructure.Caching;
 
 using Application.Common.DTOs.Book;
 using Application.Common.Models;
-using Infrastructure.Observability;
+using Observability;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
@@ -31,12 +31,13 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        using var activity = StartCacheActivity("cache.books.get", ownerId, skip, take, query, sortBy, sortDirection);
-        var key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
+        using Activity? activity =
+            StartCacheActivity("cache.books.get", ownerId, skip, take, query, sortBy, sortDirection);
+        string key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
         activity?.SetTag("cache.key", key);
 
-        var cached = await GetAsync<BookListItemDto>(key, cancellationToken);
-        var hit = cached != null;
+        PaginatedResult<BookListItemDto>? cached = await GetAsync<BookListItemDto>(key, cancellationToken);
+        bool hit = cached != null;
         activity?.SetTag("cache.hit", hit);
         _logger.LogInformation(
             "Book list cache lookup. OwnerId={OwnerId} Skip={Skip} Take={Take} SortBy={SortBy} SortDirection={SortDirection} Query={Query} CacheKey={CacheKey} CacheHit={CacheHit}",
@@ -61,8 +62,9 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         PaginatedResult<BookListItemDto> value,
         CancellationToken cancellationToken)
     {
-        using var activity = StartCacheActivity("cache.books.set", ownerId, skip, take, query, sortBy, sortDirection);
-        var key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
+        using Activity? activity =
+            StartCacheActivity("cache.books.set", ownerId, skip, take, query, sortBy, sortDirection);
+        string key = await BuildBooksKey(ownerId, skip, take, query, sortBy, sortDirection, cancellationToken);
         activity?.SetTag("cache.key", key);
         activity?.SetTag("cache.item_count", value.Data.Count);
         await SetAsync(key, value, cancellationToken);
@@ -80,12 +82,13 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
 
     public async Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
     {
-        using var activity = InfrastructureTelemetry.ActivitySource.StartActivity("cache.books.invalidate", ActivityKind.Internal);
+        using Activity? activity =
+            InfrastructureTelemetry.ActivitySource.StartActivity("cache.books.invalidate", ActivityKind.Internal);
         activity?.SetTag("cache.type", "book-list");
         activity?.SetTag("cache.owner_id", ownerId);
-        var versionKey = GetVersionKey(ownerId);
-        var current = await GetVersionAsync(versionKey, cancellationToken);
-        var next = current + 1;
+        string versionKey = GetVersionKey(ownerId);
+        int current = await GetVersionAsync(versionKey, cancellationToken);
+        int next = current + 1;
         activity?.SetTag("cache.version.key", versionKey);
         activity?.SetTag("cache.version.previous", current);
         activity?.SetTag("cache.version.next", next);
@@ -100,13 +103,13 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
 
     private async Task<PaginatedResult<T>?> GetAsync<T>(string key, CancellationToken cancellationToken)
     {
-        var json = await _cache.GetStringAsync(key, cancellationToken);
+        string? json = await _cache.GetStringAsync(key, cancellationToken);
         return json == null ? null : JsonSerializer.Deserialize<PaginatedResult<T>>(json, SerializerOptions);
     }
 
     private Task SetAsync<T>(string key, PaginatedResult<T> value, CancellationToken cancellationToken)
     {
-        var json = JsonSerializer.Serialize(value, SerializerOptions);
+        string json = JsonSerializer.Serialize(value, SerializerOptions);
         return _cache.SetStringAsync(key, json, CreateEntryOptions(), cancellationToken);
     }
 
@@ -119,16 +122,18 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        var version = await GetVersionAsync(GetVersionKey(ownerId), cancellationToken);
-        return $"books:{ownerId}:v{version}:skip:{skip}:take:{take}:sort:{Normalize(sortBy)}:{Normalize(sortDirection)}:q:{Hash(query)}";
+        int version = await GetVersionAsync(GetVersionKey(ownerId), cancellationToken);
+        return
+            $"books:{ownerId}:v{version}:skip:{skip}:take:{take}:sort:{Normalize(sortBy)}:{Normalize(sortDirection)}:q:{Hash(query)}";
     }
 
     private async Task<int> GetVersionAsync(string key, CancellationToken cancellationToken)
     {
-        using var activity = InfrastructureTelemetry.ActivitySource.StartActivity("cache.books.version.get", ActivityKind.Internal);
+        using Activity? activity =
+            InfrastructureTelemetry.ActivitySource.StartActivity("cache.books.version.get", ActivityKind.Internal);
         activity?.SetTag("cache.version.key", key);
-        var value = await _cache.GetStringAsync(key, cancellationToken);
-        if (int.TryParse(value, out var version) && version > 0)
+        string? value = await _cache.GetStringAsync(key, cancellationToken);
+        if (int.TryParse(value, out int version) && version > 0)
         {
             activity?.SetTag("cache.version", version);
             activity?.SetTag("cache.version.initialized", false);
@@ -138,15 +143,19 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         await _cache.SetStringAsync(key, "1", CreateVersionOptions(), cancellationToken);
         activity?.SetTag("cache.version", 1);
         activity?.SetTag("cache.version.initialized", true);
-        _logger.LogInformation("Book list cache version initialized. VersionKey={VersionKey} Version={Version}", key, 1);
+        _logger.LogInformation("Book list cache version initialized. VersionKey={VersionKey} Version={Version}", key,
+            1);
         return 1;
     }
 
-    private static string GetVersionKey(Guid ownerId) => $"books:{ownerId}:version";
+    private static string GetVersionKey(Guid ownerId)
+    {
+        return $"books:{ownerId}:version";
+    }
 
     private static string Hash(string? value)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value?.Trim() ?? string.Empty));
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(value?.Trim() ?? string.Empty));
         return Convert.ToHexString(bytes);
     }
 
@@ -159,7 +168,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         string? sortBy,
         string? sortDirection)
     {
-        var activity = InfrastructureTelemetry.ActivitySource.StartActivity(name, ActivityKind.Internal);
+        Activity? activity = InfrastructureTelemetry.ActivitySource.StartActivity(name, ActivityKind.Internal);
         activity?.SetTag("cache.type", "book-list");
         activity?.SetTag("cache.owner_id", ownerId);
         activity?.SetTag("cache.skip", skip);
@@ -171,21 +180,18 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
         return activity;
     }
 
-    private static string Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? "-" : value.Trim().ToLowerInvariant();
+    private static string Normalize(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "-" : value.Trim().ToLowerInvariant();
+    }
 
     private static DistributedCacheEntryOptions CreateEntryOptions()
     {
-        return new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
-        };
+        return new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10) };
     }
 
     private static DistributedCacheEntryOptions CreateVersionOptions()
     {
-        return new DistributedCacheEntryOptions
-        {
-            AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30)
-        };
+        return new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(30) };
     }
 }

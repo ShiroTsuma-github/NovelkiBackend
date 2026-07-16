@@ -1,4 +1,5 @@
 namespace Application.Features.StatusFeatures.Commands;
+
 public record DeleteStatusCommand(Guid Id) : IRequest;
 
 public class DeleteStatusCommandHandler : IRequestHandler<DeleteStatusCommand>

@@ -1,5 +1,6 @@
 ﻿namespace Api.Controllers;
 
+using Application.Common.Models;
 using Application.Features.AccountFeatures.Commands;
 using Microsoft.AspNetCore.RateLimiting;
 
@@ -17,19 +18,20 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("register")]
-    [EnableRateLimiting(Api.DependencyInjection.AccountAuthRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Register(RegisterUserCommand registerUserCommand)
     {
-        var response = await _mediator.Send(registerUserCommand);
-        _logger.LogInformation("User registered. UserId={UserId} Username={Username}", response.Id, registerUserCommand.Username);
+        RegisterResponse response = await _mediator.Send(registerUserCommand);
+        _logger.LogInformation("User registered. UserId={UserId} Username={Username}", response.Id,
+            registerUserCommand.Username);
         return Ok(response);
     }
 
     [HttpPost("login")]
-    [EnableRateLimiting(Api.DependencyInjection.AccountAuthRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Login(LoginUserCommand loginUserCommand)
     {
-        var response = await _mediator.Send(loginUserCommand);
+        TokenResponse response = await _mediator.Send(loginUserCommand);
         _logger.LogInformation(
             "User logged in. UserId={UserId} IdentifierType={IdentifierType}",
             response.UserId,
@@ -40,7 +42,7 @@ public class AccountController : ControllerBase
     [HttpPost("refresh")]
     public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand refreshTokenCommand)
     {
-        var response = await _mediator.Send(refreshTokenCommand);
+        TokenResponse response = await _mediator.Send(refreshTokenCommand);
         _logger.LogInformation("Access token refreshed. UserId={UserId}", response.UserId);
         return Ok(response);
     }

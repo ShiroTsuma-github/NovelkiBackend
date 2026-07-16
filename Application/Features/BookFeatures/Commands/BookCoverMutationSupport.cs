@@ -8,8 +8,8 @@ internal static class BookCoverMutationSupport
         BookCoverSource source,
         string? originalImageUrl)
     {
-        var change = PrepareCover(book);
-        var cover = change.Cover;
+        BookCoverChange change = PrepareCover(book);
+        BookCover cover = change.Cover;
 
         cover.Status = BookCoverStatus.Uploaded;
         cover.Source = source;
@@ -33,8 +33,8 @@ internal static class BookCoverMutationSupport
 
     public static BookCoverChange ApplyPendingRefresh(Book book)
     {
-        var change = PrepareCover(book);
-        var cover = change.Cover;
+        BookCoverChange change = PrepareCover(book);
+        BookCover cover = change.Cover;
 
         cover.Status = BookCoverStatus.Pending;
         cover.Source = null;
@@ -83,7 +83,8 @@ internal static class BookCoverMutationSupport
             await storage.DeleteIfExistsAsync(change.PreviousStoragePath, cancellationToken);
         }
 
-        if (!string.Equals(change.PreviousThumbnailStoragePath, stored.Thumbnail.StoragePath, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(change.PreviousThumbnailStoragePath, stored.Thumbnail.StoragePath,
+                StringComparison.OrdinalIgnoreCase))
         {
             await storage.DeleteIfExistsAsync(change.PreviousThumbnailStoragePath, cancellationToken);
         }
@@ -91,7 +92,7 @@ internal static class BookCoverMutationSupport
 
     private static BookCoverChange PrepareCover(Book book)
     {
-        var hadExistingCover = book.Cover is not null;
+        bool hadExistingCover = book.Cover is not null;
         book.Cover ??= new BookCover { BookId = book.Id, Book = book };
         return new BookCoverChange(
             book.Cover,

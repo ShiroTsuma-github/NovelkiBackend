@@ -1,5 +1,7 @@
 ﻿namespace Api.Controllers;
 
+using Application.Common.DTOs.Type;
+using Application.Common.Models;
 using Application.Features.TypeFeatures.Commands;
 using Application.Features.TypeFeatures.Queries.GetType;
 
@@ -18,16 +20,16 @@ public class TypeController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateTypeCommand command)
     {
-        var type = await _mediator.Send(command);
+        TypeDto type = await _mediator.Send(command);
 
         return CreatedAtAction(nameof(GetById), new { id = type.Id }, type);
     }
 
-    [HttpGet()]
+    [HttpGet]
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllTypesQuery getAllTypees)
     {
-        var types = await _mediator.Send(getAllTypees);
+        PaginatedResult<TypeDto> types = await _mediator.Send(getAllTypees);
 
         return Ok(types);
     }
@@ -36,7 +38,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var typeDto = await _mediator.Send(new GetTypeQuery(id));
+        TypeDto typeDto = await _mediator.Send(new GetTypeQuery(id));
 
         return Ok(typeDto);
     }
@@ -45,7 +47,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
-        var typeDto = await _mediator.Send(new GetTypeDetailsQuery(id));
+        TypeDetailsDto typeDto = await _mediator.Send(new GetTypeDetailsQuery(id));
 
         return Ok(typeDto);
     }
@@ -54,7 +56,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
-        var typeDto = await _mediator.Send(new GetTypeByNameQuery(name));
+        TypeDto typeDto = await _mediator.Send(new GetTypeByNameQuery(name));
 
         return Ok(typeDto);
     }
@@ -63,7 +65,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
-        var typeDto = await _mediator.Send(new GetTypeDetailsByNameQuery(name));
+        TypeDetailsDto typeDto = await _mediator.Send(new GetTypeDetailsByNameQuery(name));
 
         return Ok(typeDto);
     }
@@ -73,7 +75,7 @@ public class TypeController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateTypeCommand updateType)
     {
         updateType.Id = id;
-        var typeDto = await _mediator.Send(updateType);
+        TypeDto typeDto = await _mediator.Send(updateType);
 
         return Ok(typeDto);
     }

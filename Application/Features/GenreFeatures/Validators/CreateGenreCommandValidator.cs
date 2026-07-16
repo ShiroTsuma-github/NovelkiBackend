@@ -1,6 +1,6 @@
 namespace Application.Features.GenreFeatures.Validators;
 
-using Application.Features.GenreFeatures.Commands;
+using Commands;
 
 public class CreateGenreCommandValidator : AbstractValidator<CreateGenreCommand>
 {

@@ -1,5 +1,6 @@
 namespace Api.Controllers;
 
+using Application.Common.DTOs.Tag;
 using Application.Features.TagFeatures.Queries;
 
 [ApiController]
@@ -17,7 +18,7 @@ public class TagController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Search([FromQuery] SearchTagsQuery query)
     {
-        var tags = await _mediator.Send(query);
+        IReadOnlyCollection<TagDto> tags = await _mediator.Send(query);
         return Ok(tags);
     }
 }

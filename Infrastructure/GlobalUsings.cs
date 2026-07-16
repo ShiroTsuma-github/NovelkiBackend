@@ -9,4 +9,3 @@ global using Domain.Common;
 global using Infrastructure.Identity;
 global using Domain.Exceptions;
 global using Domain.Repositories;
-

@@ -14,9 +14,9 @@ public class JwtTokenGeneratorTests
     [Fact]
     public void GenerateToken_ShouldReturnNullForUnauthenticatedUser()
     {
-        var generator = CreateGenerator();
+        JwtTokenGenerator generator = CreateGenerator();
 
-        var token = generator.GenerateToken(new FakeUser(false));
+        TokenResponse? token = generator.GenerateToken(new FakeUser(false));
 
         Assert.Null(token);
     }
@@ -24,14 +24,15 @@ public class JwtTokenGeneratorTests
     [Fact]
     public void GenerateToken_ShouldIncludeUserClaimsAndRoles()
     {
-        var generator = CreateGenerator();
+        JwtTokenGenerator generator = CreateGenerator();
 
-        var token = generator.GenerateToken(new FakeUser(true));
+        TokenResponse? token = generator.GenerateToken(new FakeUser(true));
 
         Assert.NotNull(token);
         Assert.Equal(UserId, token.UserId);
-        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token.AccessToken);
-        Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.NameIdentifier && claim.Value == UserId.ToString());
+        JwtSecurityToken? jwt = new JwtSecurityTokenHandler().ReadJwtToken(token.AccessToken);
+        Assert.Contains(jwt.Claims,
+            claim => claim.Type == ClaimTypes.NameIdentifier && claim.Value == UserId.ToString());
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Name && claim.Value == "reader");
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Email && claim.Value == "reader@example.com");
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Role && claim.Value == "Admin");

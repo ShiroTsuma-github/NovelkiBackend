@@ -13,13 +13,25 @@ public class ErrorHandlingMiddlewareTests
 {
     public static TheoryData<Exception, int, string> MappedExceptions => new()
     {
-        { new EntityNotFoundException<Infrastructure.Identity.User, string>("missing"), StatusCodes.Status404NotFound, "Authentication Failed" },
+        {
+            new EntityNotFoundException<Infrastructure.Identity.User, string>("missing"), StatusCodes.Status404NotFound,
+            "Authentication Failed"
+        },
         { new WrongPasswordException(), StatusCodes.Status401Unauthorized, "Authentication Failed" },
-        { new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()), StatusCodes.Status409Conflict,
+            "Conflict"
+        },
         { new EntityNotFoundException<Genre, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityAlreadyExistsException<Status, Guid>("Reading", Guid.NewGuid()), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityAlreadyExistsException<Status, Guid>("Reading", Guid.NewGuid()), StatusCodes.Status409Conflict,
+            "Conflict"
+        },
         { new EntityNotFoundException<Status, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityAlreadyExistsException<ContentType, Guid>("Novel", Guid.NewGuid()), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityAlreadyExistsException<ContentType, Guid>("Novel", Guid.NewGuid()), StatusCodes.Status409Conflict,
+            "Conflict"
+        },
         { new EntityNotFoundException<ContentType, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<Book, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<BookCover, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
@@ -29,7 +41,7 @@ public class ErrorHandlingMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ShouldCallNextWhenNoExceptionIsThrown()
     {
-        var called = false;
+        bool called = false;
         var context = new DefaultHttpContext();
         var middleware = new ErrorHandlingMiddleware(
             _ =>
@@ -47,12 +59,13 @@ public class ErrorHandlingMiddlewareTests
 
     [Theory]
     [MemberData(nameof(MappedExceptions))]
-    public async Task InvokeAsync_ShouldMapKnownExceptions(Exception exception, int expectedStatus, string expectedTitle)
+    public async Task InvokeAsync_ShouldMapKnownExceptions(Exception exception, int expectedStatus,
+        string expectedTitle)
     {
-        var context = await InvokeWithException(exception);
+        DefaultHttpContext context = await InvokeWithException(exception);
 
         context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
 
         Assert.Equal(expectedStatus, context.Response.StatusCode);
         Assert.Equal(expectedTitle, document.RootElement.GetProperty("title").GetString());
@@ -73,8 +86,8 @@ public class ErrorHandlingMiddlewareTests
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var detail = document.RootElement.GetProperty("detail").GetString();
+        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
+        string? detail = document.RootElement.GetProperty("detail").GetString();
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
         Assert.Equal("A book named 'Duplicated Book' already exists.", detail);
@@ -84,14 +97,15 @@ public class ErrorHandlingMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ShouldReturnIdentityOperationErrors()
     {
-        var context = await InvokeWithException(new IdentityOperationFailedException(["Password is too weak."]));
+        DefaultHttpContext context =
+            await InvokeWithException(new IdentityOperationFailedException(["Password is too weak."]));
 
         context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
+        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
+        JsonElement errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Identity", out var identityErrors));
+        Assert.True(errors.TryGetProperty("Identity", out JsonElement identityErrors));
         Assert.Contains("Password is too weak.", identityErrors.EnumerateArray().Select(e => e.GetString()));
     }
 
@@ -104,11 +118,11 @@ public class ErrorHandlingMiddlewareTests
             new ValidationFailure("Rating", "Rating must be valid.")
         ]);
 
-        var context = await InvokeWithException(exception);
+        DefaultHttpContext context = await InvokeWithException(exception);
 
         context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
+        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
+        JsonElement errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
         Assert.Equal("Title: Title is required.", document.RootElement.GetProperty("detail").GetString());
@@ -128,12 +142,13 @@ public class ErrorHandlingMiddlewareTests
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
+        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
+        JsonElement errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Username", out var usernameErrors));
-        Assert.Contains("Account with username 'reader' already exists.", usernameErrors.EnumerateArray().Select(e => e.GetString()));
+        Assert.True(errors.TryGetProperty("Username", out JsonElement usernameErrors));
+        Assert.Contains("Account with username 'reader' already exists.",
+            usernameErrors.EnumerateArray().Select(e => e.GetString()));
     }
 
     [Fact]
@@ -148,12 +163,13 @@ public class ErrorHandlingMiddlewareTests
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
+        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
+        JsonElement errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Email", out var emailErrors));
-        Assert.Contains("The account with email reader@example.com already exists.", emailErrors.EnumerateArray().Select(e => e.GetString()));
+        Assert.True(errors.TryGetProperty("Email", out JsonElement emailErrors));
+        Assert.Contains("The account with email reader@example.com already exists.",
+            emailErrors.EnumerateArray().Select(e => e.GetString()));
     }
 
     private static async Task<DefaultHttpContext> InvokeWithException(Exception exception)

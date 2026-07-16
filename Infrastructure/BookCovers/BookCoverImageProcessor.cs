@@ -11,11 +11,10 @@ internal static class BookCoverImageProcessor
     private const int ThumbnailJpegQuality = 82;
     private const int ThumbnailTargetWidth = 500;
     private static readonly Color AlphaBackground = Color.White;
+
     private static readonly HashSet<string> AllowedFormats = new(StringComparer.OrdinalIgnoreCase)
     {
-        "JPEG",
-        "PNG",
-        "WEBP"
+        "JPEG", "PNG", "WEBP"
     };
 
     public static async Task<ProcessedBookCoverContent> ProcessAsync(
@@ -24,8 +23,9 @@ internal static class BookCoverImageProcessor
         long maxBytes,
         CancellationToken cancellationToken)
     {
-        var input = await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, maxBytes, cancellationToken);
-        var format = Image.DetectFormat(input.Bytes);
+        ValidatedBookCoverContent input =
+            await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, maxBytes, cancellationToken);
+        IImageFormat? format = Image.DetectFormat(input.Bytes);
         if (format == null || !AllowedFormats.Contains(format.Name))
         {
             throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");
@@ -34,9 +34,11 @@ internal static class BookCoverImageProcessor
         try
         {
             using var source = Image.Load<Rgba32>(input.Bytes);
-            var original = await EncodeVariantAsync(source, source.Width, FullJpegQuality, cancellationToken);
-            var thumbnailWidth = Math.Min(ThumbnailTargetWidth, source.Width);
-            var thumbnail = await EncodeVariantAsync(source, thumbnailWidth, ThumbnailJpegQuality, cancellationToken);
+            BookCoverStoredVariantContent original =
+                await EncodeVariantAsync(source, source.Width, FullJpegQuality, cancellationToken);
+            int thumbnailWidth = Math.Min(ThumbnailTargetWidth, source.Width);
+            BookCoverStoredVariantContent thumbnail =
+                await EncodeVariantAsync(source, thumbnailWidth, ThumbnailJpegQuality, cancellationToken);
             return new ProcessedBookCoverContent(original, thumbnail);
         }
         catch (UnknownImageFormatException)
@@ -55,24 +57,22 @@ internal static class BookCoverImageProcessor
         int quality,
         CancellationToken cancellationToken)
     {
-        using var prepared = RenderOnWhiteBackground(source, targetWidth);
+        using Image<Rgb24> prepared = RenderOnWhiteBackground(source, targetWidth);
         await using var output = new MemoryStream();
-        await prepared.SaveAsJpegAsync(output, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder
-        {
-            Quality = quality
-        }, cancellationToken);
+        await prepared.SaveAsJpegAsync(output, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality = quality },
+            cancellationToken);
 
         return new BookCoverStoredVariantContent(output.ToArray(), "image/jpeg", prepared.Width, prepared.Height);
     }
 
     private static Image<Rgb24> RenderOnWhiteBackground(Image<Rgba32> source, int targetWidth)
     {
-        var targetHeight = source.Width == targetWidth
+        int targetHeight = source.Width == targetWidth
             ? source.Height
             : Math.Max(1, (int)Math.Round(source.Height * (targetWidth / (double)source.Width)));
 
         var canvas = new Image<Rgb24>(targetWidth, targetHeight, AlphaBackground.ToPixel<Rgb24>());
-        using var scaled = source.Width == targetWidth && source.Height == targetHeight
+        using Image<Rgba32> scaled = source.Width == targetWidth && source.Height == targetHeight
             ? source.Clone()
             : source.Clone(ctx => ctx.Resize(new ResizeOptions
             {
@@ -86,6 +86,8 @@ internal static class BookCoverImageProcessor
     }
 }
 
-internal sealed record ProcessedBookCoverContent(BookCoverStoredVariantContent Original, BookCoverStoredVariantContent Thumbnail);
+internal sealed record ProcessedBookCoverContent(
+    BookCoverStoredVariantContent Original,
+    BookCoverStoredVariantContent Thumbnail);
 
 internal sealed record BookCoverStoredVariantContent(byte[] Bytes, string MimeType, int Width, int Height);

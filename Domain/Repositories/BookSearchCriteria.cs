@@ -23,7 +23,8 @@ public sealed record BookSearchCriteria(
             Array.Empty<BookSearchDateFilter>(),
             Array.Empty<BookSearchMissingFilter>());
 
-    public bool HasFilters => Terms.Count > 0 || Fields.Count > 0 || Numbers.Count > 0 || Dates.Count > 0 || Missing.Count > 0;
+    public bool HasFilters =>
+        Terms.Count > 0 || Fields.Count > 0 || Numbers.Count > 0 || Dates.Count > 0 || Missing.Count > 0;
 }
 
 public sealed record BookSearchFieldFilter(BookSearchField Field, IReadOnlyCollection<string> Values)

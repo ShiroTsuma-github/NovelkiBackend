@@ -16,19 +16,20 @@ public static class BookSearchQueryParser
         ["contentType"] = BookSearchField.Type
     };
 
-    private static readonly Dictionary<string, BookSearchNumberField> NumberAliases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["rating"] = BookSearchNumberField.Rating,
-        ["priority"] = BookSearchNumberField.Priority,
-        ["current"] = BookSearchNumberField.CurrentChapter,
-        ["currentChapter"] = BookSearchNumberField.CurrentChapter,
-        ["progress"] = BookSearchNumberField.CurrentChapter,
-        ["chapter"] = BookSearchNumberField.TotalChapters,
-        ["chapters"] = BookSearchNumberField.TotalChapters,
-        ["total"] = BookSearchNumberField.TotalChapters,
-        ["total-chapters"] = BookSearchNumberField.TotalChapters,
-        ["totalChapters"] = BookSearchNumberField.TotalChapters
-    };
+    private static readonly Dictionary<string, BookSearchNumberField> NumberAliases =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["rating"] = BookSearchNumberField.Rating,
+            ["priority"] = BookSearchNumberField.Priority,
+            ["current"] = BookSearchNumberField.CurrentChapter,
+            ["currentChapter"] = BookSearchNumberField.CurrentChapter,
+            ["progress"] = BookSearchNumberField.CurrentChapter,
+            ["chapter"] = BookSearchNumberField.TotalChapters,
+            ["chapters"] = BookSearchNumberField.TotalChapters,
+            ["total"] = BookSearchNumberField.TotalChapters,
+            ["total-chapters"] = BookSearchNumberField.TotalChapters,
+            ["totalChapters"] = BookSearchNumberField.TotalChapters
+        };
 
     private static readonly Dictionary<string, BookSearchDateField> DateAliases = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -41,25 +42,26 @@ public static class BookSearchQueryParser
         ["lastModified"] = BookSearchDateField.LastModified
     };
 
-    private static readonly Dictionary<string, BookSearchMissingField> MissingAliases = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["rating"] = BookSearchMissingField.Rating,
-        ["priority"] = BookSearchMissingField.Priority,
-        ["author"] = BookSearchMissingField.Author,
-        ["genre"] = BookSearchMissingField.Genre,
-        ["tag"] = BookSearchMissingField.Tag,
-        ["current"] = BookSearchMissingField.CurrentChapter,
-        ["currentChapter"] = BookSearchMissingField.CurrentChapter,
-        ["progress"] = BookSearchMissingField.CurrentChapter,
-        ["total"] = BookSearchMissingField.TotalChapters,
-        ["chapter"] = BookSearchMissingField.TotalChapters,
-        ["chapters"] = BookSearchMissingField.TotalChapters,
-        ["total-chapters"] = BookSearchMissingField.TotalChapters,
-        ["totalChapters"] = BookSearchMissingField.TotalChapters,
-        ["cover"] = BookSearchMissingField.Cover,
-        ["link"] = BookSearchMissingField.Link,
-        ["links"] = BookSearchMissingField.Link
-    };
+    private static readonly Dictionary<string, BookSearchMissingField> MissingAliases =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["rating"] = BookSearchMissingField.Rating,
+            ["priority"] = BookSearchMissingField.Priority,
+            ["author"] = BookSearchMissingField.Author,
+            ["genre"] = BookSearchMissingField.Genre,
+            ["tag"] = BookSearchMissingField.Tag,
+            ["current"] = BookSearchMissingField.CurrentChapter,
+            ["currentChapter"] = BookSearchMissingField.CurrentChapter,
+            ["progress"] = BookSearchMissingField.CurrentChapter,
+            ["total"] = BookSearchMissingField.TotalChapters,
+            ["chapter"] = BookSearchMissingField.TotalChapters,
+            ["chapters"] = BookSearchMissingField.TotalChapters,
+            ["total-chapters"] = BookSearchMissingField.TotalChapters,
+            ["totalChapters"] = BookSearchMissingField.TotalChapters,
+            ["cover"] = BookSearchMissingField.Cover,
+            ["link"] = BookSearchMissingField.Link,
+            ["links"] = BookSearchMissingField.Link
+        };
 
     private static readonly string[] DateFormats =
     [
@@ -85,27 +87,27 @@ public static class BookSearchQueryParser
         var dates = new List<BookSearchDateFilter>();
         var missing = new List<BookSearchMissingFilter>();
 
-        foreach (var token in Tokenize(query))
+        foreach (string token in Tokenize(query))
         {
-            if (TryParseMissingFilter(token, out var missingFilter))
+            if (TryParseMissingFilter(token, out BookSearchMissingFilter missingFilter))
             {
                 missing.Add(missingFilter);
                 continue;
             }
 
-            if (TryParseDateFilter(token, out var dateFilters))
+            if (TryParseDateFilter(token, out IReadOnlyCollection<BookSearchDateFilter> dateFilters))
             {
                 dates.AddRange(dateFilters);
                 continue;
             }
 
-            if (TryParseNumberFilter(token, out var numberFilter))
+            if (TryParseNumberFilter(token, out BookSearchNumberFilter numberFilter))
             {
                 numbers.Add(numberFilter);
                 continue;
             }
 
-            if (TryParseFieldFilter(token, out var fieldFilter))
+            if (TryParseFieldFilter(token, out BookSearchFieldFilter fieldFilter))
             {
                 fields.Add(fieldFilter);
                 continue;
@@ -120,16 +122,16 @@ public static class BookSearchQueryParser
     private static bool TryParseMissingFilter(string token, out BookSearchMissingFilter filter)
     {
         filter = default!;
-        var separatorIndex = token.IndexOf(':');
+        int separatorIndex = token.IndexOf(':');
         if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
         {
             return false;
         }
 
-        var fieldName = token[..separatorIndex];
-        var value = Unquote(token[(separatorIndex + 1)..].Trim());
+        string fieldName = token[..separatorIndex];
+        string value = Unquote(token[(separatorIndex + 1)..].Trim());
         if (!value.Equals("none", StringComparison.OrdinalIgnoreCase) ||
-            !MissingAliases.TryGetValue(fieldName, out var field))
+            !MissingAliases.TryGetValue(fieldName, out BookSearchMissingField field))
         {
             return false;
         }
@@ -141,22 +143,22 @@ public static class BookSearchQueryParser
     private static bool TryParseDateFilter(string token, out IReadOnlyCollection<BookSearchDateFilter> filters)
     {
         filters = default!;
-        var separatorIndex = token.IndexOf(':');
+        int separatorIndex = token.IndexOf(':');
         if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
         {
             return false;
         }
 
-        var fieldName = token[..separatorIndex];
-        var valueText = token[(separatorIndex + 1)..].Trim();
-        if (!DateAliases.TryGetValue(fieldName, out var field))
+        string fieldName = token[..separatorIndex];
+        string valueText = token[(separatorIndex + 1)..].Trim();
+        if (!DateAliases.TryGetValue(fieldName, out BookSearchDateField field))
         {
             return false;
         }
 
-        var parsedOperator = BookSearchOperator.Equal;
-        var hasOperator = false;
-        foreach (var op in new[] { ">=", "<=", ">", "<", "=" })
+        BookSearchOperator parsedOperator = BookSearchOperator.Equal;
+        bool hasOperator = false;
+        foreach (string op in new[] { ">=", "<=", ">", "<", "=" })
         {
             if (!valueText.StartsWith(op, StringComparison.Ordinal))
             {
@@ -169,7 +171,7 @@ public static class BookSearchQueryParser
             break;
         }
 
-        if (!hasOperator || !TryParseDatePeriod(Unquote(valueText), out var period))
+        if (!hasOperator || !TryParseDatePeriod(Unquote(valueText), out DatePeriod period))
         {
             return false;
         }
@@ -181,20 +183,20 @@ public static class BookSearchQueryParser
     private static bool TryParseFieldFilter(string token, out BookSearchFieldFilter filter)
     {
         filter = default!;
-        var separatorIndex = token.IndexOf(':');
+        int separatorIndex = token.IndexOf(':');
         if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
         {
             return false;
         }
 
-        var fieldName = token[..separatorIndex];
-        var value = token[(separatorIndex + 1)..].Trim();
-        if (!FieldAliases.TryGetValue(fieldName, out var field) || string.IsNullOrWhiteSpace(value))
+        string fieldName = token[..separatorIndex];
+        string value = token[(separatorIndex + 1)..].Trim();
+        if (!FieldAliases.TryGetValue(fieldName, out BookSearchField field) || string.IsNullOrWhiteSpace(value))
         {
             return false;
         }
 
-        var values = SplitFieldValues(value)
+        string[] values = SplitFieldValues(value)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Select(item => item.Trim())
             .ToArray();
@@ -216,18 +218,18 @@ public static class BookSearchQueryParser
             return true;
         }
 
-        foreach (var op in new[] { ">=", "<=", ">", "<", "=" })
+        foreach (string op in new[] { ">=", "<=", ">", "<", "=" })
         {
-            var opIndex = token.IndexOf(op, StringComparison.Ordinal);
+            int opIndex = token.IndexOf(op, StringComparison.Ordinal);
             if (opIndex <= 0 || opIndex == token.Length - op.Length)
             {
                 continue;
             }
 
-            var fieldName = token[..opIndex];
-            var valueText = token[(opIndex + op.Length)..];
-            if (!NumberAliases.TryGetValue(fieldName, out var field) ||
-                !decimal.TryParse(valueText, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
+            string fieldName = token[..opIndex];
+            string valueText = token[(opIndex + op.Length)..];
+            if (!NumberAliases.TryGetValue(fieldName, out BookSearchNumberField field) ||
+                !decimal.TryParse(valueText, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value))
             {
                 return false;
             }
@@ -242,21 +244,21 @@ public static class BookSearchQueryParser
     private static bool TryParseNumberFilterWithColonAlias(string token, out BookSearchNumberFilter filter)
     {
         filter = default!;
-        var separatorIndex = token.IndexOf(':');
+        int separatorIndex = token.IndexOf(':');
         if (separatorIndex <= 0 || separatorIndex == token.Length - 1)
         {
             return false;
         }
 
-        var fieldName = token[..separatorIndex];
-        var valueText = token[(separatorIndex + 1)..].Trim();
-        if (!NumberAliases.TryGetValue(fieldName, out var field))
+        string fieldName = token[..separatorIndex];
+        string valueText = token[(separatorIndex + 1)..].Trim();
+        if (!NumberAliases.TryGetValue(fieldName, out BookSearchNumberField field))
         {
             return false;
         }
 
-        var parsedOperator = BookSearchOperator.Equal;
-        foreach (var op in new[] { ">=", "<=", ">", "<", "=" })
+        BookSearchOperator parsedOperator = BookSearchOperator.Equal;
+        foreach (string op in new[] { ">=", "<=", ">", "<", "=" })
         {
             if (!valueText.StartsWith(op, StringComparison.Ordinal))
             {
@@ -268,7 +270,7 @@ public static class BookSearchQueryParser
             break;
         }
 
-        if (!decimal.TryParse(valueText, NumberStyles.Number, CultureInfo.InvariantCulture, out var value))
+        if (!decimal.TryParse(valueText, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal value))
         {
             return false;
         }
@@ -277,21 +279,24 @@ public static class BookSearchQueryParser
         return true;
     }
 
-    private static BookSearchOperator ToOperator(string op) => op switch
+    private static BookSearchOperator ToOperator(string op)
     {
-        ">" => BookSearchOperator.GreaterThan,
-        ">=" => BookSearchOperator.GreaterThanOrEqual,
-        "<" => BookSearchOperator.LessThan,
-        "<=" => BookSearchOperator.LessThanOrEqual,
-        _ => BookSearchOperator.Equal
-    };
+        return op switch
+        {
+            ">" => BookSearchOperator.GreaterThan,
+            ">=" => BookSearchOperator.GreaterThanOrEqual,
+            "<" => BookSearchOperator.LessThan,
+            "<=" => BookSearchOperator.LessThanOrEqual,
+            _ => BookSearchOperator.Equal
+        };
+    }
 
     private static IEnumerable<string> Tokenize(string query)
     {
         var token = new List<char>();
         char? quote = null;
 
-        foreach (var c in query)
+        foreach (char c in query)
         {
             if (c is '"' or '\'')
             {
@@ -340,7 +345,7 @@ public static class BookSearchQueryParser
             return false;
         }
 
-        for (var i = token.Count - 1; i >= 0; i--)
+        for (int i = token.Count - 1; i >= 0; i--)
         {
             if (!char.IsWhiteSpace(token[i]))
             {
@@ -382,20 +387,20 @@ public static class BookSearchQueryParser
 
     private static bool TryParseDatePeriod(string value, out DatePeriod period)
     {
-        if (TryParseDateOnly(value, out var day))
+        if (TryParseDateOnly(value, out DateOnly day))
         {
             period = new DatePeriod(day, day.AddDays(1));
             return true;
         }
 
-        if (TryParseMonthPeriod(value, out var monthPeriod))
+        if (TryParseMonthPeriod(value, out DatePeriod monthPeriod))
         {
             period = monthPeriod;
             return true;
         }
 
         if (value.Length == 4 &&
-            int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out var year) &&
+            int.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out int year) &&
             year is >= 1 and <= 9998)
         {
             var start = new DateOnly(year, 1, 1);
@@ -410,7 +415,7 @@ public static class BookSearchQueryParser
     private static bool TryParseMonthPeriod(string value, out DatePeriod period)
     {
         period = default;
-        var separator = value.Contains('-', StringComparison.Ordinal) ? '-' :
+        char separator = value.Contains('-', StringComparison.Ordinal) ? '-' :
             value.Contains('.', StringComparison.Ordinal) ? '.' :
             value.Contains('/', StringComparison.Ordinal) ? '/' :
             '\0';
@@ -420,23 +425,23 @@ public static class BookSearchQueryParser
             return false;
         }
 
-        var parts = value.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        string[] parts = value.Split(separator, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length != 2)
         {
             return false;
         }
 
-        var firstIsYear = parts[0].Length == 4;
-        var secondIsYear = parts[1].Length == 4;
+        bool firstIsYear = parts[0].Length == 4;
+        bool secondIsYear = parts[1].Length == 4;
         if (firstIsYear == secondIsYear)
         {
             return false;
         }
 
-        var yearText = firstIsYear ? parts[0] : parts[1];
-        var monthText = firstIsYear ? parts[1] : parts[0];
-        if (!int.TryParse(yearText, NumberStyles.None, CultureInfo.InvariantCulture, out var year) ||
-            !int.TryParse(monthText, NumberStyles.None, CultureInfo.InvariantCulture, out var month) ||
+        string yearText = firstIsYear ? parts[0] : parts[1];
+        string monthText = firstIsYear ? parts[1] : parts[0];
+        if (!int.TryParse(yearText, NumberStyles.None, CultureInfo.InvariantCulture, out int year) ||
+            !int.TryParse(monthText, NumberStyles.None, CultureInfo.InvariantCulture, out int month) ||
             year is < 1 or > 9999 ||
             month is < 1 or > 12)
         {
@@ -455,14 +460,18 @@ public static class BookSearchQueryParser
     {
         return op switch
         {
-            BookSearchOperator.Equal => [
+            BookSearchOperator.Equal =>
+            [
                 new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start),
                 new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)
             ],
-            BookSearchOperator.GreaterThan => [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.EndExclusive)],
-            BookSearchOperator.GreaterThanOrEqual => [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start)],
+            BookSearchOperator.GreaterThan =>
+                [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.EndExclusive)],
+            BookSearchOperator.GreaterThanOrEqual =>
+                [new BookSearchDateFilter(field, BookSearchOperator.GreaterThanOrEqual, period.Start)],
             BookSearchOperator.LessThan => [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.Start)],
-            BookSearchOperator.LessThanOrEqual => [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)],
+            BookSearchOperator.LessThanOrEqual =>
+                [new BookSearchDateFilter(field, BookSearchOperator.LessThan, period.EndExclusive)],
             _ => [new BookSearchDateFilter(field, op, period.Start)]
         };
     }

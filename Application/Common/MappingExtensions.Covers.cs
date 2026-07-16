@@ -6,14 +6,15 @@ public static partial class MappingExtensions
 {
     public static BookCoverDto ToDto(this BookCover source, Guid bookId)
     {
-        var version = GetCoverVersion(source).ToUnixTimeMilliseconds();
+        long version = GetCoverVersion(source).ToUnixTimeMilliseconds();
         return new BookCoverDto
         {
             Id = source.Id,
             Status = source.Status.ToString(),
             Source = source.Source?.ToString(),
             ImageUrl = source.StoragePath == null ? null : $"/api/v1/book/{bookId}/cover/file?v={version}",
-            ThumbnailImageUrl = source.ThumbnailStoragePath == null ? null : $"/api/v1/book/{bookId}/cover/thumbnail?v={version}",
+            ThumbnailImageUrl =
+                source.ThumbnailStoragePath == null ? null : $"/api/v1/book/{bookId}/cover/thumbnail?v={version}",
             OriginalImageUrl = source.OriginalImageUrl,
             MimeType = source.MimeType,
             SizeBytes = source.SizeBytes,

@@ -4,12 +4,15 @@ using Domain.Entities;
 
 namespace Application.UnitTests;
 
+using Common.DTOs.Author;
+using Common.DTOs.Book;
+
 public class MappingExtensionTests
 {
     [Fact]
     public void NormalizeName_ShouldTrimCollapseWhitespaceAndUppercase()
     {
-        var result = MappingExtensions.NormalizeName("  Er\t \n Gen   ");
+        string result = MappingExtensions.NormalizeName("  Er\t \n Gen   ");
 
         Assert.Equal("ER GEN", result);
     }
@@ -17,7 +20,7 @@ public class MappingExtensionTests
     [Fact]
     public void CollapseWhitespace_ShouldPreserveDisplayCasing()
     {
-        var result = MappingExtensions.CollapseWhitespace("  Lord   of\tMysteries  ");
+        string result = MappingExtensions.CollapseWhitespace("  Lord   of\tMysteries  ");
 
         Assert.Equal("Lord of Mysteries", result);
     }
@@ -74,7 +77,7 @@ public class MappingExtensionTests
             LastAttemptAt = coverVersion
         };
 
-        var dto = book.ToDto();
+        BookDto dto = book.ToDto();
 
         Assert.Equal("Everyone Else is a Returnee", dto.PrimaryTitle);
         Assert.Equal("Portal fantasy with returnee progression.", dto.Description);
@@ -87,13 +90,15 @@ public class MappingExtensionTests
         Assert.Contains("Fantasy", dto.Genres);
         Assert.Contains("favorite", dto.Tags);
         Assert.Single(dto.Links);
-        var progressEntry = Assert.Single(dto.ProgressHistory);
+        BookProgressHistoryDto progressEntry = Assert.Single(dto.ProgressHistory);
         Assert.Equal("Progress note", progressEntry.Comment);
         Assert.NotNull(dto.Cover);
         Assert.Equal("Found", dto.Cover.Status);
         Assert.Equal("Jikan", dto.Cover.Source);
-        Assert.Equal($"/api/v1/book/{book.Id}/cover/file?v={coverVersion.ToUnixTimeMilliseconds()}", dto.Cover.ImageUrl);
-        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail?v={coverVersion.ToUnixTimeMilliseconds()}", dto.Cover.ThumbnailImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/file?v={coverVersion.ToUnixTimeMilliseconds()}",
+            dto.Cover.ImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail?v={coverVersion.ToUnixTimeMilliseconds()}",
+            dto.Cover.ThumbnailImageUrl);
     }
 
     [Fact]
@@ -102,7 +107,7 @@ public class MappingExtensionTests
         var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
         author.Names.Add(new AuthorName { Name = "Ergen", NormalizedName = "ERGEN", IsPrimary = false });
 
-        var dto = author.ToDto();
+        AuthorDto dto = author.ToDto();
 
         Assert.Equal("Er Gen", dto.PrimaryName);
         Assert.Contains("Ergen", dto.OtherNames);

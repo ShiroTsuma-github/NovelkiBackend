@@ -1,6 +1,6 @@
 namespace Application.Features.TypeFeatures.Validators;
 
-using Application.Features.TypeFeatures.Commands;
+using Commands;
 
 public class CreateTypeCommandValidator : AbstractValidator<CreateTypeCommand>
 {

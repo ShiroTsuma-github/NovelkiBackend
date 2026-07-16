@@ -3,11 +3,11 @@
 using Amazon.Runtime;
 using Amazon.S3;
 using Application.Common.Interfaces;
-using Infrastructure.Authentication;
-using Infrastructure.BookCovers;
-using Infrastructure.Caching;
-using Infrastructure.Identity;
-using Infrastructure.Services;
+using Authentication;
+using BookCovers;
+using Caching;
+using Identity;
+using Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,32 +19,29 @@ public static class DependencyInjection
 {
     public static void AddInfrastructureServices(this IHostApplicationBuilder builder)
     {
-        var jwtSettings = builder.Configuration.GetSection("Jwt");
-        
-        var keyString = jwtSettings["Key"];
+        IConfigurationSection jwtSettings = builder.Configuration.GetSection("Jwt");
+
+        string? keyString = jwtSettings["Key"];
         if (keyString == null)
         {
             throw new ArgumentNullException(nameof(keyString));
         }
-        var key = Encoding.UTF8.GetBytes(keyString);
 
-        var connectionString = builder.Configuration.GetConnectionString("DB");
-        var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+        byte[] key = Encoding.UTF8.GetBytes(keyString);
+
+        string? connectionString = builder.Configuration.GetConnectionString("DB");
+        string? redisConnectionString = builder.Configuration.GetConnectionString("Redis");
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseNpgsql(connectionString, npgsqlOptions =>
-            {
-                npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
-            });
+            options.UseNpgsql(connectionString,
+                npgsqlOptions => { npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery); });
         });
         builder.Services.AddDistributedMemoryCache();
         if (!string.IsNullOrWhiteSpace(redisConnectionString))
         {
-            builder.Services.AddStackExchangeRedisCache(options =>
-            {
-                options.Configuration = redisConnectionString;
-            });
+            builder.Services.AddStackExchangeRedisCache(options => { options.Configuration = redisConnectionString; });
         }
+
         builder.Services.AddScoped<IBookRepository, BookRepository>();
         builder.Services.AddScoped<BookSearchCriteriaApplier>();
         builder.Services.AddScoped<BookSortBuilder>();
@@ -66,7 +63,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 
         builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
-        var s3Options = builder.Configuration.GetSection("BookCovers:S3").Get<BookCoverS3Options>();
+        BookCoverS3Options? s3Options = builder.Configuration.GetSection("BookCovers:S3").Get<BookCoverS3Options>();
         if (!string.IsNullOrWhiteSpace(s3Options?.Endpoint) &&
             !string.IsNullOrWhiteSpace(s3Options.AccessKey) &&
             !string.IsNullOrWhiteSpace(s3Options.SecretKey) &&
@@ -89,9 +86,11 @@ public static class DependencyInjection
         {
             builder.Services.AddScoped<IBookCoverStorage, LocalBookCoverStorage>();
         }
+
         builder.Services.AddScoped<IBookCoverRemoteImageService, BookCoverRemoteImageService>();
         builder.Services.AddSingleton<InMemoryBookCoverQueue>();
-        builder.Services.AddSingleton<IBookCoverQueue>(provider => provider.GetRequiredService<InMemoryBookCoverQueue>());
+        builder.Services.AddSingleton<IBookCoverQueue>(provider =>
+            provider.GetRequiredService<InMemoryBookCoverQueue>());
         builder.Services.AddScoped<BookCoverResolver>();
         builder.Services.AddScoped<BookCoverProcessor>();
         builder.Services.AddHostedService<BookCoverBackgroundService>();
@@ -124,14 +123,9 @@ public static class DependencyInjection
             client.BaseAddress = new Uri("https://query.wikidata.org");
             client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
         });
-        builder.Services.AddHttpClient("BookCoverImages", client =>
-        {
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0");
-        })
-        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
-        {
-            AllowAutoRedirect = false
-        });
+        builder.Services.AddHttpClient("BookCoverImages",
+                client => { client.DefaultRequestHeaders.UserAgent.ParseAdd("NovelkiBackend/1.0"); })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddScoped<IUser, CurrentUser>();
@@ -143,35 +137,35 @@ public static class DependencyInjection
         builder.Services.AddScoped<IIdentityService, IdentityService>();
         builder.Services.AddHostedService<AdminRoleSeeder>();
         builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequireLowercase = true;
-            options.Password.RequireUppercase = true;
-            options.Password.RequireNonAlphanumeric = true;
-            options.Password.RequiredLength = 8;
-        })
-        .AddEntityFrameworkStores<ApplicationDbContext>()
-        .AddDefaultTokenProviders();
+            {
+                options.Password.RequireDigit = true;
+                options.Password.RequireLowercase = true;
+                options.Password.RequireUppercase = true;
+                options.Password.RequireNonAlphanumeric = true;
+                options.Password.RequiredLength = 8;
+            })
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
 
         builder.Services.AddAuthentication(options =>
-        {
-            options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-            options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-        })
-        .AddJwtBearer(options =>
-        {
-            options.TokenValidationParameters = new TokenValidationParameters
             {
-                ValidateIssuer = true,
-                ValidateAudience = true,
-                ValidateLifetime = true,
-                ValidateIssuerSigningKey = true,
-                ValidIssuer = jwtSettings["Issuer"],
-                ValidAudience = jwtSettings["Audience"],
-                IssuerSigningKey = new SymmetricSecurityKey(key),
-                ClockSkew = TimeSpan.Zero
-            };
-        });
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSettings["Issuer"],
+                    ValidAudience = jwtSettings["Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ClockSkew = TimeSpan.Zero
+                };
+            });
 
         builder.Services.AddAuthorization();
     }

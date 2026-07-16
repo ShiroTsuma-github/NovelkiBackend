@@ -21,12 +21,13 @@ public class MiscControllerAndHealthTests
     public async Task AuthorController_ShouldForwardSearchToMediator()
     {
         var mediator = new Mock<IMediator>();
-        var payload = new[] { new AuthorDto { Id = Guid.NewGuid(), PrimaryName = "Author" } };
-        mediator.Setup(mock => mock.Send(It.IsAny<SearchAuthorsQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(payload);
+        AuthorDto[] payload = new[] { new AuthorDto { Id = Guid.NewGuid(), PrimaryName = "Author" } };
+        mediator.Setup(mock => mock.Send(It.IsAny<SearchAuthorsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
         var controller = new AuthorController(mediator.Object);
         var query = new SearchAuthorsQuery("auth", 5);
 
-        var result = Assert.IsType<OkObjectResult>(await controller.Search(query));
+        OkObjectResult result = Assert.IsType<OkObjectResult>(await controller.Search(query));
 
         Assert.Same(payload, result.Value);
         mediator.Verify(mock => mock.Send(query, It.IsAny<CancellationToken>()), Times.Once);
@@ -36,12 +37,13 @@ public class MiscControllerAndHealthTests
     public async Task TagController_ShouldForwardSearchToMediator()
     {
         var mediator = new Mock<IMediator>();
-        var payload = new[] { new TagDto { Id = Guid.NewGuid(), Name = "favorite" } };
-        mediator.Setup(mock => mock.Send(It.IsAny<SearchTagsQuery>(), It.IsAny<CancellationToken>())).ReturnsAsync(payload);
+        TagDto[] payload = new[] { new TagDto { Id = Guid.NewGuid(), Name = "favorite" } };
+        mediator.Setup(mock => mock.Send(It.IsAny<SearchTagsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(payload);
         var controller = new TagController(mediator.Object);
         var query = new SearchTagsQuery("fav", 5);
 
-        var result = Assert.IsType<OkObjectResult>(await controller.Search(query));
+        OkObjectResult result = Assert.IsType<OkObjectResult>(await controller.Search(query));
 
         Assert.Same(payload, result.Value);
         mediator.Verify(mock => mock.Send(query, It.IsAny<CancellationToken>()), Times.Once);
@@ -50,10 +52,10 @@ public class MiscControllerAndHealthTests
     [Fact]
     public async Task DatabaseReadyHealthCheck_ShouldReturnHealthy_WhenDatabaseCanConnect()
     {
-        await using var context = await CreateContextAsync(openConnection: true);
+        await using ApplicationDbContext context = await CreateContextAsync(true);
         var healthCheck = new DatabaseReadyHealthCheck(context);
 
-        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext(), CancellationToken.None);
+        HealthCheckResult result = await healthCheck.CheckHealthAsync(new HealthCheckContext(), CancellationToken.None);
 
         Assert.Equal(HealthStatus.Healthy, result.Status);
     }
@@ -61,10 +63,10 @@ public class MiscControllerAndHealthTests
     [Fact]
     public async Task DatabaseReadyHealthCheck_ShouldReturnUnhealthy_WhenDatabaseCannotConnect()
     {
-        await using var context = CreateMissingDatabaseContext();
+        await using ApplicationDbContext context = CreateMissingDatabaseContext();
         var healthCheck = new DatabaseReadyHealthCheck(context);
 
-        var result = await healthCheck.CheckHealthAsync(new HealthCheckContext(), CancellationToken.None);
+        HealthCheckResult result = await healthCheck.CheckHealthAsync(new HealthCheckContext(), CancellationToken.None);
 
         Assert.Equal(HealthStatus.Unhealthy, result.Status);
     }
@@ -77,7 +79,7 @@ public class MiscControllerAndHealthTests
             await connection.OpenAsync();
         }
 
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+        DbContextOptions<ApplicationDbContext> options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
             .Options;
         var context = new ApplicationDbContext(options, new FakeUser());
@@ -91,15 +93,15 @@ public class MiscControllerAndHealthTests
 
     private static ApplicationDbContext CreateMissingDatabaseContext()
     {
-        var missingPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}", "missing.db");
+        string missingPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}", "missing.db");
         var connection = new SqliteConnection($"Data Source={missingPath};Mode=ReadOnly");
-        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+        DbContextOptions<ApplicationDbContext> options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(connection)
             .Options;
         return new ApplicationDbContext(options, new FakeUser());
     }
 
-    private sealed class FakeUser : Application.Common.Interfaces.IUser
+    private sealed class FakeUser : Common.Interfaces.IUser
     {
         public Guid? Id => Guid.NewGuid();
         public Guid RequiredId => Id!.Value;

@@ -28,7 +28,7 @@ internal sealed class TextSearchExpressionFactory
         Expression<Func<TEntity, string>> normalizedValueSelector,
         string search)
     {
-        var selector = SelectSelector(valueSelector, normalizedValueSelector);
+        Expression<Func<TEntity, string>> selector = SelectSelector(valueSelector, normalizedValueSelector);
         return Expression.Lambda<Func<TEntity, bool>>(
             BuildLikeCall(selector.Body, search),
             selector.Parameters);
@@ -40,11 +40,11 @@ internal sealed class TextSearchExpressionFactory
         Expression<Func<TElement, string>> normalizedValueSelector,
         string search)
     {
-        var selector = SelectSelector(valueSelector, normalizedValueSelector);
+        Expression<Func<TElement, string>> selector = SelectSelector(valueSelector, normalizedValueSelector);
         var elementPredicate = Expression.Lambda<Func<TElement, bool>>(
             BuildLikeCall(selector.Body, search),
             selector.Parameters);
-        var anyCall = Expression.Call(
+        MethodCallExpression anyCall = Expression.Call(
             typeof(Enumerable),
             nameof(Enumerable.Any),
             [typeof(TElement)],
@@ -63,7 +63,7 @@ internal sealed class TextSearchExpressionFactory
 
     private MethodCallExpression BuildLikeCall(Expression value, string search)
     {
-        var patternInput = _useILike ? search : MappingExtensions.NormalizeName(search);
+        string patternInput = _useILike ? search : MappingExtensions.NormalizeName(search);
         return Expression.Call(
             _useILike ? ILikeMethod : LikeMethod,
             Expression.Property(null, typeof(EF), nameof(EF.Functions)),
@@ -74,8 +74,8 @@ internal sealed class TextSearchExpressionFactory
 
     private static string ToLikePattern(string value)
     {
-        var trimmed = value.Trim();
-        var pattern = EscapeLike(trimmed).Replace("*", "%", StringComparison.Ordinal);
+        string trimmed = value.Trim();
+        string pattern = EscapeLike(trimmed).Replace("*", "%", StringComparison.Ordinal);
         return trimmed.Contains('*') ? pattern : $"%{pattern}%";
     }
 
@@ -108,7 +108,7 @@ internal static class PredicateExpression
         IEnumerable<Expression<Func<T, bool>>> predicates)
     {
         Expression<Func<T, bool>>? combined = null;
-        foreach (var predicate in predicates)
+        foreach (Expression<Func<T, bool>> predicate in predicates)
         {
             combined = combined == null ? predicate : Or(combined, predicate);
         }
@@ -121,9 +121,9 @@ internal static class PredicateExpression
         Expression<Func<T, bool>> right,
         Func<Expression, Expression, BinaryExpression> merge)
     {
-        var parameter = Expression.Parameter(typeof(T), left.Parameters[0].Name);
-        var leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
-        var rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
+        ParameterExpression parameter = Expression.Parameter(typeof(T), left.Parameters[0].Name);
+        Expression leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
+        Expression rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
         return Expression.Lambda<Func<T, bool>>(merge(leftBody, rightBody), parameter);
     }
 

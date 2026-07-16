@@ -19,7 +19,7 @@ public class AccountFeatureTests
         var service = new FakeIdentityService { RefreshResult = expected };
         var handler = new RefreshTokenHandler(service);
 
-        var result = await handler.Handle(new RefreshTokenCommand("refresh-token"), CancellationToken.None);
+        TokenResponse result = await handler.Handle(new RefreshTokenCommand("refresh-token"), CancellationToken.None);
 
         Assert.Same(expected, result);
         Assert.Equal("refresh-token", service.LastRefreshToken);
@@ -40,16 +40,21 @@ public class AccountFeatureTests
     {
         public TokenResponse RefreshResult { get; set; } = new()
         {
-            AccessToken = string.Empty,
-            RefreshToken = string.Empty,
-            RefreshTokenExpiresAt = DateTimeOffset.UtcNow
+            AccessToken = string.Empty, RefreshToken = string.Empty, RefreshTokenExpiresAt = DateTimeOffset.UtcNow
         };
 
         public string? LastRefreshToken { get; private set; }
         public string? LastRevokedToken { get; private set; }
 
-        public Task<RegisterResponse> RegisterUser(RegisterDto registerForm, CancellationToken cancellation) => throw new NotSupportedException();
-        public Task<TokenResponse> LoginUser(LoginDto loginForm, CancellationToken cancellationToken) => throw new NotSupportedException();
+        public Task<RegisterResponse> RegisterUser(RegisterDto registerForm, CancellationToken cancellation)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task<TokenResponse> LoginUser(LoginDto loginForm, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
 
         public Task<TokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken)
         {

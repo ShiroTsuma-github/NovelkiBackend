@@ -19,7 +19,7 @@ public class TypeRepository : ITypeRepository
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
-        var type = await _context.ContentTypes.FindAsync(new object[] { id }, cancellationToken);
+        ContentType? type = await _context.ContentTypes.FindAsync(new object[] { id }, cancellationToken);
         if (type != null)
         {
             _context.ContentTypes.Remove(type);
@@ -43,7 +43,7 @@ public class TypeRepository : ITypeRepository
 
     public async Task<ContentType?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var normalizedName = MappingExtensions.NormalizeName(name);
+        string normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.ContentTypes.FirstOrDefaultAsync(
             t => t.Name.ToUpper() == normalizedName || t.Slug.ToUpper() == normalizedName,
             cancellationToken);

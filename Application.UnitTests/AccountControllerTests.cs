@@ -15,7 +15,8 @@ public class AccountControllerTests
     public async Task AccountActions_ShouldForwardCommandsToMediator()
     {
         var userId = Guid.NewGuid();
-        var registerCommand = new RegisterUserCommand { Username = "reader", Email = "reader@example.com", Password = "Strong1!" };
+        var registerCommand =
+            new RegisterUserCommand { Username = "reader", Email = "reader@example.com", Password = "Strong1!" };
         var loginCommand = new LoginUserCommand { Username = "reader", Password = "Strong1!" };
         var refreshCommand = new RefreshTokenCommand("refresh");
         var logoutCommand = new LogoutCommand("refresh");
@@ -28,7 +29,8 @@ public class AccountControllerTests
             UserId = userId
         };
         var mediator = new Mock<IMediator>();
-        mediator.Setup(mock => mock.Send(registerCommand, It.IsAny<CancellationToken>())).ReturnsAsync(registerResponse);
+        mediator.Setup(mock => mock.Send(registerCommand, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(registerResponse);
         mediator.Setup(mock => mock.Send(loginCommand, It.IsAny<CancellationToken>())).ReturnsAsync(tokenResponse);
         mediator.Setup(mock => mock.Send(refreshCommand, It.IsAny<CancellationToken>())).ReturnsAsync(tokenResponse);
         var controller = new AccountController(mediator.Object, NullLogger<AccountController>.Instance);

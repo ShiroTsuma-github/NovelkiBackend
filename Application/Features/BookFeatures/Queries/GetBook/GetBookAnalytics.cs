@@ -15,11 +15,10 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
     private const int DefaultRangeDays = 84;
     private const int MaxDailyBucketRangeDays = 366;
     private const int MaxWeeklyBucketRangeDays = 3660;
+
     private static readonly HashSet<string> SupportedBuckets = new(StringComparer.OrdinalIgnoreCase)
     {
-        "day",
-        "week",
-        "month"
+        "day", "week", "month"
     };
 
     private readonly IBookAnalyticsQueryService _queryService;
@@ -33,15 +32,15 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
     public async Task<BookAnalyticsDto> Handle(GetBookAnalyticsQuery request, CancellationToken cancellationToken)
     {
-        var bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "week" : request.Bucket.Trim().ToLowerInvariant();
+        string bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "week" : request.Bucket.Trim().ToLowerInvariant();
         if (!SupportedBuckets.Contains(bucket))
         {
             throw ValidationError(nameof(request.Bucket), "Bucket must be one of: day, week, month.");
         }
 
-        var todayExclusive = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
-        var to = request.To ?? todayExclusive;
-        var from = request.From ?? to.AddDays(-DefaultRangeDays);
+        DateOnly todayExclusive = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        DateOnly to = request.To ?? todayExclusive;
+        DateOnly from = request.From ?? to.AddDays(-DefaultRangeDays);
         if (_user.CreatedAt is { } userCreatedAt)
         {
             var accountStart = DateOnly.FromDateTime(userCreatedAt.UtcDateTime);
@@ -58,8 +57,9 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
         bucket = ResolveEffectiveBucket(bucket, from, to);
         var scope = new BookAnalyticsScopeSnapshot(request.Query, from, to, bucket);
-        var criteria = BookSearchQueryParser.Parse(request.Query);
-        var snapshot = await _queryService.GetAnalyticsAsync(_user.RequiredId, criteria, scope, cancellationToken);
+        BookSearchCriteria criteria = BookSearchQueryParser.Parse(request.Query);
+        BookAnalyticsSnapshot snapshot =
+            await _queryService.GetAnalyticsAsync(_user.RequiredId, criteria, scope, cancellationToken);
 
         return snapshot.ToDto();
     }
@@ -71,7 +71,7 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
     private static string ResolveEffectiveBucket(string requestedBucket, DateOnly from, DateOnly to)
     {
-        var rangeDays = to.DayNumber - from.DayNumber;
+        int rangeDays = to.DayNumber - from.DayNumber;
         if (rangeDays > MaxWeeklyBucketRangeDays)
         {
             return "month";

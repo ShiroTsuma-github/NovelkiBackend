@@ -5,9 +5,9 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
-static class DependencyInjection
+internal static class DependencyInjection
 {
     public const string FrontendCorsPolicy = "Frontend";
     public const string AccountAuthRateLimitPolicy = "account-auth";
@@ -39,7 +39,8 @@ static class DependencyInjection
         {
             options.AddPolicy(FrontendCorsPolicy, policy =>
             {
-                var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+                string[] origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ??
+                                   Array.Empty<string>();
                 if (origins.Length > 0)
                 {
                     policy.WithOrigins(origins)
@@ -62,23 +63,23 @@ static class DependencyInjection
         });
         builder.Services.AddRateLimiter(options =>
         {
-            var accountPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Account:PermitLimit") ?? 10;
-            var accountWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Account:WindowSeconds") ?? 60;
-            var expensivePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:PermitLimit") ?? 20;
-            var expensiveWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:WindowSeconds") ?? 60;
+            int accountPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Account:PermitLimit") ?? 10;
+            int accountWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Account:WindowSeconds") ?? 60;
+            int expensivePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:PermitLimit") ?? 20;
+            int expensiveWindowSeconds =
+                builder.Configuration.GetValue<int?>("RateLimiting:Expensive:WindowSeconds") ?? 60;
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
                 {
-                    context.HttpContext.Response.Headers.RetryAfter = Math.Ceiling(retryAfter.TotalSeconds).ToString("0");
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        Math.Ceiling(retryAfter.TotalSeconds).ToString("0");
                 }
 
-                await context.HttpContext.Response.WriteAsJsonAsync(new
-                {
-                    error = "Too many requests. Please retry later."
-                }, cancellationToken);
+                await context.HttpContext.Response.WriteAsJsonAsync(
+                    new { error = "Too many requests. Please retry later." }, cancellationToken);
             };
 
             options.AddPolicy(AccountAuthRateLimitPolicy, httpContext =>
@@ -126,19 +127,9 @@ static class DependencyInjection
                 Scheme = "Bearer"
             });
 
-            c.AddSecurityRequirement(new OpenApiSecurityRequirement
+            c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
             {
-                {
-                    new OpenApiSecurityScheme
-                    {
-                        Reference = new OpenApiReference
-                        {
-                            Type = ReferenceType.SecurityScheme,
-                            Id = "Bearer"
-                        }
-                    },
-                    Array.Empty<string>()
-                }
+                { new OpenApiSecuritySchemeReference("Bearer", document), [] }
             });
             c.CustomSchemaIds(type =>
             {
@@ -147,14 +138,17 @@ static class DependencyInjection
                 {
                     return name.Substring(0, name.Length - "Command".Length);
                 }
+
                 if (name.EndsWith("Query"))
                 {
                     return name.Substring(0, name.Length - "Query".Length);
                 }
+
                 if (name.EndsWith("Request"))
                 {
                     return name.Substring(0, name.Length - "Request".Length);
                 }
+
                 return name;
             });
         });

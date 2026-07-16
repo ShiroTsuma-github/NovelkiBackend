@@ -26,14 +26,14 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var queueTask = ProcessQueueAsync(stoppingToken);
-        var pendingTask = ProcessPendingPeriodicallyAsync(stoppingToken);
+        Task queueTask = ProcessQueueAsync(stoppingToken);
+        Task pendingTask = ProcessPendingPeriodicallyAsync(stoppingToken);
         await Task.WhenAll(queueTask, pendingTask);
     }
 
     private async Task ProcessQueueAsync(CancellationToken stoppingToken)
     {
-        await foreach (var bookId in _queue.ReadAllAsync(stoppingToken))
+        await foreach (Guid bookId in _queue.ReadAllAsync(stoppingToken))
         {
             await ProcessBookAsync(bookId, stoppingToken);
         }
@@ -44,10 +44,10 @@ public sealed class BookCoverBackgroundService : BackgroundService
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            using var scope = _scopeFactory.CreateScope();
-            var repository = scope.ServiceProvider.GetRequiredService<IBookCoverRepository>();
-            var pending = await repository.GetPendingAsync(20, stoppingToken);
-            foreach (var cover in pending)
+            using IServiceScope scope = _scopeFactory.CreateScope();
+            IBookCoverRepository repository = scope.ServiceProvider.GetRequiredService<IBookCoverRepository>();
+            IReadOnlyCollection<BookCover> pending = await repository.GetPendingAsync(20, stoppingToken);
+            foreach (BookCover cover in pending)
             {
                 await ProcessBookAsync(cover.BookId, stoppingToken);
             }
@@ -63,8 +63,8 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
         try
         {
-            using var scope = _scopeFactory.CreateScope();
-            var processor = scope.ServiceProvider.GetRequiredService<BookCoverProcessor>();
+            using IServiceScope scope = _scopeFactory.CreateScope();
+            BookCoverProcessor processor = scope.ServiceProvider.GetRequiredService<BookCoverProcessor>();
             await processor.ProcessAsync(bookId, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -113,7 +113,7 @@ public sealed class BookCoverProcessor
 
     public async Task ProcessAsync(Guid bookId, CancellationToken cancellationToken)
     {
-        var cover = await _coverRepository.GetByBookIdAsync(bookId, cancellationToken);
+        BookCover? cover = await _coverRepository.GetByBookIdAsync(bookId, cancellationToken);
         if (cover == null || cover.Status != BookCoverStatus.Pending)
         {
             return;
@@ -124,19 +124,20 @@ public sealed class BookCoverProcessor
 
         try
         {
-            var candidate = await _resolver.FindAsync(cover.Book, cancellationToken);
+            BookCoverCandidate? candidate = await _resolver.FindAsync(cover.Book, cancellationToken);
             if (candidate == null)
             {
                 cover.Status = BookCoverStatus.NotFound;
-                cover.FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
+                cover.FailureReason =
+                    "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
                 CoverLinkHelper.TouchBook(cover.Book);
                 await _coverRepository.SaveAsync(cancellationToken);
                 return;
             }
 
-            using var client = _httpClientFactory.CreateClient("BookCoverImages");
-            await using var imageStream = await client.GetStreamAsync(candidate.ImageUrl, cancellationToken);
-            var stored = await _storage.SaveAsync(
+            using HttpClient client = _httpClientFactory.CreateClient("BookCoverImages");
+            await using Stream imageStream = await client.GetStreamAsync(candidate.ImageUrl, cancellationToken);
+            BookCoverStoredFiles stored = await _storage.SaveAsync(
                 cover.Book.OwnerId,
                 cover.BookId,
                 imageStream,
@@ -174,7 +175,7 @@ public sealed class BookCoverProcessor
         }
         catch (Exception ex)
         {
-            var shouldInvalidateCache = true;
+            bool shouldInvalidateCache = true;
             if (IsProviderResponseFailure(ex))
             {
                 cover.Status = BookCoverStatus.NotFound;
@@ -186,12 +187,14 @@ public sealed class BookCoverProcessor
                 cover.Status = BookCoverStatus.Failed;
                 cover.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
             }
+
             CoverLinkHelper.TouchBook(cover.Book);
             await _coverRepository.SaveAsync(cancellationToken);
             if (shouldInvalidateCache)
             {
                 await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
             }
+
             _logger.LogWarning(ex, "Cover provider failed. BookId={BookId}", cover.BookId);
         }
     }
@@ -226,7 +229,7 @@ internal static class CoverLinkHelper
             Label = source?.ToString(),
             SourceType = "Cover",
             IsPrimary = false,
-            LastReadHere = false,
+            LastReadHere = false
         });
     }
 

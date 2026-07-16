@@ -79,7 +79,7 @@ internal static class BookCsvImportRowMapper
 
     public static decimal? ParseDecimal(string? value)
     {
-        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed)
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed)
             ? parsed
             : null;
     }
@@ -91,7 +91,7 @@ internal static class BookCsvImportRowMapper
             return null;
         }
 
-        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var parsed))
+        if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal parsed))
         {
             AddFieldError(row, fieldKey, $"{fieldName} must be a valid number.");
             return null;
@@ -102,7 +102,7 @@ internal static class BookCsvImportRowMapper
 
     public static int? ParseInt(string? value)
     {
-        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed)
             ? parsed
             : null;
     }
@@ -114,7 +114,7 @@ internal static class BookCsvImportRowMapper
             return null;
         }
 
-        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
+        if (!int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int parsed))
         {
             AddFieldError(row, fieldKey, $"{fieldName} must be a valid integer.");
             return null;
@@ -132,7 +132,7 @@ internal static class BookCsvImportRowMapper
     {
         row.Errors.Add(message);
 
-        if (!row.FieldErrors.TryGetValue(fieldKey, out var errors))
+        if (!row.FieldErrors.TryGetValue(fieldKey, out List<string>? errors))
         {
             errors = [];
             row.FieldErrors[fieldKey] = errors;
@@ -143,12 +143,12 @@ internal static class BookCsvImportRowMapper
 
     private static string? Clean(IReadOnlyDictionary<string, string> row, string key)
     {
-        return row.TryGetValue(key, out var value) ? TrimToNull(value) : null;
+        return row.TryGetValue(key, out string? value) ? TrimToNull(value) : null;
     }
 
     private static string? CleanName(IReadOnlyDictionary<string, string> row, string key)
     {
-        return row.TryGetValue(key, out var value) ? NormalizeNameToNull(value) : null;
+        return row.TryGetValue(key, out string? value) ? NormalizeNameToNull(value) : null;
     }
 
     private static string? TrimToNull(string? value)
@@ -163,7 +163,7 @@ internal static class BookCsvImportRowMapper
 
     private static string? NormalizeTags(string? value)
     {
-        var tags = SplitTags(value).ToArray();
+        string[] tags = SplitTags(value).ToArray();
         return tags.Length == 0 ? null : string.Join("; ", tags);
     }
 
@@ -174,13 +174,13 @@ internal static class BookCsvImportRowMapper
             return null;
         }
 
-        var normalized = value
+        IEnumerable<string> normalized = value
             .Replace("\r\n", "\n", StringComparison.Ordinal)
             .Replace('\r', '\n')
             .Split(['|', '\n'], StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Select(line => line.Trim())
             .Where(line => line.Length > 0);
-        var result = string.Join('\n', normalized);
+        string result = string.Join('\n', normalized);
         return string.IsNullOrWhiteSpace(result) ? null : result;
     }
 }

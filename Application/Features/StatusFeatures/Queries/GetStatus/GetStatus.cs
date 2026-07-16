@@ -15,8 +15,8 @@ public class GetStatusQueryHandler : IRequestHandler<GetStatusQuery, StatusDto>
 
     public async Task<StatusDto> Handle(GetStatusQuery request, CancellationToken cancellationToken)
     {
-        var status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken)
-            ?? throw new EntityNotFoundException<Status, Guid>(request.Id);
+        Status status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken)
+                        ?? throw new EntityNotFoundException<Status, Guid>(request.Id);
 
         return status.ToDto();
     }

@@ -13,9 +13,10 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
         _storage = storage;
     }
 
-    public async Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl, CancellationToken cancellationToken)
+    public async Task<BookCoverStoredFiles> SaveFromUrlAsync(Guid ownerId, Guid bookId, string imageUrl,
+        CancellationToken cancellationToken)
     {
-        if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var imageUri) ||
+        if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out Uri? imageUri) ||
             imageUri.Scheme is not ("http" or "https"))
         {
             throw new FluentValidation.ValidationException("Image URL must be an absolute HTTP or HTTPS URL.");
@@ -23,14 +24,15 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
 
         await EnsureRemoteHostAllowedAsync(imageUri, cancellationToken);
 
-        using var client = _httpClientFactory.CreateClient("BookCoverImages");
-        using var response = await client.GetAsync(imageUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using HttpClient client = _httpClientFactory.CreateClient("BookCoverImages");
+        using HttpResponseMessage response =
+            await client.GetAsync(imageUri, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
         if (!response.IsSuccessStatusCode)
         {
             throw new FluentValidation.ValidationException($"Image URL returned HTTP {(int)response.StatusCode}.");
         }
 
-        await using var imageStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using Stream imageStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         return await _storage.SaveAsync(
             ownerId,
             bookId,
@@ -47,7 +49,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
             throw new FluentValidation.ValidationException("Image URL host is not allowed.");
         }
 
-        var addresses = IPAddress.TryParse(imageUri.Host, out var literalAddress)
+        IPAddress[] addresses = IPAddress.TryParse(imageUri.Host, out IPAddress? literalAddress)
             ? [literalAddress]
             : await Dns.GetHostAddressesAsync(imageUri.Host, cancellationToken);
         if (addresses.Length == 0 || addresses.Any(IsBlockedAddress))
@@ -76,7 +78,7 @@ public sealed class BookCoverRemoteImageService : IBookCoverRemoteImageService
             return true;
         }
 
-        var bytes = address.GetAddressBytes();
+        byte[] bytes = address.GetAddressBytes();
         if (address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
         {
             return bytes[0] == 10 ||

@@ -12,38 +12,22 @@ public static class TestData
 
     public static Author Author(string name)
     {
-        var author = new Author
-        {
-            PrimaryName = name,
-            NormalizedPrimaryName = MappingExtensions.NormalizeName(name)
-        };
+        var author = new Author { PrimaryName = name, NormalizedPrimaryName = MappingExtensions.NormalizeName(name) };
         author.Names.Add(new AuthorName
         {
-            Name = name,
-            NormalizedName = MappingExtensions.NormalizeName(name),
-            IsPrimary = true,
-            Source = "Test"
+            Name = name, NormalizedName = MappingExtensions.NormalizeName(name), IsPrimary = true, Source = "Test"
         });
         return author;
     }
 
     public static Genre Genre(string name)
     {
-        return new Genre
-        {
-            Name = name,
-            NormalizedName = MappingExtensions.NormalizeName(name)
-        };
+        return new Genre { Name = name, NormalizedName = MappingExtensions.NormalizeName(name) };
     }
 
     public static Tag Tag(Guid ownerId, string name)
     {
-        return new Tag
-        {
-            OwnerId = ownerId,
-            Name = name,
-            NormalizedName = MappingExtensions.NormalizeName(name)
-        };
+        return new Tag { OwnerId = ownerId, Name = name, NormalizedName = MappingExtensions.NormalizeName(name) };
     }
 
     public static Book Book(Guid ownerId, string title, Author? author = null)
@@ -62,9 +46,10 @@ public static class TestData
         return book;
     }
 
-    public static async Task<Book> AddBookAsync(ApplicationDbContext context, Guid ownerId, string title, Author? author = null)
+    public static async Task<Book> AddBookAsync(ApplicationDbContext context, Guid ownerId, string title,
+        Author? author = null)
     {
-        var book = Book(ownerId, title, author);
+        Book book = Book(ownerId, title, author);
         context.Books.Add(book);
         await context.SaveChangesAsync();
         return book;
@@ -72,14 +57,14 @@ public static class TestData
 
     public static async Task<Book> AddBookWithRelationsAsync(ApplicationDbContext context, Guid ownerId)
     {
-        var author = Author("Toika");
-        var genre = Genre("Fantasy");
-        var tag = Tag(ownerId, "favorite");
+        Author author = Author("Toika");
+        Genre genre = Genre("Fantasy");
+        Tag tag = Tag(ownerId, "favorite");
         context.Authors.Add(author);
         context.Genres.Add(genre);
         context.Tags.Add(tag);
 
-        var book = Book(ownerId, "Everyone Else is a Returnee", author);
+        Book book = Book(ownerId, "Everyone Else is a Returnee", author);
         book.Titles.Add(new BookTitle
         {
             Title = "Na Bbaego Da Gwihwanja",

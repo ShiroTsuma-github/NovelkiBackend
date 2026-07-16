@@ -1,5 +1,6 @@
 namespace Api.Controllers;
 
+using Application.Common.DTOs.Author;
 using Application.Features.AuthorFeatures.Queries;
 
 [ApiController]
@@ -17,7 +18,7 @@ public class AuthorController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Search([FromQuery] SearchAuthorsQuery query)
     {
-        var authors = await _mediator.Send(query);
+        IReadOnlyCollection<AuthorDto> authors = await _mediator.Send(query);
         return Ok(authors);
     }
 }

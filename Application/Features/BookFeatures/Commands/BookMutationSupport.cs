@@ -14,9 +14,9 @@ internal static class BookMutationSupport
         IEnumerable<BookTitleInput>? alternativeTitles,
         CancellationToken cancellationToken)
     {
-        foreach (var title in EnumerateTitles(primaryTitle, alternativeTitles))
+        foreach (string title in EnumerateTitles(primaryTitle, alternativeTitles))
         {
-            var existing = await bookRepository.GetByNameAsync(title, ownerId, contentTypeId, cancellationToken);
+            Book? existing = await bookRepository.GetByNameAsync(title, ownerId, contentTypeId, cancellationToken);
             if (existing != null && existing.Id != currentBookId)
             {
                 throw new EntityAlreadyExistsException<Book, Guid>(title, existing.Id);
@@ -33,7 +33,7 @@ internal static class BookMutationSupport
         if (authorId.HasValue)
         {
             return await authorRepository.GetByIdAsync(authorId.Value, cancellationToken)
-                ?? throw new EntityNotFoundException<Author, Guid>(authorId.Value);
+                   ?? throw new EntityNotFoundException<Author, Guid>(authorId.Value);
         }
 
         if (string.IsNullOrWhiteSpace(authorName))
@@ -41,8 +41,8 @@ internal static class BookMutationSupport
             return null;
         }
 
-        var normalizedAuthorName = authorName.Trim();
-        var existing = await authorRepository.GetByNameAsync(normalizedAuthorName, cancellationToken);
+        string normalizedAuthorName = authorName.Trim();
+        Author? existing = await authorRepository.GetByNameAsync(normalizedAuthorName, cancellationToken);
         if (existing != null)
         {
             return existing;
@@ -77,20 +77,15 @@ internal static class BookMutationSupport
             .ToList();
         var existingTags = (await tagRepository.GetByNamesAsync(ownerId, names, cancellationToken)).ToList();
         var existingNormalized = existingTags.Select(tag => tag.NormalizedName).ToHashSet();
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            var normalized = MappingExtensions.NormalizeName(name);
+            string normalized = MappingExtensions.NormalizeName(name);
             if (existingNormalized.Contains(normalized))
             {
                 continue;
             }
 
-            var tag = new Tag
-            {
-                OwnerId = ownerId,
-                Name = name,
-                NormalizedName = normalized
-            };
+            var tag = new Tag { OwnerId = ownerId, Name = name, NormalizedName = normalized };
             await tagRepository.AddAsync(tag, cancellationToken);
             existingTags.Add(tag);
         }
@@ -119,11 +114,12 @@ internal static class BookMutationSupport
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private static IEnumerable<string> EnumerateTitles(string primaryTitle, IEnumerable<BookTitleInput>? alternativeTitles)
+    private static IEnumerable<string> EnumerateTitles(string primaryTitle,
+        IEnumerable<BookTitleInput>? alternativeTitles)
     {
         yield return primaryTitle;
 
-        foreach (var title in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
+        foreach (BookTitleInput title in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
         {
             if (!string.IsNullOrWhiteSpace(title.Title))
             {

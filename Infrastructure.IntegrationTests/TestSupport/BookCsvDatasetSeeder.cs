@@ -12,9 +12,15 @@ namespace Infrastructure.IntegrationTests.TestSupport;
 public static class BookCsvDatasetSeeder
 {
     private static readonly string[] TypeNames = ["Novel", "Manga", "Manhwa", "Manhua", "Other"];
-    private static readonly string[] StatusNames = ["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"];
-    private static readonly string[] FallbackGenreNames = ["Fantasy", "Action", "Drama", "Adventure", "Romance", "Comedy", "Xianxia", "Harem"];
-    private static readonly string[] CsvRelativePaths = ["Sample/books-export.csv", "Infrastructure.IntegrationTests/Sample/books-export.csv"];
+
+    private static readonly string[] StatusNames =
+        ["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"];
+
+    private static readonly string[] FallbackGenreNames =
+        ["Fantasy", "Action", "Drama", "Adventure", "Romance", "Comedy", "Xianxia", "Harem"];
+
+    private static readonly string[] CsvRelativePaths =
+        ["Sample/books-export.csv", "Infrastructure.IntegrationTests/Sample/books-export.csv"];
 
     public static async Task<BookCsvDatasetSnapshot> SeedAsync(
         ApplicationDbContext context,
@@ -24,42 +30,45 @@ public static class BookCsvDatasetSeeder
         var rows = ReadRows().ToList();
         if (rows.Count == 0)
         {
-            throw new InvalidOperationException("The local CSV test dataset notes/books-export.csv contains no importable books.");
+            throw new InvalidOperationException(
+                "The local CSV test dataset notes/books-export.csv contains no importable books.");
         }
 
-        var contentTypes = await context.ContentTypes
+        Dictionary<string, ContentType> contentTypes = await context.ContentTypes
             .Where(type => TypeNames.Contains(type.Name))
             .ToDictionaryAsync(type => type.Name, cancellationToken);
-        var statuses = await context.Statuses
+        Dictionary<string, Status> statuses = await context.Statuses
             .Where(status => StatusNames.Contains(status.Name))
             .ToDictionaryAsync(status => status.Name, cancellationToken);
 
-        var genreNames = rows
+        string[] genreNames = rows
             .SelectMany(row => row.Genres)
             .Concat(FallbackGenreNames)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var genres = await EnsureGenresAsync(context, genreNames, cancellationToken);
-        var tags = await EnsureTagsAsync(context, ownerId, rows.SelectMany(row => row.Tags), cancellationToken);
-        var authors = await EnsureAuthorsAsync(context, rows.Select(row => row.Author), cancellationToken);
+        Dictionary<string, Genre> genres = await EnsureGenresAsync(context, genreNames, cancellationToken);
+        Dictionary<string, Tag> tags =
+            await EnsureTagsAsync(context, ownerId, rows.SelectMany(row => row.Tags), cancellationToken);
+        Dictionary<string, Author> authors =
+            await EnsureAuthorsAsync(context, rows.Select(row => row.Author), cancellationToken);
 
         var random = new Random(1337);
         var usedKeys = new HashSet<BookUniqueKey>();
         var samples = new List<BookCsvDatasetSample>();
         var typeCounts = TypeNames.ToDictionary(name => name, _ => 0);
         var statusCounts = StatusNames.ToDictionary(name => name, _ => 0);
-        var booksWithGenres = 0;
-        var preservedTaggedBooks = 0;
-        var preservedRatedBooks = 0;
-        var preservedProgressBooks = 0;
+        int booksWithGenres = 0;
+        int preservedTaggedBooks = 0;
+        int preservedRatedBooks = 0;
+        int preservedProgressBooks = 0;
 
-        for (var index = 0; index < rows.Count; index++)
+        for (int index = 0; index < rows.Count; index++)
         {
-            var row = rows[index];
-            var typeName = TypeNames[index % TypeNames.Length];
-            var statusName = StatusNames[index % StatusNames.Length];
-            var title = MakeUniqueTitle(row.PrimaryTitle, ownerId, contentTypes[typeName].Id, usedKeys);
+            CsvBookRow row = rows[index];
+            string typeName = TypeNames[index % TypeNames.Length];
+            string statusName = StatusNames[index % StatusNames.Length];
+            string title = MakeUniqueTitle(row.PrimaryTitle, ownerId, contentTypes[typeName].Id, usedKeys);
             var book = new Book
             {
                 OwnerId = ownerId,
@@ -86,12 +95,15 @@ public static class BookCsvDatasetSeeder
                 Source = "CsvTestDataset"
             });
 
-            foreach (var genreName in SelectGenres(row, genreNames, random))
+            foreach (string genreName in SelectGenres(row, genreNames, random))
             {
-                book.BookGenres.Add(new BookGenre { Book = book, Genre = genres[MappingExtensions.NormalizeName(genreName)] });
+                book.BookGenres.Add(new BookGenre
+                {
+                    Book = book, Genre = genres[MappingExtensions.NormalizeName(genreName)]
+                });
             }
 
-            foreach (var tagName in row.Tags.Distinct(StringComparer.OrdinalIgnoreCase))
+            foreach (string tagName in row.Tags.Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 book.BookTags.Add(new BookTag { Book = book, Tag = tags[MappingExtensions.NormalizeName(tagName)] });
             }
@@ -101,8 +113,10 @@ public static class BookCsvDatasetSeeder
                 book.ProgressHistory.Add(new BookProgressHistory
                 {
                     ChapterNumber = row.CurrentChapterNumber,
-                    ChapterLabel = row.CurrentChapterLabel ?? row.CurrentChapterNumber?.ToString(CultureInfo.InvariantCulture),
-                    ChangedAt = DateTimeOffset.Parse("2026-01-01T00:00:00+00:00", CultureInfo.InvariantCulture).AddMinutes(index)
+                    ChapterLabel =
+                        row.CurrentChapterLabel ?? row.CurrentChapterNumber?.ToString(CultureInfo.InvariantCulture),
+                    ChangedAt = DateTimeOffset.Parse("2026-01-01T00:00:00+00:00", CultureInfo.InvariantCulture)
+                        .AddMinutes(index)
                 });
             }
 
@@ -160,7 +174,8 @@ public static class BookCsvDatasetSeeder
     private static void AssertBalanced(IReadOnlyDictionary<string, int> counts)
     {
         Assert.NotEmpty(counts);
-        Assert.True(counts.Values.Max() - counts.Values.Min() <= 1, $"Expected balanced distribution, got {string.Join(", ", counts.Select(item => $"{item.Key}={item.Value}"))}.");
+        Assert.True(counts.Values.Max() - counts.Values.Min() <= 1,
+            $"Expected balanced distribution, got {string.Join(", ", counts.Select(item => $"{item.Key}={item.Value}"))}.");
     }
 
     private static async Task<Dictionary<string, Genre>> EnsureGenresAsync(
@@ -168,25 +183,25 @@ public static class BookCsvDatasetSeeder
         IEnumerable<string> genreNames,
         CancellationToken cancellationToken)
     {
-        var names = genreNames
+        string[] names = genreNames
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToArray();
-        var genres = await context.Genres
+        string[] normalizedNames = names.Select(MappingExtensions.NormalizeName).ToArray();
+        Dictionary<string, Genre> genres = await context.Genres
             .Where(genre => normalizedNames.Contains(genre.NormalizedName))
             .ToDictionaryAsync(genre => genre.NormalizedName, cancellationToken);
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            var normalizedName = MappingExtensions.NormalizeName(name);
+            string normalizedName = MappingExtensions.NormalizeName(name);
             if (genres.ContainsKey(normalizedName))
             {
                 continue;
             }
 
-            var genre = TestData.Genre(name);
+            Genre genre = TestData.Genre(name);
             context.Genres.Add(genre);
             genres[normalizedName] = genre;
         }
@@ -200,25 +215,25 @@ public static class BookCsvDatasetSeeder
         IEnumerable<string> tagNames,
         CancellationToken cancellationToken)
     {
-        var names = tagNames
+        string[] names = tagNames
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToArray();
-        var tags = await context.Tags
+        string[] normalizedNames = names.Select(MappingExtensions.NormalizeName).ToArray();
+        Dictionary<string, Tag> tags = await context.Tags
             .Where(tag => tag.OwnerId == ownerId && normalizedNames.Contains(tag.NormalizedName))
             .ToDictionaryAsync(tag => tag.NormalizedName, cancellationToken);
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            var normalizedName = MappingExtensions.NormalizeName(name);
+            string normalizedName = MappingExtensions.NormalizeName(name);
             if (tags.ContainsKey(normalizedName))
             {
                 continue;
             }
 
-            var tag = TestData.Tag(ownerId, name);
+            Tag tag = TestData.Tag(ownerId, name);
             context.Tags.Add(tag);
             tags[normalizedName] = tag;
         }
@@ -231,25 +246,25 @@ public static class BookCsvDatasetSeeder
         IEnumerable<string?> authorNames,
         CancellationToken cancellationToken)
     {
-        var names = authorNames
+        string[] names = authorNames
             .Where(name => !string.IsNullOrWhiteSpace(name))
             .Select(name => name!.Trim())
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToArray();
-        var authors = await context.Authors
+        string[] normalizedNames = names.Select(MappingExtensions.NormalizeName).ToArray();
+        Dictionary<string, Author> authors = await context.Authors
             .Where(author => normalizedNames.Contains(author.NormalizedPrimaryName))
             .ToDictionaryAsync(author => author.NormalizedPrimaryName, cancellationToken);
 
-        foreach (var name in names)
+        foreach (string name in names)
         {
-            var normalizedName = MappingExtensions.NormalizeName(name);
+            string normalizedName = MappingExtensions.NormalizeName(name);
             if (authors.ContainsKey(normalizedName))
             {
                 continue;
             }
 
-            var author = TestData.Author(name);
+            Author author = TestData.Author(name);
             context.Authors.Add(author);
             authors[normalizedName] = author;
         }
@@ -257,10 +272,11 @@ public static class BookCsvDatasetSeeder
         return authors;
     }
 
-    private static IReadOnlyCollection<string> SelectGenres(CsvBookRow row, IReadOnlyList<string> genreNames, Random random)
+    private static IReadOnlyCollection<string> SelectGenres(CsvBookRow row, IReadOnlyList<string> genreNames,
+        Random random)
     {
         var selected = new HashSet<string>(row.Genres, StringComparer.OrdinalIgnoreCase);
-        var targetCount = Math.Max(selected.Count, random.Next(1, Math.Min(3, genreNames.Count) + 1));
+        int targetCount = Math.Max(selected.Count, random.Next(1, Math.Min(3, genreNames.Count) + 1));
         while (selected.Count < targetCount)
         {
             selected.Add(genreNames[random.Next(genreNames.Count)]);
@@ -269,10 +285,11 @@ public static class BookCsvDatasetSeeder
         return selected;
     }
 
-    private static string MakeUniqueTitle(string baseTitle, Guid ownerId, Guid contentTypeId, HashSet<BookUniqueKey> usedKeys)
+    private static string MakeUniqueTitle(string baseTitle, Guid ownerId, Guid contentTypeId,
+        HashSet<BookUniqueKey> usedKeys)
     {
-        var title = baseTitle;
-        var suffix = 2;
+        string title = baseTitle;
+        int suffix = 2;
         while (!usedKeys.Add(new BookUniqueKey(ownerId, MappingExtensions.NormalizeName(title), contentTypeId)))
         {
             title = $"{baseTitle} ({suffix})";
@@ -284,29 +301,27 @@ public static class BookCsvDatasetSeeder
 
     private static IEnumerable<CsvBookRow> ReadRows()
     {
-        var csvPath = FindCsvPath();
+        string csvPath = FindCsvPath();
         using var parser = new TextFieldParser(csvPath)
         {
-            TextFieldType = FieldType.Delimited,
-            HasFieldsEnclosedInQuotes = true,
-            TrimWhiteSpace = false
+            TextFieldType = FieldType.Delimited, HasFieldsEnclosedInQuotes = true, TrimWhiteSpace = false
         };
         parser.SetDelimiters(",");
 
-        var headers = parser.ReadFields() ?? [];
+        string[] headers = parser.ReadFields() ?? [];
         var headerIndexes = headers
             .Select((header, index) => new { Header = header, Index = index })
             .ToDictionary(item => item.Header, item => item.Index, StringComparer.OrdinalIgnoreCase);
 
         while (!parser.EndOfData)
         {
-            var fields = parser.ReadFields();
+            string[]? fields = parser.ReadFields();
             if (fields == null)
             {
                 continue;
             }
 
-            var title = GetField(fields, headerIndexes, "primaryTitle");
+            string? title = GetField(fields, headerIndexes, "primaryTitle");
             if (string.IsNullOrWhiteSpace(title))
             {
                 continue;
@@ -328,7 +343,11 @@ public static class BookCsvDatasetSeeder
 
     private static string FindCsvPath([CallerFilePath] string sourceFilePath = "")
     {
-        foreach (var startPath in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory(), Path.GetDirectoryName(sourceFilePath) })
+        foreach (string? startPath in new[]
+                 {
+                     AppContext.BaseDirectory, Directory.GetCurrentDirectory(),
+                     Path.GetDirectoryName(sourceFilePath)
+                 })
         {
             if (string.IsNullOrWhiteSpace(startPath))
             {
@@ -338,9 +357,9 @@ public static class BookCsvDatasetSeeder
             var current = new DirectoryInfo(startPath);
             while (current != null)
             {
-                foreach (var relativePath in CsvRelativePaths)
+                foreach (string relativePath in CsvRelativePaths)
                 {
-                    var candidate = Path.Combine(current.FullName, relativePath);
+                    string candidate = Path.Combine(current.FullName, relativePath);
                     if (File.Exists(candidate))
                     {
                         return candidate;
@@ -351,12 +370,14 @@ public static class BookCsvDatasetSeeder
             }
         }
 
-        throw new FileNotFoundException("Expected CSV test dataset at Infrastructure.IntegrationTests/Sample/books-export.csv or copied build output Sample/books-export.csv.");
+        throw new FileNotFoundException(
+            "Expected CSV test dataset at Infrastructure.IntegrationTests/Sample/books-export.csv or copied build output Sample/books-export.csv.");
     }
 
-    private static string? GetField(IReadOnlyList<string> fields, IReadOnlyDictionary<string, int> headerIndexes, string header)
+    private static string? GetField(IReadOnlyList<string> fields, IReadOnlyDictionary<string, int> headerIndexes,
+        string header)
     {
-        return headerIndexes.TryGetValue(header, out var index) && index < fields.Count ? fields[index] : null;
+        return headerIndexes.TryGetValue(header, out int index) && index < fields.Count ? fields[index] : null;
     }
 
     private static string? TrimToNull(string? value)
@@ -366,12 +387,14 @@ public static class BookCsvDatasetSeeder
 
     private static decimal? TryDecimal(string? value)
     {
-        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) ? result : null;
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out decimal result)
+            ? result
+            : null;
     }
 
     private static int? TryInt(string? value)
     {
-        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var result) ? result : null;
+        return int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out int result) ? result : null;
     }
 
     private static IReadOnlyList<string> SplitSemicolonList(string? value)
@@ -412,7 +435,10 @@ public sealed record BookCsvDatasetSnapshot(
     public BookCsvDatasetSample Any => Samples[0];
     public BookCsvDatasetSample WithTag => Samples.First(sample => sample.Tags.Count > 0);
     public BookCsvDatasetSample WithRating => Samples.First(sample => sample.Rating != null);
-    public BookCsvDatasetSample WithTagAndRating => Samples.First(sample => sample.Tags.Count > 0 && sample.Rating != null);
+
+    public BookCsvDatasetSample WithTagAndRating =>
+        Samples.First(sample => sample.Tags.Count > 0 && sample.Rating != null);
+
     public BookCsvDatasetSample WithTotalChapters => Samples.First(sample => sample.TotalChapters != null);
     public BookCsvDatasetSample WithNotes => Samples.First(sample => !string.IsNullOrWhiteSpace(sample.Notes));
 }

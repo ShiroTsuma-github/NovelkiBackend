@@ -12,6 +12,7 @@ using System.Collections.Concurrent;
 public sealed class BookCsvImportService : IBookCsvImportService
 {
     private static readonly string[] RequiredColumns = ["primaryTitle", "contentType", "status"];
+
     private static readonly string[] TemplateColumns =
     [
         "primaryTitle",
@@ -28,6 +29,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         "notes",
         "rawImportedLine"
     ];
+
     private static readonly ConcurrentDictionary<Guid, ImportSession> Sessions = new();
 
     private readonly ApplicationDbContext _context;
@@ -52,15 +54,14 @@ public sealed class BookCsvImportService : IBookCsvImportService
         return string.Join(',', TemplateColumns) + Environment.NewLine;
     }
 
-    public async Task<BookImportSessionDto> CreateSessionAsync(Stream csvStream, string fileName, CancellationToken cancellationToken)
+    public async Task<BookImportSessionDto> CreateSessionAsync(Stream csvStream, string fileName,
+        CancellationToken cancellationToken)
     {
-        var ownerId = _user.RequiredId;
+        Guid ownerId = _user.RequiredId;
         using var reader = new StreamReader(csvStream, leaveOpen: true);
         using var parser = new TextFieldParser(reader)
         {
-            TextFieldType = FieldType.Delimited,
-            HasFieldsEnclosedInQuotes = true,
-            TrimWhiteSpace = false
+            TextFieldType = FieldType.Delimited, HasFieldsEnclosedInQuotes = true, TrimWhiteSpace = false
         };
         parser.SetDelimiters(",");
 
@@ -69,7 +70,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             throw new ValidationException("CSV file is empty.");
         }
 
-        var headers = parser.ReadFields();
+        string[]? headers = parser.ReadFields();
         if (headers == null)
         {
             throw new ValidationException("CSV header could not be read.");
@@ -79,7 +80,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             .Select((name, index) => new { Name = name.Trim(), Index = index })
             .ToDictionary(item => item.Name, item => item.Index, StringComparer.OrdinalIgnoreCase);
 
-        var missingColumns = RequiredColumns.Where(column => !headerMap.ContainsKey(column)).ToArray();
+        string[] missingColumns = RequiredColumns.Where(column => !headerMap.ContainsKey(column)).ToArray();
         if (missingColumns.Length > 0)
         {
             throw new ValidationException($"CSV is missing required columns: {string.Join(", ", missingColumns)}");
@@ -132,16 +133,17 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
     public async Task<BookImportSessionDto> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
+        ImportSession session = GetOwnedSession(sessionId);
         await RevalidateSessionAsync(session, cancellationToken);
         return BookCsvImportSessionMapper.ToDto(session);
     }
 
-    public async Task<BookImportSessionDto> UpdateRowAsync(Guid sessionId, Guid rowId, UpdateBookImportRowRequest request, CancellationToken cancellationToken)
+    public async Task<BookImportSessionDto> UpdateRowAsync(Guid sessionId, Guid rowId,
+        UpdateBookImportRowRequest request, CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
-        var row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
-            ?? throw new ValidationException("Import row not found.");
+        ImportSession session = GetOwnedSession(sessionId);
+        ImportRow row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
+                        ?? throw new ValidationException("Import row not found.");
 
         BookCsvImportRowMapper.ApplyRequest(row, request);
 
@@ -149,10 +151,11 @@ public sealed class BookCsvImportService : IBookCsvImportService
         return BookCsvImportSessionMapper.ToDto(session);
     }
 
-    public async Task<BookImportSessionDto> DeleteRowAsync(Guid sessionId, Guid rowId, CancellationToken cancellationToken)
+    public async Task<BookImportSessionDto> DeleteRowAsync(Guid sessionId, Guid rowId,
+        CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
-        var removed = session.Rows.RemoveAll(item => item.RowId == rowId);
+        ImportSession session = GetOwnedSession(sessionId);
+        int removed = session.Rows.RemoveAll(item => item.RowId == rowId);
         if (removed == 0)
         {
             throw new ValidationException("Import row not found.");
@@ -164,7 +167,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
     public async Task<BookImportSessionDto> DeleteInvalidRowsAsync(Guid sessionId, CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
+        ImportSession session = GetOwnedSession(sessionId);
         session.Rows.RemoveAll(item => item.Errors.Count > 0);
         await RevalidateSessionAsync(session, cancellationToken);
         return BookCsvImportSessionMapper.ToDto(session);
@@ -172,47 +175,48 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
     public async Task<BookImportFinalizeResultDto> FinalizeAsync(Guid sessionId, CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
+        ImportSession session = GetOwnedSession(sessionId);
         await RevalidateSessionAsync(session, cancellationToken);
         if (session.Rows.Any(row => row.Errors.Count > 0))
         {
             throw new ValidationException("Fix invalid import rows before finalizing.");
         }
 
-        var ownerId = session.OwnerId;
-        var typeMap = await _context.ContentTypes.AsNoTracking()
+        Guid ownerId = session.OwnerId;
+        Dictionary<string, ContentType> typeMap = await _context.ContentTypes.AsNoTracking()
             .ToDictionaryAsync(t => MappingExtensions.NormalizeName(t.Name), t => t, cancellationToken);
-        var statusMap = await _context.Statuses.AsNoTracking()
+        Dictionary<string, Status> statusMap = await _context.Statuses.AsNoTracking()
             .ToDictionaryAsync(s => MappingExtensions.NormalizeName(s.Name), s => s, cancellationToken);
-        var authorMap = await _context.Authors.Include(a => a.Names)
+        Dictionary<string, Author> authorMap = await _context.Authors.Include(a => a.Names)
             .ToDictionaryAsync(a => a.NormalizedPrimaryName, cancellationToken);
-        var tagMap = await _context.Tags.Where(t => t.OwnerId == ownerId)
+        Dictionary<string, Tag> tagMap = await _context.Tags.Where(t => t.OwnerId == ownerId)
             .ToDictionaryAsync(t => t.NormalizedName, cancellationToken);
-        var existingKeys = await _context.Books.AsNoTracking()
+        HashSet<BookImportKey> existingKeys = await _context.Books.AsNoTracking()
             .Where(b => b.OwnerId == ownerId)
             .Select(b => new BookImportKey(b.NormalizedPrimaryTitle, b.ContentTypeId))
             .ToHashSetAsync(cancellationToken);
 
-        var imported = 0;
-        var skipped = 0;
+        int imported = 0;
+        int skipped = 0;
         var errors = new List<string>();
         var createdBookIds = new List<Guid>();
         var importedBooks = new List<BookImportFinalizedBookDto>();
 
-        foreach (var row in session.Rows)
+        foreach (ImportRow row in session.Rows)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var normalizedTitle = MappingExtensions.NormalizeName(row.PrimaryTitle!);
-            var contentTypeId = typeMap[MappingExtensions.NormalizeName(row.ContentType!)].Id;
+            string normalizedTitle = MappingExtensions.NormalizeName(row.PrimaryTitle!);
+            Guid contentTypeId = typeMap[MappingExtensions.NormalizeName(row.ContentType!)].Id;
             var importKey = new BookImportKey(normalizedTitle, contentTypeId);
             if (existingKeys.Contains(importKey))
             {
                 skipped++;
-                errors.Add($"Line {row.LineNumber}: title '{row.PrimaryTitle}' already exists for content type '{row.ContentType}'.");
+                errors.Add(
+                    $"Line {row.LineNumber}: title '{row.PrimaryTitle}' already exists for content type '{row.ContentType}'.");
                 continue;
             }
 
-            var author = ResolveAuthor(row.AuthorName, authorMap);
+            Author? author = ResolveAuthor(row.AuthorName, authorMap);
             var book = new Book
             {
                 PrimaryTitle = row.PrimaryTitle!,
@@ -237,17 +241,12 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             book.Titles.Add(book.PrimaryTitle.ToPrimaryTitle());
 
-            foreach (var tagName in BookCsvImportRowMapper.SplitTags(row.Tags))
+            foreach (string tagName in BookCsvImportRowMapper.SplitTags(row.Tags))
             {
-                var normalizedTag = MappingExtensions.NormalizeName(tagName);
-                if (!tagMap.TryGetValue(normalizedTag, out var tag))
+                string normalizedTag = MappingExtensions.NormalizeName(tagName);
+                if (!tagMap.TryGetValue(normalizedTag, out Tag? tag))
                 {
-                    tag = new Tag
-                    {
-                        OwnerId = ownerId,
-                        Name = tagName,
-                        NormalizedName = normalizedTag
-                    };
+                    tag = new Tag { OwnerId = ownerId, Name = tagName, NormalizedName = normalizedTag };
                     tagMap[normalizedTag] = tag;
                     _context.Tags.Add(tag);
                 }
@@ -283,7 +282,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         if (imported > 0)
         {
             await _context.SaveChangesAsync(cancellationToken);
-            foreach (var bookId in createdBookIds)
+            foreach (Guid bookId in createdBookIds)
             {
                 await _bookCoverQueue.QueueAsync(bookId, cancellationToken);
             }
@@ -294,16 +293,13 @@ public sealed class BookCsvImportService : IBookCsvImportService
         Sessions.TryRemove(sessionId, out _);
         return new BookImportFinalizeResultDto
         {
-            ImportedCount = imported,
-            SkippedCount = skipped,
-            ImportedBooks = importedBooks,
-            Errors = errors
+            ImportedCount = imported, SkippedCount = skipped, ImportedBooks = importedBooks, Errors = errors
         };
     }
 
     public Task CancelAsync(Guid sessionId, CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
+        ImportSession session = GetOwnedSession(sessionId);
         Sessions.TryRemove(session.SessionId, out _);
         return Task.CompletedTask;
     }
@@ -316,7 +312,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             .ToListAsync(cancellationToken);
         var typeNames = types.Select(t => MappingExtensions.NormalizeName(t.Name)).ToList();
         var typeIdsByName = types.ToDictionary(t => MappingExtensions.NormalizeName(t.Name), t => t.Id);
-        var statusNames = await _context.Statuses.AsNoTracking()
+        List<string> statusNames = await _context.Statuses.AsNoTracking()
             .OrderBy(s => s.Id.ToString())
             .Select(s => s.Name)
             .ToListAsync(cancellationToken);
@@ -326,13 +322,14 @@ public sealed class BookCsvImportService : IBookCsvImportService
         session.AvailableStatuses = statusNames
             .ToArray();
         var validTypes = typeNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var validStatuses = statusNames.Select(MappingExtensions.NormalizeName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var existingKeys = await _context.Books.AsNoTracking()
+        var validStatuses = statusNames.Select(MappingExtensions.NormalizeName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        HashSet<BookImportKey> existingKeys = await _context.Books.AsNoTracking()
             .Where(b => b.OwnerId == session.OwnerId)
             .Select(b => new BookImportKey(b.NormalizedPrimaryTitle, b.ContentTypeId))
             .ToHashSetAsync(cancellationToken);
 
-        foreach (var row in session.Rows)
+        foreach (ImportRow row in session.Rows)
         {
             row.Errors.Clear();
             row.FieldErrors.Clear();
@@ -344,27 +341,36 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 BookCsvImportRowMapper.AddFieldError(row, "primaryTitle", "Primary title is required.");
             }
 
-            var normalizedContentType = string.IsNullOrWhiteSpace(row.ContentType) ? null : MappingExtensions.NormalizeName(row.ContentType);
-            var normalizedStatus = string.IsNullOrWhiteSpace(row.Status) ? null : MappingExtensions.NormalizeName(row.Status);
+            string? normalizedContentType = string.IsNullOrWhiteSpace(row.ContentType)
+                ? null
+                : MappingExtensions.NormalizeName(row.ContentType);
+            string? normalizedStatus = string.IsNullOrWhiteSpace(row.Status)
+                ? null
+                : MappingExtensions.NormalizeName(row.Status);
 
             if (normalizedContentType == null || !validTypes.Contains(normalizedContentType))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "contentType", $"Content type is required and must exist. Allowed values: {string.Join(", ", types.Select(type => type.Name))}.");
+                BookCsvImportRowMapper.AddFieldError(row, "contentType",
+                    $"Content type is required and must exist. Allowed values: {string.Join(", ", types.Select(type => type.Name))}.");
             }
 
             if (normalizedStatus == null || !validStatuses.Contains(normalizedStatus))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "status", $"Status is required and must exist. Allowed values: {string.Join(", ", statusNames)}.");
+                BookCsvImportRowMapper.AddFieldError(row, "status",
+                    $"Status is required and must exist. Allowed values: {string.Join(", ", statusNames)}.");
             }
 
-            var totalChapters = BookCsvImportRowMapper.ParseDecimal(row, row.TotalChapters, "totalChapters", nameof(row.TotalChapters));
-            var currentChapterNumber = BookCsvImportRowMapper.ParseDecimal(row, row.CurrentChapterNumber, "currentChapterNumber", nameof(row.CurrentChapterNumber));
+            decimal? totalChapters =
+                BookCsvImportRowMapper.ParseDecimal(row, row.TotalChapters, "totalChapters", nameof(row.TotalChapters));
+            decimal? currentChapterNumber = BookCsvImportRowMapper.ParseDecimal(row, row.CurrentChapterNumber,
+                "currentChapterNumber", nameof(row.CurrentChapterNumber));
             _ = BookCsvImportRowMapper.ParseInt(row, row.Rating, "rating", nameof(row.Rating), 1, 10);
             _ = BookCsvImportRowMapper.ParseInt(row, row.Priority, "priority", nameof(row.Priority), 1, 5);
 
             if (currentChapterNumber.HasValue && currentChapterNumber < 0)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "currentChapterNumber", "Current chapter number cannot be negative.");
+                BookCsvImportRowMapper.AddFieldError(row, "currentChapterNumber",
+                    "Current chapter number cannot be negative.");
             }
 
             if (totalChapters.HasValue && totalChapters < 0)
@@ -374,7 +380,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             if (totalChapters.HasValue && currentChapterNumber.HasValue && currentChapterNumber > totalChapters)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "currentChapterNumber", "Current chapter number cannot exceed total chapters.");
+                BookCsvImportRowMapper.AddFieldError(row, "currentChapterNumber",
+                    "Current chapter number cannot exceed total chapters.");
             }
 
             if (!string.IsNullOrWhiteSpace(row.PrimaryTitle) &&
@@ -384,29 +391,32 @@ public sealed class BookCsvImportService : IBookCsvImportService
                     MappingExtensions.NormalizeName(row.PrimaryTitle),
                     typeIdsByName[normalizedContentType])))
             {
-                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle", "A book with this title and content type already exists in your library.");
+                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle",
+                    "A book with this title and content type already exists in your library.");
             }
         }
 
-        var duplicateGroups = session.Rows
-            .Where(row => !string.IsNullOrWhiteSpace(row.PrimaryTitle) && !string.IsNullOrWhiteSpace(row.ContentType) && validTypes.Contains(MappingExtensions.NormalizeName(row.ContentType)))
+        IEnumerable<IGrouping<BookImportKey, ImportRow>> duplicateGroups = session.Rows
+            .Where(row => !string.IsNullOrWhiteSpace(row.PrimaryTitle) && !string.IsNullOrWhiteSpace(row.ContentType) &&
+                          validTypes.Contains(MappingExtensions.NormalizeName(row.ContentType)))
             .GroupBy(row => new BookImportKey(
                 MappingExtensions.NormalizeName(row.PrimaryTitle!),
                 typeIdsByName[MappingExtensions.NormalizeName(row.ContentType!)]))
             .Where(group => group.Count() > 1);
 
-        foreach (var duplicateGroup in duplicateGroups)
+        foreach (IGrouping<BookImportKey, ImportRow> duplicateGroup in duplicateGroups)
         {
-            foreach (var row in duplicateGroup)
+            foreach (ImportRow row in duplicateGroup)
             {
-                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle", "Duplicate title with the same content type inside this import session.");
+                BookCsvImportRowMapper.AddFieldError(row, "primaryTitle",
+                    "Duplicate title with the same content type inside this import session.");
             }
         }
     }
 
     private ImportSession GetOwnedSession(Guid sessionId)
     {
-        if (!Sessions.TryGetValue(sessionId, out var session) || session.OwnerId != _user.RequiredId)
+        if (!Sessions.TryGetValue(sessionId, out ImportSession? session) || session.OwnerId != _user.RequiredId)
         {
             throw new ValidationException("Import session not found or expired.");
         }
@@ -421,23 +431,16 @@ public sealed class BookCsvImportService : IBookCsvImportService
             return null;
         }
 
-        var normalized = MappingExtensions.NormalizeName(authorName);
-        if (authorMap.TryGetValue(normalized, out var author))
+        string normalized = MappingExtensions.NormalizeName(authorName);
+        if (authorMap.TryGetValue(normalized, out Author? author))
         {
             return author;
         }
 
-        author = new Author
-        {
-            PrimaryName = authorName,
-            NormalizedPrimaryName = normalized
-        };
+        author = new Author { PrimaryName = authorName, NormalizedPrimaryName = normalized };
         author.Names.Add(new AuthorName
         {
-            Name = authorName,
-            NormalizedName = normalized,
-            IsPrimary = true,
-            Source = "CSV import"
+            Name = authorName, NormalizedName = normalized, IsPrimary = true, Source = "CSV import"
         });
         authorMap[normalized] = author;
         _context.Authors.Add(author);

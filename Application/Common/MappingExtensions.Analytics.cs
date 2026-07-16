@@ -10,13 +10,14 @@ public static partial class MappingExtensions
         return new BookAnalyticsDto
         {
             GeneratedAt = source.GeneratedAt,
-            Scope = new BookAnalyticsScopeDto
-            {
-                Query = source.Scope.Query,
-                From = source.Scope.From,
-                To = source.Scope.To,
-                Bucket = source.Scope.Bucket
-            },
+            Scope =
+                new BookAnalyticsScopeDto
+                {
+                    Query = source.Scope.Query,
+                    From = source.Scope.From,
+                    To = source.Scope.To,
+                    Bucket = source.Scope.Bucket
+                },
             Overview = new BookAnalyticsOverviewDto
             {
                 TotalBooks = source.Overview.TotalBooks,
@@ -37,8 +38,7 @@ public static partial class MappingExtensions
                         Statuses = item.Statuses
                             .Select(status => new BookAnalyticsStatusCountDto
                             {
-                                Status = status.Status,
-                                BookCount = status.BookCount
+                                Status = status.Status, BookCount = status.BookCount
                             })
                             .ToList()
                     })
@@ -46,17 +46,13 @@ public static partial class MappingExtensions
                 Genres = source.Composition.Genres
                     .Select(item => new BookAnalyticsRelationCountDto
                     {
-                        Name = item.Name,
-                        BookCount = item.BookCount,
-                        ShareOfBooks = item.ShareOfBooks
+                        Name = item.Name, BookCount = item.BookCount, ShareOfBooks = item.ShareOfBooks
                     })
                     .ToList(),
                 Tags = source.Composition.Tags
                     .Select(item => new BookAnalyticsRelationCountDto
                     {
-                        Name = item.Name,
-                        BookCount = item.BookCount,
-                        ShareOfBooks = item.ShareOfBooks
+                        Name = item.Name, BookCount = item.BookCount, ShareOfBooks = item.ShareOfBooks
                     })
                     .ToList()
             },
@@ -68,8 +64,7 @@ public static partial class MappingExtensions
                 Counts = source.Ratings.Counts
                     .Select(item => new BookAnalyticsRatingCountDto
                     {
-                        Rating = item.Rating,
-                        BookCount = item.BookCount
+                        Rating = item.Rating, BookCount = item.BookCount
                     })
                     .ToList()
             },
@@ -83,8 +78,7 @@ public static partial class MappingExtensions
                         Priorities = item.Priorities
                             .Select(priority => new BookAnalyticsPriorityCountDto
                             {
-                                Priority = priority.Priority,
-                                BookCount = priority.BookCount
+                                Priority = priority.Priority, BookCount = priority.BookCount
                             })
                             .ToList()
                     })
@@ -127,8 +121,7 @@ public static partial class MappingExtensions
                         ByType = item.ByType
                             .Select(type => new BookAnalyticsTypeCountDto
                             {
-                                Type = type.Type,
-                                BookCount = type.BookCount
+                                Type = type.Type, BookCount = type.BookCount
                             })
                             .ToList()
                     })
@@ -139,9 +132,7 @@ public static partial class MappingExtensions
                 FieldCompleteness = source.Quality.FieldCompleteness
                     .Select(item => new BookAnalyticsFieldCompletenessDto
                     {
-                        Field = item.Field,
-                        BookCount = item.BookCount,
-                        ShareOfBooks = item.ShareOfBooks
+                        Field = item.Field, BookCount = item.BookCount, ShareOfBooks = item.ShareOfBooks
                     })
                     .ToList(),
                 LinkSources = source.Quality.LinkSources
@@ -156,17 +147,13 @@ public static partial class MappingExtensions
                 CoverStatuses = source.Quality.CoverStatuses
                     .Select(item => new BookAnalyticsCoverStatusDto
                     {
-                        Status = item.Status,
-                        BookCount = item.BookCount,
-                        ShareOfBooks = item.ShareOfBooks
+                        Status = item.Status, BookCount = item.BookCount, ShareOfBooks = item.ShareOfBooks
                     })
                     .ToList(),
                 CoverSources = source.Quality.CoverSources
                     .Select(item => new BookAnalyticsCoverSourceDto
                     {
-                        Source = item.Source,
-                        BookCount = item.BookCount,
-                        ShareOfBooks = item.ShareOfBooks
+                        Source = item.Source, BookCount = item.BookCount, ShareOfBooks = item.ShareOfBooks
                     })
                     .ToList()
             }

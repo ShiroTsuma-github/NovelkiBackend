@@ -18,7 +18,10 @@ public record BookDto
     public int? Rating { get; set; }
     public int? Priority { get; set; }
     public string? Notes { get; set; }
-    public IReadOnlyCollection<BookProgressHistoryDto> ProgressHistory { get; set; } = Array.Empty<BookProgressHistoryDto>();
+
+    public IReadOnlyCollection<BookProgressHistoryDto> ProgressHistory { get; set; } =
+        Array.Empty<BookProgressHistoryDto>();
+
     public BookCoverDto? Cover { get; set; }
     public IReadOnlyCollection<string> Genres { get; set; } = Array.Empty<string>();
     public IReadOnlyCollection<string> Tags { get; set; } = Array.Empty<string>();
