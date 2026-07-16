@@ -25,8 +25,8 @@ internal static class BookCoverStorageValidation
             throw new FluentValidation.ValidationException($"Cover file cannot exceed {maxBytes} bytes.");
         }
 
-        byte[] bytes = buffer.ToArray();
-        string? detectedMimeType = DetectMimeType(bytes) ?? contentType;
+        var bytes = buffer.ToArray();
+        var detectedMimeType = DetectMimeType(bytes) ?? contentType;
         if (detectedMimeType == null || !AllowedMimeTypes.Contains(detectedMimeType))
         {
             throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");

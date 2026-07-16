@@ -20,7 +20,7 @@ public class GenreController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateGenreCommand command)
     {
-        GenreDto genre = await _mediator.Send(command);
+        var genre = await _mediator.Send(command);
 
         return CreatedAtAction(nameof(GetById), new { id = genre.Id }, genre);
     }
@@ -29,7 +29,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllGenresQuery getAllGenres)
     {
-        PaginatedResult<GenreDto> genres = await _mediator.Send(getAllGenres);
+        var genres = await _mediator.Send(getAllGenres);
 
         return Ok(genres);
     }
@@ -38,7 +38,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        GenreDto genreDto = await _mediator.Send(new GetGenreQuery(id));
+        var genreDto = await _mediator.Send(new GetGenreQuery(id));
 
         return Ok(genreDto);
     }
@@ -47,7 +47,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
-        GenreDetailsDto genreDto = await _mediator.Send(new GetGenreDetailsQuery(id));
+        var genreDto = await _mediator.Send(new GetGenreDetailsQuery(id));
 
         return Ok(genreDto);
     }
@@ -56,7 +56,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
-        GenreDto genreDto = await _mediator.Send(new GetGenreByNameQuery(name));
+        var genreDto = await _mediator.Send(new GetGenreByNameQuery(name));
 
         return Ok(genreDto);
     }
@@ -65,7 +65,7 @@ public class GenreController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
-        GenreDetailsDto genreDto = await _mediator.Send(new GetGenreDetailsByNameQuery(name));
+        var genreDto = await _mediator.Send(new GetGenreDetailsByNameQuery(name));
 
         return Ok(genreDto);
     }
@@ -75,7 +75,7 @@ public class GenreController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateGenreCommand updateGenre)
     {
         updateGenre.Id = id;
-        GenreDto genre = await _mediator.Send(updateGenre);
+        var genre = await _mediator.Send(updateGenre);
 
         return Ok(genre);
     }

@@ -19,8 +19,8 @@ public class CurrentUser : IUser
     {
         get
         {
-            string? userIdClaim = User?.FindFirstValue(ClaimTypes.NameIdentifier);
-            return Guid.TryParse(userIdClaim, out Guid guid) ? guid : null;
+            var userIdClaim = User?.FindFirstValue(ClaimTypes.NameIdentifier);
+            return Guid.TryParse(userIdClaim, out var guid) ? guid : null;
         }
     }
 
@@ -35,8 +35,8 @@ public class CurrentUser : IUser
     {
         get
         {
-            string? createdAtClaim = User?.FindFirstValue("created_at");
-            return DateTimeOffset.TryParse(createdAtClaim, out DateTimeOffset createdAt) ? createdAt : null;
+            var createdAtClaim = User?.FindFirstValue("created_at");
+            return DateTimeOffset.TryParse(createdAtClaim, out var createdAt) ? createdAt : null;
         }
     }
 

@@ -9,9 +9,9 @@ public class ValidationBehaviorTests
     public async Task Handle_ShouldCallNext_WhenNoValidatorsExist()
     {
         var behavior = new ValidationBehavior<TestRequest, string>(Array.Empty<IValidator<TestRequest>>());
-        bool nextCalled = false;
+        var nextCalled = false;
 
-        string result = await behavior.Handle(new TestRequest("ok"), cancellationToken =>
+        var result = await behavior.Handle(new TestRequest("ok"), cancellationToken =>
         {
             nextCalled = true;
             return Task.FromResult("done");
@@ -25,9 +25,9 @@ public class ValidationBehaviorTests
     public async Task Handle_ShouldCallNext_WhenValidationSucceeds()
     {
         var behavior = new ValidationBehavior<TestRequest, string>([new TestRequestValidator()]);
-        bool nextCalled = false;
+        var nextCalled = false;
 
-        string result = await behavior.Handle(new TestRequest("value"), cancellationToken =>
+        var result = await behavior.Handle(new TestRequest("value"), cancellationToken =>
         {
             nextCalled = true;
             return Task.FromResult("done");
@@ -43,7 +43,7 @@ public class ValidationBehaviorTests
         var behavior =
             new ValidationBehavior<TestRequest, string>([new TestRequestValidator(), new TestRequestLengthValidator()]);
 
-        ValidationException exception = await Assert.ThrowsAsync<ValidationException>(() =>
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
             behavior.Handle(new TestRequest(""), _ => Task.FromResult("done"), CancellationToken.None));
 
         Assert.True(exception.Errors.Count() >= 2);

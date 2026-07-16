@@ -35,7 +35,7 @@ public class SecurityAttributeTests
     [Fact]
     public void AdminController_ShouldRequireAdminRoleAtControllerLevel()
     {
-        AuthorizeAttribute authorize = typeof(AdminController)
+        var authorize = typeof(AdminController)
             .GetCustomAttributes<AuthorizeAttribute>(true)
             .Single();
 

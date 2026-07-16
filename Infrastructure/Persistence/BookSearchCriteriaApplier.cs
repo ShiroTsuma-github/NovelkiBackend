@@ -11,7 +11,7 @@ public sealed class BookSearchCriteriaApplier
 
     public BookSearchCriteriaApplier(ApplicationDbContext context)
     {
-        bool isPostgres = context.Database.IsNpgsql();
+        var isPostgres = context.Database.IsNpgsql();
         _dateSearch = new DateSearchExpressionFactory(isPostgres);
         _numberSearch = new NumberSearchExpressionFactory(isPostgres);
         _textSearch = new TextSearchExpressionFactory(isPostgres);
@@ -19,7 +19,7 @@ public sealed class BookSearchCriteriaApplier
 
     public IQueryable<Book> Apply(IQueryable<Book> query, BookSearchCriteria criteria)
     {
-        Expression<Func<Book, bool>>? predicate = PredicateExpression.AndAll(BuildPredicates(criteria));
+        var predicate = PredicateExpression.AndAll(BuildPredicates(criteria));
         return predicate == null ? query : query.Where(predicate);
     }
 

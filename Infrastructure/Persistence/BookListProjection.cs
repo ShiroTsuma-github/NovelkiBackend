@@ -60,7 +60,7 @@ internal static class BookListProjectionMapper
         BookListProjection projection,
         IReadOnlyDictionary<Guid, BookOwnerProjection> owners)
     {
-        owners.TryGetValue(projection.OwnerId, out BookOwnerProjection? owner);
+        owners.TryGetValue(projection.OwnerId, out var owner);
         return MapListFields(projection,
             new AdminBookListItemDto
             {
@@ -80,10 +80,10 @@ internal static class BookListProjectionMapper
             return null;
         }
 
-        DateTimeOffset version = projection.CoverLastAttemptAt
-                                 ?? projection.CoverLastModified
-                                 ?? projection.CoverCreated
-                                 ?? DateTimeOffset.UnixEpoch;
+        var version = projection.CoverLastAttemptAt
+                      ?? projection.CoverLastModified
+                      ?? projection.CoverCreated
+                      ?? DateTimeOffset.UnixEpoch;
 
         return new BookCoverDto
         {

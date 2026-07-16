@@ -10,7 +10,7 @@ public class BookCsvExportServiceTests
     {
         var service = new BookCsvExportService();
 
-        string csv = service.Build([
+        var csv = service.Build([
             Book("Alpha \"Quoted\"", notes: "A,B")
         ]);
 
@@ -23,7 +23,7 @@ public class BookCsvExportServiceTests
     {
         var service = new BookCsvExportService();
 
-        string csv = service.Build([
+        var csv = service.Build([
             Book("=HYPERLINK(\"https://evil.example\")", "+cmd", ["@tag"], "-payload")
         ]);
 

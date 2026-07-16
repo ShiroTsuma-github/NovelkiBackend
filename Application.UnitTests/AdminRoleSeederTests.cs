@@ -13,8 +13,8 @@ public class AdminRoleSeederTests
     public async Task StartAsync_ShouldCreateAdminRoleAndAssignConfiguredUsers()
     {
         var user = new User { Id = Guid.NewGuid(), Email = "admin@example.com", UserName = "admin" };
-        Mock<RoleManager<IdentityRole<Guid>>> roleManager = CreateRoleManager();
-        Mock<UserManager<User>> userManager = CreateUserManager();
+        var roleManager = CreateRoleManager();
+        var userManager = CreateUserManager();
         roleManager.Setup(manager => manager.RoleExistsAsync(AdminRoleSeeder.AdminRole)).ReturnsAsync(false);
         roleManager.Setup(manager =>
                 manager.CreateAsync(It.Is<IdentityRole<Guid>>(role => role.Name == AdminRoleSeeder.AdminRole)))
@@ -23,7 +23,7 @@ public class AdminRoleSeederTests
         userManager.Setup(manager => manager.IsInRoleAsync(user, AdminRoleSeeder.AdminRole)).ReturnsAsync(false);
         userManager.Setup(manager => manager.AddToRoleAsync(user, AdminRoleSeeder.AdminRole))
             .ReturnsAsync(IdentityResult.Success);
-        AdminRoleSeeder seeder = CreateSeeder(roleManager.Object, userManager.Object,
+        var seeder = CreateSeeder(roleManager.Object, userManager.Object,
             [" admin@example.com ", "", "missing@example.com"]);
 
         await seeder.StartAsync(CancellationToken.None);
@@ -37,12 +37,12 @@ public class AdminRoleSeederTests
     [Fact]
     public async Task StartAsync_ShouldSkipRoleAssignment_WhenRoleCreationFails()
     {
-        Mock<RoleManager<IdentityRole<Guid>>> roleManager = CreateRoleManager();
-        Mock<UserManager<User>> userManager = CreateUserManager();
+        var roleManager = CreateRoleManager();
+        var userManager = CreateUserManager();
         roleManager.Setup(manager => manager.RoleExistsAsync(AdminRoleSeeder.AdminRole)).ReturnsAsync(false);
         roleManager.Setup(manager => manager.CreateAsync(It.IsAny<IdentityRole<Guid>>()))
             .ReturnsAsync(IdentityResult.Failed(new IdentityError { Description = "boom" }));
-        AdminRoleSeeder seeder = CreateSeeder(roleManager.Object, userManager.Object, ["admin@example.com"]);
+        var seeder = CreateSeeder(roleManager.Object, userManager.Object, ["admin@example.com"]);
 
         await seeder.StartAsync(CancellationToken.None);
 
@@ -54,12 +54,12 @@ public class AdminRoleSeederTests
     public async Task StartAsync_ShouldNotAssignUserAlreadyInRole()
     {
         var user = new User { Id = Guid.NewGuid(), Email = "admin@example.com", UserName = "admin" };
-        Mock<RoleManager<IdentityRole<Guid>>> roleManager = CreateRoleManager();
-        Mock<UserManager<User>> userManager = CreateUserManager();
+        var roleManager = CreateRoleManager();
+        var userManager = CreateUserManager();
         roleManager.Setup(manager => manager.RoleExistsAsync(AdminRoleSeeder.AdminRole)).ReturnsAsync(true);
         userManager.Setup(manager => manager.FindByEmailAsync("admin@example.com")).ReturnsAsync(user);
         userManager.Setup(manager => manager.IsInRoleAsync(user, AdminRoleSeeder.AdminRole)).ReturnsAsync(true);
-        AdminRoleSeeder seeder = CreateSeeder(roleManager.Object, userManager.Object, ["admin@example.com"]);
+        var seeder = CreateSeeder(roleManager.Object, userManager.Object, ["admin@example.com"]);
 
         await seeder.StartAsync(CancellationToken.None);
 
@@ -73,7 +73,7 @@ public class AdminRoleSeederTests
         var services = new ServiceCollection();
         services.AddSingleton(roleManager);
         services.AddSingleton(userManager);
-        IConfigurationRoot configuration = new ConfigurationBuilder()
+        var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(adminEmails.Select((email, index) =>
                 new KeyValuePair<string, string?>($"Admin:Emails:{index}", email)))
             .Build();

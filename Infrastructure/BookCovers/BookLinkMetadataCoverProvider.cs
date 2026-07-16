@@ -14,34 +14,34 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
 
     public async Task<BookCoverCandidate?> FindAsync(Book book, CancellationToken cancellationToken)
     {
-        foreach (BookLink link in book.Links.OrderByDescending(l => l.IsPrimary))
+        foreach (var link in book.Links.OrderByDescending(l => l.IsPrimary))
         {
-            if (!Uri.TryCreate(link.Url, UriKind.Absolute, out Uri? pageUri) ||
+            if (!Uri.TryCreate(link.Url, UriKind.Absolute, out var pageUri) ||
                 pageUri.Scheme is not ("http" or "https"))
             {
                 continue;
             }
 
-            using HttpResponseMessage response = await _httpClient.GetAsync(pageUri, cancellationToken);
+            using var response = await _httpClient.GetAsync(pageUri, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
             }
 
-            string? contentType = response.Content.Headers.ContentType?.MediaType;
+            var contentType = response.Content.Headers.ContentType?.MediaType;
             if (contentType != null && !contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            string html = await response.Content.ReadAsStringAsync(cancellationToken);
+            var html = await response.Content.ReadAsStringAsync(cancellationToken);
             if (html.Contains("challenge-platform", StringComparison.OrdinalIgnoreCase) ||
                 html.Contains("cf_chl", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            foreach (string imageUrl in ExtractImageUrls(html, pageUri))
+            foreach (var imageUrl in ExtractImageUrls(html, pageUri))
             {
                 return new BookCoverCandidate(BookCoverSource.BookLinkMetadata, imageUrl);
             }
@@ -54,14 +54,14 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
     {
         foreach (Match match in MetaRegex().Matches(html))
         {
-            string key = WebUtility.HtmlDecode(match.Groups["key"].Value).Trim().ToLowerInvariant();
+            var key = WebUtility.HtmlDecode(match.Groups["key"].Value).Trim().ToLowerInvariant();
             if (key is not ("og:image" or "og:image:url" or "twitter:image" or "twitter:image:src"))
             {
                 continue;
             }
 
-            string content = WebUtility.HtmlDecode(match.Groups["content"].Value).Trim();
-            if (TryNormalizeImageUrl(content, pageUri, out string imageUrl))
+            var content = WebUtility.HtmlDecode(match.Groups["content"].Value).Trim();
+            if (TryNormalizeImageUrl(content, pageUri, out var imageUrl))
             {
                 yield return imageUrl;
             }
@@ -69,8 +69,8 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
 
         foreach (Match match in LinkImageRegex().Matches(html))
         {
-            string href = WebUtility.HtmlDecode(match.Groups["href"].Value).Trim();
-            if (TryNormalizeImageUrl(href, pageUri, out string imageUrl))
+            var href = WebUtility.HtmlDecode(match.Groups["href"].Value).Trim();
+            if (TryNormalizeImageUrl(href, pageUri, out var imageUrl))
             {
                 yield return imageUrl;
             }
@@ -89,7 +89,7 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
             return false;
         }
 
-        Uri uri = Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute)
+        var uri = Uri.TryCreate(value, UriKind.Absolute, out var absolute)
             ? absolute
             : new Uri(pageUri, value);
         if (uri.Scheme is not ("http" or "https"))

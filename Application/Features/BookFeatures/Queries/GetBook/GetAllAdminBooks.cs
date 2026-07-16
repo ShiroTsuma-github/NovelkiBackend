@@ -22,10 +22,10 @@ public class GetAllAdminBooksHandler : IRequestHandler<GetAllAdminBooksQuery, Pa
     public async Task<PaginatedResult<AdminBookListItemDto>> Handle(GetAllAdminBooksQuery request,
         CancellationToken cancellationToken)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(request.Query);
-        IReadOnlyCollection<AdminBookListItemDto> books = await _queryService.GetAdminBooksAsync(criteria, request.Skip,
+        var criteria = BookSearchQueryParser.Parse(request.Query);
+        var books = await _queryService.GetAdminBooksAsync(criteria, request.Skip,
             request.Take, request.SortBy, request.SortDirection, cancellationToken);
-        int total = await _queryService.GetAdminBookCountAsync(criteria, cancellationToken);
+        var total = await _queryService.GetAdminBookCountAsync(criteria, cancellationToken);
 
         return PaginatedResult<AdminBookListItemDto>.Create(request.Skip, request.Take, total, books);
     }
@@ -44,8 +44,8 @@ public class GetAdminBookHandler : IRequestHandler<GetAdminBookQuery, AdminBookD
 
     public async Task<AdminBookDto> Handle(GetAdminBookQuery request, CancellationToken cancellationToken)
     {
-        Book book = await _repository.GetByIdAsync(request.Id, cancellationToken)
-                    ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
+        var book = await _repository.GetByIdAsync(request.Id, cancellationToken)
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
 
         return book.ToAdminDto();
     }

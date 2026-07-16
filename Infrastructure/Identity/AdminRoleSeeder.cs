@@ -25,14 +25,14 @@ public class AdminRoleSeeder : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        using IServiceScope scope = _serviceProvider.CreateScope();
-        RoleManager<IdentityRole<Guid>> roleManager =
+        using var scope = _serviceProvider.CreateScope();
+        var roleManager =
             scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
-        UserManager<User> userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
 
         if (!await roleManager.RoleExistsAsync(AdminRole))
         {
-            IdentityResult result = await roleManager.CreateAsync(new IdentityRole<Guid>(AdminRole));
+            var result = await roleManager.CreateAsync(new IdentityRole<Guid>(AdminRole));
             if (!result.Succeeded)
             {
                 _logger.LogError("Could not create Admin role: {Errors}",
@@ -41,10 +41,10 @@ public class AdminRoleSeeder : IHostedService
             }
         }
 
-        string[] adminEmails = _configuration.GetSection("Admin:Emails").Get<string[]>() ?? Array.Empty<string>();
-        foreach (string email in adminEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim()))
+        var adminEmails = _configuration.GetSection("Admin:Emails").Get<string[]>() ?? Array.Empty<string>();
+        foreach (var email in adminEmails.Where(e => !string.IsNullOrWhiteSpace(e)).Select(e => e.Trim()))
         {
-            User? user = await userManager.FindByEmailAsync(email);
+            var user = await userManager.FindByEmailAsync(email);
             if (user == null)
             {
                 _logger.LogWarning("Configured admin email {Email} does not match any user.", email);
@@ -53,7 +53,7 @@ public class AdminRoleSeeder : IHostedService
 
             if (!await userManager.IsInRoleAsync(user, AdminRole))
             {
-                IdentityResult result = await userManager.AddToRoleAsync(user, AdminRole);
+                var result = await userManager.AddToRoleAsync(user, AdminRole);
                 if (!result.Succeeded)
                 {
                     _logger.LogError("Could not assign Admin role to {Email}: {Errors}", email,

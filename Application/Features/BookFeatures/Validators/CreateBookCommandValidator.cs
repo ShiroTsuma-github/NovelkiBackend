@@ -87,13 +87,13 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
         Expression<Func<TCommand, string?>> rawImportedLine,
         Expression<Func<TCommand, IEnumerable<BookLinkInput>?>> links)
     {
-        Func<TCommand, decimal?> totalChaptersValue = totalChapters.Compile();
-        Func<TCommand, decimal?> currentChapterNumberValue = currentChapterNumber.Compile();
-        Func<TCommand, int?> ratingValue = rating.Compile();
-        Func<TCommand, int?> priorityValue = priority.Compile();
-        Func<TCommand, IEnumerable<BookTitleInput>?> alternativeTitlesValue = alternativeTitles.Compile();
-        Func<TCommand, IEnumerable<string>?> tagsValue = tags.Compile();
-        Func<TCommand, IEnumerable<BookLinkInput>?> linksValue = links.Compile();
+        var totalChaptersValue = totalChapters.Compile();
+        var currentChapterNumberValue = currentChapterNumber.Compile();
+        var ratingValue = rating.Compile();
+        var priorityValue = priority.Compile();
+        var alternativeTitlesValue = alternativeTitles.Compile();
+        var tagsValue = tags.Compile();
+        var linksValue = links.Compile();
 
         RuleFor(primaryTitle)
             .Must(value => !string.IsNullOrWhiteSpace(value))
@@ -142,8 +142,8 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
         RuleFor(x => x)
             .Custom((command, context) =>
             {
-                int index = 0;
-                foreach (BookTitleInput title in alternativeTitlesValue(command) ?? Enumerable.Empty<BookTitleInput>())
+                var index = 0;
+                foreach (var title in alternativeTitlesValue(command) ?? Enumerable.Empty<BookTitleInput>())
                 {
                     if (string.IsNullOrWhiteSpace(title.Title))
                     {
@@ -174,8 +174,8 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
         RuleFor(x => x)
             .Custom((command, context) =>
             {
-                int index = 0;
-                foreach (string tag in tagsValue(command) ?? Enumerable.Empty<string>())
+                var index = 0;
+                foreach (var tag in tagsValue(command) ?? Enumerable.Empty<string>())
                 {
                     if (string.IsNullOrWhiteSpace(tag))
                     {
@@ -193,8 +193,8 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
         RuleFor(x => x)
             .Custom((command, context) =>
             {
-                int index = 0;
-                foreach (BookLinkInput link in linksValue(command) ?? Enumerable.Empty<BookLinkInput>())
+                var index = 0;
+                foreach (var link in linksValue(command) ?? Enumerable.Empty<BookLinkInput>())
                 {
                     if (string.IsNullOrWhiteSpace(link.Url))
                     {
@@ -204,7 +204,7 @@ internal sealed class BookCommandValidatorRules<TCommand> : AbstractValidator<TC
                     {
                         context.AddFailure($"Links[{index}].Url", "Url must be 2000 characters or fewer.");
                     }
-                    else if (!Uri.TryCreate(link.Url, UriKind.Absolute, out Uri? parsed) ||
+                    else if (!Uri.TryCreate(link.Url, UriKind.Absolute, out var parsed) ||
                              (parsed.Scheme != Uri.UriSchemeHttp && parsed.Scheme != Uri.UriSchemeHttps))
                     {
                         context.AddFailure($"Links[{index}].Url", "Url must be an absolute HTTP or HTTPS URL.");

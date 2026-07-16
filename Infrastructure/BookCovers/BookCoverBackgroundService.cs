@@ -26,14 +26,14 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Task queueTask = ProcessQueueAsync(stoppingToken);
-        Task pendingTask = ProcessPendingPeriodicallyAsync(stoppingToken);
+        var queueTask = ProcessQueueAsync(stoppingToken);
+        var pendingTask = ProcessPendingPeriodicallyAsync(stoppingToken);
         await Task.WhenAll(queueTask, pendingTask);
     }
 
     private async Task ProcessQueueAsync(CancellationToken stoppingToken)
     {
-        await foreach (Guid bookId in _queue.ReadAllAsync(stoppingToken))
+        await foreach (var bookId in _queue.ReadAllAsync(stoppingToken))
         {
             await ProcessBookAsync(bookId, stoppingToken);
         }
@@ -44,10 +44,10 @@ public sealed class BookCoverBackgroundService : BackgroundService
         using var timer = new PeriodicTimer(TimeSpan.FromMinutes(1));
         while (await timer.WaitForNextTickAsync(stoppingToken))
         {
-            using IServiceScope scope = _scopeFactory.CreateScope();
-            IBookCoverRepository repository = scope.ServiceProvider.GetRequiredService<IBookCoverRepository>();
-            IReadOnlyCollection<BookCover> pending = await repository.GetPendingAsync(20, stoppingToken);
-            foreach (BookCover cover in pending)
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<IBookCoverRepository>();
+            var pending = await repository.GetPendingAsync(20, stoppingToken);
+            foreach (var cover in pending)
             {
                 await ProcessBookAsync(cover.BookId, stoppingToken);
             }
@@ -63,8 +63,8 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
         try
         {
-            using IServiceScope scope = _scopeFactory.CreateScope();
-            BookCoverProcessor processor = scope.ServiceProvider.GetRequiredService<BookCoverProcessor>();
+            using var scope = _scopeFactory.CreateScope();
+            var processor = scope.ServiceProvider.GetRequiredService<BookCoverProcessor>();
             await processor.ProcessAsync(bookId, stoppingToken);
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -113,7 +113,7 @@ public sealed class BookCoverProcessor
 
     public async Task ProcessAsync(Guid bookId, CancellationToken cancellationToken)
     {
-        BookCover? cover = await _coverRepository.GetByBookIdAsync(bookId, cancellationToken);
+        var cover = await _coverRepository.GetByBookIdAsync(bookId, cancellationToken);
         if (cover == null || cover.Status != BookCoverStatus.Pending)
         {
             return;
@@ -124,7 +124,7 @@ public sealed class BookCoverProcessor
 
         try
         {
-            BookCoverCandidate? candidate = await _resolver.FindAsync(cover.Book, cancellationToken);
+            var candidate = await _resolver.FindAsync(cover.Book, cancellationToken);
             if (candidate == null)
             {
                 cover.Status = BookCoverStatus.NotFound;
@@ -135,9 +135,9 @@ public sealed class BookCoverProcessor
                 return;
             }
 
-            using HttpClient client = _httpClientFactory.CreateClient("BookCoverImages");
-            await using Stream imageStream = await client.GetStreamAsync(candidate.ImageUrl, cancellationToken);
-            BookCoverStoredFiles stored = await _storage.SaveAsync(
+            using var client = _httpClientFactory.CreateClient("BookCoverImages");
+            await using var imageStream = await client.GetStreamAsync(candidate.ImageUrl, cancellationToken);
+            var stored = await _storage.SaveAsync(
                 cover.Book.OwnerId,
                 cover.BookId,
                 imageStream,
@@ -175,7 +175,7 @@ public sealed class BookCoverProcessor
         }
         catch (Exception ex)
         {
-            bool shouldInvalidateCache = true;
+            var shouldInvalidateCache = true;
             if (IsProviderResponseFailure(ex))
             {
                 cover.Status = BookCoverStatus.NotFound;

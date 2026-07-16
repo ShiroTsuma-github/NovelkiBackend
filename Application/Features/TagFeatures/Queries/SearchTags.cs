@@ -17,7 +17,7 @@ public class SearchTagsQueryHandler : IRequestHandler<SearchTagsQuery, IReadOnly
 
     public async Task<IReadOnlyCollection<TagDto>> Handle(SearchTagsQuery request, CancellationToken cancellationToken)
     {
-        IEnumerable<Tag> tags = await _tagRepository.SearchAsync(_user.RequiredId, request.Search,
+        var tags = await _tagRepository.SearchAsync(_user.RequiredId, request.Search,
             Math.Clamp(request.Take, 1, 50), cancellationToken);
         return tags.Select(t => t.ToDto()).ToList();
     }

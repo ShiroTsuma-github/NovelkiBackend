@@ -13,7 +13,7 @@ public class AdminLibraryFeatureTests
         var service = new FakeAdminLibraryService(expected);
         var handler = new DeleteBooksByOwnerHandler(service);
 
-        AdminLibraryPurgeResult result =
+        var result =
             await handler.Handle(new DeleteBooksByOwnerCommand(ownerId), CancellationToken.None);
 
         Assert.Equal(expected, result);

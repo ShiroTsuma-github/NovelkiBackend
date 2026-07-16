@@ -23,9 +23,9 @@ internal static class BookCoverImageProcessor
         long maxBytes,
         CancellationToken cancellationToken)
     {
-        ValidatedBookCoverContent input =
+        var input =
             await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, maxBytes, cancellationToken);
-        IImageFormat? format = Image.DetectFormat(input.Bytes);
+        var format = Image.DetectFormat(input.Bytes);
         if (format == null || !AllowedFormats.Contains(format.Name))
         {
             throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");
@@ -34,10 +34,10 @@ internal static class BookCoverImageProcessor
         try
         {
             using var source = Image.Load<Rgba32>(input.Bytes);
-            BookCoverStoredVariantContent original =
+            var original =
                 await EncodeVariantAsync(source, source.Width, FullJpegQuality, cancellationToken);
-            int thumbnailWidth = Math.Min(ThumbnailTargetWidth, source.Width);
-            BookCoverStoredVariantContent thumbnail =
+            var thumbnailWidth = Math.Min(ThumbnailTargetWidth, source.Width);
+            var thumbnail =
                 await EncodeVariantAsync(source, thumbnailWidth, ThumbnailJpegQuality, cancellationToken);
             return new ProcessedBookCoverContent(original, thumbnail);
         }
@@ -57,7 +57,7 @@ internal static class BookCoverImageProcessor
         int quality,
         CancellationToken cancellationToken)
     {
-        using Image<Rgb24> prepared = RenderOnWhiteBackground(source, targetWidth);
+        using var prepared = RenderOnWhiteBackground(source, targetWidth);
         await using var output = new MemoryStream();
         await prepared.SaveAsJpegAsync(output, new SixLabors.ImageSharp.Formats.Jpeg.JpegEncoder { Quality = quality },
             cancellationToken);
@@ -67,12 +67,12 @@ internal static class BookCoverImageProcessor
 
     private static Image<Rgb24> RenderOnWhiteBackground(Image<Rgba32> source, int targetWidth)
     {
-        int targetHeight = source.Width == targetWidth
+        var targetHeight = source.Width == targetWidth
             ? source.Height
             : Math.Max(1, (int)Math.Round(source.Height * (targetWidth / (double)source.Width)));
 
         var canvas = new Image<Rgb24>(targetWidth, targetHeight, AlphaBackground.ToPixel<Rgb24>());
-        using Image<Rgba32> scaled = source.Width == targetWidth && source.Height == targetHeight
+        using var scaled = source.Width == targetWidth && source.Height == targetHeight
             ? source.Clone()
             : source.Clone(ctx => ctx.Resize(new ResizeOptions
             {

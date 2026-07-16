@@ -26,7 +26,7 @@ public sealed class BookSortBuilder
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        bool descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
         switch (NormalizeSort(sortBy))
         {
             case "title":
@@ -120,7 +120,7 @@ public sealed class BookSortBuilder
         string? sortBy,
         string? sortDirection)
     {
-        bool descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        var descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
         return NormalizeSort(sortBy) == "created"
             ? descending
                 ? books.OrderByDescending(book => book.Created).ThenBy(book => book.PrimaryTitle)
@@ -140,9 +140,9 @@ public sealed class BookSortBuilder
     {
         if (ShouldSortDateOnClient(sortBy))
         {
-            bool descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
-            List<Book> books = await query.ToListAsync(cancellationToken);
-            IOrderedEnumerable<Book> sorted = NormalizeSort(sortBy) == "created"
+            var descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+            var books = await query.ToListAsync(cancellationToken);
+            var sorted = NormalizeSort(sortBy) == "created"
                 ? descending
                     ? books.OrderByDescending(book => book.Created).ThenBy(book => book.PrimaryTitle)
                     : books.OrderBy(book => book.Created).ThenBy(book => book.PrimaryTitle)
@@ -164,8 +164,8 @@ public sealed class BookSortBuilder
         string? currentSortDirection,
         CancellationToken cancellationToken)
     {
-        string normalizedSort = NormalizeSort(sortBy);
-        List<string> orderedAvailableNames = normalizedSort switch
+        var normalizedSort = NormalizeSort(sortBy);
+        var orderedAvailableNames = normalizedSort switch
         {
             "status" => await GetOrderedAvailableNamesAsync(
                 query.Select(book => book.Status.Name),
@@ -183,12 +183,12 @@ public sealed class BookSortBuilder
             return null;
         }
 
-        string? normalizedCurrent = NormalizeCycleValue(currentSortDirection);
-        int currentIndex = normalizedCurrent == null
+        var normalizedCurrent = NormalizeCycleValue(currentSortDirection);
+        var currentIndex = normalizedCurrent == null
             ? -1
             : orderedAvailableNames.FindIndex(name =>
                 string.Equals(NormalizeCycleValue(name), normalizedCurrent, StringComparison.Ordinal));
-        int nextIndex = (currentIndex + 1 + orderedAvailableNames.Count) % orderedAvailableNames.Count;
+        var nextIndex = (currentIndex + 1 + orderedAvailableNames.Count) % orderedAvailableNames.Count;
         return orderedAvailableNames[nextIndex];
     }
 
@@ -213,7 +213,7 @@ public sealed class BookSortBuilder
 
     private static bool IsDateSort(string? sortBy)
     {
-        string normalizedSort = NormalizeSort(sortBy);
+        var normalizedSort = NormalizeSort(sortBy);
         return normalizedSort is "created" or "lastmodified";
     }
 
@@ -228,9 +228,9 @@ public sealed class BookSortBuilder
             return query.OrderBy(book => book.PrimaryTitle).ThenBy(book => book.Id);
         }
 
-        string[] orderedNameArray = orderedNames.ToArray();
-        string? normalizedStartName = NormalizeCycleValue(startName);
-        int startIndex = normalizedStartName == null
+        var orderedNameArray = orderedNames.ToArray();
+        var normalizedStartName = NormalizeCycleValue(startName);
+        var startIndex = normalizedStartName == null
             ? -1
             : Array.FindIndex(
                 orderedNameArray,
@@ -240,10 +240,10 @@ public sealed class BookSortBuilder
             startIndex = 0;
         }
 
-        string[] rotatedNames = orderedNameArray.Skip(startIndex).Concat(orderedNameArray.Take(startIndex)).ToArray();
-        ParameterExpression parameter = keySelector.Parameters[0];
+        var rotatedNames = orderedNameArray.Skip(startIndex).Concat(orderedNameArray.Take(startIndex)).ToArray();
+        var parameter = keySelector.Parameters[0];
         Expression body = Expression.Constant(rotatedNames.Length);
-        for (int index = rotatedNames.Length - 1; index >= 0; index--)
+        for (var index = rotatedNames.Length - 1; index >= 0; index--)
         {
             body = Expression.Condition(
                 Expression.Equal(keySelector.Body, Expression.Constant(rotatedNames[index])),

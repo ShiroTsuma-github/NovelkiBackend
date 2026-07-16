@@ -19,18 +19,18 @@ public static class DependencyInjection
 {
     public static void AddInfrastructureServices(this IHostApplicationBuilder builder)
     {
-        IConfigurationSection jwtSettings = builder.Configuration.GetSection("Jwt");
+        var jwtSettings = builder.Configuration.GetSection("Jwt");
 
-        string? keyString = jwtSettings["Key"];
+        var keyString = jwtSettings["Key"];
         if (keyString == null)
         {
             throw new ArgumentNullException(nameof(keyString));
         }
 
-        byte[] key = Encoding.UTF8.GetBytes(keyString);
+        var key = Encoding.UTF8.GetBytes(keyString);
 
-        string? connectionString = builder.Configuration.GetConnectionString("DB");
-        string? redisConnectionString = builder.Configuration.GetConnectionString("Redis");
+        var connectionString = builder.Configuration.GetConnectionString("DB");
+        var redisConnectionString = builder.Configuration.GetConnectionString("Redis");
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
             options.UseNpgsql(connectionString,
@@ -63,7 +63,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 
         builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection("BookCovers"));
-        BookCoverS3Options? s3Options = builder.Configuration.GetSection("BookCovers:S3").Get<BookCoverS3Options>();
+        var s3Options = builder.Configuration.GetSection("BookCovers:S3").Get<BookCoverS3Options>();
         if (!string.IsNullOrWhiteSpace(s3Options?.Endpoint) &&
             !string.IsNullOrWhiteSpace(s3Options.AccessKey) &&
             !string.IsNullOrWhiteSpace(s3Options.SecretKey) &&

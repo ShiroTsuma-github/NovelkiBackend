@@ -20,7 +20,7 @@ public class StatusController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateStatusCommand command)
     {
-        StatusDto status = await _mediator.Send(command);
+        var status = await _mediator.Send(command);
 
         return CreatedAtAction(nameof(GetById), new { id = status.Id }, status);
     }
@@ -29,7 +29,7 @@ public class StatusController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllStatusesQuery getAllStatuses)
     {
-        PaginatedResult<StatusDto> statuses = await _mediator.Send(getAllStatuses);
+        var statuses = await _mediator.Send(getAllStatuses);
 
         return Ok(statuses);
     }
@@ -38,7 +38,7 @@ public class StatusController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        StatusDto statusDto = await _mediator.Send(new GetStatusQuery(id));
+        var statusDto = await _mediator.Send(new GetStatusQuery(id));
 
         return Ok(statusDto);
     }
@@ -47,7 +47,7 @@ public class StatusController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
-        StatusDetailsDto statusDto = await _mediator.Send(new GetStatusDetailsQuery(id));
+        var statusDto = await _mediator.Send(new GetStatusDetailsQuery(id));
 
         return Ok(statusDto);
     }
@@ -56,7 +56,7 @@ public class StatusController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
-        StatusDto statusDto = await _mediator.Send(new GetStatusByNameQuery(name));
+        var statusDto = await _mediator.Send(new GetStatusByNameQuery(name));
 
         return Ok(statusDto);
     }
@@ -65,7 +65,7 @@ public class StatusController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
-        StatusDetailsDto statusDto = await _mediator.Send(new GetStatusDetailsByNameQuery(name));
+        var statusDto = await _mediator.Send(new GetStatusDetailsByNameQuery(name));
 
         return Ok(statusDto);
     }
@@ -75,7 +75,7 @@ public class StatusController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateStatusCommand updateStatus)
     {
         updateStatus.Id = id;
-        StatusDto statusDto = await _mediator.Send(updateStatus);
+        var statusDto = await _mediator.Send(updateStatus);
 
         return Ok(statusDto);
     }

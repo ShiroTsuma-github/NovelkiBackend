@@ -18,7 +18,7 @@ public class GenreRepository : IGenreRepository
 
     public async Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        string normalizedName = MappingExtensions.NormalizeName(name);
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Genres.FirstOrDefaultAsync(g => g.NormalizedName == normalizedName, cancellationToken);
     }
 
@@ -41,7 +41,7 @@ public class GenreRepository : IGenreRepository
 
     public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
     {
-        Genre? genre = await _context.Genres.FindAsync(new object[] { id }, cancellationToken);
+        var genre = await _context.Genres.FindAsync(new object[] { id }, cancellationToken);
         if (genre != null)
         {
             _context.Genres.Remove(genre);

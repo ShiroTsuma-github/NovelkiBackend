@@ -20,8 +20,8 @@ public class UpdateTypeCommandHandler : IRequestHandler<UpdateTypeCommand, TypeD
 
     public async Task<TypeDto> Handle(UpdateTypeCommand request, CancellationToken cancellationToken)
     {
-        ContentType type = await _typeRepository.GetByIdAsync(request.Id, cancellationToken)
-                           ?? throw new EntityNotFoundException<ContentType, Guid>(request.Id);
+        var type = await _typeRepository.GetByIdAsync(request.Id, cancellationToken)
+                   ?? throw new EntityNotFoundException<ContentType, Guid>(request.Id);
 
         request.ApplyTo(type);
 

@@ -18,7 +18,7 @@ public class BookCoverProcessorTests
     public async Task ProcessAsync_ShouldReturnWhenCoverIsMissing()
     {
         var repository = new FakeBookCoverRepository();
-        BookCoverProcessor processor = CreateProcessor(repository);
+        var processor = CreateProcessor(repository);
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
 
@@ -29,7 +29,7 @@ public class BookCoverProcessorTests
     public async Task ProcessAsync_ShouldReturnWhenCoverIsNotPending()
     {
         var repository = new FakeBookCoverRepository { Cover = Cover(BookCoverStatus.Found) };
-        BookCoverProcessor processor = CreateProcessor(repository);
+        var processor = CreateProcessor(repository);
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
 
@@ -39,9 +39,9 @@ public class BookCoverProcessorTests
     [Fact]
     public async Task ProcessAsync_ShouldMarkNotFoundWhenProvidersReturnNoCandidate()
     {
-        BookCover cover = Cover(BookCoverStatus.Pending);
+        var cover = Cover(BookCoverStatus.Pending);
         var repository = new FakeBookCoverRepository { Cover = cover };
-        BookCoverProcessor processor = CreateProcessor(repository);
+        var processor = CreateProcessor(repository);
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
 
@@ -54,11 +54,11 @@ public class BookCoverProcessorTests
     [Fact]
     public async Task ProcessAsync_ShouldStoreResolvedCoverAndInvalidateCache()
     {
-        BookCover cover = Cover(BookCoverStatus.Pending);
+        var cover = Cover(BookCoverStatus.Pending);
         var repository = new FakeBookCoverRepository { Cover = cover };
         var storage = new FakeBookCoverStorage();
         var cache = new FakeBookListCacheInvalidator();
-        BookCoverProcessor processor = CreateProcessor(
+        var processor = CreateProcessor(
             repository,
             storage,
             cache,
@@ -82,10 +82,10 @@ public class BookCoverProcessorTests
     [Fact]
     public async Task ProcessAsync_ShouldMarkFailedAndInvalidateCacheForValidationFailure()
     {
-        BookCover cover = Cover(BookCoverStatus.Pending);
+        var cover = Cover(BookCoverStatus.Pending);
         var repository = new FakeBookCoverRepository { Cover = cover };
         var cache = new FakeBookListCacheInvalidator();
-        BookCoverProcessor processor = CreateProcessor(
+        var processor = CreateProcessor(
             repository,
             new FakeBookCoverStorage { SaveException = new ValidationException("invalid image") },
             cache,
@@ -102,10 +102,10 @@ public class BookCoverProcessorTests
     [Fact]
     public async Task ProcessAsync_ShouldMarkNotFoundWithoutCacheInvalidationForProviderResponseFailure()
     {
-        BookCover cover = Cover(BookCoverStatus.Pending);
+        var cover = Cover(BookCoverStatus.Pending);
         var repository = new FakeBookCoverRepository { Cover = cover };
         var cache = new FakeBookListCacheInvalidator();
-        BookCoverProcessor processor = CreateProcessor(
+        var processor = CreateProcessor(
             repository,
             cacheInvalidator: cache,
             provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.AniList,
@@ -122,10 +122,10 @@ public class BookCoverProcessorTests
     [Fact]
     public async Task ProcessAsync_ShouldTruncateUnexpectedFailureReasonAndInvalidateCache()
     {
-        BookCover cover = Cover(BookCoverStatus.Pending);
+        var cover = Cover(BookCoverStatus.Pending);
         var repository = new FakeBookCoverRepository { Cover = cover };
         var cache = new FakeBookListCacheInvalidator();
-        BookCoverProcessor processor = CreateProcessor(
+        var processor = CreateProcessor(
             repository,
             new FakeBookCoverStorage { SaveException = new InvalidOperationException(new string('x', 1200)) },
             cache,

@@ -290,6 +290,7 @@ Aktualnie rozpoznaje m.in.:
 - inne wyjatki -> 500
 
 Jesli dodajesz nowe wyjatki domenowe albo nowy typ encji, trzeba dopisac mapowanie w middleware, inaczej klient dostanie
+
 500.
 
 ## Testy

@@ -41,7 +41,7 @@ public class ErrorHandlingMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ShouldCallNextWhenNoExceptionIsThrown()
     {
-        bool called = false;
+        var called = false;
         var context = new DefaultHttpContext();
         var middleware = new ErrorHandlingMiddleware(
             _ =>
@@ -62,10 +62,10 @@ public class ErrorHandlingMiddlewareTests
     public async Task InvokeAsync_ShouldMapKnownExceptions(Exception exception, int expectedStatus,
         string expectedTitle)
     {
-        DefaultHttpContext context = await InvokeWithException(exception);
+        var context = await InvokeWithException(exception);
 
         context.Response.Body.Position = 0;
-        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
 
         Assert.Equal(expectedStatus, context.Response.StatusCode);
         Assert.Equal(expectedTitle, document.RootElement.GetProperty("title").GetString());
@@ -86,8 +86,8 @@ public class ErrorHandlingMiddlewareTests
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
-        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
-        string? detail = document.RootElement.GetProperty("detail").GetString();
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var detail = document.RootElement.GetProperty("detail").GetString();
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
         Assert.Equal("A book named 'Duplicated Book' already exists.", detail);
@@ -97,15 +97,15 @@ public class ErrorHandlingMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ShouldReturnIdentityOperationErrors()
     {
-        DefaultHttpContext context =
+        var context =
             await InvokeWithException(new IdentityOperationFailedException(["Password is too weak."]));
 
         context.Response.Body.Position = 0;
-        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
-        JsonElement errors = document.RootElement.GetProperty("errors");
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Identity", out JsonElement identityErrors));
+        Assert.True(errors.TryGetProperty("Identity", out var identityErrors));
         Assert.Contains("Password is too weak.", identityErrors.EnumerateArray().Select(e => e.GetString()));
     }
 
@@ -118,11 +118,11 @@ public class ErrorHandlingMiddlewareTests
             new ValidationFailure("Rating", "Rating must be valid.")
         ]);
 
-        DefaultHttpContext context = await InvokeWithException(exception);
+        var context = await InvokeWithException(exception);
 
         context.Response.Body.Position = 0;
-        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
-        JsonElement errors = document.RootElement.GetProperty("errors");
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
         Assert.Equal("Title: Title is required.", document.RootElement.GetProperty("detail").GetString());
@@ -142,11 +142,11 @@ public class ErrorHandlingMiddlewareTests
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
-        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
-        JsonElement errors = document.RootElement.GetProperty("errors");
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Username", out JsonElement usernameErrors));
+        Assert.True(errors.TryGetProperty("Username", out var usernameErrors));
         Assert.Contains("Account with username 'reader' already exists.",
             usernameErrors.EnumerateArray().Select(e => e.GetString()));
     }
@@ -163,11 +163,11 @@ public class ErrorHandlingMiddlewareTests
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
-        using JsonDocument document = await JsonDocument.ParseAsync(context.Response.Body);
-        JsonElement errors = document.RootElement.GetProperty("errors");
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Email", out JsonElement emailErrors));
+        Assert.True(errors.TryGetProperty("Email", out var emailErrors));
         Assert.Contains("The account with email reader@example.com already exists.",
             emailErrors.EnumerateArray().Select(e => e.GetString()));
     }

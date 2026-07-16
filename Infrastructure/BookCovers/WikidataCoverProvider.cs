@@ -13,14 +13,14 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
 
     public async Task<BookCoverCandidate?> FindAsync(Book book, CancellationToken cancellationToken)
     {
-        foreach (string title in BookCoverProviderHelpers.EnumerateTitles(book))
+        foreach (var title in BookCoverProviderHelpers.EnumerateTitles(book))
         {
-            string query = "SELECT ?image WHERE {\n" +
-                           $"  ?item rdfs:label \"{EscapeSparqlString(title)}\"@en.\n" +
-                           "  ?item wdt:P18 ?image.\n" +
-                           "}\n" +
-                           "LIMIT 1";
-            using HttpResponseMessage response =
+            var query = "SELECT ?image WHERE {\n" +
+                        $"  ?item rdfs:label \"{EscapeSparqlString(title)}\"@en.\n" +
+                        "  ?item wdt:P18 ?image.\n" +
+                        "}\n" +
+                        "LIMIT 1";
+            using var response =
                 await _httpClient.GetAsync($"/sparql?format=json&query={Uri.EscapeDataString(query)}",
                     cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -28,17 +28,17 @@ public sealed class WikidataCoverProvider : IBookCoverProvider
                 continue;
             }
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            JsonElement? bindings = BookCoverJson.TryGetProperty(document.RootElement, "results", "bindings");
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var bindings = BookCoverJson.TryGetProperty(document.RootElement, "results", "bindings");
             if (bindings == null || bindings.Value.ValueKind != JsonValueKind.Array)
             {
                 continue;
             }
 
-            foreach (JsonElement binding in bindings.Value.EnumerateArray())
+            foreach (var binding in bindings.Value.EnumerateArray())
             {
-                string? imageUrl = BookCoverJson.TryGetString(binding, "image", "value");
+                var imageUrl = BookCoverJson.TryGetString(binding, "image", "value");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.Wikidata, imageUrl);

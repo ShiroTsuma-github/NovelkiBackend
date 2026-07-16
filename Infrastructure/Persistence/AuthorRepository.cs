@@ -2,26 +2,19 @@ namespace Infrastructure.Persistence;
 
 using Application.Common;
 
-public class AuthorRepository : IAuthorRepository
+public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
 {
-    private readonly ApplicationDbContext _context;
-
-    public AuthorRepository(ApplicationDbContext context)
-    {
-        _context = context;
-    }
-
     public async Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
-        return await _context.Authors
+        return await context.Authors
             .Include(a => a.Names)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
     }
 
     public async Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        string normalizedName = MappingExtensions.NormalizeName(name);
-        return await _context.Authors
+        var normalizedName = MappingExtensions.NormalizeName(name);
+        return await context.Authors
             .Include(a => a.Names)
             .FirstOrDefaultAsync(
                 a => a.NormalizedPrimaryName == normalizedName ||
@@ -31,14 +24,14 @@ public class AuthorRepository : IAuthorRepository
 
     public async Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
     {
-        IQueryable<Author> query = _context.Authors.Include(a => a.Names).AsQueryable();
+        var query = context.Authors.Include(a => a.Names).AsQueryable();
         if (string.IsNullOrWhiteSpace(search))
         {
             return await query.OrderBy(a => a.PrimaryName).Take(take).ToListAsync(cancellationToken);
         }
 
 
-        string normalizedSearch = MappingExtensions.NormalizeName(search);
+        var normalizedSearch = MappingExtensions.NormalizeName(search);
         query = query.Where(a =>
             a.NormalizedPrimaryName.Contains(normalizedSearch) ||
             a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)));
@@ -49,12 +42,12 @@ public class AuthorRepository : IAuthorRepository
 
     public async Task AddAsync(Author author, CancellationToken cancellationToken)
     {
-        _context.Authors.Add(author);
-        await _context.SaveChangesAsync(cancellationToken);
+        context.Authors.Add(author);
+        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SaveAsync(CancellationToken cancellationToken)
     {
-        await _context.SaveChangesAsync(cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
     }
 }

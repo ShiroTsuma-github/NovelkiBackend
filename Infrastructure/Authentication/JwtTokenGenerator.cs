@@ -41,7 +41,7 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             claims.Add(new Claim("created_at", createdAt.ToString("O")));
         }
 
-        foreach (string role in user.Roles)
+        foreach (var role in user.Roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
         }

@@ -20,7 +20,7 @@ public class BookQueryHandlerTests
         var service = new FakeBookListQueryService();
         var handler = new GetBooksQueryHandler(service, cache, new FakeUser());
 
-        PaginatedResult<BookListItemDto> result =
+        var result =
             await handler.Handle(new GetAllBooksQuery(0, 10, "title:Cached", "title", "asc"), CancellationToken.None);
 
         Assert.Same(cached, result);
@@ -37,7 +37,7 @@ public class BookQueryHandlerTests
         };
         var handler = new GetBooksQueryHandler(service, cache, new FakeUser());
 
-        PaginatedResult<BookListItemDto> result = await handler.Handle(
+        var result = await handler.Handle(
             new GetAllBooksQuery(0, 10, "status:reading", "status", "Reading", true), CancellationToken.None);
 
         Assert.Single(result.Data);
@@ -66,7 +66,7 @@ public class BookQueryHandlerTests
         };
         var handler = new GetAllAdminBooksHandler(service);
 
-        PaginatedResult<AdminBookListItemDto> result =
+        var result =
             await handler.Handle(new GetAllAdminBooksQuery(5, 10, "status:reading", "title", "asc"),
                 CancellationToken.None);
 
@@ -82,7 +82,7 @@ public class BookQueryHandlerTests
         var exportService = new FakeBookExportQueryService();
         var handler = new GetBooksForExportQueryHandler(exportService, new FakeUser());
 
-        PaginatedResult<BookDto> result =
+        var result =
             await handler.Handle(new GetAllBooksForExportQuery(2, 3, "rating:>=8", "rating", "desc"),
                 CancellationToken.None);
 
@@ -111,7 +111,7 @@ public class BookQueryHandlerTests
         var repository = new FakeSingleBookRepository(book);
         var handler = new GetBookHandler(repository, new FakeUser());
 
-        BookDto result = await handler.Handle(new GetBookQuery(book.Id), CancellationToken.None);
+        var result = await handler.Handle(new GetBookQuery(book.Id), CancellationToken.None);
 
         Assert.Equal(book.Id, result.Id);
         Assert.Equal("Book", result.PrimaryTitle);
@@ -142,7 +142,7 @@ public class BookQueryHandlerTests
         };
         var handler = new GetAdminBookHandler(new FakeSingleBookRepository(book));
 
-        AdminBookDto result = await handler.Handle(new GetAdminBookQuery(book.Id), CancellationToken.None);
+        var result = await handler.Handle(new GetAdminBookQuery(book.Id), CancellationToken.None);
 
         Assert.Equal(book.Id, result.Id);
         Assert.Equal(OwnerId, result.OwnerId);
@@ -163,7 +163,7 @@ public class BookQueryHandlerTests
         var service = new FakeBookAnalyticsQueryService();
         var handler = new GetBookAnalyticsHandler(service, new FakeUser());
 
-        BookAnalyticsDto result =
+        var result =
             await handler.Handle(new GetBookAnalyticsQuery("rating:none"), CancellationToken.None);
 
         Assert.Equal(OwnerId, service.OwnerId);

@@ -33,13 +33,13 @@ public sealed class BookReadQueryService : IBookListQueryService
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        IQueryable<Book> query = ApplyCriteria(CreateOwnerQuery(ownerId), criteria);
+        var query = ApplyCriteria(CreateOwnerQuery(ownerId), criteria);
         return await _projectionQuery.GetBooksAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
     }
 
     public Task<int> GetBookCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
     {
-        IQueryable<Book> query = ApplyCriteria(_context.Books.Where(book => book.OwnerId == ownerId), criteria);
+        var query = ApplyCriteria(_context.Books.Where(book => book.OwnerId == ownerId), criteria);
         return query.CountAsync(cancellationToken);
     }
 
@@ -51,13 +51,13 @@ public sealed class BookReadQueryService : IBookListQueryService
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        IQueryable<Book> query = ApplyCriteria(_context.Books.AsNoTracking(), criteria);
+        var query = ApplyCriteria(_context.Books.AsNoTracking(), criteria);
         return await _projectionQuery.GetAdminBooksAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
     }
 
     public Task<int> GetAdminBookCountAsync(BookSearchCriteria criteria, CancellationToken cancellationToken)
     {
-        IQueryable<Book> query = ApplyCriteria(_context.Books, criteria);
+        var query = ApplyCriteria(_context.Books, criteria);
         return query.CountAsync(cancellationToken);
     }
 
@@ -68,7 +68,7 @@ public sealed class BookReadQueryService : IBookListQueryService
         string? currentSortDirection,
         CancellationToken cancellationToken)
     {
-        IQueryable<Book> query =
+        var query =
             ApplyCriteria(BookQueryInclude.IncludeDetails(_context.Books).Where(book => book.OwnerId == ownerId),
                 criteria);
         return await _sortBuilder.GetNextCycleSortDirectionAsync(query, sortBy, currentSortDirection,

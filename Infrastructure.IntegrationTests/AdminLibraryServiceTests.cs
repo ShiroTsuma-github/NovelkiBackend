@@ -15,21 +15,21 @@ public class AdminLibraryServiceTests
     public async Task DeleteAllBooksForOwnerAsync_ShouldDeleteOnlyOwnersLibraryAndCleanupUnusedRelations()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("66666666-6666-6666-6666-666666666666");
         context.Users.Add(new Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
 
-        Author sharedAuthor = TestData.Author("Shared Author");
-        Author ownedOnlyAuthor = TestData.Author("Owned Only Author");
-        Tag ownerTag = TestData.Tag(database.UserId, "favorite");
-        Tag otherTag = TestData.Tag(otherOwnerId, "favorite");
+        var sharedAuthor = TestData.Author("Shared Author");
+        var ownedOnlyAuthor = TestData.Author("Owned Only Author");
+        var ownerTag = TestData.Tag(database.UserId, "favorite");
+        var otherTag = TestData.Tag(otherOwnerId, "favorite");
         context.Authors.AddRange(sharedAuthor, ownedOnlyAuthor);
         context.Tags.AddRange(ownerTag, otherTag);
 
-        Book ownedBook = TestData.Book(database.UserId, "Owned Book", ownedOnlyAuthor);
+        var ownedBook = TestData.Book(database.UserId, "Owned Book", ownedOnlyAuthor);
         ownedBook.BookTags.Add(new BookTag { Book = ownedBook, Tag = ownerTag });
-        Book ownedBookWithSharedAuthor = TestData.Book(database.UserId, "Owned Book 2", sharedAuthor);
-        Book otherBook = TestData.Book(otherOwnerId, "Other Book", sharedAuthor);
+        var ownedBookWithSharedAuthor = TestData.Book(database.UserId, "Owned Book 2", sharedAuthor);
+        var otherBook = TestData.Book(otherOwnerId, "Other Book", sharedAuthor);
         otherBook.BookTags.Add(new BookTag { Book = otherBook, Tag = otherTag });
 
         context.Books.AddRange(ownedBook, ownedBookWithSharedAuthor, otherBook);
@@ -38,18 +38,18 @@ public class AdminLibraryServiceTests
         var cacheInvalidator = new TrackingCacheInvalidator();
         var storage = new TrackingBookCoverStorage();
         context.BookCovers.AddRange(
-            new Domain.Entities.BookCover
+            new BookCover
             {
                 Id = Guid.Empty, BookId = ownedBook.Id, StoragePath = "owned/one.jpg", MimeType = "image/jpeg"
             },
-            new Domain.Entities.BookCover
+            new BookCover
             {
                 Id = Guid.Empty,
                 BookId = ownedBookWithSharedAuthor.Id,
                 StoragePath = "owned/two.jpg",
                 MimeType = "image/jpeg"
             },
-            new Domain.Entities.BookCover
+            new BookCover
             {
                 Id = Guid.Empty, BookId = otherBook.Id, StoragePath = "other/keep.jpg", MimeType = "image/jpeg"
             });
@@ -57,7 +57,7 @@ public class AdminLibraryServiceTests
 
         var service = new AdminLibraryService(context, storage, cacheInvalidator);
 
-        AdminLibraryPurgeResult result =
+        var result =
             await service.DeleteAllBooksForOwnerAsync(database.UserId, CancellationToken.None);
 
         Assert.Equal(2, result.DeletedBooks);
@@ -81,12 +81,12 @@ public class AdminLibraryServiceTests
     public async Task DeleteAllBooksForOwnerAsync_ShouldInvalidateCacheEvenWhenOwnerHasNoBooks()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         var cacheInvalidator = new TrackingCacheInvalidator();
         var storage = new TrackingBookCoverStorage();
         var service = new AdminLibraryService(context, storage, cacheInvalidator);
 
-        AdminLibraryPurgeResult result =
+        var result =
             await service.DeleteAllBooksForOwnerAsync(database.UserId, CancellationToken.None);
 
         Assert.Equal(new AdminLibraryPurgeResult(0, 0, 0), result);

@@ -6,7 +6,7 @@ using Infrastructure;
 using Infrastructure.Middleware;
 using Serilog.Events;
 
-WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
 if (builder.Environment.IsDevelopment())
 {
@@ -20,7 +20,7 @@ builder.AddInfrastructureServices();
 builder.Services.AddHealthChecks()
     .AddCheck<DatabaseReadyHealthCheck>("database");
 
-WebApplication app = builder.Build();
+var app = builder.Build();
 
 await app.ApplyDatabaseMigrationsAsync();
 
@@ -45,7 +45,7 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
         diagnosticContext.Set("TraceId", System.Diagnostics.Activity.Current?.TraceId.ToString() ?? string.Empty);
         diagnosticContext.Set("SpanId", System.Diagnostics.Activity.Current?.SpanId.ToString() ?? string.Empty);
-        string? userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (!string.IsNullOrWhiteSpace(userId))
         {
             diagnosticContext.Set("UserId", userId);

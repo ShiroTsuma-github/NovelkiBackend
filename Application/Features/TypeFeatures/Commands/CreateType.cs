@@ -16,7 +16,7 @@ public class CreateTypeCommandHandler : IRequestHandler<CreateTypeCommand, TypeD
 
     public async Task<TypeDto> Handle(CreateTypeCommand request, CancellationToken cancellationToken)
     {
-        ContentType? type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken);
+        var type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken);
         if (type != null)
         {
             throw new EntityAlreadyExistsException<ContentType, Guid>(request.Name, type.Id);

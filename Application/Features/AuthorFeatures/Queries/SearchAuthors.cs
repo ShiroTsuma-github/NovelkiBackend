@@ -16,7 +16,7 @@ public class SearchAuthorsQueryHandler : IRequestHandler<SearchAuthorsQuery, IRe
     public async Task<IReadOnlyCollection<AuthorDto>> Handle(SearchAuthorsQuery request,
         CancellationToken cancellationToken)
     {
-        IEnumerable<Author> authors =
+        var authors =
             await _authorRepository.SearchAsync(request.Search, Math.Clamp(request.Take, 1, 50), cancellationToken);
         return authors.Select(a => a.ToDto()).ToList();
     }

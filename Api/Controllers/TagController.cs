@@ -18,7 +18,7 @@ public class TagController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Search([FromQuery] SearchTagsQuery query)
     {
-        IReadOnlyCollection<TagDto> tags = await _mediator.Send(query);
+        var tags = await _mediator.Send(query);
         return Ok(tags);
     }
 }

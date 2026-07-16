@@ -31,7 +31,7 @@ public class BookCoverTests
             new FakeProvider(new BookCoverCandidate(BookCoverSource.Jikan, "https://example.com/other.jpg"))
         });
 
-        BookCoverCandidate? result = await resolver.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await resolver.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.GoogleBooks, result.Source);
@@ -41,24 +41,24 @@ public class BookCoverTests
     [Fact]
     public async Task BookLinkMetadataProvider_ShouldReadOpenGraphImage()
     {
-        string html = """
-                      <html>
-                        <head>
-                          <meta property="og:image" content="/covers/book.jpg" />
-                        </head>
-                      </html>
-                      """;
+        var html = """
+                   <html>
+                     <head>
+                       <meta property="og:image" content="/covers/book.jpg" />
+                     </head>
+                   </html>
+                   """;
         var provider = new BookLinkMetadataCoverProvider(new HttpClient(new FakeHttpMessageHandler(html))
         {
             BaseAddress = new Uri("https://source.example")
         });
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Links.Add(new BookLink
         {
             Url = "https://source.example/series/book", SourceType = "Official", IsPrimary = true
         });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.BookLinkMetadata, result.Source);
@@ -68,23 +68,23 @@ public class BookCoverTests
     [Fact]
     public async Task BookLinkMetadataProvider_ShouldReadImageSrcLinkWhenMetaImagesAreRejected()
     {
-        string html = """
-                      <html>
-                        <head>
-                          <meta property="og:image" content="/assets/logo.png" />
-                          <meta content="/covers/reversed.jpg" property="twitter:image" />
-                          <link rel="preload image_src" href="/covers/fallback.webp" />
-                        </head>
-                      </html>
-                      """;
+        var html = """
+                   <html>
+                     <head>
+                       <meta property="og:image" content="/assets/logo.png" />
+                       <meta content="/covers/reversed.jpg" property="twitter:image" />
+                       <link rel="preload image_src" href="/covers/fallback.webp" />
+                     </head>
+                   </html>
+                   """;
         var provider = new BookLinkMetadataCoverProvider(new HttpClient(new FakeHttpMessageHandler(html)));
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Links.Add(new BookLink
         {
             Url = "https://source.example/series/book", SourceType = "Official", IsPrimary = true
         });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://source.example/covers/reversed.jpg", result.ImageUrl);
@@ -93,15 +93,15 @@ public class BookCoverTests
     [Fact]
     public async Task BookLinkMetadataProvider_ShouldSkipInvalidNonHtmlAndChallengePages()
     {
-        Book invalidLinkBook = CreateBook();
+        var invalidLinkBook = CreateBook();
         invalidLinkBook.Links.Add(
             new BookLink { Url = "file:///tmp/page.html", SourceType = "Local", IsPrimary = true });
-        Book challengeBook = CreateBook();
+        var challengeBook = CreateBook();
         challengeBook.Links.Add(new BookLink
         {
             Url = "https://source.example/challenge", SourceType = "Official", IsPrimary = true
         });
-        Book nonHtmlBook = CreateBook();
+        var nonHtmlBook = CreateBook();
         nonHtmlBook.Links.Add(new BookLink
         {
             Url = "https://source.example/image", SourceType = "Official", IsPrimary = true
@@ -122,23 +122,23 @@ public class BookCoverTests
     [Fact]
     public async Task BookLinkMetadataProvider_ShouldSkipBadImageCandidatesAndUseLinkFallback()
     {
-        string html = """
-                      <html>
-                        <head>
-                          <meta property="og:image" content="data:image/png;base64,abc" />
-                          <meta property="twitter:image" content="/avatars/user.jpg" />
-                          <link rel="image_src" href="/covers/fallback.jpg" />
-                        </head>
-                      </html>
-                      """;
+        var html = """
+                   <html>
+                     <head>
+                       <meta property="og:image" content="data:image/png;base64,abc" />
+                       <meta property="twitter:image" content="/avatars/user.jpg" />
+                       <link rel="image_src" href="/covers/fallback.jpg" />
+                     </head>
+                   </html>
+                   """;
         var provider = new BookLinkMetadataCoverProvider(new HttpClient(new FakeHttpMessageHandler(html)));
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Links.Add(new BookLink
         {
             Url = "https://source.example/series/book", SourceType = "Official", IsPrimary = true
         });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://source.example/covers/fallback.jpg", result.ImageUrl);
@@ -151,7 +151,7 @@ public class BookCoverTests
             {"data":{"Page":{"media":[{"coverImage":{"extraLarge":"https://cdn.example.com/anilist-xl.jpg","large":"https://cdn.example.com/anilist.jpg"}}]}}}
             """)) { BaseAddress = new Uri("https://graphql.anilist.co") });
 
-        BookCoverCandidate? result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.AniList, result.Source);
@@ -172,10 +172,10 @@ public class BookCoverTests
                     """{"data":{"Page":{"media":[{"coverImage":{"large":"https://cdn.example.com/anilist-large.jpg"}}]}}}""",
                     Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://graphql.anilist.co") });
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALT TITLE", IsPrimary = false });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://cdn.example.com/anilist-large.jpg", result.ImageUrl);
@@ -188,7 +188,7 @@ public class BookCoverTests
             {"data":[{"images":{"jpg":{"large_image_url":"https://cdn.example.com/jikan-large.jpg","image_url":"https://cdn.example.com/jikan.jpg"}}}]}
             """)) { BaseAddress = new Uri("https://api.jikan.moe") });
 
-        BookCoverCandidate? result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.Jikan, result.Source);
@@ -209,10 +209,10 @@ public class BookCoverTests
                     """{"data":[{"images":{"jpg":{"image_url":"https://cdn.example.com/jikan.jpg"}}}]}""",
                     Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://api.jikan.moe") });
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALT TITLE", IsPrimary = false });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://cdn.example.com/jikan.jpg", result.ImageUrl);
@@ -225,7 +225,7 @@ public class BookCoverTests
             {"items":[{"volumeInfo":{"imageLinks":{"thumbnail":"http://books.google.com/cover.jpg"}}}]}
             """)) { BaseAddress = new Uri("https://www.googleapis.com") });
 
-        BookCoverCandidate? result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.GoogleBooks, result.Source);
@@ -239,7 +239,7 @@ public class BookCoverTests
             {"items":[{"volumeInfo":{"imageLinks":{"smallThumbnail":"http://books.google.com/small.jpg"}}}]}
             """)) { BaseAddress = new Uri("https://www.googleapis.com") });
 
-        BookCoverCandidate? result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://books.google.com/small.jpg", result.ImageUrl);
@@ -252,7 +252,7 @@ public class BookCoverTests
             {"docs":[{"title":"I Shall Seal the Heavens","cover_i":12345}]}
             """)) { BaseAddress = new Uri("https://openlibrary.org") });
 
-        BookCoverCandidate? result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.OpenLibrary, result.Source);
@@ -271,10 +271,10 @@ public class BookCoverTests
             {
                 Content = new StringContent("""{"docs":[{"cover_i":999}]}""", Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://openlibrary.org") });
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALT TITLE", IsPrimary = false });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://covers.openlibrary.org/b/id/999-L.jpg", result.ImageUrl);
@@ -287,7 +287,7 @@ public class BookCoverTests
             {"results":{"bindings":[{"image":{"type":"uri","value":"https://commons.wikimedia.org/wiki/Special:FilePath/Cover.jpg"}}]}}
             """)) { BaseAddress = new Uri("https://query.wikidata.org") });
 
-        BookCoverCandidate? result = await provider.FindAsync(CreateBook(), CancellationToken.None);
+        var result = await provider.FindAsync(CreateBook(), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal(BookCoverSource.Wikidata, result.Source);
@@ -309,13 +309,13 @@ public class BookCoverTests
                     """{"results":{"bindings":[{"image":{"value":"https://commons.wikimedia.org/wiki/Special:FilePath/Alt.jpg"}}]}}""",
                     Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://query.wikidata.org") });
-        Book book = CreateBook();
+        var book = CreateBook();
         book.Titles.Add(new BookTitle
         {
             Title = "Alt \"Quoted\" Title", NormalizedTitle = "ALT QUOTED TITLE", IsPrimary = false
         });
 
-        BookCoverCandidate? result = await provider.FindAsync(book, CancellationToken.None);
+        var result = await provider.FindAsync(book, CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("https://commons.wikimedia.org/wiki/Special:FilePath/Alt.jpg", result.ImageUrl);
@@ -324,7 +324,7 @@ public class BookCoverTests
     [Fact]
     public async Task SetBookCoverFromUrl_ShouldStoreManualUrlCover()
     {
-        Book book = CreateBook(new BookCover
+        var book = CreateBook(new BookCover
         {
             BookId = BookId,
             Status = BookCoverStatus.NotFound,
@@ -342,7 +342,7 @@ public class BookCoverTests
             new FakeBookListCacheInvalidator(),
             new FakeUser());
 
-        BookCoverDto dto =
+        var dto =
             await handler.Handle(new SetBookCoverFromUrlCommand(book.Id, "https://example.com/cover.jpg"),
                 CancellationToken.None);
 
@@ -358,7 +358,7 @@ public class BookCoverTests
     [Fact]
     public async Task UploadBookCover_ShouldStoreManualUploadAndInvalidateCache()
     {
-        Book book = CreateBook(new BookCover
+        var book = CreateBook(new BookCover
         {
             BookId = BookId,
             Status = BookCoverStatus.Found,
@@ -377,7 +377,7 @@ public class BookCoverTests
             new FakeUser());
 
         await using var content = new MemoryStream([1, 2, 3]);
-        BookCoverDto dto =
+        var dto =
             await handler.Handle(new UploadBookCoverCommand(book.Id, content, "cover.png", "image/png", content.Length),
                 CancellationToken.None);
 
@@ -399,7 +399,7 @@ public class BookCoverTests
             new FakeBookListCacheInvalidator(),
             new FakeUser());
 
-        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             handler.Handle(new UploadBookCoverCommand(BookId, new MemoryStream(), "cover.jpg", "image/jpeg", 0),
                 CancellationToken.None));
     }
@@ -415,14 +415,14 @@ public class BookCoverTests
             new FakeBookListCacheInvalidator(),
             new FakeUser());
 
-        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             handler.Handle(new SetBookCoverFromUrlCommand(BookId, "file:///tmp/cover.jpg"), CancellationToken.None));
     }
 
     [Fact]
     public async Task SetBookCoverFromUrl_ShouldAddCover_WhenBookHasNoCoverRow()
     {
-        Book book = CreateBook(hasCover: false);
+        var book = CreateBook(hasCover: false);
         var repository = new FakeBookRepository(book);
         var coverRepository = new FakeBookCoverRepository();
         var handler = new SetBookCoverFromUrlHandler(
@@ -433,7 +433,7 @@ public class BookCoverTests
             new FakeBookListCacheInvalidator(),
             new FakeUser());
 
-        BookCoverDto dto =
+        var dto =
             await handler.Handle(new SetBookCoverFromUrlCommand(book.Id, "https://example.com/cover.jpg"),
                 CancellationToken.None);
 
@@ -447,13 +447,13 @@ public class BookCoverTests
     [Fact]
     public async Task RemoteImageService_ShouldAcceptImageBytes_WhenUrlExtensionIsMisleading()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
-            byte[] pngBytes = CreateTestPngBytes();
-            BookCoverRemoteImageService service = CreateRemoteImageService(storageRoot, pngBytes, "text/plain");
+            var pngBytes = CreateTestPngBytes();
+            var service = CreateRemoteImageService(storageRoot, pngBytes, "text/plain");
 
-            BookCoverStoredFiles stored = await service.SaveFromUrlAsync(OwnerId, BookId,
+            var stored = await service.SaveFromUrlAsync(OwnerId, BookId,
                 "https://example.com/not-an-image.txt", CancellationToken.None);
 
             Assert.Equal("image/jpeg", stored.Original.MimeType);
@@ -471,13 +471,13 @@ public class BookCoverTests
     [Fact]
     public async Task RemoteImageService_ShouldRejectNonImageBytes_WhenUrlLooksLikeJpg()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
-            BookCoverRemoteImageService service = CreateRemoteImageService(storageRoot,
+            var service = CreateRemoteImageService(storageRoot,
                 Encoding.UTF8.GetBytes("<html>not an image</html>"), "text/html");
 
-            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            await Assert.ThrowsAsync<ValidationException>(() =>
                 service.SaveFromUrlAsync(OwnerId, BookId, "https://example.com/cover.jpg", CancellationToken.None));
         }
         finally
@@ -496,13 +496,13 @@ public class BookCoverTests
     [InlineData("http://[fc00::1]/cover.jpg")]
     public async Task RemoteImageService_ShouldRejectPrivateOrLoopbackHosts(string imageUrl)
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
             var handler = new FakeHttpMessageHandler(CreateTestPngBytes(), "image/png");
-            BookCoverRemoteImageService service = CreateRemoteImageService(storageRoot, handler);
+            var service = CreateRemoteImageService(storageRoot, handler);
 
-            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            await Assert.ThrowsAsync<ValidationException>(() =>
                 service.SaveFromUrlAsync(OwnerId, BookId, imageUrl, CancellationToken.None));
 
             Assert.Equal(0, handler.RequestCount);
@@ -518,13 +518,13 @@ public class BookCoverTests
     [InlineData("file:///tmp/cover.jpg")]
     public async Task RemoteImageService_ShouldRejectInvalidOrNonHttpUrls(string imageUrl)
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
             var handler = new FakeHttpMessageHandler(CreateTestPngBytes(), "image/png");
-            BookCoverRemoteImageService service = CreateRemoteImageService(storageRoot, handler);
+            var service = CreateRemoteImageService(storageRoot, handler);
 
-            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            await Assert.ThrowsAsync<ValidationException>(() =>
                 service.SaveFromUrlAsync(OwnerId, BookId, imageUrl, CancellationToken.None));
 
             Assert.Equal(0, handler.RequestCount);
@@ -538,13 +538,13 @@ public class BookCoverTests
     [Fact]
     public async Task RemoteImageService_ShouldRejectUnsuccessfulStatusCode()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
             var handler = new FakeHttpMessageHandler(Array.Empty<byte>(), "text/plain", HttpStatusCode.NotFound);
-            BookCoverRemoteImageService service = CreateRemoteImageService(storageRoot, handler);
+            var service = CreateRemoteImageService(storageRoot, handler);
 
-            ValidationException exception = await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            var exception = await Assert.ThrowsAsync<ValidationException>(() =>
                 service.SaveFromUrlAsync(OwnerId, BookId, "https://93.184.216.34/missing.jpg", CancellationToken.None));
 
             Assert.Contains("HTTP 404", exception.Message);
@@ -559,14 +559,14 @@ public class BookCoverTests
     [Fact]
     public async Task RemoteImageService_ShouldRejectRedirectResponses()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
-            BookCoverRemoteImageService service = CreateRemoteImageService(
+            var service = CreateRemoteImageService(
                 storageRoot,
                 new FakeHttpMessageHandler(Array.Empty<byte>(), "text/plain", HttpStatusCode.Redirect));
 
-            await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+            await Assert.ThrowsAsync<ValidationException>(() =>
                 service.SaveFromUrlAsync(OwnerId, BookId, "https://example.com/redirect", CancellationToken.None));
         }
         finally
@@ -578,7 +578,7 @@ public class BookCoverTests
     [Fact]
     public async Task RefreshBookCover_ShouldAddPendingCover_WhenBookHasNoCoverRow()
     {
-        Book book = CreateBook(hasCover: false);
+        var book = CreateBook(hasCover: false);
         var repository = new FakeBookRepository(book);
         var coverRepository = new FakeBookCoverRepository();
         var queue = new FakeBookCoverQueue();
@@ -590,7 +590,7 @@ public class BookCoverTests
             new FakeBookListCacheInvalidator(),
             new FakeUser());
 
-        BookCoverDto dto = await handler.Handle(new RefreshBookCoverCommand(book.Id), CancellationToken.None);
+        var dto = await handler.Handle(new RefreshBookCoverCommand(book.Id), CancellationToken.None);
 
         Assert.Equal("Pending", dto.Status);
         Assert.NotNull(book.Cover);
@@ -602,7 +602,7 @@ public class BookCoverTests
     [Fact]
     public async Task RefreshBookCover_ShouldResetExistingCoverDeleteFilesAndInvalidateCache()
     {
-        Book book = CreateBook(new BookCover
+        var book = CreateBook(new BookCover
         {
             BookId = BookId,
             Status = BookCoverStatus.Found,
@@ -625,7 +625,7 @@ public class BookCoverTests
             cacheInvalidator,
             new FakeUser());
 
-        BookCoverDto dto = await handler.Handle(new RefreshBookCoverCommand(book.Id), CancellationToken.None);
+        var dto = await handler.Handle(new RefreshBookCoverCommand(book.Id), CancellationToken.None);
 
         Assert.Equal("Pending", dto.Status);
         Assert.Null(book.Cover!.StoragePath);
@@ -640,7 +640,7 @@ public class BookCoverTests
     [Fact]
     public async Task DeleteBookCover_ShouldRemoveCoverLinkStorageAndInvalidateCache()
     {
-        Book book = CreateBook(new BookCover
+        var book = CreateBook(new BookCover
         {
             BookId = BookId,
             Status = BookCoverStatus.Uploaded,
@@ -674,7 +674,7 @@ public class BookCoverTests
     [Fact]
     public async Task DeleteBookCover_ShouldReturnWhenBookHasNoCover()
     {
-        Book book = CreateBook(hasCover: false);
+        var book = CreateBook(hasCover: false);
         var coverRepository = new FakeBookCoverRepository();
         var storage = new FakeCoverStorage();
         var cacheInvalidator = new FakeBookListCacheInvalidator();
@@ -708,9 +708,9 @@ public class BookCoverTests
         var originalHandler = new GetBookCoverFileHandler(coverRepository, storage, new FakeUser());
         var thumbnailHandler = new GetBookCoverThumbnailFileHandler(coverRepository, storage, new FakeUser());
 
-        BookCoverFileResult original =
+        var original =
             await originalHandler.Handle(new GetBookCoverFileQuery(BookId), CancellationToken.None);
-        BookCoverFileResult thumbnail =
+        var thumbnail =
             await thumbnailHandler.Handle(new GetBookCoverThumbnailFileQuery(BookId), CancellationToken.None);
 
         Assert.Equal("image/jpeg", original.MimeType);
@@ -736,7 +736,7 @@ public class BookCoverTests
     [Fact]
     public async Task LocalBookCoverStorage_ShouldOpenReadAndDeleteStoredFiles()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
             var storage =
@@ -744,9 +744,9 @@ public class BookCoverTests
                     Options.Create(new BookCoverOptions { StorageRoot = storageRoot, MaxBytes = 1024 * 1024 }));
             await using var content = new MemoryStream(CreateTestPngBytes());
 
-            BookCoverStoredFiles stored = await storage.SaveAsync(OwnerId, BookId, content, "cover.png", "image/png",
+            var stored = await storage.SaveAsync(OwnerId, BookId, content, "cover.png", "image/png",
                 CancellationToken.None);
-            await using (Stream stream =
+            await using (var stream =
                          await storage.OpenReadAsync(stored.Original.StoragePath, CancellationToken.None))
             {
                 Assert.True(stream.Length > 0);
@@ -767,7 +767,7 @@ public class BookCoverTests
     [Fact]
     public async Task LocalBookCoverStorage_ShouldRejectMissingAndEscapingPaths()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
             var storage =
@@ -788,7 +788,7 @@ public class BookCoverTests
     [Fact]
     public async Task LocalBookCoverStorage_DeleteIfExistsAsync_ShouldIgnoreNullWhitespaceAndMissingFiles()
     {
-        string storageRoot = CreateTempStorageRoot();
+        var storageRoot = CreateTempStorageRoot();
         try
         {
             var storage =
@@ -814,7 +814,7 @@ public class BookCoverTests
 
         await queue.QueueAsync(bookId, cts.Token);
 
-        await foreach (Guid queuedBookId in queue.ReadAllAsync(cts.Token))
+        await foreach (var queuedBookId in queue.ReadAllAsync(cts.Token))
         {
             Assert.Equal(bookId, queuedBookId);
             break;
@@ -862,7 +862,7 @@ public class BookCoverTests
 
     private static string CreateTempStorageRoot()
     {
-        string root = Path.Combine(Path.GetTempPath(), "novelki-cover-tests", Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "novelki-cover-tests", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         return root;
     }

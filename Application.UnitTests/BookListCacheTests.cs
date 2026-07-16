@@ -13,7 +13,7 @@ public class BookListCacheTests
     {
         var cache = new BookListCache(new FakeDistributedCache(), NullLogger<BookListCache>.Instance);
 
-        PaginatedResult<BookListItemDto>? result =
+        var result =
             await cache.GetBooksAsync(Guid.NewGuid(), 0, 20, null, null, null, CancellationToken.None);
 
         Assert.Null(result);
@@ -47,7 +47,7 @@ public class BookListCacheTests
 
         await cache.SetBooksAsync(ownerId, 0, 20, "  title:lord  ", " LastModified ", " DESC ", expected,
             CancellationToken.None);
-        PaginatedResult<BookListItemDto>? result = await cache.GetBooksAsync(ownerId, 0, 20, "title:lord",
+        var result = await cache.GetBooksAsync(ownerId, 0, 20, "title:lord",
             "lastmodified", "desc", CancellationToken.None);
 
         Assert.NotNull(result);
@@ -74,10 +74,10 @@ public class BookListCacheTests
         await cache.SetBooksAsync(ownerId, 0, 20, "query", "title", "asc", initial, CancellationToken.None);
         await cache.InvalidateBooksAsync(ownerId, CancellationToken.None);
 
-        PaginatedResult<BookListItemDto>? oldLookup =
+        var oldLookup =
             await cache.GetBooksAsync(ownerId, 0, 20, "query", "title", "asc", CancellationToken.None);
         await cache.SetBooksAsync(ownerId, 0, 20, "query", "title", "asc", refreshed, CancellationToken.None);
-        PaginatedResult<BookListItemDto>? newLookup =
+        var newLookup =
             await cache.GetBooksAsync(ownerId, 0, 20, "query", "title", "asc", CancellationToken.None);
 
         Assert.Null(oldLookup);
@@ -121,7 +121,7 @@ public class BookListCacheTests
         var expected = PaginatedResult<BookListItemDto>.Create(0, 10, 1, [CreateBookDto("Whitespace")]);
 
         await cache.SetBooksAsync(ownerId, 0, 10, "   ", null, null, expected, CancellationToken.None);
-        PaginatedResult<BookListItemDto>? result =
+        var result =
             await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
 
         Assert.NotNull(result);
@@ -154,7 +154,7 @@ public class BookListCacheTests
 
         public byte[]? Get(string key)
         {
-            return _entries.TryGetValue(key, out byte[]? value) ? value : null;
+            return _entries.TryGetValue(key, out var value) ? value : null;
         }
 
         public Task<byte[]?> GetAsync(string key, CancellationToken token = default)

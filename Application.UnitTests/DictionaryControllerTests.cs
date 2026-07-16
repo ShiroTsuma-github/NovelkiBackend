@@ -40,7 +40,7 @@ public class DictionaryControllerTests
             .ReturnsAsync(dto);
         var controller = new GenreController(mediator.Object);
 
-        CreatedAtActionResult created =
+        var created =
             Assert.IsType<CreatedAtActionResult>(await controller.Create(new CreateGenreCommand("Fantasy", null)));
         Assert.Equal(nameof(GenreController.GetById), created.ActionName);
         Assert.Same(page, Assert.IsType<OkObjectResult>(await controller.GetAll(new GetAllGenresQuery(0, 10))).Value);
@@ -78,7 +78,7 @@ public class DictionaryControllerTests
             .ReturnsAsync(dto);
         var controller = new StatusController(mediator.Object);
 
-        CreatedAtActionResult created =
+        var created =
             Assert.IsType<CreatedAtActionResult>(await controller.Create(new CreateStatusCommand("Reading", null)));
         Assert.Equal(nameof(StatusController.GetById), created.ActionName);
         Assert.Same(page, Assert.IsType<OkObjectResult>(await controller.GetAll(new GetAllStatusesQuery(0, 10))).Value);
@@ -116,7 +116,7 @@ public class DictionaryControllerTests
             .ReturnsAsync(dto);
         var controller = new TypeController(mediator.Object);
 
-        CreatedAtActionResult created =
+        var created =
             Assert.IsType<CreatedAtActionResult>(await controller.Create(new CreateTypeCommand("Novel", null)));
         Assert.Equal(nameof(TypeController.GetById), created.ActionName);
         Assert.Same(page, Assert.IsType<OkObjectResult>(await controller.GetAll(new GetAllTypesQuery(0, 10))).Value);

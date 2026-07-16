@@ -6,7 +6,7 @@ public static partial class MappingExtensions
 {
     public static BookCoverDto ToDto(this BookCover source, Guid bookId)
     {
-        long version = GetCoverVersion(source).ToUnixTimeMilliseconds();
+        var version = GetCoverVersion(source).ToUnixTimeMilliseconds();
         return new BookCoverDto
         {
             Id = source.Id,

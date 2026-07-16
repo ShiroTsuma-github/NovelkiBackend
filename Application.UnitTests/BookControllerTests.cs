@@ -20,14 +20,14 @@ public class BookControllerTests
     public async Task Create_ShouldSendCommandAndReturnCreatedBookId()
     {
         var bookId = Guid.NewGuid();
-        CreateBookCommand command = CreateBookCommand("New Book");
+        var command = CreateBookCommand("New Book");
         var mediator = new Mock<IMediator>();
         mediator.Setup(mock => mock.Send(command, It.IsAny<CancellationToken>())).ReturnsAsync(bookId);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.Create(command);
+        var result = await controller.Create(command);
 
-        CreatedAtActionResult created = Assert.IsType<CreatedAtActionResult>(result);
+        var created = Assert.IsType<CreatedAtActionResult>(result);
         Assert.Equal(nameof(BookController.GetById), created.ActionName);
         Assert.Equal(bookId, created.RouteValues!["id"]);
         mediator.Verify(mock => mock.Send(command, It.IsAny<CancellationToken>()), Times.Once);
@@ -49,23 +49,23 @@ public class BookControllerTests
             ]);
         var mediator = new Mock<IMediator>();
         mediator.Setup(mock => mock.Send(query, It.IsAny<CancellationToken>())).ReturnsAsync(expected);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.GetAll(query);
+        var result = await controller.GetAll(query);
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
     }
 
     [Fact]
     public async Task GetById_ShouldReturnMediatorBook()
     {
-        BookDto book = Book("Details");
+        var book = Book("Details");
         var mediator = new Mock<IMediator>();
         mediator.Setup(mock => mock.Send(new GetBookQuery(book.Id), It.IsAny<CancellationToken>())).ReturnsAsync(book);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.GetById(book.Id);
+        var result = await controller.GetById(book.Id);
 
         Assert.Same(book, Assert.IsType<OkObjectResult>(result).Value);
     }
@@ -74,11 +74,11 @@ public class BookControllerTests
     public async Task Update_ShouldSendRouteIdAndReturnNoContent()
     {
         var bookId = Guid.NewGuid();
-        UpdateBookCommand model = UpdateBookCommand(Guid.Empty, "Updated");
+        var model = UpdateBookCommand(Guid.Empty, "Updated");
         var mediator = new Mock<IMediator>();
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.Update(bookId, model);
+        var result = await controller.Update(bookId, model);
 
         Assert.IsType<NoContentResult>(result);
         mediator.Verify(mock => mock.Send(
@@ -89,23 +89,23 @@ public class BookControllerTests
     [Fact]
     public async Task CreateImportSession_ShouldRejectMissingFile()
     {
-        BookController controller = CreateController();
+        var controller = CreateController();
 
-        IActionResult result = await controller.CreateImportSession(null, CancellationToken.None);
+        var result = await controller.CreateImportSession(null, CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("CSV file is required.", ReadError(badRequest.Value));
     }
 
     [Fact]
     public async Task CreateImportSession_ShouldRejectEmptyFile()
     {
-        BookController controller = CreateController();
-        IFormFile file = CreateFormFile(string.Empty, "books.csv");
+        var controller = CreateController();
+        var file = CreateFormFile(string.Empty, "books.csv");
 
-        IActionResult result = await controller.CreateImportSession(file, CancellationToken.None);
+        var result = await controller.CreateImportSession(file, CancellationToken.None);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("CSV file is empty.", ReadError(badRequest.Value));
     }
 
@@ -120,12 +120,12 @@ public class BookControllerTests
         importService
             .Setup(service => service.CreateSessionAsync(It.IsAny<Stream>(), "books.csv", CancellationToken.None))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(importService: importService.Object);
-        IFormFile file = CreateFormFile("primaryTitle,contentType,status\nBook,Novel,Reading", "books.csv");
+        var controller = CreateController(importService: importService.Object);
+        var file = CreateFormFile("primaryTitle,contentType,status\nBook,Novel,Reading", "books.csv");
 
-        IActionResult result = await controller.CreateImportSession(file, CancellationToken.None);
+        var result = await controller.CreateImportSession(file, CancellationToken.None);
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
     }
 
@@ -141,11 +141,11 @@ public class BookControllerTests
         importService
             .Setup(service => service.FinalizeAsync(sessionId, CancellationToken.None))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(importService: importService.Object);
+        var controller = CreateController(importService: importService.Object);
 
-        IActionResult result = await controller.FinalizeImport(sessionId, CancellationToken.None);
+        var result = await controller.FinalizeImport(sessionId, CancellationToken.None);
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
     }
 
@@ -154,11 +154,11 @@ public class BookControllerTests
     {
         var importService = new Mock<IBookCsvImportService>();
         importService.Setup(service => service.CreateTemplate()).Returns("template,csv\n");
-        BookController controller = CreateController(importService: importService.Object);
+        var controller = CreateController(importService: importService.Object);
 
-        IActionResult result = controller.DownloadImportTemplate();
+        var result = controller.DownloadImportTemplate();
 
-        FileContentResult file = Assert.IsType<FileContentResult>(result);
+        var file = Assert.IsType<FileContentResult>(result);
         Assert.Equal("book-import-template.csv", file.FileDownloadName);
         Assert.Equal("template,csv\n", Encoding.UTF8.GetString(file.FileContents));
     }
@@ -183,7 +183,7 @@ public class BookControllerTests
             .ReturnsAsync(expected);
         importService.Setup(service => service.DeleteRowAsync(sessionId, rowId, CancellationToken.None))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(importService: importService.Object);
+        var controller = CreateController(importService: importService.Object);
 
         Assert.Same(expected,
             Assert.IsType<OkObjectResult>(await controller.GetImportSession(sessionId, CancellationToken.None)).Value);
@@ -200,9 +200,9 @@ public class BookControllerTests
     {
         var sessionId = Guid.NewGuid();
         var importService = new Mock<IBookCsvImportService>();
-        BookController controller = CreateController(importService: importService.Object);
+        var controller = CreateController(importService: importService.Object);
 
-        IActionResult result = await controller.CancelImport(sessionId, CancellationToken.None);
+        var result = await controller.CancelImport(sessionId, CancellationToken.None);
 
         Assert.IsType<NoContentResult>(result);
         importService.Verify(service => service.CancelAsync(sessionId, CancellationToken.None), Times.Once);
@@ -226,34 +226,34 @@ public class BookControllerTests
         importService
             .Setup(service => service.DeleteInvalidRowsAsync(sessionId, CancellationToken.None))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(importService: importService.Object);
+        var controller = CreateController(importService: importService.Object);
 
-        IActionResult result = await controller.DeleteInvalidImportRows(sessionId, CancellationToken.None);
+        var result = await controller.DeleteInvalidImportRows(sessionId, CancellationToken.None);
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
     }
 
     [Fact]
     public async Task UploadCover_ShouldRejectMissingFile()
     {
-        BookController controller = CreateController();
+        var controller = CreateController();
 
-        IActionResult result = await controller.UploadCover(Guid.NewGuid(), null);
+        var result = await controller.UploadCover(Guid.NewGuid(), null);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("Cover file is required.", ReadError(badRequest.Value));
     }
 
     [Fact]
     public async Task UploadCover_ShouldRejectEmptyFile()
     {
-        BookController controller = CreateController();
-        IFormFile file = CreateFormFile(string.Empty, "cover.jpg", "image/jpeg");
+        var controller = CreateController();
+        var file = CreateFormFile(string.Empty, "cover.jpg", "image/jpeg");
 
-        IActionResult result = await controller.UploadCover(Guid.NewGuid(), file);
+        var result = await controller.UploadCover(Guid.NewGuid(), file);
 
-        BadRequestObjectResult badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal("Cover file is empty.", ReadError(badRequest.Value));
     }
 
@@ -261,7 +261,7 @@ public class BookControllerTests
     public async Task UploadCover_ShouldSendUploadCommandAndReturnCover()
     {
         var bookId = Guid.NewGuid();
-        BookCoverDto expected = Cover("Uploaded");
+        var expected = Cover("Uploaded");
         var mediator = new Mock<IMediator>();
         mediator
             .Setup(mock => mock.Send(It.Is<UploadBookCoverCommand>(command =>
@@ -270,9 +270,9 @@ public class BookControllerTests
                 command.ContentType == "image/jpeg" &&
                 command.Length == 3), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.UploadCover(bookId, CreateFormFile("abc", "cover.jpg", "image/jpeg"));
+        var result = await controller.UploadCover(bookId, CreateFormFile("abc", "cover.jpg", "image/jpeg"));
 
         Assert.Same(expected, Assert.IsType<OkObjectResult>(result).Value);
     }
@@ -281,13 +281,13 @@ public class BookControllerTests
     public async Task CoverMutationEndpoints_ShouldSendCommands()
     {
         var bookId = Guid.NewGuid();
-        BookCoverDto expected = Cover("Found");
+        var expected = Cover("Found");
         var mediator = new Mock<IMediator>();
         mediator.Setup(mock => mock.Send(new SetBookCoverFromUrlCommand(bookId, "https://example.com/cover.jpg"),
             It.IsAny<CancellationToken>())).ReturnsAsync(expected);
         mediator.Setup(mock => mock.Send(new RefreshBookCoverCommand(bookId), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
         Assert.Same(expected,
             Assert.IsType<OkObjectResult>(await controller.SetCoverFromUrl(bookId,
@@ -309,11 +309,11 @@ public class BookControllerTests
                 new MemoryStream(Encoding.UTF8.GetBytes("abc")),
                 "image/jpeg",
                 "cover.jpg"));
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.GetCoverFile(bookId);
+        var result = await controller.GetCoverFile(bookId);
 
-        FileStreamResult file = Assert.IsType<FileStreamResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("image/jpeg", file.ContentType);
         Assert.Equal("cover.jpg", file.FileDownloadName);
         Assert.Equal("private, max-age=2592000, immutable", controller.Response.Headers.CacheControl);
@@ -332,11 +332,11 @@ public class BookControllerTests
                 new MemoryStream(Encoding.UTF8.GetBytes("thumb")),
                 "image/jpeg",
                 "cover.thumb.jpg"));
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.GetCoverThumbnail(bookId);
+        var result = await controller.GetCoverThumbnail(bookId);
 
-        FileStreamResult file = Assert.IsType<FileStreamResult>(result);
+        var file = Assert.IsType<FileStreamResult>(result);
         Assert.Equal("image/jpeg", file.ContentType);
         Assert.Equal("cover.thumb.jpg", file.FileDownloadName);
         Assert.Equal("private, max-age=2592000, immutable", controller.Response.Headers.CacheControl);
@@ -371,10 +371,10 @@ public class BookControllerTests
             .Returns("exported,csv\n");
         var controller = new BookController(mediator.Object, importService.Object, exportService.Object, logger.Object);
 
-        IActionResult result = await controller.ExportBooks("author:Toika", "title", "asc");
+        var result = await controller.ExportBooks("author:Toika", "title", "asc");
 
-        FileContentResult file = Assert.IsType<FileContentResult>(result);
-        string csv = Encoding.UTF8.GetString(file.FileContents);
+        var file = Assert.IsType<FileContentResult>(result);
+        var csv = Encoding.UTF8.GetString(file.FileContents);
 
         Assert.Equal("books-export.csv", file.FileDownloadName);
         Assert.Equal("exported,csv\n", csv);
@@ -396,9 +396,9 @@ public class BookControllerTests
         mediator.Setup(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(emptyPage);
         exportService.Setup(service => service.Build(emptyPage.Data)).Returns("headers\n");
-        BookController controller = CreateController(mediator.Object, exportService: exportService.Object);
+        var controller = CreateController(mediator.Object, exportService: exportService.Object);
 
-        IActionResult result = await controller.ExportBooks(null, null, null);
+        var result = await controller.ExportBooks(null, null, null);
 
         Assert.Equal("headers\n", Encoding.UTF8.GetString(Assert.IsType<FileContentResult>(result).FileContents));
         mediator.Verify(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()),
@@ -440,11 +440,11 @@ public class BookControllerTests
         mediator
             .Setup(mock => mock.Send(new GetBookSummaryQuery("author:Toika"), It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.GetSummary(new GetBookSummaryQuery("author:Toika"));
+        var result = await controller.GetSummary(new GetBookSummaryQuery("author:Toika"));
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
     }
 
@@ -469,15 +469,15 @@ public class BookControllerTests
                 new GetBookAnalyticsQuery("author:Toika", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), "month"),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(expected);
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult result = await controller.GetAnalytics(
+        var result = await controller.GetAnalytics(
             "author:Toika",
             new DateOnly(2026, 1, 1),
             new DateOnly(2026, 2, 1),
             "month");
 
-        OkObjectResult ok = Assert.IsType<OkObjectResult>(result);
+        var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
     }
 
@@ -486,11 +486,11 @@ public class BookControllerTests
     {
         var bookId = Guid.NewGuid();
         var mediator = new Mock<IMediator>();
-        BookController controller = CreateController(mediator.Object);
+        var controller = CreateController(mediator.Object);
 
-        IActionResult progress =
+        var progress =
             await controller.UpdateProgress(bookId, new UpdateBookProgressCommand(Guid.Empty, 12, "12", "done"));
-        IActionResult delete = await controller.Delete(bookId);
+        var delete = await controller.Delete(bookId);
 
         Assert.IsType<NoContentResult>(progress);
         Assert.IsType<NoContentResult>(delete);
@@ -518,7 +518,7 @@ public class BookControllerTests
 
     private static IFormFile CreateFormFile(string content, string fileName, string contentType = "text/csv")
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(content);
+        var bytes = Encoding.UTF8.GetBytes(content);
         var stream = new MemoryStream(bytes);
         return new FormFile(stream, 0, bytes.Length, "file", fileName)
         {

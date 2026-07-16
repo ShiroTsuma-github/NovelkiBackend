@@ -20,7 +20,7 @@ public class TypeController : ControllerBase
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateTypeCommand command)
     {
-        TypeDto type = await _mediator.Send(command);
+        var type = await _mediator.Send(command);
 
         return CreatedAtAction(nameof(GetById), new { id = type.Id }, type);
     }
@@ -29,7 +29,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllTypesQuery getAllTypees)
     {
-        PaginatedResult<TypeDto> types = await _mediator.Send(getAllTypees);
+        var types = await _mediator.Send(getAllTypees);
 
         return Ok(types);
     }
@@ -38,7 +38,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
-        TypeDto typeDto = await _mediator.Send(new GetTypeQuery(id));
+        var typeDto = await _mediator.Send(new GetTypeQuery(id));
 
         return Ok(typeDto);
     }
@@ -47,7 +47,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByIdDetails(Guid id)
     {
-        TypeDetailsDto typeDto = await _mediator.Send(new GetTypeDetailsQuery(id));
+        var typeDto = await _mediator.Send(new GetTypeDetailsQuery(id));
 
         return Ok(typeDto);
     }
@@ -56,7 +56,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByName(string name)
     {
-        TypeDto typeDto = await _mediator.Send(new GetTypeByNameQuery(name));
+        var typeDto = await _mediator.Send(new GetTypeByNameQuery(name));
 
         return Ok(typeDto);
     }
@@ -65,7 +65,7 @@ public class TypeController : ControllerBase
     [Authorize]
     public async Task<IActionResult> GetByNameDetails(string name)
     {
-        TypeDetailsDto typeDto = await _mediator.Send(new GetTypeDetailsByNameQuery(name));
+        var typeDto = await _mediator.Send(new GetTypeDetailsByNameQuery(name));
 
         return Ok(typeDto);
     }
@@ -75,7 +75,7 @@ public class TypeController : ControllerBase
     public async Task<IActionResult> Update(Guid id, UpdateTypeCommand updateType)
     {
         updateType.Id = id;
-        TypeDto typeDto = await _mediator.Send(updateType);
+        var typeDto = await _mediator.Send(updateType);
 
         return Ok(typeDto);
     }

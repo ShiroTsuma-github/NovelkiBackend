@@ -21,15 +21,15 @@ public class BookCsvImportServiceTests
     public async Task CreateSessionAsync_ShouldRejectCsvWithoutRequiredColumns()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType
-                                              Only Title,Novel
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType
+                                     Only Title,Novel
+                                     """);
 
-        ValidationException exception = await Assert.ThrowsAsync<ValidationException>(() =>
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
             service.CreateSessionAsync(stream, "books.csv", CancellationToken.None));
 
         Assert.Contains("status", exception.Message);
@@ -39,18 +39,18 @@ public class BookCsvImportServiceTests
     public async Task CreateSessionAsync_ShouldNormalizeFieldsAndFlagInvalidRows()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         await TestData.AddBookAsync(context, database.UserId, "Existing Book");
-        BookCsvImportService service = CreateService(context, database.UserId);
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,rating,priority,notes
-                                               Existing Book , Toika , Novel , Reading , fantasy; favorite , 10 , 11 , 11 , 0 , one|two
-                                               Existing Book , Toika , Novel , Reading , fantasy , 10 , 5 , 8 , 1 , keep
-                                               New Book , , InvalidType , MissingStatus , , nope , -1 , x , 7 , 
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,rating,priority,notes
+                                      Existing Book , Toika , Novel , Reading , fantasy; favorite , 10 , 11 , 11 , 0 , one|two
+                                      Existing Book , Toika , Novel , Reading , fantasy , 10 , 5 , 8 , 1 , keep
+                                      New Book , , InvalidType , MissingStatus , , nope , -1 , x , 7 , 
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, " import.csv ", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, " import.csv ", CancellationToken.None);
 
         Assert.Equal("import.csv", session.FileName);
         Assert.Equal(3, session.TotalRows);
@@ -69,7 +69,7 @@ public class BookCsvImportServiceTests
             error => error.Contains("already exists in your library."));
         Assert.Equal("one\ntwo", existingRows[0].Notes);
 
-        BookImportRowDto invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "New Book");
+        var invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "New Book");
         Assert.Contains("Content type is required and must exist. Allowed values: Novel, Manga, Manhwa, Manhua, Other.",
             invalidRow.Errors);
         Assert.Contains(
@@ -94,16 +94,16 @@ public class BookCsvImportServiceTests
     public async Task CreateSessionAsync_ShouldReturnFieldErrorsForMissingTitle()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status
-                                               ,Novel,Reading
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status
+                                      ,Novel,Reading
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
-        BookImportRowDto row = Assert.Single(session.Rows);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var row = Assert.Single(session.Rows);
 
         Assert.Contains("Primary title is required.", row.Errors);
         Assert.Contains("Primary title is required.", row.FieldErrors["primaryTitle"]);
@@ -113,15 +113,15 @@ public class BookCsvImportServiceTests
     public async Task CreateSessionAsync_ShouldExposeDomainOrderedTypeAndStatusSuggestions()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status
-                                              Book,Invalid,Missing
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status
+                                     Book,Invalid,Missing
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
         Assert.Equal(["Novel", "Manga", "Manhwa", "Manhua", "Other"], session.AvailableContentTypes);
         Assert.Equal(["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"],
@@ -132,18 +132,18 @@ public class BookCsvImportServiceTests
     public async Task UpdateRowAsync_ShouldRevalidateSessionAfterFixingRow()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status,totalChapters,currentChapterNumber,rating,priority
-                                              Bad Book,Novel,Reading,10,11,11,0
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber,rating,priority
+                                     Bad Book,Novel,Reading,10,11,11,0
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
-        BookImportRowDto row = Assert.Single(session.Rows);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var row = Assert.Single(session.Rows);
 
-        BookImportSessionDto updatedSession = await service.UpdateRowAsync(
+        var updatedSession = await service.UpdateRowAsync(
             session.SessionId,
             row.RowId,
             new UpdateBookImportRowRequest(
@@ -162,7 +162,7 @@ public class BookCsvImportServiceTests
                 "raw"),
             CancellationToken.None);
 
-        BookImportRowDto updatedRow = Assert.Single(updatedSession.Rows);
+        var updatedRow = Assert.Single(updatedSession.Rows);
         Assert.True(updatedRow.IsValid);
         Assert.Empty(updatedRow.Errors);
         Assert.Equal("alpha\nbeta", updatedRow.Notes);
@@ -173,24 +173,24 @@ public class BookCsvImportServiceTests
     public async Task FinalizeAsync_ShouldCreateBooksTagsAuthorsAndQueueCovers()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         var queue = new TrackingBookCoverQueue();
         var cacheInvalidator = new TrackingCacheInvalidator();
-        BookCsvImportService service = CreateService(context, database.UserId, queue, cacheInvalidator);
+        var service = CreateService(context, database.UserId, queue, cacheInvalidator);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,currentChapterLabel,rating,priority,description,notes,rawImportedLine
-                                               The Novel , Toika , Novel , Reading , favorite; action; favorite , 200 , 49 , Progress: 49 , 8 , 2 , Desc , line1|line2 , source line
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,currentChapterLabel,rating,priority,description,notes,rawImportedLine
+                                      The Novel , Toika , Novel , Reading , favorite; action; favorite , 200 , 49 , Progress: 49 , 8 , 2 , Desc , line1|line2 , source line
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
-        BookImportFinalizeResultDto result = await service.FinalizeAsync(session.SessionId, CancellationToken.None);
+        var result = await service.FinalizeAsync(session.SessionId, CancellationToken.None);
 
         Assert.Equal(1, result.ImportedCount);
         Assert.Equal(0, result.SkippedCount);
         Assert.Empty(result.Errors);
-        BookImportFinalizedBookDto importedBook = Assert.Single(result.ImportedBooks);
+        var importedBook = Assert.Single(result.ImportedBooks);
         Assert.Equal("The Novel", importedBook.PrimaryTitle);
         Assert.Equal("Novel", importedBook.ContentType);
         Assert.Equal("Reading", importedBook.Status);
@@ -200,7 +200,7 @@ public class BookCsvImportServiceTests
         Assert.Equal(database.UserId, cacheInvalidator.InvalidatedOwnerId);
         Assert.Single(queue.BookIds);
 
-        Book savedBook = await context.Books
+        var savedBook = await context.Books
             .Include(b => b.Author)
             .Include(b => b.BookTags).ThenInclude(bt => bt.Tag)
             .Include(b => b.ProgressHistory)
@@ -214,7 +214,7 @@ public class BookCsvImportServiceTests
         Assert.Equal(2, savedBook.BookTags.Count);
         Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "favorite");
         Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "action");
-        BookProgressHistory progress = Assert.Single(savedBook.ProgressHistory);
+        var progress = Assert.Single(savedBook.ProgressHistory);
         Assert.Equal(49, progress.ChapterNumber);
         Assert.Equal("Progress: 49", progress.ChapterLabel);
         Assert.Equal("Imported from CSV", progress.Comment);
@@ -223,18 +223,18 @@ public class BookCsvImportServiceTests
         Assert.Equal(savedBook.Id, queue.BookIds[0]);
         Assert.Equal("line1\nline2", savedBook.Notes);
 
-        BookAnalyticsSnapshot analytics =
+        var analytics =
             await new BookAnalyticsQueryService(context, new BookSearchCriteriaApplier(context)).GetAnalyticsAsync(
                 database.UserId,
                 BookSearchQueryParser.Parse("title:\"The Novel\""),
-                new Domain.Models.BookAnalyticsScopeSnapshot(
+                new BookAnalyticsScopeSnapshot(
                     "title:\"The Novel\"",
                     DateOnly.FromDateTime(savedBook.Created.UtcDateTime),
                     DateOnly.FromDateTime(savedBook.Created.UtcDateTime).AddDays(1),
                     "week"),
                 CancellationToken.None);
 
-        BookAnalyticsFieldCompletenessSnapshot authorCompleteness =
+        var authorCompleteness =
             Assert.Single(analytics.Quality.FieldCompleteness, item => item.Field == "author");
         Assert.Equal(1, authorCompleteness.BookCount);
         Assert.Equal(1d, authorCompleteness.ShareOfBooks, 6);
@@ -244,16 +244,16 @@ public class BookCsvImportServiceTests
     public async Task FinalizeAsync_ShouldCollapseWhitespaceInIdentifyingFields()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,authorName,contentType,status,tags
-                                               The   Novel , Er    Gen , Novel , Plan   To Read , favorite   tag; action    tag
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,authorName,contentType,status,tags
+                                      The   Novel , Er    Gen , Novel , Plan   To Read , favorite   tag; action    tag
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
-        BookImportRowDto row = Assert.Single(session.Rows);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var row = Assert.Single(session.Rows);
 
         Assert.True(row.IsValid);
         Assert.Equal("The Novel", row.PrimaryTitle);
@@ -264,7 +264,7 @@ public class BookCsvImportServiceTests
 
         await service.FinalizeAsync(session.SessionId, CancellationToken.None);
 
-        Book savedBook = await context.Books
+        var savedBook = await context.Books
             .Include(b => b.Author)
             .Include(b => b.BookTags).ThenInclude(bt => bt.Tag)
             .SingleAsync();
@@ -279,22 +279,22 @@ public class BookCsvImportServiceTests
     public async Task FinalizeAsync_ShouldSkipRowsThatConflictWithinExistingLibrary()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         await TestData.AddBookAsync(context, database.UserId, "Existing Book");
-        BookCsvImportService service = CreateService(context, database.UserId);
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status
-                                              New Book,Novel,Reading
-                                              Existing Book,Novel,Reading
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status
+                                     New Book,Novel,Reading
+                                     Existing Book,Novel,Reading
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
-        BookImportRowDto invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "Existing Book");
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var invalidRow = Assert.Single(session.Rows, row => row.PrimaryTitle == "Existing Book");
 
-        BookImportSessionDto fixedSession =
+        var fixedSession =
             await service.DeleteRowAsync(session.SessionId, invalidRow.RowId, CancellationToken.None);
-        BookImportFinalizeResultDto
+        var
             result = await service.FinalizeAsync(fixedSession.SessionId, CancellationToken.None);
 
         Assert.Equal(1, result.ImportedCount);
@@ -306,17 +306,17 @@ public class BookCsvImportServiceTests
     public async Task FinalizeAsync_ShouldRejectInvalidSessionWithoutPersistingOrQueuingCovers()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         var queue = new TrackingBookCoverQueue();
         var cacheInvalidator = new TrackingCacheInvalidator();
-        BookCsvImportService service = CreateService(context, database.UserId, queue, cacheInvalidator);
+        var service = CreateService(context, database.UserId, queue, cacheInvalidator);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status,totalChapters,currentChapterNumber
-                                              Invalid Book,Novel,Reading,10,11
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber
+                                     Invalid Book,Novel,Reading,10,11
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
         await Assert.ThrowsAsync<ValidationException>(() =>
             service.FinalizeAsync(session.SessionId, CancellationToken.None));
@@ -329,18 +329,18 @@ public class BookCsvImportServiceTests
     public async Task DeleteInvalidRowsAsync_ShouldRemoveOnlyInvalidRows()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status,totalChapters,currentChapterNumber
-                                              Valid Book,Novel,Reading,12,10
-                                              Invalid Book,Novel,Reading,10,11
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber
+                                     Valid Book,Novel,Reading,12,10
+                                     Invalid Book,Novel,Reading,10,11
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
-        BookImportSessionDto updatedSession =
+        var updatedSession =
             await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
 
         Assert.Equal(1, updatedSession.TotalRows);
@@ -354,17 +354,17 @@ public class BookCsvImportServiceTests
     public async Task DeleteInvalidRowsAsync_ShouldKeepSessionUnchangedWhenThereAreNoInvalidRows()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status,totalChapters,currentChapterNumber
-                                              Valid Book,Novel,Reading,12,10
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status,totalChapters,currentChapterNumber
+                                     Valid Book,Novel,Reading,12,10
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
-        BookImportSessionDto updatedSession =
+        var updatedSession =
             await service.DeleteInvalidRowsAsync(session.SessionId, CancellationToken.None);
 
         Assert.Equal(1, updatedSession.TotalRows);
@@ -377,15 +377,15 @@ public class BookCsvImportServiceTests
     public async Task CancelAsync_ShouldExpireSession()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
-        await using ApplicationDbContext context = database.CreateContext();
-        BookCsvImportService service = CreateService(context, database.UserId);
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
 
-        using MemoryStream stream = CreateCsv("""
-                                              primaryTitle,contentType,status
-                                              Book,Novel,Reading
-                                              """);
+        using var stream = CreateCsv("""
+                                     primaryTitle,contentType,status
+                                     Book,Novel,Reading
+                                     """);
 
-        BookImportSessionDto session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
 
         await service.CancelAsync(session.SessionId, CancellationToken.None);
 
@@ -394,7 +394,7 @@ public class BookCsvImportServiceTests
     }
 
     private static BookCsvImportService CreateService(
-        Contexts.ApplicationDbContext context,
+        ApplicationDbContext context,
         Guid ownerId,
         TrackingBookCoverQueue? queue = null,
         TrackingCacheInvalidator? cacheInvalidator = null)
@@ -408,7 +408,7 @@ public class BookCsvImportServiceTests
 
     private static MemoryStream CreateCsv(string content)
     {
-        string normalized = content.Replace("\r\n", "\n", StringComparison.Ordinal);
+        var normalized = content.Replace("\r\n", "\n", StringComparison.Ordinal);
         return new MemoryStream(
             Encoding.UTF8.GetBytes(normalized.Replace("\n", Environment.NewLine, StringComparison.Ordinal)));
     }

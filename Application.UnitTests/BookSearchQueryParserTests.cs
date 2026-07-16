@@ -8,7 +8,7 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldReadTermsFieldsQuotedValuesAndNumbers()
     {
-        BookSearchCriteria criteria =
+        var criteria =
             BookSearchQueryParser.Parse("martial title:\"Lord of Mysteries\" tag:favorite rating>=8 current<120");
 
         Assert.Equal(new[] { "martial" }, criteria.Terms);
@@ -26,7 +26,7 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldReadSingleQuotedWildcardFieldValues()
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse("author:'Er Gen' title:'i sha*'");
+        var criteria = BookSearchQueryParser.Parse("author:'Er Gen' title:'i sha*'");
 
         Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Author && f.Values.SequenceEqual(["Er Gen"]));
         Assert.Contains(criteria.Fields, f => f.Field == BookSearchField.Title && f.Values.SequenceEqual(["i sha*"]));
@@ -35,7 +35,7 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldReadMultipleValuesInSingleFieldFilter()
     {
-        BookSearchCriteria criteria =
+        var criteria =
             BookSearchQueryParser.Parse("genre:fantasy,\"slice of life\" tag:\"to read soon\",favorite");
 
         Assert.Contains(criteria.Fields,
@@ -47,7 +47,7 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldTreatRatingColonAsEqualNumberFilter()
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse("rating:8 priority:2");
+        var criteria = BookSearchQueryParser.Parse("rating:8 priority:2");
 
         Assert.Contains(criteria.Numbers,
             f => f.Field == BookSearchNumberField.Rating && f.Operator == BookSearchOperator.Equal && f.Value == 8);
@@ -74,9 +74,9 @@ public class BookSearchQueryParserTests
         BookSearchOperator expectedOperator,
         decimal expectedValue)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
-        BookSearchNumberFilter filter = Assert.Single(criteria.Numbers);
+        var filter = Assert.Single(criteria.Numbers);
         Assert.Equal(expectedField, filter.Field);
         Assert.Equal(expectedOperator, filter.Operator);
         Assert.Equal(expectedValue, filter.Value);
@@ -87,7 +87,7 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldReturnEmptyCriteriaForBlankQuery()
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse("   ");
+        var criteria = BookSearchQueryParser.Parse("   ");
 
         Assert.Same(BookSearchCriteria.Empty, criteria);
     }
@@ -95,7 +95,7 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldTreatInvalidFiltersAsTerms()
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse("title: rating:bad unknown:value progress:abc");
+        var criteria = BookSearchQueryParser.Parse("title: rating:bad unknown:value progress:abc");
 
         Assert.Equal(["title:", "rating:bad", "unknown:value", "progress:abc"], criteria.Terms);
         Assert.Empty(criteria.Fields);
@@ -117,9 +117,9 @@ public class BookSearchQueryParserTests
     [InlineData("links:none", BookSearchMissingField.Link)]
     public void Parse_ShouldReadMissingValueFilters(string query, BookSearchMissingField expectedField)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
-        BookSearchMissingFilter filter = Assert.Single(criteria.Missing);
+        var filter = Assert.Single(criteria.Missing);
         Assert.Equal(expectedField, filter.Field);
         Assert.Empty(criteria.Terms);
         Assert.Empty(criteria.Fields);
@@ -141,9 +141,9 @@ public class BookSearchQueryParserTests
         int month,
         int day)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
-        BookSearchDateFilter filter = Assert.Single(criteria.Dates);
+        var filter = Assert.Single(criteria.Dates);
         Assert.Equal(expectedField, filter.Field);
         Assert.Equal(expectedOperator, filter.Operator);
         Assert.Equal(new DateOnly(year, month, day), filter.Value);
@@ -165,7 +165,7 @@ public class BookSearchQueryParserTests
         int endMonth,
         int endDay)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
         Assert.Collection(
             criteria.Dates,
@@ -195,9 +195,9 @@ public class BookSearchQueryParserTests
         int month,
         int day)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
-        BookSearchDateFilter filter = Assert.Single(criteria.Dates);
+        var filter = Assert.Single(criteria.Dates);
         Assert.Equal(expectedField, filter.Field);
         Assert.Equal(expectedOperator, filter.Operator);
         Assert.Equal(new DateOnly(year, month, day), filter.Value);
@@ -210,7 +210,7 @@ public class BookSearchQueryParserTests
     [InlineData("unknown:none")]
     public void Parse_ShouldTreatInvalidDateAndMissingFiltersAsTerms(string query)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
         Assert.Equal([query], criteria.Terms);
         Assert.Empty(criteria.Dates);
@@ -220,9 +220,9 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldContinueFieldValueListAcrossWhitespaceAfterComma()
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse("tag:favorite, to-read, 'slow burn'");
+        var criteria = BookSearchQueryParser.Parse("tag:favorite, to-read, 'slow burn'");
 
-        BookSearchFieldFilter field = Assert.Single(criteria.Fields);
+        var field = Assert.Single(criteria.Fields);
         Assert.Equal(BookSearchField.Tag, field.Field);
         Assert.Equal(["favorite", "to-read", "slow burn"], field.Values);
     }
@@ -233,9 +233,9 @@ public class BookSearchQueryParserTests
     public void Parse_ShouldAcceptTotalChapterAliasesWithoutColon(string query, BookSearchOperator expectedOperator,
         decimal expectedValue)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(query);
+        var criteria = BookSearchQueryParser.Parse(query);
 
-        BookSearchNumberFilter filter = Assert.Single(criteria.Numbers);
+        var filter = Assert.Single(criteria.Numbers);
         Assert.Equal(BookSearchNumberField.TotalChapters, filter.Field);
         Assert.Equal(expectedOperator, filter.Operator);
         Assert.Equal(expectedValue, filter.Value);
