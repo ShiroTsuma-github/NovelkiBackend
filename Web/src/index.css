@@ -390,6 +390,26 @@ h4 {
   background: var(--qs-surface);
 }
 
+.ui-control.ui-control--search {
+  padding-left: 2.5rem;
+}
+
+.ui-control.ui-control--compact-select {
+  width: 5rem;
+  padding-right: 2.5rem;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.ui-control.ui-control--page-size {
+  width: 6rem;
+}
+
+.pagination-page-button {
+  border: 0;
+  border-radius: 999px;
+}
+
 select.ui-control {
   color-scheme: dark;
 }

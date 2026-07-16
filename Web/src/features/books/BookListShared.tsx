@@ -6,11 +6,14 @@ import { inputClass } from '@/components/app/FormField'
 
 export const bookListPageSizeOptions = [20, 50, 100, 500]
 
-const compactPaginationButtonClass =
+const paginationDirectionButtonClass =
   'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xl font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950'
 
-const compactActivePaginationButtonClass =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 text-xl font-medium text-white'
+const paginationPageButtonClass =
+  'pagination-page-button inline-flex min-h-11 min-w-11 items-center justify-center bg-transparent px-3 text-base font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950'
+
+const paginationActivePageButtonClass =
+  'pagination-page-button inline-flex min-h-11 min-w-11 items-center justify-center bg-slate-900 px-3 text-base font-semibold text-white'
 
 export function useBookListUrlState(
   searchParams: URLSearchParams,
@@ -200,7 +203,7 @@ export function BookListFooter({
             <span>Per page</span>
             <span className="relative inline-flex">
               <select
-                className={`${inputClass} min-h-11 w-24 appearance-none bg-white pr-9 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+                className={`${inputClass} ui-control--compact-select ui-control--page-size bg-white transition hover:border-slate-400 hover:bg-white focus:bg-white`}
                 value={pageSize}
                 onChange={(event) => setPageSize(event.target.value)}
               >
@@ -211,12 +214,12 @@ export function BookListFooter({
           </label>
           <div className="flex flex-wrap items-center gap-1.5">
             {canGoBack ? (
-              <button aria-label="First page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(1)}>
+              <button aria-label="First page" className={paginationDirectionButtonClass} type="button" onClick={() => onGoToPage(1)}>
                 <ChevronsLeft className="h-4 w-4" />
               </button>
             ) : null}
             {canGoBack ? (
-              <button aria-label="Previous page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(currentPage - 1)}>
+              <button aria-label="Previous page" className={paginationDirectionButtonClass} type="button" onClick={() => onGoToPage(currentPage - 1)}>
                 <ChevronLeft className="h-4 w-4" />
               </button>
             ) : null}
@@ -235,7 +238,7 @@ export function BookListFooter({
               : (
                 <button
                   aria-current={item === currentPage ? 'page' : undefined}
-                  className={item === currentPage ? compactActivePaginationButtonClass : compactPaginationButtonClass}
+                  className={item === currentPage ? paginationActivePageButtonClass : paginationPageButtonClass}
                   key={item}
                   type="button"
                   onClick={() => onGoToPage(item)}
@@ -244,12 +247,12 @@ export function BookListFooter({
                 </button>
               ))}
             {canGoForward ? (
-              <button aria-label="Next page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(currentPage + 1)}>
+              <button aria-label="Next page" className={paginationDirectionButtonClass} type="button" onClick={() => onGoToPage(currentPage + 1)}>
                 <ChevronRight className="h-4 w-4" />
               </button>
             ) : null}
             {canGoForward ? (
-              <button aria-label="Last page" className={compactPaginationButtonClass} type="button" onClick={() => onGoToPage(totalPages)}>
+              <button aria-label="Last page" className={paginationDirectionButtonClass} type="button" onClick={() => onGoToPage(totalPages)}>
                 <ChevronsRight className="h-4 w-4" />
               </button>
             ) : null}
@@ -375,7 +378,7 @@ function PageGapJump({
       <button
         aria-label="Jump between pages"
         aria-expanded={isOpen}
-        className={compactPaginationButtonClass}
+        className={paginationPageButtonClass}
         type="button"
         onClick={() => {
           if (isOpen) {

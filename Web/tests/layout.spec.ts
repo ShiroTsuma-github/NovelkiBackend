@@ -168,6 +168,50 @@ test('cards layout constrains long titles and shows active toggle styles', async
   await expectNoHorizontalOverflow(page)
 })
 
+test('search and compact selects reserve space for their icons', async ({ page }) => {
+  await page.goto('/books')
+
+  const search = page.getByPlaceholder(/^Search:/)
+  const pageSize = page.getByLabel('Per page')
+
+  await expect(search).toHaveCSS('padding-left', '40px')
+  await expect(pageSize).toHaveCSS('padding-right', '40px')
+
+  const pageSizeBox = await requiredBox(pageSize)
+  expect(pageSizeBox.width).toBeGreaterThanOrEqual(96)
+
+  await page.getByRole('button', { name: /cards/i }).click()
+  const cardsPerRow = page.getByLabel('Cards per row')
+  await expect(cardsPerRow).toHaveCSS('padding-right', '40px')
+  const cardsPerRowBox = await requiredBox(cardsPerRow)
+  expect(cardsPerRowBox.width).toBeGreaterThanOrEqual(80)
+})
+
+test('page numbers are round and borderless while direction controls remain structural', async ({ page }) => {
+  await page.route('**/api/v1/book?**', async (route) => {
+    await route.fulfill({
+      json: {
+        skip: 0,
+        take: 20,
+        total: 220,
+        data: layoutBooks,
+      },
+    })
+  })
+  await page.goto('/books')
+
+  const currentPage = page.getByRole('button', { name: '1', exact: true })
+  const nextPage = page.getByRole('button', { name: '2', exact: true })
+  const nextDirection = page.getByRole('button', { name: /next page/i })
+
+  await expect(currentPage).toHaveCSS('border-radius', '999px')
+  await expect(currentPage).toHaveCSS('border-top-width', '0px')
+  await expect(nextPage).toHaveCSS('border-radius', '999px')
+  await expect(nextPage).toHaveCSS('border-top-width', '0px')
+  await expect(nextPage).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expect(nextDirection).toHaveCSS('border-top-width', '1px')
+})
+
 test('analytics layout exposes chart structure without page overflow', async ({ page }) => {
   await page.goto('/analytics')
   await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible()
