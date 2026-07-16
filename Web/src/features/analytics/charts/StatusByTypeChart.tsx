@@ -6,6 +6,19 @@ type StatusByTypeChartProps = {
   data: BookAnalyticsDto | undefined
 }
 
+type StatusByTypeTooltipEntry = {
+  name?: unknown
+  value?: unknown
+  color?: string
+  payload?: Record<string, unknown>
+}
+
+type StatusByTypeTooltipProps = {
+  active?: boolean
+  label?: unknown
+  payload?: StatusByTypeTooltipEntry[]
+}
+
 export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
   const items = data?.composition.statusByType ?? []
   const openBooks = useBooksDrilldown()
@@ -48,10 +61,7 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
             <YAxis dataKey="type" tickLine={false} type="category" width={96} />
             <Tooltip
               {...analyticsTooltipProps}
-              formatter={(value, name, item) => [
-                `${formatPercent(Number(item.payload[`${String(name)}Percent`] ?? value))} (${formatCount(Number(item.payload[`${String(name)}Count`] ?? 0))} books)`,
-                String(name),
-              ]}
+              content={<StatusByTypeTooltip />}
             />
             {statuses.map((status, index) => (
               <Bar
@@ -91,6 +101,33 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.type}>
             <span className="font-semibold text-slate-950">{item.type}</span>
             <span className="text-slate-500">{formatCount(item.totalBooks)} books</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function StatusByTypeTooltip({ active, label, payload }: StatusByTypeTooltipProps) {
+  const rows = statusByTypeTooltipRows(payload)
+
+  if (!active || !rows.length) {
+    return null
+  }
+
+  return (
+    <div className="min-w-56 max-w-80 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 shadow-xl">
+      <p className="font-bold text-slate-50">{String(label)}</p>
+      <div className="mt-2 grid gap-1.5">
+        {rows.map((row) => (
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3" key={row.status}>
+            <span className="flex min-w-0 items-center gap-2">
+              <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+              <span className="truncate text-slate-200">{row.status}</span>
+            </span>
+            <span className="whitespace-nowrap font-semibold text-slate-50">
+              {formatPercent(row.percent)} ({formatCount(row.count)} books)
+            </span>
           </div>
         ))}
       </div>
@@ -147,8 +184,35 @@ export function distributeStackedPercents(counts: number[], total: number, minim
   return result
 }
 
+export function statusByTypeTooltipRows(payload: readonly StatusByTypeTooltipEntry[] | undefined) {
+  return (payload ?? [])
+    .map((entry) => {
+      const status = String(entry.name ?? '')
+      const count = finiteNumber(entry.payload?.[`${status}Count`])
+      const percentValue = entry.payload?.[`${status}Percent`] ?? entry.value
+
+      return {
+        color: entry.color ?? '#94a3b8',
+        count,
+        percent: finiteNumber(percentValue),
+        status,
+      }
+    })
+    .filter((row) => row.status && row.count > 0)
+    .sort((first, second) =>
+      second.percent - first.percent
+      || second.count - first.count
+      || first.status.localeCompare(second.status),
+    )
+}
+
 export function statusByTypeRows(data?: BookAnalyticsDto) {
   return (data?.composition.statusByType ?? []).flatMap((item) =>
     item.statuses.map((status) => [item.type, status.status, formatCount(status.bookCount), formatPercent(percent(status.bookCount, item.totalBooks))]),
   )
+}
+
+function finiteNumber(value: unknown) {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : 0
 }
