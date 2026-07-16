@@ -345,7 +345,7 @@ function CardsPerRowControl({
         >
           {cardsPerRowOptions.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </span>
     </label>
   )
@@ -607,11 +607,11 @@ function BookCardGrid({
   return (
     <div className={`grid gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
-        <Surface as="article" className="book-card p-3" key={book.id} tone="muted">
-          <Link className="grid gap-3" to={`/books/${book.id}`}>
+        <Surface as="article" className="book-card" key={book.id} tone="muted">
+          <Link className="grid" to={`/books/${book.id}`}>
             <div className="relative">
               <BookCoverArtwork
-                className="w-full"
+                className="book-card__cover w-full"
                 cover={book.cover}
                 emptyLabel="No cover"
                 preferredVariant="thumbnail"
@@ -630,7 +630,7 @@ function BookCardGrid({
                 </span>
               ) : null}
             </div>
-            <div className={`grid gap-1 ${cardDetailsClass}`}>
+            <div className={`grid gap-1 p-3 ${cardDetailsClass}`}>
               {showTitle ? (
                 <div className="min-h-10">
                   <h2 className={`line-clamp-2 font-semibold text-slate-950 ${cardText.title}`}>{book.primaryTitle}</h2>

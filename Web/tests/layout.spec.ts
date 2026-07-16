@@ -161,10 +161,14 @@ test('cards layout constrains long titles and shows active toggle styles', async
   })
   const titleBox = await requiredBox(longTitle)
   const cardBox = await requiredBox(longTitle.locator('xpath=ancestor::article[1]'))
+  const coverBox = await requiredBox(longTitle.locator('xpath=ancestor::article[1]').locator('.book-card__cover'))
 
   expect(titleBox.x).toBeGreaterThanOrEqual(cardBox.x)
   expect(titleBox.x + titleBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width + 1)
   expect(titleBox.height).toBeLessThanOrEqual(56)
+  expect(Math.abs(coverBox.x - cardBox.x)).toBeLessThanOrEqual(1)
+  expect(Math.abs(coverBox.y - cardBox.y)).toBeLessThanOrEqual(1)
+  expect(Math.abs(coverBox.width - cardBox.width)).toBeLessThanOrEqual(2)
   await expectNoHorizontalOverflow(page)
 })
 
@@ -175,16 +179,18 @@ test('search and compact selects reserve space for their icons', async ({ page }
   const pageSize = page.getByLabel('Per page')
 
   await expect(search).toHaveCSS('padding-left', '40px')
-  await expect(pageSize).toHaveCSS('padding-right', '40px')
+  await expect(pageSize).toHaveCSS('padding-right', '32px')
 
   const pageSizeBox = await requiredBox(pageSize)
-  expect(pageSizeBox.width).toBeGreaterThanOrEqual(96)
+  expect(pageSizeBox.width).toBeGreaterThanOrEqual(76)
+  expect(pageSizeBox.width).toBeLessThanOrEqual(78)
 
   await page.getByRole('button', { name: /cards/i }).click()
   const cardsPerRow = page.getByLabel('Cards per row')
-  await expect(cardsPerRow).toHaveCSS('padding-right', '40px')
+  await expect(cardsPerRow).toHaveCSS('padding-right', '32px')
   const cardsPerRowBox = await requiredBox(cardsPerRow)
-  expect(cardsPerRowBox.width).toBeGreaterThanOrEqual(80)
+  expect(cardsPerRowBox.width).toBeGreaterThanOrEqual(64)
+  expect(cardsPerRowBox.width).toBeLessThanOrEqual(66)
 })
 
 test('page numbers are round and borderless while direction controls remain structural', async ({ page }) => {
