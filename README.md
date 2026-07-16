@@ -249,7 +249,7 @@ Aktualne kontrolery:
 
 Przyklady pelnych wywolan HTTP, custom query dla ksiazek i flow dodawania ksiazki sa w `docs/http-examples.md`.
 
-Custom query dla `GET /api/v1/book` przyjmuje parametr `query`, np. `title:"Lord of Mysteries" tag:favorite rating>=8`. Obslugiwane sa filtry `title`, `author`, `tag`, `genre`, `status`, `type` oraz porownania numeryczne dla `rating`, `priority`, `current/currentChapter` i `total/totalChapters`.
+Custom query dla `GET /api/v1/book` przyjmuje parametr `query`, np. `title:"Lord of Mysteries" tag:favorite rating>=8`. Obslugiwane sa filtry `title`, `author`, `tag`, `genre`, `status`, `type` oraz porownania numeryczne dla `rating`, `priority`, `current/currentChapter` i `total/totalChapters`. Brakujace metadane mozna filtrowac przez wartosc `none`, np. `author:none`, `rating:none`, `progress:none`, `cover:none` lub `links:none`.
 
 `StatusController` i `TypeController` sa analogiczne do `GenreController`; `TypeController` operuje pod spodem na encji `ContentType`.
 

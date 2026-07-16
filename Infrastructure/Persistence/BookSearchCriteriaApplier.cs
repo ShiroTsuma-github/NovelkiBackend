@@ -11,7 +11,7 @@ public sealed class BookSearchCriteriaApplier
 
     public BookSearchCriteriaApplier(ApplicationDbContext context)
     {
-        _supportsILike = context.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+        _supportsILike = context.Database.IsNpgsql();
     }
 
     public IQueryable<Book> Apply(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -66,6 +66,7 @@ public sealed class BookSearchCriteriaApplier
                 BookSearchMissingField.Author => query.Where(book => book.Author == null),
                 BookSearchMissingField.Genre => query.Where(book => !book.BookGenres.Any()),
                 BookSearchMissingField.Tag => query.Where(book => !book.BookTags.Any()),
+                BookSearchMissingField.CurrentChapter => query.Where(book => book.CurrentChapterNumber == null),
                 BookSearchMissingField.TotalChapters => query.Where(book => book.TotalChapters == null),
                 BookSearchMissingField.Cover => query.Where(book => book.Cover == null),
                 BookSearchMissingField.Link => query.Where(book => !book.Links.Any()),
@@ -82,20 +83,20 @@ public sealed class BookSearchCriteriaApplier
         if (_supportsILike)
         {
             return query.Where(book =>
-                EF.Functions.ILike(book.PrimaryTitle, pattern) ||
-                book.Titles.Any(title => EF.Functions.ILike(title.Title, pattern)) ||
+                EF.Functions.ILike(book.PrimaryTitle, pattern, @"\") ||
+                book.Titles.Any(title => EF.Functions.ILike(title.Title, pattern, @"\")) ||
                 (book.Author != null && (
-                    EF.Functions.ILike(book.Author.PrimaryName, pattern) ||
-                    book.Author.Names.Any(name => EF.Functions.ILike(name.Name, pattern)))));
+                    EF.Functions.ILike(book.Author.PrimaryName, pattern, @"\") ||
+                    book.Author.Names.Any(name => EF.Functions.ILike(name.Name, pattern, @"\")))));
         }
 
         var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(term));
         return query.Where(book =>
-            EF.Functions.Like(book.NormalizedPrimaryTitle, normalizedPattern) ||
-            book.Titles.Any(title => EF.Functions.Like(title.NormalizedTitle, normalizedPattern)) ||
+            EF.Functions.Like(book.NormalizedPrimaryTitle, normalizedPattern, @"\") ||
+            book.Titles.Any(title => EF.Functions.Like(title.NormalizedTitle, normalizedPattern, @"\")) ||
             (book.Author != null && (
-                EF.Functions.Like(book.Author.NormalizedPrimaryName, normalizedPattern) ||
-                book.Author.Names.Any(name => EF.Functions.Like(name.NormalizedName, normalizedPattern)))));
+                EF.Functions.Like(book.Author.NormalizedPrimaryName, normalizedPattern, @"\") ||
+                book.Author.Names.Any(name => EF.Functions.Like(name.NormalizedName, normalizedPattern, @"\")))));
     }
 
     private IQueryable<Book> ApplyTitleSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
@@ -105,15 +106,15 @@ public sealed class BookSearchCriteriaApplier
             {
                 var pattern = ToLikePattern(search);
                 return book =>
-                    EF.Functions.ILike(book.PrimaryTitle, pattern) ||
-                    book.Titles.Any(title => EF.Functions.ILike(title.Title, pattern));
+                    EF.Functions.ILike(book.PrimaryTitle, pattern, @"\") ||
+                    book.Titles.Any(title => EF.Functions.ILike(title.Title, pattern, @"\"));
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return book =>
-                    EF.Functions.Like(book.NormalizedPrimaryTitle, normalizedPattern) ||
-                    book.Titles.Any(title => EF.Functions.Like(title.NormalizedTitle, normalizedPattern));
+                    EF.Functions.Like(book.NormalizedPrimaryTitle, normalizedPattern, @"\") ||
+                    book.Titles.Any(title => EF.Functions.Like(title.NormalizedTitle, normalizedPattern, @"\"));
             });
 
         return ApplyAnyFieldMatch(query, predicates);
@@ -126,15 +127,15 @@ public sealed class BookSearchCriteriaApplier
             {
                 var pattern = ToLikePattern(search);
                 return book => book.Author != null && (
-                    EF.Functions.ILike(book.Author.PrimaryName, pattern) ||
-                    book.Author.Names.Any(name => EF.Functions.ILike(name.Name, pattern)));
+                    EF.Functions.ILike(book.Author.PrimaryName, pattern, @"\") ||
+                    book.Author.Names.Any(name => EF.Functions.ILike(name.Name, pattern, @"\")));
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
                 return book => book.Author != null && (
-                    EF.Functions.Like(book.Author.NormalizedPrimaryName, normalizedPattern) ||
-                    book.Author.Names.Any(name => EF.Functions.Like(name.NormalizedName, normalizedPattern)));
+                    EF.Functions.Like(book.Author.NormalizedPrimaryName, normalizedPattern, @"\") ||
+                    book.Author.Names.Any(name => EF.Functions.Like(name.NormalizedName, normalizedPattern, @"\")));
             });
 
         return ApplyAnyFieldMatch(query, predicates);
@@ -146,12 +147,12 @@ public sealed class BookSearchCriteriaApplier
             ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var pattern = ToLikePattern(search);
-                return book => book.BookTags.Any(bookTag => EF.Functions.ILike(bookTag.Tag.Name, pattern));
+                return book => book.BookTags.Any(bookTag => EF.Functions.ILike(bookTag.Tag.Name, pattern, @"\"));
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => book.BookTags.Any(bookTag => EF.Functions.Like(bookTag.Tag.NormalizedName, normalizedPattern));
+                return book => book.BookTags.Any(bookTag => EF.Functions.Like(bookTag.Tag.NormalizedName, normalizedPattern, @"\"));
             });
 
         return ApplyAnyFieldMatch(query, predicates);
@@ -163,12 +164,12 @@ public sealed class BookSearchCriteriaApplier
             ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var pattern = ToLikePattern(search);
-                return book => book.BookGenres.Any(bookGenre => EF.Functions.ILike(bookGenre.Genre.Name, pattern));
+                return book => book.BookGenres.Any(bookGenre => EF.Functions.ILike(bookGenre.Genre.Name, pattern, @"\"));
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => book.BookGenres.Any(bookGenre => EF.Functions.Like(bookGenre.Genre.NormalizedName, normalizedPattern));
+                return book => book.BookGenres.Any(bookGenre => EF.Functions.Like(bookGenre.Genre.NormalizedName, normalizedPattern, @"\"));
             });
 
         return ApplyAnyFieldMatch(query, predicates);
@@ -180,12 +181,12 @@ public sealed class BookSearchCriteriaApplier
             ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var pattern = ToLikePattern(search);
-                return book => EF.Functions.ILike(book.Status.Name, pattern);
+                return book => EF.Functions.ILike(book.Status.Name, pattern, @"\");
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => EF.Functions.Like(book.Status.Name.ToUpper(), normalizedPattern);
+                return book => EF.Functions.Like(book.Status.Name.ToUpper(), normalizedPattern, @"\");
             });
 
         return ApplyAnyFieldMatch(query, predicates);
@@ -197,12 +198,12 @@ public sealed class BookSearchCriteriaApplier
             ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var pattern = ToLikePattern(search);
-                return book => EF.Functions.ILike(book.ContentType.Name, pattern);
+                return book => EF.Functions.ILike(book.ContentType.Name, pattern, @"\");
             })
             : searches.Select<string, Expression<Func<Book, bool>>>(search =>
             {
                 var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => EF.Functions.Like(book.ContentType.Name.ToUpper(), normalizedPattern);
+                return book => EF.Functions.Like(book.ContentType.Name.ToUpper(), normalizedPattern, @"\");
             });
 
         return ApplyAnyFieldMatch(query, predicates);
@@ -256,8 +257,9 @@ public sealed class BookSearchCriteriaApplier
 
     private static string ToLikePattern(string value)
     {
-        var pattern = EscapeLike(value.Trim()).Replace("*", "%", StringComparison.Ordinal);
-        return pattern.Contains('%') ? pattern : $"%{pattern}%";
+        var trimmed = value.Trim();
+        var pattern = EscapeLike(trimmed).Replace("*", "%", StringComparison.Ordinal);
+        return trimmed.Contains('*') ? pattern : $"%{pattern}%";
     }
 
     private static string EscapeLike(string value)
@@ -268,8 +270,21 @@ public sealed class BookSearchCriteriaApplier
             .Replace("_", @"\_", StringComparison.Ordinal);
     }
 
-    private static IQueryable<Book> ApplyRating(IQueryable<Book> query, BookSearchOperator op, decimal value)
+    private IQueryable<Book> ApplyRating(IQueryable<Book> query, BookSearchOperator op, decimal value)
     {
+        if (!_supportsILike)
+        {
+            var sqliteValue = (double)value;
+            return op switch
+            {
+                BookSearchOperator.GreaterThan => query.Where(book => book.Rating != null && book.Rating.Value > sqliteValue),
+                BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Rating != null && book.Rating.Value >= sqliteValue),
+                BookSearchOperator.LessThan => query.Where(book => book.Rating != null && book.Rating.Value < sqliteValue),
+                BookSearchOperator.LessThanOrEqual => query.Where(book => book.Rating != null && book.Rating.Value <= sqliteValue),
+                _ => query.Where(book => book.Rating != null && book.Rating.Value == sqliteValue)
+            };
+        }
+
         return op switch
         {
             BookSearchOperator.GreaterThan => query.Where(book => book.Rating != null && (decimal)book.Rating.Value > value),
@@ -280,8 +295,21 @@ public sealed class BookSearchCriteriaApplier
         };
     }
 
-    private static IQueryable<Book> ApplyPriority(IQueryable<Book> query, BookSearchOperator op, decimal value)
+    private IQueryable<Book> ApplyPriority(IQueryable<Book> query, BookSearchOperator op, decimal value)
     {
+        if (!_supportsILike)
+        {
+            var sqliteValue = (double)value;
+            return op switch
+            {
+                BookSearchOperator.GreaterThan => query.Where(book => book.Priority != null && book.Priority.Value > sqliteValue),
+                BookSearchOperator.GreaterThanOrEqual => query.Where(book => book.Priority != null && book.Priority.Value >= sqliteValue),
+                BookSearchOperator.LessThan => query.Where(book => book.Priority != null && book.Priority.Value < sqliteValue),
+                BookSearchOperator.LessThanOrEqual => query.Where(book => book.Priority != null && book.Priority.Value <= sqliteValue),
+                _ => query.Where(book => book.Priority != null && book.Priority.Value == sqliteValue)
+            };
+        }
+
         return op switch
         {
             BookSearchOperator.GreaterThan => query.Where(book => book.Priority != null && (decimal)book.Priority.Value > value),
