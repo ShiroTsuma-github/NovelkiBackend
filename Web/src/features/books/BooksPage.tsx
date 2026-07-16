@@ -339,7 +339,7 @@ function CardsPerRowControl({
       <span className="relative inline-flex">
         <select
           aria-label="Cards per row"
-          className={`${inputClass} h-10 w-20 appearance-none bg-white pr-9 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+          className={`${inputClass} ui-control--compact-select bg-white text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
         >
@@ -398,9 +398,9 @@ export function BookAdvancedSearch({
   return (
     <Surface className="grid gap-3 p-4" tone="muted">
       <label className="relative">
-        <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
-          className={`${inputClass} w-full pl-9`}
+          className={`${inputClass} ui-control--search`}
           placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating:>=8'}
           value={draftValue}
           onChange={(event) => {
