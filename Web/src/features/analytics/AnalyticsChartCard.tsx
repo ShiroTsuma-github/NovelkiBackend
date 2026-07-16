@@ -68,7 +68,7 @@ export function AnalyticsChartCard({
           </div>
         </div>
       ) : isError ? (
-        <div className="grid min-h-64 place-items-center rounded-lg border border-rose-500/40 bg-rose-950/40 p-4 text-center shadow-[inset_0_0_0_1px_rgb(244_63_94_/_0.08)]" role="alert">
+        <div className="grid min-h-64 place-items-center rounded-lg border border-rose-500/40 bg-rose-950/40 p-4 text-center" role="alert">
           <div>
             <p className="text-sm font-semibold text-rose-100">Could not load this analytics card.</p>
             {onRetry ? (

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { installLayoutApiMocks, seedAuthenticatedSession } from './fixtures/api.js'
+import { installLayoutApiMocks, layoutBooks, seedAuthenticatedSession } from './fixtures/api.js'
 import {
   backgroundColor,
   expectCenteredInViewport,
@@ -26,12 +26,41 @@ test('app shell keeps stable page landmarks and primary structure', async ({ pag
   await expect(page.getByRole('button', { name: /log out/i })).toBeVisible()
   await expect(page.locator('main')).toHaveCount(1)
 
-  if (page.viewportSize()!.width >= 768) {
-    await expect(page.getByRole('navigation')).toBeVisible()
-    await expect(page.getByRole('link', { name: /books/i })).toHaveAttribute('aria-current', 'page')
-  }
+  await expect(page.getByRole('navigation', { name: /primary/i })).toBeVisible()
+  await expect(page.getByRole('link', { name: /books/i })).toHaveAttribute('aria-current', 'page')
+  await expect(page.getByRole('link', { name: /skip to content/i })).toHaveAttribute('href', '#main-content')
 
   await expectNoHorizontalOverflow(page)
+})
+
+test('quiet structure POC keeps its defining visual rules', async ({ page }) => {
+  await page.goto('/books')
+
+  const title = page.getByRole('heading', { name: 'Books' })
+  const addButton = page.getByRole('link', { name: /add book/i })
+  const mainSurface = page.locator('.ui-surface').filter({ has: page.getByRole('table') }).first()
+
+  await expect(title).toHaveCSS('font-family', /IBM Plex Sans/)
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(5, 7, 11)')
+  await expect(addButton).toHaveCSS('border-radius', '3px')
+  await expect(addButton).toHaveCSS('background-image', 'none')
+  await expect(addButton).toHaveCSS('box-shadow', 'none')
+  await expect(mainSurface).toHaveCSS('border-radius', '0px')
+
+  await page.goto('/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+  await page.getByRole('button', { name: /progress/i }).click()
+  await expect(page.getByRole('dialog').locator('.ui-dialog-panel')).toHaveCSS('border-radius', '4px')
+})
+
+test('mobile navigation and primary actions keep touch targets', async ({ page }) => {
+  test.skip(page.viewportSize()!.width >= 768, 'Mobile-only touch target coverage')
+  await page.goto('/books')
+
+  await expectMinHeight(page.getByRole('navigation', { name: /primary/i }).getByRole('link', { name: /books/i }), 44)
+  await expectMinHeight(page.getByRole('button', { name: /log out/i }), 44)
+  await expectMinHeight(page.getByRole('button', { name: /summary/i }), 44)
+  await expectMinHeight(page.getByRole('button', { name: /import csv/i }), 44)
+  await expectMinHeight(page.getByRole('link', { name: /add book/i }), 44)
 })
 
 test('books table layout has no horizontal overflow and keeps controls in viewport', async ({ page }) => {
@@ -61,10 +90,61 @@ test('books table hover highlight reaches the sticky actions cell', async ({ pag
   const alternativeBadgeBackground = await backgroundColor(page.getByLabel('1 alternative titles'))
 
   expect(actionsBackground).toBe(titleBackground)
-  expect(actionsBackground).toBe('rgb(30, 41, 59)')
-  expect(alternativeBadgeBackground).toBe('rgb(71, 85, 105)')
+  expect(actionsBackground).toBe('rgb(23, 31, 45)')
+  expect(alternativeBadgeBackground).toBe('rgb(36, 42, 66)')
   expect(alternativeBadgeBackground).not.toBe(titleBackground)
 })
+
+test('quiet structure reference screens stay visually stable', async ({ page }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+
+  await page.goto('/books')
+  await expect(page.getByRole('table')).toBeVisible()
+  await waitForVisualReady(page)
+  await expect(page).toHaveScreenshot(`nb-054-v3-books-table-${testInfo.project.name}.png`, {
+    animations: 'disabled',
+    fullPage: false,
+  })
+
+  await page.getByRole('button', { name: /cards/i }).click()
+  await expect(page.locator('article').first()).toBeVisible()
+  await waitForVisualReady(page)
+  await expect(page).toHaveScreenshot(`nb-054-v3-books-cards-${testInfo.project.name}.png`, {
+    animations: 'disabled',
+    fullPage: false,
+  })
+
+  await page.goto('/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+  await expect(page.getByRole('heading', { name: layoutBooks[0].primaryTitle })).toBeVisible()
+  await waitForVisualReady(page)
+  await expect(page).toHaveScreenshot(`nb-054-v3-book-details-${testInfo.project.name}.png`, {
+    animations: 'disabled',
+    fullPage: false,
+  })
+
+  await page.getByRole('button', { name: /progress/i }).click()
+  await expect(page.getByRole('heading', { name: /update progress/i })).toBeVisible()
+  await waitForVisualReady(page)
+  await expect(page).toHaveScreenshot(`nb-054-v3-progress-dialog-${testInfo.project.name}.png`, {
+    animations: 'disabled',
+    fullPage: false,
+  })
+
+  await page.goto('/books/new')
+  await expect(page.getByRole('heading', { name: 'Add book' })).toBeVisible()
+  await waitForVisualReady(page)
+  await expect(page).toHaveScreenshot(`nb-054-v3-book-form-${testInfo.project.name}.png`, {
+    animations: 'disabled',
+    fullPage: false,
+  })
+})
+
+async function waitForVisualReady(page: import('@playwright/test').Page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
+  })
+}
 
 test('cards layout constrains long titles and shows active toggle styles', async ({ page }) => {
   await page.goto('/books')
@@ -72,8 +152,9 @@ test('cards layout constrains long titles and shows active toggle styles', async
 
   const cardsButton = page.getByRole('button', { name: /cards/i })
   const tableButton = page.getByRole('button', { name: /table/i })
-  await expect(cardsButton).toHaveCSS('color', 'rgb(255, 255, 255)')
-  await expect(tableButton).not.toHaveCSS('color', 'rgb(255, 255, 255)')
+  await expect(cardsButton).toHaveAttribute('aria-pressed', 'true')
+  await expect(cardsButton).toHaveClass(/ui-segmented-control__item--active/)
+  await expect(tableButton).toHaveAttribute('aria-pressed', 'false')
 
   const longTitle = page.getByRole('heading', {
     name: 'A Very Long Book Title That Should Stay Inside Its Card Container Without Pushing Actions Away',

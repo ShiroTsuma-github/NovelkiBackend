@@ -7,10 +7,10 @@ import { inputClass } from '@/components/app/FormField'
 export const bookListPageSizeOptions = [20, 50, 100, 500]
 
 const compactPaginationButtonClass =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-xl font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-slate-300 bg-white px-3 text-xl font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-950'
 
 const compactActivePaginationButtonClass =
-  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-slate-900 px-3 text-xl font-medium text-white shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
+  'inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-slate-300 bg-slate-900 px-3 text-xl font-medium text-white'
 
 export function useBookListUrlState(
   searchParams: URLSearchParams,
@@ -280,7 +280,7 @@ export function ScrollShortcutButtons({
       {showBackToTop ? (
         <button
           aria-label="Back to top"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
           type="button"
           onClick={onBackToTop}
         >
@@ -290,7 +290,7 @@ export function ScrollShortcutButtons({
       {showGoDown ? (
         <button
           aria-label="Go to bottom"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-xl transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
           type="button"
           onClick={onGoDown}
         >

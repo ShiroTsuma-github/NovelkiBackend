@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { BookImportFinalizeResult, BookImportRowDto, BookImportRowUpdateRequest, BookImportSessionDto } from '@/api/types'
+import { DialogPanel, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatProgress } from './bookProgress'
 
@@ -38,6 +39,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
+  useBodyScrollLock(open)
   const [dropzoneActive, setDropzoneActive] = useState(false)
   const [finalizeResult, setFinalizeResult] = useState<BookImportFinalizeResult | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -204,7 +206,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       role="dialog"
       onClick={handleDismiss}
     >
-      <div data-testid="import-dialog-panel" className={`${session && !finalizeResult ? 'h-[calc(100vh-0.5rem)] sm:h-[calc(100vh-1rem)]' : 'max-h-[calc(100vh-0.5rem)] sm:max-h-[calc(100vh-1rem)]'} flex w-full max-w-6xl flex-col gap-2 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-3 text-slate-100 shadow-2xl sm:p-4`} onClick={(event) => event.stopPropagation()}>
+      <DialogPanel data-testid="import-dialog-panel" className={`${session && !finalizeResult ? 'h-[calc(100vh-0.5rem)] sm:h-[calc(100vh-1rem)]' : 'max-h-[calc(100vh-0.5rem)] sm:max-h-[calc(100vh-1rem)]'} flex max-w-6xl flex-col gap-2 overflow-hidden p-3 sm:p-4`} onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-2">
           <div className="grid gap-1">
             <h2 className={`${session && !finalizeResult ? 'text-base' : 'text-lg'} font-semibold text-slate-50`}>Import books from CSV</h2>
@@ -222,7 +224,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               <Download className="h-4 w-4" />
               {templateMutation.isPending ? 'Downloading...' : 'Download template'}
             </button>
-            <button className="rounded-full border border-slate-700 p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" type="button" onClick={handleDismiss}>
+            <button className="min-h-11 min-w-11 rounded-md border border-slate-700 p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" type="button" onClick={handleDismiss}>
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -234,7 +236,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
           <ImportFinalizeSuccess result={finalizeResult} onClose={onClose} />
         ) : !session ? (
           <div
-            className={`grid gap-4 rounded-2xl border border-dashed p-8 text-center transition ${dropzoneActive ? 'border-cyan-400 bg-slate-900/80 shadow-[0_0_0_1px_rgba(34,211,238,0.25)]' : 'border-slate-700 bg-slate-900'}`}
+            className={`grid gap-4 rounded-2xl border border-dashed p-8 text-center transition ${dropzoneActive ? 'border-cyan-400 bg-slate-900/80' : 'border-slate-700 bg-slate-900'}`}
             onDragEnter={(event) => {
               event.preventDefault()
               setDropzoneActive(true)
@@ -254,7 +256,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             }}
             onDrop={handleDrop}
           >
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md bg-slate-900 text-white">
               {createSessionMutation.isPending ? <LoaderCircle className="h-6 w-6 animate-spin" /> : <FileUp className="h-6 w-6" />}
             </div>
             <div className="grid gap-1">
@@ -358,7 +360,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             </div>
           </div>
         )}
-      </div>
+      </DialogPanel>
       <CancelImportConfirmDialog
         open={confirmCancelOpen}
         pending={cancelMutation.isPending}
@@ -448,7 +450,7 @@ function CancelImportConfirmDialog({
       role="dialog"
       onClick={pending ? undefined : onCancel}
     >
-      <div className="grid w-full max-w-md gap-5 rounded-3xl border border-slate-800 bg-slate-950 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <DialogPanel className="grid max-w-md gap-5 p-6" onClick={(event) => event.stopPropagation()}>
         <div className="grid gap-2">
           <h2 className="text-lg font-semibold text-slate-50">Cancel import?</h2>
           <p className="text-sm leading-6 text-slate-300">
@@ -468,7 +470,7 @@ function CancelImportConfirmDialog({
             {pending ? 'Cancelling...' : 'Cancel import'}
           </button>
         </div>
-      </div>
+      </DialogPanel>
     </div>
   )
 }

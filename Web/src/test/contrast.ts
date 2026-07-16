@@ -3,22 +3,22 @@ import { expect } from 'vitest'
 const foregroundColors: Record<string, string> = {
   'text-white': '#ffffff',
   'text-slate-50': '#f8fafc',
-  'text-slate-100': '#f1f5f9',
-  'text-slate-200': '#e2e8f0',
-  'text-slate-300': '#cbd5e1',
-  'text-slate-400': '#64748b',
-  'text-slate-500': '#94a3b8',
-  'text-slate-600': '#cbd5e1',
-  'text-slate-700': '#cbd5e1',
-  'text-slate-950': '#f8fafc',
+  'text-slate-100': '#eef2f7',
+  'text-slate-200': '#cbd2dc',
+  'text-slate-300': '#cbd2dc',
+  'text-slate-400': '#9aa5b4',
+  'text-slate-500': '#9aa5b4',
+  'text-slate-600': '#cbd2dc',
+  'text-slate-700': '#cbd2dc',
+  'text-slate-950': '#eef2f7',
 }
 
 const backgroundColors: Record<string, string> = {
-  'bg-white': '#0f172a',
-  'bg-slate-50': '#020617',
-  'bg-slate-100': '#1e293b',
-  'bg-slate-900': '#0f172a',
-  'bg-slate-950': '#0f172a',
+  'bg-white': '#0d121a',
+  'bg-slate-50': '#05070b',
+  'bg-slate-100': '#121925',
+  'bg-slate-900': '#121925',
+  'bg-slate-950': '#0d121a',
 }
 
 export function expectReadableTextContrast(element: Element, minimumRatio = 4.5) {
@@ -40,7 +40,7 @@ function resolveForeground(element: Element): string {
     }
   }
 
-  return '#e5e7eb'
+  return '#eef2f7'
 }
 
 function resolveBackground(element: Element): string {
