@@ -804,10 +804,10 @@ function Pills({ values }: { values: string[] }) {
   return (
     <div className="flex flex-wrap gap-1">
       {visibleValues.map((value) => (
-        <span className="rounded bg-slate-100 px-2 py-1 text-xs text-slate-600" key={value}>{value}</span>
+        <span className="book-table-badge rounded px-2 py-1 text-xs" key={value}>{value}</span>
       ))}
       {hiddenCount > 0 ? (
-        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">+{hiddenCount} more</span>
+        <span className="book-table-badge rounded px-2 py-1 text-xs font-medium">+{hiddenCount} more</span>
       ) : null}
     </div>
   )
@@ -825,7 +825,7 @@ function TitleCell({ book }: { book: BookListItemDto }) {
       {alternativeCount > 0 ? (
         <span
           aria-label={`${alternativeCount} alternative titles`}
-          className="shrink-0 rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500"
+          className="book-table-badge shrink-0 rounded px-2 py-1 text-xs font-medium"
           title={alternativeTitle}
         >
           +{alternativeCount}

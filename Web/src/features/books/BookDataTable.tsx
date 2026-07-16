@@ -60,15 +60,15 @@ export function BookDataTable<T extends { id: string }>({
             <tr><td className="px-4 py-8 text-center text-slate-500" colSpan={columns.length + 1}>{loadingMessage}</td></tr>
           ) : null}
           {items.map((item) => (
-            <tr className="group border-t border-slate-100 hover:bg-slate-50" key={item.id}>
+            <tr className="book-table-row group border-t border-slate-100" data-testid={`book-table-row-${item.id}`} key={item.id}>
               {columns.map((column) => (
-                <td className="px-3 py-3 text-slate-600" key={column.id}>
+                <td className="book-table-cell px-3 py-3 text-slate-600" data-testid={`book-table-cell-${item.id}-${column.id}`} key={column.id}>
                   <div className="overflow-hidden">
                     {column.render(item)}
                   </div>
                 </td>
               ))}
-              <td className="sticky right-0 z-10 bg-white px-3 py-3 shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)] group-hover:bg-slate-50">
+              <td className="book-table-actions-cell sticky right-0 z-10 bg-white px-3 py-3 shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)]" data-testid={`book-table-actions-cell-${item.id}`}>
                 <div className="flex justify-end gap-2 whitespace-nowrap">
                   {renderActions(item)}
                 </div>

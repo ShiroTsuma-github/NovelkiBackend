@@ -136,6 +136,22 @@ a {
   box-shadow: 0 18px 45px rgb(0 0 0 / 0.22);
 }
 
+.book-table-row:hover > .book-table-cell,
+.book-table-row:hover > .book-table-actions-cell {
+  background-color: #1e293b;
+}
+
+.book-table-badge {
+  border: 1px solid #475569;
+  background-color: #334155;
+  color: #e2e8f0;
+}
+
+.book-table-row:hover .book-table-badge {
+  background-color: #475569;
+  color: #f8fafc;
+}
+
 .analytics-chart-surface :where(.recharts-wrapper, .recharts-surface, .recharts-layer, svg, g, path, rect, circle):focus {
   outline: none;
 }
