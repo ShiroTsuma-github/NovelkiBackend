@@ -200,15 +200,17 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/70 p-1 backdrop-blur-sm sm:p-2"
       role="dialog"
       onClick={handleDismiss}
     >
-      <div className="mx-auto my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col gap-4 overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-6 text-slate-100 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
+      <div data-testid="import-dialog-panel" className={`${session && !finalizeResult ? 'h-[calc(100vh-0.5rem)] sm:h-[calc(100vh-1rem)]' : 'max-h-[calc(100vh-0.5rem)] sm:max-h-[calc(100vh-1rem)]'} flex w-full max-w-6xl flex-col gap-2 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-3 text-slate-100 shadow-2xl sm:p-4`} onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-2">
           <div className="grid gap-1">
-            <h2 className="text-lg font-semibold text-slate-50">Import books from CSV</h2>
-            <p className="text-sm text-slate-400">Upload a file, fix invalid rows, then finalize to save books to your library.</p>
+            <h2 className={`${session && !finalizeResult ? 'text-base' : 'text-lg'} font-semibold text-slate-50`}>Import books from CSV</h2>
+            {session && !finalizeResult ? null : (
+              <p className="text-sm text-slate-400">Upload a file, fix invalid rows, then finalize to save books to your library.</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -269,20 +271,20 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             </div>
           </div>
         ) : (
-          <>
-            <div className="grid gap-4 md:grid-cols-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               <SummaryCard label="File" value={session.fileName} />
               <SummaryCard label="Rows" value={formatImportCount(importStats.totalRows)} />
               <SummaryCard label="Positive" value={formatImportCount(importStats.validRows)} />
               <SummaryCard label="Negative" value={formatImportCount(importStats.invalidRowsCount)} tone={importStats.invalidRowsCount ? 'warn' : 'ok'} />
             </div>
 
-            <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <div className="grid gap-1 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-slate-100">Progress</div>
                 <div className="text-sm text-slate-300">{formatImportCount(importStats.validRows)} / {formatImportCount(importStats.totalRows)} valid</div>
               </div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-[width]"
                   style={{ width: `${importStats.progressPercent}%` }}
@@ -290,7 +292,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               </div>
             </div>
 
-            <div className="h-[min(60vh,44rem)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-2" data-testid="import-invalid-rows-panel">
               {invalidRows.length ? (
                 <div className="grid h-full min-h-0 gap-3">
                   <Virtuoso
@@ -299,7 +301,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                     data={invalidRows}
                     increaseViewportBy={{ bottom: 160, top: 160 }}
                     itemContent={(_, row) => (
-                      <div className="pb-3 pr-3">
+                      <div className="pb-2 pr-2">
                         <ImportRowEditor
                           availableContentTypes={session.availableContentTypes}
                           availableStatuses={session.availableStatuses}
@@ -354,7 +356,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                 {finalizeMutation.isPending ? 'Saving...' : 'Finalize import'}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
       <CancelImportConfirmDialog
@@ -617,7 +619,7 @@ function ExpandedImportRowEditor({
       onRevalidate={() => mutation.mutate()}
       onToggle={onToggle}
     >
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
         <LabeledInput error={fieldError('primaryTitle')} label="Title" value={draft.primaryTitle ?? ''} onChange={(value) => update('primaryTitle', value)} />
         <LabeledInput error={fieldError('authorName')} label="Author" value={draft.authorName ?? ''} onChange={(value) => update('authorName', value)} />
         <LabeledInput error={fieldError('tags')} label="Tags" value={draft.tags ?? ''} onChange={(value) => update('tags', value)} />
@@ -726,9 +728,9 @@ function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value:
       : 'border-slate-700 bg-slate-900 text-slate-100'
 
   return (
-    <div className={`grid gap-1 rounded-2xl border px-4 py-3 ${toneClass}`}>
-      <div className="text-xs font-semibold uppercase tracking-wide">{label}</div>
-      <div className="truncate text-base font-semibold">{value}</div>
+    <div className={`grid gap-0.5 rounded-xl border px-3 py-1.5 ${toneClass}`}>
+      <div className="text-[0.68rem] font-semibold uppercase tracking-wide">{label}</div>
+      <div className="truncate text-sm font-semibold">{value}</div>
     </div>
   )
 }
