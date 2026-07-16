@@ -151,7 +151,7 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
         var rows = await context.Set<BookGenre>()
             .AsNoTracking()
             .Where(bookGenre => bookIds.Contains(bookGenre.BookId))
-            .Select(bookGenre => new { Id = bookGenre.BookId, Name = bookGenre.Genre.Name })
+            .Select(bookGenre => new { Id = bookGenre.BookId, bookGenre.Genre.Name })
             .Distinct()
             .GroupBy(row => row.Name)
             .Select(group => new { Name = group.Key, BookCount = group.Count() })
@@ -170,7 +170,7 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
         var rows = await context.Set<BookTag>()
             .AsNoTracking()
             .Where(bookTag => bookIds.Contains(bookTag.BookId))
-            .Select(bookTag => new { Id = bookTag.BookId, Name = bookTag.Tag.Name })
+            .Select(bookTag => new { Id = bookTag.BookId, bookTag.Tag.Name })
             .Distinct()
             .GroupBy(row => row.Name)
             .Select(group => new { Name = group.Key, BookCount = group.Count() })
@@ -229,7 +229,7 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
         }
 
         var rows = await query
-            .GroupBy(book => new { Status = book.Status.Name, Priority = book.Priority })
+            .GroupBy(book => new { Status = book.Status.Name, book.Priority })
             .Select(group => new { group.Key.Status, group.Key.Priority, BookCount = group.Count() })
             .ToListAsync(cancellationToken);
 
