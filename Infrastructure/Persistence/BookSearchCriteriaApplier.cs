@@ -1,6 +1,5 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
 using Domain.Entities;
 using System.Globalization;
 using System.Linq.Expressions;
@@ -8,10 +7,12 @@ using System.Linq.Expressions;
 public sealed class BookSearchCriteriaApplier
 {
     private readonly bool _supportsILike;
+    private readonly TextSearchExpressionFactory _textSearch;
 
     public BookSearchCriteriaApplier(ApplicationDbContext context)
     {
         _supportsILike = context.Database.IsNpgsql();
+        _textSearch = new TextSearchExpressionFactory(_supportsILike);
     }
 
     public IQueryable<Book> Apply(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -79,132 +80,112 @@ public sealed class BookSearchCriteriaApplier
 
     private IQueryable<Book> ApplyGeneralTextSearch(IQueryable<Book> query, string term)
     {
-        var pattern = ToLikePattern(term);
-        if (_supportsILike)
-        {
-            return query.Where(book =>
-                EF.Functions.ILike(book.PrimaryTitle, pattern, @"\") ||
-                book.Titles.Any(title => EF.Functions.ILike(title.Title, pattern, @"\")) ||
-                (book.Author != null && (
-                    EF.Functions.ILike(book.Author.PrimaryName, pattern, @"\") ||
-                    book.Author.Names.Any(name => EF.Functions.ILike(name.Name, pattern, @"\")))));
-        }
+        var authorMatch = PredicateExpression.And<Book>(
+            book => book.Author != null,
+            PredicateExpression.Or(
+                _textSearch.Match<Book>(
+                    book => book.Author!.PrimaryName,
+                    book => book.Author!.NormalizedPrimaryName,
+                    term),
+                _textSearch.AnyMatch<Book, AuthorName>(
+                    book => book.Author!.Names,
+                    name => name.Name,
+                    name => name.NormalizedName,
+                    term)));
 
-        var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(term));
-        return query.Where(book =>
-            EF.Functions.Like(book.NormalizedPrimaryTitle, normalizedPattern, @"\") ||
-            book.Titles.Any(title => EF.Functions.Like(title.NormalizedTitle, normalizedPattern, @"\")) ||
-            (book.Author != null && (
-                EF.Functions.Like(book.Author.NormalizedPrimaryName, normalizedPattern, @"\") ||
-                book.Author.Names.Any(name => EF.Functions.Like(name.NormalizedName, normalizedPattern, @"\")))));
+        var predicate = PredicateExpression.OrAll(
+        [
+            _textSearch.Match<Book>(
+                book => book.PrimaryTitle,
+                book => book.NormalizedPrimaryTitle,
+                term),
+            _textSearch.AnyMatch<Book, BookTitle>(
+                book => book.Titles,
+                title => title.Title,
+                title => title.NormalizedTitle,
+                term),
+            authorMatch
+        ])!;
+
+        return query.Where(predicate);
     }
 
     private IQueryable<Book> ApplyTitleSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = _supportsILike
-            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var pattern = ToLikePattern(search);
-                return book =>
-                    EF.Functions.ILike(book.PrimaryTitle, pattern, @"\") ||
-                    book.Titles.Any(title => EF.Functions.ILike(title.Title, pattern, @"\"));
-            })
-            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book =>
-                    EF.Functions.Like(book.NormalizedPrimaryTitle, normalizedPattern, @"\") ||
-                    book.Titles.Any(title => EF.Functions.Like(title.NormalizedTitle, normalizedPattern, @"\"));
-            });
+        var predicates = searches.Select(search => PredicateExpression.Or(
+            _textSearch.Match<Book>(
+                book => book.PrimaryTitle,
+                book => book.NormalizedPrimaryTitle,
+                search),
+            _textSearch.AnyMatch<Book, BookTitle>(
+                book => book.Titles,
+                title => title.Title,
+                title => title.NormalizedTitle,
+                search)));
 
         return ApplyAnyFieldMatch(query, predicates);
     }
 
     private IQueryable<Book> ApplyAuthorSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = _supportsILike
-            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var pattern = ToLikePattern(search);
-                return book => book.Author != null && (
-                    EF.Functions.ILike(book.Author.PrimaryName, pattern, @"\") ||
-                    book.Author.Names.Any(name => EF.Functions.ILike(name.Name, pattern, @"\")));
-            })
-            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => book.Author != null && (
-                    EF.Functions.Like(book.Author.NormalizedPrimaryName, normalizedPattern, @"\") ||
-                    book.Author.Names.Any(name => EF.Functions.Like(name.NormalizedName, normalizedPattern, @"\")));
-            });
+        var predicates = searches.Select(search => PredicateExpression.And<Book>(
+            book => book.Author != null,
+            PredicateExpression.Or(
+                _textSearch.Match<Book>(
+                    book => book.Author!.PrimaryName,
+                    book => book.Author!.NormalizedPrimaryName,
+                    search),
+                _textSearch.AnyMatch<Book, AuthorName>(
+                    book => book.Author!.Names,
+                    name => name.Name,
+                    name => name.NormalizedName,
+                    search))));
 
         return ApplyAnyFieldMatch(query, predicates);
     }
 
     private IQueryable<Book> ApplyTagSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = _supportsILike
-            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var pattern = ToLikePattern(search);
-                return book => book.BookTags.Any(bookTag => EF.Functions.ILike(bookTag.Tag.Name, pattern, @"\"));
-            })
-            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => book.BookTags.Any(bookTag => EF.Functions.Like(bookTag.Tag.NormalizedName, normalizedPattern, @"\"));
-            });
+        var predicates = searches.Select(search =>
+            _textSearch.AnyMatch<Book, BookTag>(
+                book => book.BookTags,
+                bookTag => bookTag.Tag.Name,
+                bookTag => bookTag.Tag.NormalizedName,
+                search));
 
         return ApplyAnyFieldMatch(query, predicates);
     }
 
     private IQueryable<Book> ApplyGenreSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = _supportsILike
-            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var pattern = ToLikePattern(search);
-                return book => book.BookGenres.Any(bookGenre => EF.Functions.ILike(bookGenre.Genre.Name, pattern, @"\"));
-            })
-            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => book.BookGenres.Any(bookGenre => EF.Functions.Like(bookGenre.Genre.NormalizedName, normalizedPattern, @"\"));
-            });
+        var predicates = searches.Select(search =>
+            _textSearch.AnyMatch<Book, BookGenre>(
+                book => book.BookGenres,
+                bookGenre => bookGenre.Genre.Name,
+                bookGenre => bookGenre.Genre.NormalizedName,
+                search));
 
         return ApplyAnyFieldMatch(query, predicates);
     }
 
     private IQueryable<Book> ApplyStatusSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = _supportsILike
-            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var pattern = ToLikePattern(search);
-                return book => EF.Functions.ILike(book.Status.Name, pattern, @"\");
-            })
-            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => EF.Functions.Like(book.Status.Name.ToUpper(), normalizedPattern, @"\");
-            });
+        var predicates = searches.Select(search =>
+            _textSearch.Match<Book>(
+                book => book.Status.Name,
+                book => book.Status.Name.ToUpper(),
+                search));
 
         return ApplyAnyFieldMatch(query, predicates);
     }
 
     private IQueryable<Book> ApplyTypeSearch(IQueryable<Book> query, IReadOnlyCollection<string> searches)
     {
-        var predicates = _supportsILike
-            ? searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var pattern = ToLikePattern(search);
-                return book => EF.Functions.ILike(book.ContentType.Name, pattern, @"\");
-            })
-            : searches.Select<string, Expression<Func<Book, bool>>>(search =>
-            {
-                var normalizedPattern = ToLikePattern(MappingExtensions.NormalizeName(search));
-                return book => EF.Functions.Like(book.ContentType.Name.ToUpper(), normalizedPattern, @"\");
-            });
+        var predicates = searches.Select(search =>
+            _textSearch.Match<Book>(
+                book => book.ContentType.Name,
+                book => book.ContentType.Name.ToUpper(),
+                search));
 
         return ApplyAnyFieldMatch(query, predicates);
     }
@@ -213,61 +194,8 @@ public sealed class BookSearchCriteriaApplier
         IQueryable<Book> query,
         IEnumerable<Expression<Func<Book, bool>>> predicates)
     {
-        Expression<Func<Book, bool>>? combined = null;
-
-        foreach (var predicate in predicates)
-        {
-            combined = combined == null ? predicate : OrElse(combined, predicate);
-        }
-
+        var combined = PredicateExpression.OrAll(predicates);
         return combined == null ? query : query.Where(combined);
-    }
-
-    private static Expression<Func<Book, bool>> OrElse(
-        Expression<Func<Book, bool>> left,
-        Expression<Func<Book, bool>> right)
-    {
-        var parameter = Expression.Parameter(typeof(Book), "book");
-        var leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
-        var rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
-        return Expression.Lambda<Func<Book, bool>>(Expression.OrElse(leftBody, rightBody), parameter);
-    }
-
-    private static Expression ReplaceParameter(Expression expression, ParameterExpression source, ParameterExpression target)
-    {
-        return new ParameterReplaceVisitor(source, target).Visit(expression)!;
-    }
-
-    private sealed class ParameterReplaceVisitor : ExpressionVisitor
-    {
-        private readonly ParameterExpression _source;
-        private readonly ParameterExpression _target;
-
-        public ParameterReplaceVisitor(ParameterExpression source, ParameterExpression target)
-        {
-            _source = source;
-            _target = target;
-        }
-
-        protected override Expression VisitParameter(ParameterExpression node)
-        {
-            return node == _source ? _target : base.VisitParameter(node);
-        }
-    }
-
-    private static string ToLikePattern(string value)
-    {
-        var trimmed = value.Trim();
-        var pattern = EscapeLike(trimmed).Replace("*", "%", StringComparison.Ordinal);
-        return trimmed.Contains('*') ? pattern : $"%{pattern}%";
-    }
-
-    private static string EscapeLike(string value)
-    {
-        return value
-            .Replace(@"\", @"\\", StringComparison.Ordinal)
-            .Replace("%", @"\%", StringComparison.Ordinal)
-            .Replace("_", @"\_", StringComparison.Ordinal);
     }
 
     private IQueryable<Book> ApplyRating(IQueryable<Book> query, BookSearchOperator op, decimal value)
