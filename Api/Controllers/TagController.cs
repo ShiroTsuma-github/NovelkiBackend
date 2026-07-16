@@ -4,7 +4,7 @@ using Application.Common.DTOs.Tag;
 using Application.Features.TagFeatures.Queries;
 
 [ApiController]
-[Route("api/v1/tag")]
+[Route(ApiRoutes.Tag)]
 public class TagController : ControllerBase
 {
     private readonly IMediator _mediator;

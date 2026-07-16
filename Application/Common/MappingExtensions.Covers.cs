@@ -12,9 +12,9 @@ public static partial class MappingExtensions
             Id = source.Id,
             Status = source.Status.ToString(),
             Source = source.Source?.ToString(),
-            ImageUrl = source.StoragePath == null ? null : $"/api/v1/book/{bookId}/cover/file?v={version}",
+            ImageUrl = source.StoragePath == null ? null : ApiRoutes.BookCoverFile(bookId, version),
             ThumbnailImageUrl =
-                source.ThumbnailStoragePath == null ? null : $"/api/v1/book/{bookId}/cover/thumbnail?v={version}",
+                source.ThumbnailStoragePath == null ? null : ApiRoutes.BookCoverThumbnail(bookId, version),
             OriginalImageUrl = source.OriginalImageUrl,
             MimeType = source.MimeType,
             SizeBytes = source.SizeBytes,

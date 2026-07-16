@@ -1,9 +1,6 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
-using Domain.Entities;
 using FluentValidation;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 public class BookRepository : IBookRepository
 {
@@ -106,7 +103,7 @@ public class BookRepository : IBookRepository
         if (book.TotalChapters.HasValue && book.TotalChapters > 0 && currentChapterNumber.HasValue &&
             currentChapterNumber > book.TotalChapters)
         {
-            throw new ValidationException("Current chapter cannot be greater than total chapters.");
+            throw new ValidationException(BookValidationMessages.CurrentChapterCannotExceedTotal);
         }
 
         book.CurrentChapterNumber = currentChapterNumber;

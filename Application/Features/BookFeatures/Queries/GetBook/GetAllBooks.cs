@@ -7,8 +7,8 @@ public record GetAllBooksQuery(
     int Skip = 0,
     int Take = 100,
     string? Query = null,
-    string? SortBy = "lastModified",
-    string? SortDirection = "desc",
+    string? SortBy = BookSortFields.LastModified,
+    string? SortDirection = SortDirections.Descending,
     bool AdvanceCycle = false) : IRequest<PaginatedResult<BookListItemDto>>;
 
 public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedResult<BookListItemDto>>
@@ -51,7 +51,8 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
 
     private static bool IsCyclicSort(string? sortBy)
     {
-        return sortBy?.Trim().ToLowerInvariant() is "status" or "type" or "contenttype";
+        return sortBy?.Trim().ToLowerInvariant() is
+            BookSortFields.Status or BookSortFields.Type or BookSortFields.ContentTypeAlias;
     }
 }
 
@@ -59,8 +60,8 @@ public record GetAllBooksForExportQuery(
     int Skip = 0,
     int Take = 100,
     string? Query = null,
-    string? SortBy = "lastModified",
-    string? SortDirection = "desc") : IRequest<PaginatedResult<BookDto>>;
+    string? SortBy = BookSortFields.LastModified,
+    string? SortDirection = SortDirections.Descending) : IRequest<PaginatedResult<BookDto>>;
 
 public sealed class GetBooksForExportQueryHandler : IRequestHandler<GetAllBooksForExportQuery, PaginatedResult<BookDto>>
 {

@@ -162,7 +162,7 @@ public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressComma
         if (book.TotalChapters.HasValue && book.TotalChapters > 0 && request.CurrentChapterNumber.HasValue &&
             request.CurrentChapterNumber > book.TotalChapters)
         {
-            throw new ValidationException("Current chapter cannot be greater than total chapters.");
+            throw new ValidationException(BookValidationMessages.CurrentChapterCannotExceedTotal);
         }
 
         var updated = await _repository.UpdateProgressAsync(

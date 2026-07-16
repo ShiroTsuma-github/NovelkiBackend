@@ -1,15 +1,14 @@
 ﻿namespace Api.Controllers;
 
-using Application.Common.Models;
 using Application.Features.AccountFeatures.Commands;
 using Microsoft.AspNetCore.RateLimiting;
 
 [ApiController]
-[Route("api/v1/account")]
+[Route(ApiRoutes.Account)]
 public class AccountController : ControllerBase
 {
-    private readonly IMediator _mediator;
     private readonly ILogger<AccountController> _logger;
+    private readonly IMediator _mediator;
 
     public AccountController(IMediator mediator, ILogger<AccountController> logger)
     {

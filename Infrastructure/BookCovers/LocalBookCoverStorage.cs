@@ -4,6 +4,8 @@ using Microsoft.Extensions.Options;
 
 public sealed class LocalBookCoverStorage : IBookCoverStorage
 {
+    private const string InvalidStoragePathMessage = "Invalid cover storage path.";
+
     private readonly BookCoverOptions _options;
 
     public LocalBookCoverStorage(IOptions<BookCoverOptions> options)
@@ -78,7 +80,7 @@ public sealed class LocalBookCoverStorage : IBookCoverStorage
         var fullPath = Path.GetFullPath(Path.Combine(rootPath, storagePath));
         if (!fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Invalid cover storage path.");
+            throw new InvalidOperationException(InvalidStoragePathMessage);
         }
 
         return fullPath;
@@ -89,7 +91,7 @@ public sealed class LocalBookCoverStorage : IBookCoverStorage
         var fullPath = Path.GetFullPath(Path.Combine(directory, fileName));
         if (!fullPath.StartsWith(rootPath, StringComparison.OrdinalIgnoreCase))
         {
-            throw new InvalidOperationException("Invalid cover storage path.");
+            throw new InvalidOperationException(InvalidStoragePathMessage);
         }
 
         return fullPath;

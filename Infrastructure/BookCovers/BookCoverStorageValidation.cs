@@ -1,10 +1,12 @@
 namespace Infrastructure.BookCovers;
 
+using FluentValidation;
+
 internal static class BookCoverStorageValidation
 {
     private static readonly HashSet<string> AllowedMimeTypes = new(StringComparer.OrdinalIgnoreCase)
     {
-        "image/jpeg", "image/png", "image/webp"
+        BookCoverMediaTypes.Jpeg, BookCoverMediaTypes.Png, BookCoverMediaTypes.WebP
     };
 
     public static async Task<ValidatedBookCoverContent> ReadAndValidateAsync(
@@ -17,19 +19,19 @@ internal static class BookCoverStorageValidation
         await content.CopyToAsync(buffer, cancellationToken);
         if (buffer.Length == 0)
         {
-            throw new FluentValidation.ValidationException("Cover file is empty.");
+            throw new ValidationException(BookCoverValidationMessages.EmptyFile);
         }
 
         if (buffer.Length > maxBytes)
         {
-            throw new FluentValidation.ValidationException($"Cover file cannot exceed {maxBytes} bytes.");
+            throw new ValidationException($"Cover file cannot exceed {maxBytes} bytes.");
         }
 
         var bytes = buffer.ToArray();
         var detectedMimeType = DetectMimeType(bytes) ?? contentType;
         if (detectedMimeType == null || !AllowedMimeTypes.Contains(detectedMimeType))
         {
-            throw new FluentValidation.ValidationException("Cover file must be a JPEG, PNG, or WebP image.");
+            throw new ValidationException(BookCoverValidationMessages.UnsupportedImageFormat);
         }
 
         return new ValidatedBookCoverContent(bytes, detectedMimeType);
@@ -39,7 +41,7 @@ internal static class BookCoverStorageValidation
     {
         if (bytes.Length >= 3 && bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF)
         {
-            return "image/jpeg";
+            return BookCoverMediaTypes.Jpeg;
         }
 
         if (bytes.Length >= 8 &&
@@ -52,7 +54,7 @@ internal static class BookCoverStorageValidation
             bytes[6] == 0x1A &&
             bytes[7] == 0x0A)
         {
-            return "image/png";
+            return BookCoverMediaTypes.Png;
         }
 
         if (bytes.Length >= 12 &&
@@ -65,7 +67,7 @@ internal static class BookCoverStorageValidation
             bytes[10] == 0x42 &&
             bytes[11] == 0x50)
         {
-            return "image/webp";
+            return BookCoverMediaTypes.WebP;
         }
 
         return null;

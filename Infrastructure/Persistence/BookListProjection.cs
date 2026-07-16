@@ -93,10 +93,10 @@ internal static class BookListProjectionMapper
             LastAttemptAt = projection.CoverLastAttemptAt,
             ImageUrl =
                 projection.HasCoverStoragePath
-                    ? $"/api/v1/book/{projection.Id}/cover/file?v={version.ToUnixTimeMilliseconds()}"
+                    ? ApiRoutes.BookCoverFile(projection.Id, version.ToUnixTimeMilliseconds())
                     : null,
             ThumbnailImageUrl = projection.HasCoverThumbnailStoragePath
-                ? $"/api/v1/book/{projection.Id}/cover/thumbnail?v={version.ToUnixTimeMilliseconds()}"
+                ? ApiRoutes.BookCoverThumbnail(projection.Id, version.ToUnixTimeMilliseconds())
                 : null
         };
     }

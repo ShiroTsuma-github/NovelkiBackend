@@ -1,7 +1,7 @@
 namespace Infrastructure.Persistence;
 
-using Domain.Models;
 using System.Globalization;
+using Domain.Models;
 
 public sealed class BookAnalyticsQueryService(ApplicationDbContext context, BookSearchCriteriaApplier criteriaApplier)
     : IBookAnalyticsQueryService
@@ -492,20 +492,21 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
 
         var completeCounts = new Dictionary<string, int>
         {
-            ["author"] = completenessRows.Count(row => row.HasAuthor),
-            ["description"] = completenessRows.Count(row => !string.IsNullOrWhiteSpace(row.Description)),
-            ["genre"] = completenessRows.Count(row => row.HasGenre),
-            ["tag"] = completenessRows.Count(row => row.HasTag),
-            ["rating"] = completenessRows.Count(row => row.HasRating),
-            ["priority"] = completenessRows.Count(row => row.HasPriority),
-            ["totalChapters"] = completenessRows.Count(row => row.HasTotalChapters),
-            ["link"] = completenessRows.Count(row => row.HasLink),
-            ["alternateTitle"] = alternateTitleRows
+            [BookAnalyticsQualityFields.Author] = completenessRows.Count(row => row.HasAuthor),
+            [BookAnalyticsQualityFields.Description] =
+                completenessRows.Count(row => !string.IsNullOrWhiteSpace(row.Description)),
+            [BookAnalyticsQualityFields.Genre] = completenessRows.Count(row => row.HasGenre),
+            [BookAnalyticsQualityFields.Tag] = completenessRows.Count(row => row.HasTag),
+            [BookAnalyticsQualityFields.Rating] = completenessRows.Count(row => row.HasRating),
+            [BookAnalyticsQualityFields.Priority] = completenessRows.Count(row => row.HasPriority),
+            [BookAnalyticsQualityFields.TotalChapters] = completenessRows.Count(row => row.HasTotalChapters),
+            [BookAnalyticsQualityFields.Link] = completenessRows.Count(row => row.HasLink),
+            [BookAnalyticsQualityFields.AlternateTitle] = alternateTitleRows
                 .Where(row => !string.IsNullOrWhiteSpace(row.Title))
                 .Select(row => row.BookId)
                 .Distinct()
                 .Count(),
-            ["usableCover"] =
+            [BookAnalyticsQualityFields.UsableCover] =
                 completenessRows.Count(row => IsUsableCover(row.Status, row.StoragePath, row.ThumbnailStoragePath))
         };
 
@@ -624,9 +625,9 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
     {
         var bucketDate = bucket switch
         {
-            "day" => date,
-            "week" => StartOfWeek(date),
-            "month" => new DateOnly(date.Year, date.Month, 1),
+            BookAnalyticsBuckets.Day => date,
+            BookAnalyticsBuckets.Week => StartOfWeek(date),
+            BookAnalyticsBuckets.Month => new DateOnly(date.Year, date.Month, 1),
             _ => date
         };
 
@@ -637,9 +638,9 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
     {
         return bucketSize switch
         {
-            "day" => bucket.AddDays(1),
-            "week" => StartOfWeek(bucket).AddDays(7),
-            "month" => new DateOnly(bucket.Year, bucket.Month, 1).AddMonths(1),
+            BookAnalyticsBuckets.Day => bucket.AddDays(1),
+            BookAnalyticsBuckets.Week => StartOfWeek(bucket).AddDays(7),
+            BookAnalyticsBuckets.Month => new DateOnly(bucket.Year, bucket.Month, 1).AddMonths(1),
             _ => bucket.AddDays(1)
         };
     }

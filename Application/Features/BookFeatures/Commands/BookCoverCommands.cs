@@ -1,6 +1,6 @@
 namespace Application.Features.BookFeatures.Commands;
 
-using Application.Common.DTOs.Book;
+using Common.DTOs.Book;
 
 public sealed record UploadBookCoverCommand(
     Guid BookId,
@@ -14,9 +14,9 @@ public sealed record SetBookCoverFromUrlCommand(Guid BookId, string ImageUrl) : 
 public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, BookCoverDto>
 {
     private readonly IBookRepository _bookRepository;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverStorage _storage;
-    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public UploadBookCoverHandler(
@@ -37,7 +37,7 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
     {
         if (request.Length is <= 0)
         {
-            throw new ValidationException("Cover file is empty.");
+            throw new ValidationException(BookCoverValidationMessages.EmptyFile);
         }
 
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
@@ -59,10 +59,10 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
 public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCommand, BookCoverDto>
 {
     private readonly IBookRepository _bookRepository;
-    private readonly IBookCoverRepository _coverRepository;
-    private readonly IBookCoverStorage _storage;
-    private readonly IBookCoverRemoteImageService _remoteImageService;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
+    private readonly IBookCoverRepository _coverRepository;
+    private readonly IBookCoverRemoteImageService _remoteImageService;
+    private readonly IBookCoverStorage _storage;
     private readonly IUser _user;
 
     public SetBookCoverFromUrlHandler(
@@ -84,9 +84,9 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
     public async Task<BookCoverDto> Handle(SetBookCoverFromUrlCommand request, CancellationToken cancellationToken)
     {
         if (!Uri.TryCreate(request.ImageUrl, UriKind.Absolute, out var imageUri) ||
-            imageUri.Scheme is not ("http" or "https"))
+            !imageUri.IsHttpOrHttps())
         {
-            throw new ValidationException("Image URL must be an absolute HTTP or HTTPS URL.");
+            throw new ValidationException(BookCoverValidationMessages.InvalidRemoteUrl);
         }
 
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
@@ -111,10 +111,10 @@ public sealed record RefreshBookCoverCommand(Guid BookId) : IRequest<BookCoverDt
 public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, BookCoverDto>
 {
     private readonly IBookRepository _bookRepository;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverQueue _queue;
     private readonly IBookCoverStorage _storage;
-    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public RefreshBookCoverHandler(
@@ -153,9 +153,9 @@ public sealed record DeleteBookCoverCommand(Guid BookId) : IRequest;
 public class DeleteBookCoverHandler : IRequestHandler<DeleteBookCoverCommand>
 {
     private readonly IBookRepository _bookRepository;
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
     private readonly IBookCoverStorage _storage;
-    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IUser _user;
 
     public DeleteBookCoverHandler(
