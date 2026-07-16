@@ -657,25 +657,25 @@ public sealed class BookSearchCriteriaApplierTests
         {
             case BookSearchOperator.GreaterThan:
                 Assert.Contains(">=", sql, StringComparison.Ordinal);
-                Assert.Contains("nextDay", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("2026-07-16", sql, StringComparison.Ordinal);
                 break;
             case BookSearchOperator.GreaterThanOrEqual:
                 Assert.Contains(">=", sql, StringComparison.Ordinal);
-                Assert.Contains("start", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("2026-07-15", sql, StringComparison.Ordinal);
                 break;
             case BookSearchOperator.LessThan:
                 Assert.Contains(" < ", sql, StringComparison.Ordinal);
-                Assert.Contains("start", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("2026-07-15", sql, StringComparison.Ordinal);
                 break;
             case BookSearchOperator.LessThanOrEqual:
                 Assert.Contains(" < ", sql, StringComparison.Ordinal);
-                Assert.Contains("nextDay", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("2026-07-16", sql, StringComparison.Ordinal);
                 break;
             default:
                 Assert.Contains(">=", sql, StringComparison.Ordinal);
                 Assert.Contains(" < ", sql, StringComparison.Ordinal);
-                Assert.Contains("start", sql, StringComparison.OrdinalIgnoreCase);
-                Assert.Contains("nextDay", sql, StringComparison.OrdinalIgnoreCase);
+                Assert.Contains("2026-07-15", sql, StringComparison.Ordinal);
+                Assert.Contains("2026-07-16", sql, StringComparison.Ordinal);
                 break;
         }
     }
