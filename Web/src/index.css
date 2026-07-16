@@ -395,14 +395,14 @@ h4 {
 }
 
 .ui-control.ui-control--compact-select {
-  width: 5rem;
-  padding-right: 2.5rem;
+  width: 4rem;
+  padding-right: 2rem;
   appearance: none;
   -webkit-appearance: none;
 }
 
 .ui-control.ui-control--page-size {
-  width: 6rem;
+  width: 4.75rem;
 }
 
 .pagination-page-button {
@@ -786,12 +786,19 @@ select.ui-control {
 }
 
 .book-card {
+  overflow: hidden;
   transition: border-color 120ms ease, background-color 120ms ease;
 }
 
 .book-card:hover {
   border-color: var(--qs-border-strong);
   background: var(--qs-surface-raised);
+}
+
+.book-card__cover {
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
 }
 
 .analytics-chart-surface :where(.recharts-wrapper, .recharts-surface, .recharts-layer, svg, g, path, rect, circle):focus {
