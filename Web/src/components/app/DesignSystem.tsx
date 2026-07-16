@@ -35,7 +35,7 @@ export function Surface({
   ...props
 }: HTMLAttributes<HTMLElement> & {
   as?: 'article' | 'div' | 'section'
-  tone?: 'default' | 'muted' | 'elevated'
+  tone?: 'default' | 'muted' | 'elevated' | 'danger' | 'success' | 'warning'
 }) {
   const Component = as
 

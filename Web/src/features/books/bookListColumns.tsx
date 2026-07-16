@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronsUpDown, RefreshCw, Settings2 } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { buttonVariants } from '@/components/app/DesignSystem'
 
 const columnPopupWidthPx = 320
 const columnPopupEdgeGapPx = 16
@@ -110,7 +111,7 @@ export function ColumnSettingsPopup<T>({
     <div className="inline-block text-left" ref={containerRef}>
       <button
         ref={buttonRef}
-        className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+        className={buttonVariants.ghost}
         type="button"
         onClick={() => setOpen(!open)}
       >
@@ -119,7 +120,7 @@ export function ColumnSettingsPopup<T>({
       </button>
       {open ? (
         <div
-          className="fixed z-50 grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto rounded-lg border border-slate-200 bg-white p-4 text-left normal-case tracking-normal shadow-xl"
+          className="ui-popover fixed grid max-h-[min(34rem,calc(100vh-1rem))] w-[min(20rem,calc(100vw-1rem))] gap-3 overflow-y-auto p-4 text-left normal-case tracking-normal"
           style={position}
         >
           <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
@@ -143,15 +144,15 @@ export function ColumnSettingsPopup<T>({
                   type="button"
                   onClick={() => toggleColumn(preference.id)}
                 >
-                  <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border transition ${preference.visible ? 'border-cyan-500 bg-cyan-500' : 'border-slate-300 bg-slate-200'}`}>
+                  <span className={`book-column-switch relative inline-flex h-5 w-9 shrink-0 rounded-full border transition ${preference.visible ? 'book-column-switch--active' : ''}`}>
                     <span className={`absolute top-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition ${preference.visible ? 'left-4' : 'left-0.5'}`} />
                   </span>
                   {column.label}
                 </button>
                 {allowReorder ? (
                   <div className="flex shrink-0 gap-1">
-                    <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === 0} type="button" onClick={() => moveColumn(preference.id, -1)}>Up</button>
-                    <button className="h-8 rounded border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === preferences.length - 1} type="button" onClick={() => moveColumn(preference.id, 1)}>Down</button>
+                    <button className="min-h-11 border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === 0} type="button" onClick={() => moveColumn(preference.id, -1)}>Up</button>
+                    <button className="min-h-11 border border-slate-200 px-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:text-slate-300" disabled={index === preferences.length - 1} type="button" onClick={() => moveColumn(preference.id, 1)}>Down</button>
                   </div>
                 ) : null}
               </div>

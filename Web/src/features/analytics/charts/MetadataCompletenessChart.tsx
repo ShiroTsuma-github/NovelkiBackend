@@ -7,12 +7,15 @@ type MetadataCompletenessChartProps = {
 
 const missingFieldQueries: Record<string, string> = {
   author: noneQuery('author'),
+  description: noneQuery('description'),
   genre: noneQuery('genre'),
   tag: noneQuery('tag'),
   rating: noneQuery('rating'),
   priority: noneQuery('priority'),
   totalChapters: noneQuery('total'),
   link: noneQuery('link'),
+  alternateTitle: noneQuery('alternateTitle'),
+  usableCover: noneQuery('cover'),
 }
 
 export function MetadataCompletenessChart({ data }: MetadataCompletenessChartProps) {
@@ -39,8 +42,8 @@ export function MetadataCompletenessChart({ data }: MetadataCompletenessChartPro
                 {formatCount(item.bookCount)} complete · {formatPercent(item.shareOfBooks)}
               </span>
             </div>
-            <div className="h-3 overflow-hidden rounded-full bg-slate-100" aria-label={`${formatFieldName(item.field)} completeness ${formatPercent(item.shareOfBooks)}`}>
-              <div className="h-full rounded-full bg-cyan-600" style={{ width: `${Math.min(100, Math.max(0, item.shareOfBooks))}%` }} />
+            <div className="ui-progress-track" aria-label={`${formatFieldName(item.field)} completeness ${formatPercent(item.shareOfBooks)}`}>
+              <div className="ui-progress-fill" style={{ width: `${Math.min(100, Math.max(0, item.shareOfBooks))}%` }} />
             </div>
             <div className="text-sm text-slate-600">
               Complete {formatCount(item.bookCount)} of {formatCount(totalBooks)} books. Missing: {query && missingCount > 0 ? (

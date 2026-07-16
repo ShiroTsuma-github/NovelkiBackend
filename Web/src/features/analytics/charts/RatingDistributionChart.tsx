@@ -1,5 +1,6 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
+import { Surface } from '@/components/app/DesignSystem'
 import { analyticsTooltipProps, DrilldownLink, formatCount, formatPercent, getActiveChartLabel, noneQuery, numberQuery, percent, useBooksDrilldown } from './chartUtils'
 
 type RatingDistributionChartProps = {
@@ -20,8 +21,8 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
   return (
     <div className="grid gap-4">
       <div className="grid gap-3 sm:grid-cols-[9rem_minmax(0,1fr)]">
-        <div className="grid place-items-center rounded-xl border border-slate-200 bg-white p-4 text-center">
-          <div className="grid h-24 w-24 place-items-center rounded-full border-8 border-cyan-500 bg-slate-50">
+        <Surface as="div" className="grid place-items-center p-4 text-center" tone="elevated">
+          <div className="grid h-24 w-24 place-items-center rounded-full border-8 border-[var(--qs-accent)] bg-[var(--qs-surface-muted)]">
             <div>
               <div className="text-xl font-semibold text-slate-950">{formatPercent(coverage)}</div>
               <div className="text-xs text-slate-500">rated</div>
@@ -31,7 +32,7 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
             Avg {ratings.averageRating == null ? '-' : ratings.averageRating.toFixed(1)}
           </div>
           <DrilldownLink query={noneQuery('rating')}>Unrated: {formatCount(ratings.unratedBooks)}</DrilldownLink>
-        </div>
+        </Surface>
         <div className="analytics-drilldown-chart h-64 min-w-0">
           <ResponsiveContainer>
             <BarChart
@@ -47,10 +48,10 @@ export function RatingDistributionChart({ data }: RatingDistributionChartProps) 
               <XAxis dataKey="rating" tickLine={false} />
               <YAxis allowDecimals={false} tickLine={false} />
               <Tooltip {...analyticsTooltipProps} formatter={(value, _name, item) => [`${formatCount(Number(value))} books`, `Rating ${item.payload.rating}`]} />
-              <Bar dataKey="bookCount" name="Books" radius={[6, 6, 0, 0]}>
+              <Bar dataKey="bookCount" name="Books">
                 {counts.map((item) => (
                   <Cell
-                    fill={item.bookCount > 0 ? '#7c3aed' : '#334155'}
+                    fill={item.bookCount > 0 ? '#8b92d8' : '#273142'}
                     key={item.rating}
                   />
                 ))}

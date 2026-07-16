@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { BookAnalyticsDto } from '@/api/types'
+import { Surface } from '@/components/app/DesignSystem'
 import { inputClass } from '@/components/app/FormField'
 import { formatChapterCount } from '@/features/books/BooksPage'
 import { readReadingTimeSettings, writeReadingTimeSettings } from '../readingTimeSettings'
@@ -21,16 +22,16 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
 
   return (
     <div className="grid gap-4">
-      <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <Surface as="div" className="p-4" tone="elevated">
         <div className="text-sm font-semibold text-slate-950">Estimated total</div>
         <div className="mt-1 text-3xl font-semibold text-slate-950">{formatHours(totalHours)}</div>
         <div className="mt-2 text-sm text-slate-500">
           {formatDays(totalHours)} · {formatMonths(totalHours)} · {formatYears(totalHours)} based on known current chapters.
         </div>
-      </div>
+      </Surface>
       <div className="grid gap-2">
         {estimates.map((item) => (
-          <label className="grid gap-2 rounded-md border border-slate-200 bg-white p-3" key={item.type}>
+          <Surface as="div" className="grid gap-2 p-3" key={item.type}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-semibold text-slate-950">{item.type}</span>
               <span className="text-sm text-slate-500">{formatChapterCount(item.currentChapters)} chapters · {formatHours(item.hours)}</span>
@@ -38,7 +39,7 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
             <div className="flex flex-wrap items-center gap-3">
               <input
                 aria-label={`${item.type} minutes per chapter`}
-                className={`${inputClass} h-10 w-28 border-slate-300 bg-white text-slate-950`}
+                className={`${inputClass} w-28`}
                 min="0"
                 step="1"
                 type="number"
@@ -54,7 +55,7 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
               />
               <span className="text-sm text-slate-600">minutes per chapter</span>
             </div>
-          </label>
+          </Surface>
         ))}
       </div>
     </div>

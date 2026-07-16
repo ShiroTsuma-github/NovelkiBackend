@@ -437,6 +437,115 @@ public sealed class BookSearchCriteriaApplierTests
     }
 
     [Fact]
+    public async Task MissingCoverFilter_ShouldMatchEveryCoverWithoutAUsableStoredImage()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var usableFound = AddBookWithMetadata(context, database.UserId, "Usable Found");
+        var usableUploaded = AddBookWithMetadata(context, database.UserId, "Usable Uploaded");
+        usableUploaded.Cover!.Status = BookCoverStatus.Uploaded;
+        usableUploaded.Cover.StoragePath = null;
+        usableUploaded.Cover.ThumbnailStoragePath = $"{usableUploaded.Id:N}/thumbnail.jpg";
+
+        var missingCover = AddBookWithMetadata(
+            context,
+            database.UserId,
+            "No Cover",
+            BookSearchMissingField.Cover);
+        var pending = AddBookWithMetadata(context, database.UserId, "Pending Cover");
+        pending.Cover!.Status = BookCoverStatus.Pending;
+        var failed = AddBookWithMetadata(context, database.UserId, "Failed Cover");
+        failed.Cover!.Status = BookCoverStatus.Failed;
+        var notFound = AddBookWithMetadata(context, database.UserId, "Not Found Cover");
+        notFound.Cover!.Status = BookCoverStatus.NotFound;
+        var foundWithoutStorage = AddBookWithMetadata(context, database.UserId, "Found Without Storage");
+        foundWithoutStorage.Cover!.StoragePath = null;
+
+        await context.SaveChangesAsync();
+
+        var ids = await Apply(
+                context,
+                Criteria(missing: [new BookSearchMissingFilter(BookSearchMissingField.Cover)]))
+            .Select(book => book.Id)
+            .ToArrayAsync();
+
+        Assert.Equal(
+            new[]
+            {
+                failed.Id,
+                foundWithoutStorage.Id,
+                missingCover.Id,
+                notFound.Id,
+                pending.Id
+            }.Order(),
+            ids.Order());
+        Assert.DoesNotContain(usableFound.Id, ids);
+        Assert.DoesNotContain(usableUploaded.Id, ids);
+    }
+
+    [Fact]
+    public async Task MissingDescriptionFilter_ShouldMatchNullEmptyAndWhitespaceValues()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var complete = AddBookWithMetadata(context, database.UserId, "Complete Description");
+        var missing = AddBookWithMetadata(
+            context,
+            database.UserId,
+            "Null Description",
+            BookSearchMissingField.Description);
+        var empty = AddBookWithMetadata(context, database.UserId, "Empty Description");
+        empty.Description = string.Empty;
+        var whitespace = AddBookWithMetadata(context, database.UserId, "Whitespace Description");
+        whitespace.Description = "   ";
+        await context.SaveChangesAsync();
+
+        var ids = await Apply(
+                context,
+                Criteria(missing: [new BookSearchMissingFilter(BookSearchMissingField.Description)]))
+            .Select(book => book.Id)
+            .ToArrayAsync();
+
+        Assert.Equal(new[] { empty.Id, missing.Id, whitespace.Id }.Order(), ids.Order());
+        Assert.DoesNotContain(complete.Id, ids);
+    }
+
+    [Fact]
+    public async Task MissingAlternateTitleFilter_ShouldIgnorePrimaryAndWhitespaceOnlyTitles()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var complete = AddBookWithMetadata(context, database.UserId, "Complete Alternate Title");
+        var missing = AddBookWithMetadata(
+            context,
+            database.UserId,
+            "Primary Title Only",
+            BookSearchMissingField.AlternateTitle);
+        var whitespace = AddBookWithMetadata(
+            context,
+            database.UserId,
+            "Whitespace Alternate",
+            BookSearchMissingField.AlternateTitle);
+        whitespace.Titles.Add(new BookTitle
+        {
+            Title = "   ",
+            NormalizedTitle = string.Empty,
+            IsPrimary = false,
+            Source = "Test"
+        });
+        await context.SaveChangesAsync();
+
+        var ids = await Apply(
+                context,
+                Criteria(missing: [new BookSearchMissingFilter(BookSearchMissingField.AlternateTitle)]))
+            .Select(book => book.Id)
+            .ToArrayAsync();
+
+        Assert.Equal(new[] { missing.Id, whitespace.Id }.Order(), ids.Order());
+        Assert.DoesNotContain(complete.Id, ids);
+    }
+
+    [Fact]
     public void UnknownMissingFilter_ShouldLeaveQueryUnchanged()
     {
         using var database = new SqliteTestDatabase();
@@ -701,6 +810,7 @@ public sealed class BookSearchCriteriaApplierTests
     {
         var author = missing == BookSearchMissingField.Author ? null : TestData.Author($"{title} Author");
         var book = TestData.Book(ownerId, title, author);
+        book.Description = missing == BookSearchMissingField.Description ? null : $"{title} description";
         book.Rating = missing == BookSearchMissingField.Rating ? null : 8;
         book.Priority = missing == BookSearchMissingField.Priority ? null : 2;
         book.CurrentChapterNumber = missing == BookSearchMissingField.CurrentChapter ? null : 50;
@@ -722,9 +832,24 @@ public sealed class BookSearchCriteriaApplierTests
             });
         }
 
+        if (missing != BookSearchMissingField.AlternateTitle)
+        {
+            book.Titles.Add(new BookTitle
+            {
+                Title = $"{title} Alternate",
+                NormalizedTitle = MappingExtensions.NormalizeName($"{title} Alternate"),
+                IsPrimary = false,
+                Source = "Test"
+            });
+        }
+
         if (missing != BookSearchMissingField.Cover)
         {
-            book.Cover = new BookCover { Status = BookCoverStatus.Pending };
+            book.Cover = new BookCover
+            {
+                Status = BookCoverStatus.Found,
+                StoragePath = $"{book.Id:N}/cover.jpg"
+            };
         }
 
         if (missing != BookSearchMissingField.Link)

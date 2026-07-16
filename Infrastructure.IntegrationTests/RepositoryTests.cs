@@ -265,10 +265,13 @@ public class RepositoryTests
         var missingRating = AddBookWithMetadata("Missing Rating", BookSearchMissingField.Rating);
         var missingPriority = AddBookWithMetadata("Missing Priority", BookSearchMissingField.Priority);
         var missingAuthor = AddBookWithMetadata("Missing Author", BookSearchMissingField.Author);
+        var missingDescription = AddBookWithMetadata("Missing Description", BookSearchMissingField.Description);
         var missingGenre = AddBookWithMetadata("Missing Genre", BookSearchMissingField.Genre);
         var missingTag = AddBookWithMetadata("Missing Tag", BookSearchMissingField.Tag);
         var missingCurrent = AddBookWithMetadata("Missing Current Chapter", BookSearchMissingField.CurrentChapter);
         var missingTotal = AddBookWithMetadata("Missing Total Chapters", BookSearchMissingField.TotalChapters);
+        var missingAlternateTitle =
+            AddBookWithMetadata("Missing Alternate Title", BookSearchMissingField.AlternateTitle);
         var missingCover = AddBookWithMetadata("Missing Cover", BookSearchMissingField.Cover);
         var missingLink = AddBookWithMetadata("Missing Link", BookSearchMissingField.Link);
         var missingGenreAndTag = AddBookWithMetadata(
@@ -284,11 +287,14 @@ public class RepositoryTests
                  {
                      ("rating:none", new[] { missingRating.Id }), ("priority:NONE", new[] { missingPriority.Id }),
                      ("author:'none'", new[] { missingAuthor.Id }),
+                     ("description:none", new[] { missingDescription.Id }),
                      ("genre:none", new[] { missingGenre.Id, missingGenreAndTag.Id }),
                      ("tag:none", new[] { missingTag.Id, missingGenreAndTag.Id }),
                      ("current:none", new[] { missingCurrent.Id }),
                      ("currentChapter:none", new[] { missingCurrent.Id }),
                      ("progress:none", new[] { missingCurrent.Id }), ("total:none", new[] { missingTotal.Id }),
+                     ("alternateTitle:none", new[] { missingAlternateTitle.Id }),
+                     ("alternativeTitle:none", new[] { missingAlternateTitle.Id }),
                      ("cover:none", new[] { missingCover.Id }), ("link:none", new[] { missingLink.Id }),
                      ("links:none", new[] { missingLink.Id }),
                      ("genre:none tag:none", new[] { missingGenreAndTag.Id })
@@ -320,6 +326,7 @@ public class RepositoryTests
 
             var author = IsMissing(BookSearchMissingField.Author) ? null : TestData.Author($"{title} Author");
             var book = TestData.Book(database.UserId, title, author);
+            book.Description = IsMissing(BookSearchMissingField.Description) ? null : $"{title} description";
             book.Rating = IsMissing(BookSearchMissingField.Rating) ? null : 8;
             book.Priority = IsMissing(BookSearchMissingField.Priority) ? null : 2;
             book.CurrentChapterNumber = IsMissing(BookSearchMissingField.CurrentChapter) ? null : 50;
@@ -335,9 +342,24 @@ public class RepositoryTests
                 book.BookTags.Add(new BookTag { Book = book, Tag = TestData.Tag(database.UserId, $"{title} Tag") });
             }
 
+            if (!IsMissing(BookSearchMissingField.AlternateTitle))
+            {
+                book.Titles.Add(new BookTitle
+                {
+                    Title = $"{title} Alternate",
+                    NormalizedTitle = MappingExtensions.NormalizeName($"{title} Alternate"),
+                    IsPrimary = false,
+                    Source = "Test"
+                });
+            }
+
             if (!IsMissing(BookSearchMissingField.Cover))
             {
-                book.Cover = new BookCover { Status = BookCoverStatus.Pending };
+                book.Cover = new BookCover
+                {
+                    Status = BookCoverStatus.Found,
+                    StoragePath = $"{book.Id:N}/cover.jpg"
+                };
             }
 
             if (!IsMissing(BookSearchMissingField.Link))
