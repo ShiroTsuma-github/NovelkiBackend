@@ -1,6 +1,7 @@
 import { X, ZoomIn } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { BookCoverDto } from '@/api/types'
+import { buttonVariants, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { loadCoverBlobUrl } from './coverCache'
 
 type BookCoverArtworkProps = {
@@ -157,8 +158,8 @@ export function BookCoverArtwork({
   const blobUrl = useResolvedCoverImage(cover, preferredVariant)
   const resolvedImageUrl = imageUrl ?? blobUrl
   const wrapperClassName = [
-    'group relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm',
-    interactive ? 'transition hover:border-slate-300 hover:shadow-md' : '',
+    'book-cover-artwork group relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden',
+    interactive ? 'transition hover:border-slate-300' : '',
     interactive && resolvedImageUrl ? 'cursor-zoom-in' : '',
     interactive && !resolvedImageUrl ? 'cursor-pointer' : '',
     className,
@@ -186,7 +187,7 @@ export function BookCoverArtwork({
         {resolvedImageUrl && onRemove ? (
           <button
             aria-label={removeLabel}
-            className="absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600/90 text-white opacity-0 shadow-lg transition hover:bg-red-700 group-hover:opacity-100"
+            className={`${buttonVariants.destructive} ui-icon-button absolute left-3 top-3 opacity-0 group-hover:opacity-100`}
             type="button"
             onClick={onRemove}
           >
@@ -209,7 +210,7 @@ export function BookCoverArtwork({
             onRemove()
           }}
         >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600/90 text-white opacity-0 shadow-lg transition hover:bg-red-700 group-hover:opacity-100">
+          <span className={`${buttonVariants.destructive} ui-icon-button opacity-0 group-hover:opacity-100`}>
             <X className="h-4 w-4" />
           </span>
         </span>
@@ -221,7 +222,7 @@ export function BookCoverArtwork({
         </span>
       ) : null}
       {resolvedImageUrl && hoverFooter ? (
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/55 to-transparent px-4 pb-3 pt-8 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-slate-950/85 px-4 py-3 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
           {hoverFooter}
         </span>
       ) : null}
@@ -237,6 +238,8 @@ export function CoverLightbox({
   footer,
   onClose,
 }: CoverLightboxProps) {
+  useBodyScrollLock(open)
+
   useEffect(() => {
     if (!open) {
       return
@@ -259,14 +262,14 @@ export function CoverLightbox({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
       role="dialog"
       onClick={onClose}
     >
       <div className="relative max-h-[90vh] w-full max-w-4xl" onClick={(event) => event.stopPropagation()}>
         <button
           aria-label="Close preview"
-          className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-950/80 text-white transition hover:bg-slate-950"
+          className={`${buttonVariants.ghost} ui-icon-button absolute right-3 top-3 z-10`}
           type="button"
           onClick={onClose}
         >
@@ -274,15 +277,15 @@ export function CoverLightbox({
         </button>
         {imageUrl ? (
           <div className="grid gap-3">
-            <img alt={title} className="max-h-[82vh] w-full rounded-3xl bg-white object-contain shadow-2xl" src={imageUrl} />
+            <img alt={title} className="max-h-[82vh] w-full rounded-[var(--qs-dialog-radius)] bg-white object-contain shadow-2xl" src={imageUrl} />
             {footer ? (
-              <div className="rounded-2xl bg-slate-900/85 px-4 py-3 text-sm text-slate-100 shadow-xl">
+              <div className="ui-surface ui-surface--elevated px-4 py-3 text-sm text-slate-100">
                 {footer}
               </div>
             ) : null}
           </div>
         ) : (
-          <div className="grid min-h-[70vh] place-items-center rounded-3xl border border-dashed border-slate-600 bg-slate-900 px-8 text-center text-slate-200 shadow-2xl">
+          <div className="grid min-h-[70vh] place-items-center rounded-[var(--qs-dialog-radius)] border border-dashed border-slate-600 bg-slate-900 px-8 text-center text-slate-200 shadow-2xl">
             <div className="grid gap-2">
               <div className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-500">No Cover</div>
               <div className="text-lg font-medium">{emptyLabel}</div>

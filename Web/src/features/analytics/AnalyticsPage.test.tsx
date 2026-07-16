@@ -64,11 +64,10 @@ describe('AnalyticsPage', () => {
     )
 
     const alert = screen.getByRole('alert')
-    expect(alert).toHaveClass('border-rose-500/40')
-    expect(alert).toHaveClass('bg-rose-950/40')
+    expect(alert).toHaveClass('ui-surface', 'ui-surface--danger')
     expect(alert).not.toHaveClass('bg-rose-50')
-    expect(screen.getByText('Could not load this analytics card.')).toHaveClass('text-rose-100')
-    expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('bg-rose-500/20')
+    expect(screen.getByText('Could not load this analytics card.')).toHaveClass('text-inherit')
+    expect(screen.getByRole('button', { name: 'Retry' })).toHaveClass('ui-button--destructive')
   })
 
   it('extracts date filters from query into analytics range request', async () => {
@@ -138,7 +137,7 @@ describe('AnalyticsPage', () => {
     expect(screen.getByRole('button', { name: 'Beginning' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Last 2 years' })).toBeInTheDocument()
     expect(lastMonth.compareDocumentPosition(screen.getAllByRole('grid')[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Last 3 months' })).toHaveClass('border-slate-700')
+    expect(screen.getByRole('button', { name: 'Last 3 months' })).toHaveClass('ui-filter-chip')
 
     await user.click(lastMonth)
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
@@ -167,15 +166,18 @@ describe('AnalyticsPage', () => {
     const pendingButton = screen.getByRole('button', { name: new RegExp(`date range: ${format(start, 'MMM d, yyyy')}`, 'i') })
     expect(pendingButton).toHaveAttribute('title', format(start, 'MMM d, yyyy'))
     expect(pendingButton).not.toHaveTextContent('Today')
-    expect(getDayCell(startDay)).toHaveClass('rounded-l-full')
+    expect(startDay).toHaveClass('analytics-calendar-day-button')
+    expect(getDayCell(startDay)).toHaveClass('analytics-calendar-day--range-start', 'rounded-l-full')
     expect(getDayCell(startDay)).not.toHaveClass('rounded-r-full')
 
     const endDay = screen.getByRole('button', { name: dayButtonMatcher(end) })
     await user.click(endDay)
     await user.click(screen.getByRole('button', { name: /date range/i }))
     const appliedEndCell = getDayCell(screen.getByRole('button', { name: dayButtonMatcher(end) }))
-    expect(appliedEndCell).toHaveClass('rounded-r-full')
+    expect(appliedEndCell).toHaveClass('analytics-calendar-day--range-end', 'rounded-r-full')
     expect(appliedEndCell).not.toHaveClass('rounded-l-full')
+    expect(getDayCell(screen.getByRole('button', { name: dayButtonMatcher(addDays(start, 1)) })))
+      .toHaveClass('analytics-calendar-day--range-middle')
     await user.click(screen.getByRole('button', { name: /date range/i }))
     await user.click(screen.getByRole('button', { name: /apply filters/i }))
 
@@ -621,9 +623,10 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByTestId('priority-heatmap')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for priority by status/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Plan to Read' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22')
+    expect(screen.getByRole('columnheader', { name: 'Unset' })).toHaveClass('analytics-priority-heading')
     const unsetLink = screen.getByRole('link', { name: '3' })
     expect(unsetLink).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22%20priority%3Anone')
-    expect(unsetLink).toHaveClass('text-inherit')
+    expect(unsetLink).toHaveClass('analytics-heat-value')
     expect(screen.getByText('75%')).toHaveClass('text-current/85')
   })
 
@@ -822,6 +825,8 @@ describe('AnalyticsPage', () => {
       quality: {
         fieldCompleteness: [
           { field: 'author', bookCount: 10, shareOfBooks: 100 },
+          { field: 'description', bookCount: 0, shareOfBooks: 0 },
+          { field: 'alternateTitle', bookCount: 0, shareOfBooks: 0 },
           { field: 'usableCover', bookCount: 0, shareOfBooks: 0 },
         ],
         linkSources: [
@@ -848,18 +853,65 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByText(/Cleanup queue/i)).toBeInTheDocument()
     expect(screen.getByText(/Usable covers are counted only/i)).toBeInTheDocument()
-    expect(screen.getByText(/Missing: 10 books/i)).toBeInTheDocument()
+    expect(screen.getByTitle('Open books filtered by cover:none')).toBeInTheDocument()
     expect(screen.getByText(/Unknown status bucket: 2 books/i)).toBeInTheDocument()
     expect(screen.getByText(/Very Long Source Name/i)).toBeInTheDocument()
 
     const analyticsLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
-    expect(analyticsLinks.some((link) => link.href.includes('cover%3Anone'))).toBe(false)
+    expect(analyticsLinks.some((link) => link.href.includes('description%3Anone'))).toBe(true)
+    expect(analyticsLinks.some((link) => link.href.includes('alternateTitle%3Anone'))).toBe(true)
+    expect(analyticsLinks.some((link) => link.href.includes('cover%3Anone'))).toBe(true)
     expect(analyticsLinks.some((link) => link.href.includes('coverStatus'))).toBe(false)
     expect(analyticsLinks.some((link) => link.href.includes('coverSource'))).toBe(false)
 
     await user.click(screen.getByRole('button', { name: /view data for link sources/i }))
     expect(screen.getByRole('cell', { name: '99' })).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: '4' })).toBeInTheDocument()
+  })
+
+  it('links every searchable metadata completeness field to its missing-value filter', async () => {
+    vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
+      totalBooks: 10,
+      quality: {
+        fieldCompleteness: [
+          { field: 'author', bookCount: 0, shareOfBooks: 0 },
+          { field: 'description', bookCount: 0, shareOfBooks: 0 },
+          { field: 'genre', bookCount: 0, shareOfBooks: 0 },
+          { field: 'tag', bookCount: 0, shareOfBooks: 0 },
+          { field: 'rating', bookCount: 0, shareOfBooks: 0 },
+          { field: 'priority', bookCount: 0, shareOfBooks: 0 },
+          { field: 'totalChapters', bookCount: 0, shareOfBooks: 0 },
+          { field: 'link', bookCount: 0, shareOfBooks: 0 },
+          { field: 'alternateTitle', bookCount: 0, shareOfBooks: 0 },
+          { field: 'usableCover', bookCount: 0, shareOfBooks: 0 },
+        ],
+        linkSources: [],
+        coverStatuses: [],
+        coverSources: [],
+      },
+    }))
+
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+    await screen.findByText(/Cleanup queue/i)
+
+    for (const query of [
+      'author:none',
+      'description:none',
+      'genre:none',
+      'tag:none',
+      'rating:none',
+      'priority:none',
+      'total:none',
+      'link:none',
+      'alternateTitle:none',
+      'cover:none',
+    ]) {
+      const expectedHref = `/books?query=${encodeURIComponent(query)}`
+      expect(
+        screen.getAllByTitle(`Open books filtered by ${query}`)
+          .some((link) => link.getAttribute('href') === expectedHref),
+      ).toBe(true)
+    }
   })
 
   it('keeps analytics type labels readable against their calculated background', async () => {

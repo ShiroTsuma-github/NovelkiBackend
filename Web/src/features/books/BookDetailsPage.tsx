@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { BookDto, BookLinkDto, BookProgressHistoryDto } from '@/api/types'
 import { HttpError } from '@/api/http'
+import { Badge, buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { ProgressDialog } from './ProgressDialog'
@@ -79,11 +80,11 @@ export function BookDetailsPage() {
   }, [book?.description, descriptionExpanded])
 
   if (bookQuery.isLoading) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Loading...</div>
+    return <Surface className="p-6 text-slate-500" tone="muted">Loading...</Surface>
   }
 
   if (!book) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Book not found.</div>
+    return <Surface className="p-6 text-slate-500" tone="muted">Book not found.</Surface>
   }
 
   const genreDescriptions = new Map(
@@ -125,7 +126,7 @@ export function BookDetailsPage() {
               Edit
             </Link>
             <button
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+              className={buttonVariants.destructive}
               disabled={deleteMutation.isPending}
               type="button"
               onClick={() => setDeleteConfirmOpen(true)}
@@ -136,7 +137,7 @@ export function BookDetailsPage() {
           </div>
         </div>
 
-        <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <Surface className="p-5">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
               <div className="flex-none lg:w-[320px]">
@@ -178,7 +179,7 @@ export function BookDetailsPage() {
                         <span className="text-lg font-semibold normal-case tracking-normal text-slate-950">{book.author ?? 'unknown'}</span>
                       </p>
                     </div>
-                    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <Surface as="div" className="grid gap-4 p-4" tone="muted">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="mb-2 flex items-center justify-between gap-3">
@@ -202,7 +203,7 @@ export function BookDetailsPage() {
                           <Pills values={book.tags} empty="No tags." />
                         </div>
                       </div>
-                    </div>
+                    </Surface>
                     <div className="grid gap-2">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</div>
                       {book.description ? (
@@ -210,7 +211,7 @@ export function BookDetailsPage() {
                           <p className="max-w-4xl text-sm leading-6 text-slate-600" ref={descriptionRef} style={descriptionStyle}>{book.description}</p>
                           {descriptionOverflowing ? (
                             <button
-                              className="w-fit text-sm font-semibold text-cyan-700 hover:text-cyan-900"
+                              className="ui-inline-link w-fit text-sm"
                               type="button"
                               onClick={() => setDescriptionExpanded(!descriptionExpanded)}
                             >
@@ -227,7 +228,7 @@ export function BookDetailsPage() {
               </div>
             </div>
           </div>
-        </section>
+        </Surface>
 
         <section className="grid gap-4 md:grid-cols-2">
           <Panel title="Links">
@@ -253,7 +254,7 @@ export function BookDetailsPage() {
         <Panel title="Changelog">
           <div className="grid gap-3">
             {progressHistory.length ? progressHistory.map((entry) => (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" key={entry.id}>
+              <Surface as="div" className="px-4 py-3" key={entry.id} tone="muted">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-sm font-semibold text-slate-950">
@@ -278,7 +279,7 @@ export function BookDetailsPage() {
                   ) : null}
                   {entry.comment ? <p className="whitespace-pre-line">{entry.comment}</p> : null}
                 </div>
-              </div>
+              </Surface>
             )) : (
               <p className="text-sm text-slate-500">No changelog yet.</p>
             )}
@@ -334,9 +335,9 @@ function ProgressBar({ book }: { book: BookDto }) {
 
   return (
     <div className="grid gap-2">
-      <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+      <div className="ui-progress-track">
         <div
-          className="h-full rounded-full bg-cyan-500 transition-[width]"
+          className="ui-progress-fill transition-[width]"
           style={{ width: percent == null ? '0%' : `${percent}%` }}
         />
       </div>
@@ -368,22 +369,22 @@ function RatingSummary({ rating }: { rating?: number | null }) {
 
 function StatusPill({ status }: { status: string }) {
   const normalized = status.trim().toLowerCase()
-  const className = normalized === 'reading'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  const tone = normalized === 'reading'
+    ? 'success'
     : normalized === 'completed'
-      ? 'border-cyan-200 bg-cyan-50 text-cyan-700'
-      : normalized === 'plan to read'
-        ? 'border-amber-200 bg-amber-50 text-amber-700'
-        : normalized === 'on hold'
-          ? 'border-orange-200 bg-orange-50 text-orange-700'
-          : normalized === 'dropped'
-            ? 'border-rose-200 bg-rose-50 text-rose-700'
-            : 'border-slate-200 bg-slate-100 text-slate-700'
+      ? 'accent'
+    : normalized === 'plan to read'
+        ? 'warning'
+      : normalized === 'on hold'
+          ? 'warning'
+        : normalized === 'dropped'
+            ? 'danger'
+            : 'neutral'
 
   return (
-    <span className={`inline-flex min-h-10 items-center self-center rounded-full border px-4 py-1.5 text-sm font-semibold uppercase tracking-wide ${className}`}>
+    <Badge className="min-h-10 self-center px-4 py-1.5 text-sm uppercase tracking-wide" tone={tone}>
       {status}
-    </span>
+    </Badge>
   )
 }
 
@@ -424,10 +425,10 @@ function getBookLinkLabel(link: BookLinkDto) {
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <Surface className="p-5">
       <h2 className="mb-3 text-base font-semibold text-slate-950">{title}</h2>
       {children}
-    </section>
+    </Surface>
   )
 }
 
@@ -444,6 +445,8 @@ function DeleteBookDialog({
   onCancel: () => void
   onConfirm: () => void
 }) {
+  useBodyScrollLock(open)
+
   if (!open) {
     return null
   }
@@ -451,11 +454,11 @@ function DeleteBookDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
       role="dialog"
       onClick={pending ? undefined : onCancel}
     >
-      <div className="grid w-full max-w-md gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <DialogPanel className="grid max-w-md gap-5 p-6" onClick={(event) => event.stopPropagation()}>
         <div className="grid gap-2">
           <h2 className="text-lg font-semibold text-slate-950">Delete book</h2>
           <p className="text-sm leading-6 text-slate-600">
@@ -467,7 +470,7 @@ function DeleteBookDialog({
             Cancel
           </button>
           <button
-            className="inline-flex min-h-10 items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+            className={buttonVariants.destructive}
             disabled={pending}
             type="button"
             onClick={onConfirm}
@@ -475,7 +478,7 @@ function DeleteBookDialog({
             {pending ? 'Deleting...' : 'Delete'}
           </button>
         </div>
-      </div>
+      </DialogPanel>
     </div>
   )
 }
@@ -506,7 +509,7 @@ function GenrePills({ values, descriptions }: { values: string[]; descriptions: 
           <span className="group relative" key={value}>
             <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{value}</span>
             {description ? (
-              <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 rounded-lg bg-slate-950 px-3 py-2 text-xs font-normal leading-5 text-white shadow-xl group-hover:block">
+              <span className="ui-chart-tooltip pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 text-xs font-normal leading-5 group-hover:block">
                 {description}
               </span>
             ) : null}

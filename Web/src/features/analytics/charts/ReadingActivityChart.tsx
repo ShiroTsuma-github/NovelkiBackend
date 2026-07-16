@@ -1,5 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsActivityPointDto, BookAnalyticsDto } from '@/api/types'
+import { Surface } from '@/components/app/DesignSystem'
 import { analyticsTooltipProps, dateRangeForBucket, formatCount, formatDateRange } from './chartUtils'
 
 type ReadingActivityChartProps = {
@@ -29,14 +30,14 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
               formatter={(value, name) => [`${formatCount(Number(value))}`, activityLabel(name)]}
               labelFormatter={(label) => `Bucket ${label}`}
             />
-            <Line dataKey="progressEvents" name="progressEvents" stroke="#0891b2" strokeWidth={2} dot={{ r: 3 }} />
-            <Line dataKey="booksTouched" name="booksTouched" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
+            <Line dataKey="progressEvents" name="progressEvents" stroke="#8b92d8" strokeWidth={2} dot={{ r: 3 }} />
+            <Line dataKey="booksTouched" name="booksTouched" stroke="#75b69c" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
       <div className="grid gap-2">
         {newestDisplayPoints.map((point) => (
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={point.label}>
+          <Surface as="div" className="px-3 py-2 text-sm" key={point.label}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-semibold text-slate-950">{point.label}</span>
               <span className="text-slate-700">
@@ -44,7 +45,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
               </span>
             </div>
             <div className="mt-1 text-slate-600">Chapters advanced: {formatCount(point.chaptersAdvanced)}</div>
-          </div>
+          </Surface>
         ))}
       </div>
     </div>

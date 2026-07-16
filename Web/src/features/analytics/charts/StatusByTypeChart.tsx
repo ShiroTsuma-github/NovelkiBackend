@@ -1,5 +1,6 @@
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto } from '@/api/types'
+import { Surface } from '@/components/app/DesignSystem'
 import { analyticsTooltipProps, chartColors, DrilldownLink, fieldQuery, formatCount, formatPercent, getActiveChartLabel, normalizedPercent, percent, useBooksDrilldown } from './chartUtils'
 
 type StatusByTypeChartProps = {
@@ -98,10 +99,10 @@ export function StatusByTypeChart({ data }: StatusByTypeChartProps) {
       </div>
       <div className="grid gap-2">
         {items.map((item) => (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.type}>
+          <Surface as="div" className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm" key={item.type}>
             <span className="font-semibold text-slate-950">{item.type}</span>
             <span className="text-slate-500">{formatCount(item.totalBooks)} books</span>
-          </div>
+          </Surface>
         ))}
       </div>
     </div>
@@ -116,7 +117,7 @@ function StatusByTypeTooltip({ active, label, payload }: StatusByTypeTooltipProp
   }
 
   return (
-    <div className="min-w-56 max-w-80 rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-200 shadow-xl">
+    <div className="ui-chart-tooltip">
       <p className="font-bold text-slate-50">{String(label)}</p>
       <div className="mt-2 grid gap-1.5">
         {rows.map((row) => (
@@ -192,7 +193,7 @@ export function statusByTypeTooltipRows(payload: readonly StatusByTypeTooltipEnt
       const percentValue = entry.payload?.[`${status}Percent`] ?? entry.value
 
       return {
-        color: entry.color ?? '#94a3b8',
+        color: entry.color ?? '#9aa5b4',
         count,
         percent: finiteNumber(percentValue),
         status,

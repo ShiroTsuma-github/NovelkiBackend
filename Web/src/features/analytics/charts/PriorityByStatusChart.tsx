@@ -18,9 +18,11 @@ export function PriorityByStatusChart({ data }: PriorityByStatusChartProps) {
       <table className="min-w-full border-separate border-spacing-2 text-sm" data-testid="priority-heatmap">
         <thead>
           <tr>
-            <th className="px-2 py-1 text-left text-slate-500" scope="col">Status</th>
+            <th className="analytics-priority-heading px-2 py-1 text-left" scope="col">Status</th>
             {priorities.map((priority) => (
-              <th className="px-2 py-1 text-center text-slate-500" key={priority} scope="col">{priority}</th>
+              <th className="analytics-priority-heading px-2 py-1 text-center" key={priority} scope="col">
+                {priority}
+              </th>
             ))}
           </tr>
         </thead>
@@ -34,9 +36,9 @@ export function PriorityByStatusChart({ data }: PriorityByStatusChartProps) {
                 const count = row.priorities.find((item) => item.priority === priority)?.bookCount ?? 0
                 const share = percent(count, row.totalBooks)
                 return (
-                  <td className={`rounded-lg px-3 py-3 text-center font-semibold ${getHeatClass(share)}`} key={`${row.status}-${priority}`}>
+                  <td className={`px-3 py-3 text-center font-semibold ${getHeatClass(share)}`} key={`${row.status}-${priority}`}>
                     <DrilldownLink
-                      className="text-inherit decoration-current/70 hover:text-inherit hover:decoration-current"
+                      className="analytics-heat-value decoration-current/70 hover:decoration-current"
                       query={`${fieldQuery('status', row.status)} ${priority.toLowerCase() === 'unset' ? noneQuery('priority') : `priority:${priority}`}`}
                     >
                       {formatCount(count)}
@@ -66,14 +68,14 @@ export function priorityRows(data?: BookAnalyticsDto) {
 
 function getHeatClass(share: number) {
   if (share >= 66) {
-    return 'bg-cyan-500 text-slate-950'
+    return 'analytics-heat analytics-heat--high'
   }
   if (share >= 33) {
-    return 'bg-blue-600 text-white'
+    return 'analytics-heat analytics-heat--medium'
   }
   if (share > 0) {
-    return 'bg-slate-100 text-slate-950'
+    return 'analytics-heat analytics-heat--low'
   }
 
-  return 'bg-white text-slate-500'
+  return 'analytics-heat analytics-heat--empty'
 }
