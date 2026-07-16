@@ -88,6 +88,22 @@ test('books table layout has no horizontal overflow and keeps controls in viewpo
   await expectNoHorizontalOverflow(page)
 })
 
+test('books table hover highlight reaches the sticky actions cell', async ({ page }) => {
+  await page.goto('/books')
+  await expect(page.getByRole('table')).toBeVisible()
+
+  await page.getByTestId('book-table-row-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa').hover()
+
+  const titleBackground = await backgroundColor(page.getByTestId('book-table-cell-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa-title'))
+  const actionsBackground = await backgroundColor(page.getByTestId('book-table-actions-cell-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'))
+  const alternativeBadgeBackground = await backgroundColor(page.getByLabel('1 alternative titles'))
+
+  expect(actionsBackground).toBe(titleBackground)
+  expect(actionsBackground).toBe('rgb(30, 41, 59)')
+  expect(alternativeBadgeBackground).toBe('rgb(71, 85, 105)')
+  expect(alternativeBadgeBackground).not.toBe(titleBackground)
+})
+
 test('cards layout constrains long titles and shows active toggle styles', async ({ page }) => {
   await page.goto('/books')
   await page.getByRole('button', { name: /cards/i }).click()
@@ -274,6 +290,10 @@ async function expectNoVerticalDocumentOverflow(page: Page) {
     return root.scrollHeight > root.clientHeight + 1 || body.scrollHeight > body.clientHeight + 1
   })
   expect(hasOverflow).toBe(false)
+}
+
+async function backgroundColor(locator: Locator) {
+  return locator.evaluate((element) => getComputedStyle(element).backgroundColor)
 }
 
 async function expectInViewport(locator: Locator) {
