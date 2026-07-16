@@ -25,8 +25,8 @@ export function LinkSourcesChart({ data }: LinkSourcesChartProps) {
               {formatCount(item.linkCount)} links · {formatCount(item.bookCount)} books · {formatPercent(item.shareOfBooks)}
             </span>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-slate-100" aria-label={`${item.source || 'Unknown source'} link coverage ${formatPercent(item.shareOfBooks)}`}>
-            <div className="h-full rounded-full bg-violet-600" style={{ width: `${Math.min(100, Math.max(0, item.shareOfBooks))}%` }} />
+          <div className="ui-progress-track" aria-label={`${item.source || 'Unknown source'} link coverage ${formatPercent(item.shareOfBooks)}`}>
+            <div className="ui-progress-fill" style={{ width: `${Math.min(100, Math.max(0, item.shareOfBooks))}%` }} />
           </div>
         </div>
       ))}

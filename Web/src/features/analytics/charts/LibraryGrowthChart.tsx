@@ -1,5 +1,6 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto, BookAnalyticsLibraryGrowthPointDto } from '@/api/types'
+import { Surface } from '@/components/app/DesignSystem'
 import { analyticsTooltipProps, dateRangeForBucket, DrilldownLink, fieldQuery, formatCount, formatDateRange } from './chartUtils'
 
 type LibraryGrowthChartProps = {
@@ -40,14 +41,14 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
               formatter={(value, name) => [`${formatCount(Number(value))}`, growthLabel(name)]}
               labelFormatter={(label) => `Bucket ${label}`}
             />
-            <Line dataKey="cumulativeBooks" name="cumulativeBooks" stroke="#0891b2" strokeWidth={2} dot={{ r: 3 }} />
-            <Line dataKey="booksAdded" name="booksAdded" stroke="#ea580c" strokeWidth={2} dot={{ r: 3 }} />
+            <Line dataKey="cumulativeBooks" name="cumulativeBooks" stroke="#8b92d8" strokeWidth={2} dot={{ r: 3 }} />
+            <Line dataKey="booksAdded" name="booksAdded" stroke="#d1aa6e" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
       <div className="grid gap-2">
         {newestDisplayPoints.map((point) => (
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={point.label}>
+          <Surface as="div" className="px-3 py-2 text-sm" key={point.label}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-semibold text-slate-950">{point.label}</span>
               <span className="text-slate-700">
@@ -57,7 +58,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
             <div className="mt-1 flex flex-wrap gap-2 text-slate-600">
               {typeSummary(point)}
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
     </div>

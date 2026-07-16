@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { BookCoverDto, BookMutationRequest } from '@/api/types'
-import { DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
+import { buttonVariants, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
@@ -331,7 +331,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
         : [{ text: 'Status: Missing' }]
 
   if (isLoadingDictionaries || isLoadingBook) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Loading form...</div>
+    return <Surface className="p-6 text-slate-500" tone="muted">Loading form...</Surface>
   }
 
   return (
@@ -394,7 +394,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                     toast.success('Cover will be removed after saving the book.')
                   }}
                 />
-                <div className="mt-2 grid content-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                <Surface as="div" className="mt-2 grid content-start gap-2 p-4 text-sm text-slate-600" tone="muted">
                   {coverInfo.map((item) => (
                     <p
                       className={`${item.text === effectiveCurrentCover?.failureReason ? 'text-red-600' : ''} ${item.truncate ? 'truncate' : ''}`}
@@ -407,7 +407,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                   <p className="text-xs text-slate-500">
                     Cover source URLs are appended to book links automatically.
                   </p>
-                </div>
+                </Surface>
               </div>
 
               <div className="min-w-0 flex-1">
@@ -432,7 +432,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                           onFocus={() => setAuthorSuggestionsOpen(true)}
                         />
                         {authorSuggestionsOpen && authorName.trim().length >= 2 ? (
-                          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
+                          <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto">
                             {authorSuggestionsQuery.isLoading ? (
                               <div className="px-3 py-2 text-sm text-slate-400">Searching authors...</div>
                             ) : null}
@@ -736,9 +736,9 @@ function ChipBox({
 
   return (
     <div className="relative">
-      <div className="flex min-h-12 flex-wrap items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 focus-within:border-slate-500">
+      <div className="ui-control flex min-h-12 flex-wrap items-center gap-2 py-2 focus-within:border-[var(--qs-accent)]">
         {selected.map((item) => (
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-500 bg-slate-900 px-2.5 py-1 text-xs text-white shadow-sm" key={item.key}>
+          <span className="ui-badge inline-flex items-center gap-1" key={item.key}>
             {item.label}
             <button
               aria-label={`Remove ${item.label}`}
@@ -767,7 +767,7 @@ function ChipBox({
         />
       </div>
       {trimmed ? (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
+        <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto">
           {suggestions.map((item) => (
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
@@ -782,7 +782,7 @@ function ChipBox({
           ))}
           {canCreate ? (
             <button
-              className="w-full px-3 py-2 text-left text-sm text-cyan-100 hover:bg-slate-800"
+              className="w-full px-3 py-2 text-left text-sm text-[var(--qs-accent-strong)] hover:bg-slate-800"
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onCreate?.(trimmed)}
@@ -840,7 +840,7 @@ function CoverSourceDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
       role="dialog"
       onClick={onClose}
     >
@@ -850,15 +850,15 @@ function CoverSourceDialog({
             <h2 className="text-lg font-semibold text-white">Add cover</h2>
             <p className="text-sm text-slate-400">{introText}</p>
           </div>
-          <button className="min-h-11 min-w-11 rounded-md border border-slate-700 p-2 text-slate-300 hover:bg-slate-900" type="button" onClick={onClose}>
+          <button aria-label="Close cover dialog" className={`${buttonVariants.ghost} ui-icon-button`} type="button" onClick={onClose}>
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {view === 'choice' ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-2 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-cyan-400 hover:bg-slate-900/80">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/15 text-cyan-300">
+            <label className="ui-choice-card">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--qs-control-radius)] bg-[#262b4e] text-[var(--qs-accent-strong)]">
                 <Upload className="h-4 w-4" />
               </div>
               <div className="text-base font-semibold">Upload image</div>
@@ -878,11 +878,11 @@ function CoverSourceDialog({
               />
             </label>
             <button
-              className="grid gap-2 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-cyan-400 hover:bg-slate-900/80"
+              className="ui-choice-card"
               type="button"
               onClick={onOpenUrl}
             >
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/15 text-cyan-300">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--qs-control-radius)] bg-[#262b4e] text-[var(--qs-accent-strong)]">
                 <Link2 className="h-4 w-4" />
               </div>
               <div className="text-base font-semibold">Paste image URL</div>

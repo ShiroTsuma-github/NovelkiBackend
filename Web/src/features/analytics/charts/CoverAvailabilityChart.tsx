@@ -1,4 +1,5 @@
 import type { BookAnalyticsDto } from '@/api/types'
+import { Surface } from '@/components/app/DesignSystem'
 import { formatCount, formatPercent } from './chartUtils'
 
 type CoverAvailabilityChartProps = {
@@ -21,7 +22,7 @@ export function CoverAvailabilityChart({ data }: CoverAvailabilityChartProps) {
       <div className="grid gap-2">
         <h3 className="text-sm font-semibold text-slate-950">Cover status actions</h3>
         {statuses.map((item) => (
-          <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" key={item.status}>
+          <Surface as="div" className="px-3 py-2 text-sm" key={item.status}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <span className="font-semibold text-slate-950">{item.status || 'Unknown status'}</span>
               <span className="text-slate-700">{formatCount(item.bookCount)} books · {formatPercent(item.shareOfBooks)}</span>
@@ -29,7 +30,7 @@ export function CoverAvailabilityChart({ data }: CoverAvailabilityChartProps) {
             <div className="mt-1 text-slate-600">
               {coverStatusAction(item.status, item.bookCount)}
             </div>
-          </div>
+          </Surface>
         ))}
       </div>
       <div className="grid gap-2">

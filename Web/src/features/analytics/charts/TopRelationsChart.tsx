@@ -31,8 +31,8 @@ export function TopRelationsChart({ field, items, title }: TopRelationsChartProp
             )}
             <span className="text-slate-500">{formatCount(item.bookCount)} books · {formatPercent(item.shareOfBooks)}</span>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-slate-100">
-            <div className="h-full rounded-full bg-cyan-500" style={{ width: `${Math.min(100, item.shareOfBooks)}%` }} />
+          <div className="ui-progress-track">
+            <div className="ui-progress-fill" style={{ width: `${Math.min(100, item.shareOfBooks)}%` }} />
           </div>
         </div>
       ))}

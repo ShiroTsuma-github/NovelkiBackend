@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
+import { Surface } from '@/components/app/DesignSystem'
 import { buttonClass, inputClass } from '@/components/app/FormField'
 import { useAuth } from './AuthProvider'
 
@@ -43,7 +44,7 @@ export function LoginPage() {
       </form>
       <p className="mt-4 text-sm text-slate-500">
         Do not have an account?{' '}
-        <Link className="font-semibold text-slate-950 underline" to="/register">
+        <Link className="ui-inline-link" to="/register">
           Register
         </Link>
       </p>
@@ -59,19 +60,20 @@ type AuthFrameProps = {
 
 export function AuthFrame({ title, description, children }: AuthFrameProps) {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-10">
-      <section className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+    <main className="auth-frame">
+      <Surface className="auth-panel">
         <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-950 text-white">
+          <div className="auth-brand-mark">
             <BookOpen className="h-5 w-5" />
           </div>
           <div>
+            <div className="ui-eyebrow">Personal library</div>
             <h1 className="text-xl font-semibold text-slate-950">{title}</h1>
-            <p className="text-sm text-slate-500">{description}</p>
+            <p className="ui-panel-description">{description}</p>
           </div>
         </div>
         {children}
-      </section>
+      </Surface>
     </main>
   )
 }

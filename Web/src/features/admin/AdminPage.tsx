@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { AdminBookListItemDto, DictionaryMutationRequest } from '@/api/types'
 import { HttpError } from '@/api/http'
-import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { buttonVariants, PageHeader, Surface } from '@/components/app/DesignSystem'
+import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookDataTable } from '@/features/books/BookDataTable'
 import {
   ColumnSettingsPopup,
@@ -108,14 +109,15 @@ export function AdminPage() {
 
   return (
     <div className="grid gap-5">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-950">Admin panel</h1>
-        <p className="text-sm text-slate-500">Global dictionaries and books from all users.</p>
-      </div>
+      <PageHeader
+        description="Global dictionaries and books from all users."
+        eyebrow="System workspace"
+        title="Admin panel"
+      />
 
-      <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Add dictionary item</h2>
-        <p className="text-sm text-slate-500">The description is shown as help when users choose a type, status, or genre.</p>
+      <Surface className="grid gap-4 p-5">
+        <h2 className="ui-panel-title">Add dictionary item</h2>
+        <p className="ui-panel-description">The description is shown as help when users choose a type, status, or genre.</p>
         <div className="grid gap-4 lg:grid-cols-3">
           <DictionaryCreateForm
             label="Status"
@@ -133,11 +135,11 @@ export function AdminPage() {
             queryKeys={['genres']}
           />
         </div>
-      </section>
+      </Surface>
 
-      <section className="grid gap-4 rounded-lg border border-red-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-950">Purge user library</h2>
-        <p className="text-sm text-slate-500">Deletes all books for the given owner id, then removes orphaned authors and that user&apos;s orphaned tags.</p>
+      <Surface className="grid gap-4 p-5" tone="danger">
+        <h2 className="ui-panel-title text-inherit">Purge user library</h2>
+        <p className="text-sm text-inherit opacity-80">Deletes all books for the given owner id, then removes orphaned authors and that user&apos;s orphaned tags.</p>
         <div className="flex flex-wrap gap-2">
           <input
             className={`${inputClass} min-w-80`}
@@ -146,7 +148,7 @@ export function AdminPage() {
             onChange={(event) => setOwnerIdToPurge(event.target.value)}
           />
           <button
-            className="inline-flex min-h-10 items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+            className={buttonVariants.destructive}
             disabled={purgeMutation.isPending || !ownerIdToPurge.trim()}
             type="button"
             onClick={() => {
@@ -161,11 +163,11 @@ export function AdminPage() {
             {purgeMutation.isPending ? 'Purging...' : 'Delete all by owner id'}
           </button>
         </div>
-      </section>
+      </Surface>
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <Surface className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {adminBooksQuery.isFetching && !adminBooksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
@@ -200,7 +202,7 @@ export function AdminPage() {
           visiblePages={pagination.visiblePages}
           onGoToPage={pagination.onGoToPage}
         />
-      </section>
+      </Surface>
       <ScrollShortcutButtons
         showBackToTop={scrollShortcuts.showBackToTop}
         showGoDown={scrollShortcuts.showGoDown}
@@ -249,7 +251,7 @@ function DictionaryCreateForm({
       <div className="text-sm font-semibold text-slate-700">{label}</div>
       <input className={inputClass} placeholder="Name" required value={name} onChange={(event) => setName(event.target.value)} />
       <input className={inputClass} placeholder="Help description" value={description} onChange={(event) => setDescription(event.target.value)} />
-      <button className={buttonClass} disabled={mutation.isPending || !name.trim()} type="submit">
+      <button className={buttonVariants.primary} disabled={mutation.isPending || !name.trim()} type="submit">
         <Plus className="h-4 w-4" />
         Add
       </button>

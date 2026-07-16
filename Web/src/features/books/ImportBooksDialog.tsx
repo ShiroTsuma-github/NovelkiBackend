@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { BookImportFinalizeResult, BookImportRowDto, BookImportRowUpdateRequest, BookImportSessionDto } from '@/api/types'
-import { DialogPanel, useBodyScrollLock } from '@/components/app/DesignSystem'
+import { buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { formatProgress } from './bookProgress'
 
@@ -202,7 +202,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/70 p-1 backdrop-blur-sm sm:p-2"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/80 p-1 sm:p-2"
       role="dialog"
       onClick={handleDismiss}
     >
@@ -224,7 +224,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               <Download className="h-4 w-4" />
               {templateMutation.isPending ? 'Downloading...' : 'Download template'}
             </button>
-            <button className="min-h-11 min-w-11 rounded-md border border-slate-700 p-2 text-slate-400 hover:bg-slate-900 hover:text-slate-100" type="button" onClick={handleDismiss}>
+            <button aria-label="Close import dialog" className={`${buttonVariants.ghost} ui-icon-button`} type="button" onClick={handleDismiss}>
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -236,7 +236,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
           <ImportFinalizeSuccess result={finalizeResult} onClose={onClose} />
         ) : !session ? (
           <div
-            className={`grid gap-4 rounded-2xl border border-dashed p-8 text-center transition ${dropzoneActive ? 'border-cyan-400 bg-slate-900/80' : 'border-slate-700 bg-slate-900'}`}
+            className={`import-dropzone grid gap-4 border border-dashed p-8 text-center transition ${dropzoneActive ? 'import-dropzone--active' : ''}`}
             onDragEnter={(event) => {
               event.preventDefault()
               setDropzoneActive(true)
@@ -281,20 +281,20 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               <SummaryCard label="Negative" value={formatImportCount(importStats.invalidRowsCount)} tone={importStats.invalidRowsCount ? 'warn' : 'ok'} />
             </div>
 
-            <div className="grid gap-1 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
+            <Surface as="div" className="grid gap-1 px-3 py-2" tone="elevated">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-slate-100">Progress</div>
                 <div className="text-sm text-slate-300">{formatImportCount(importStats.validRows)} / {formatImportCount(importStats.totalRows)} valid</div>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+              <div className="ui-progress-track h-2">
                 <div
-                  className="h-full rounded-full bg-emerald-500 transition-[width]"
+                  className="h-full rounded-full bg-[var(--qs-success)] transition-[width]"
                   style={{ width: `${importStats.progressPercent}%` }}
                 />
               </div>
-            </div>
+            </Surface>
 
-            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-2" data-testid="import-invalid-rows-panel">
+            <Surface as="div" className="min-h-0 flex-1 overflow-hidden p-2" data-testid="import-invalid-rows-panel" tone="elevated">
               {invalidRows.length ? (
                 <div className="grid h-full min-h-0 gap-3">
                   <Virtuoso
@@ -325,13 +325,13 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                   />
                 </div>
               ) : (
-                <div className="grid place-items-center gap-2 rounded-2xl border border-emerald-900/60 bg-emerald-950/40 px-4 py-10 text-center text-emerald-200">
+                <Surface as="div" className="grid place-items-center gap-2 px-4 py-10 text-center" tone="success">
                   <Save className="h-6 w-6" />
                   <div className="text-base font-semibold">All rows are valid</div>
                   <div className="text-sm">You can finalize the import now. Books will be added only after final save.</div>
-                </div>
+                </Surface>
               )}
-            </div>
+            </Surface>
 
             <div className="flex flex-wrap justify-end gap-2">
               <button className={secondaryButtonClass} disabled={finalizeMutation.isPending} type="button" onClick={handleDismiss}>
@@ -339,7 +339,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               </button>
               {invalidRows.length ? (
                 <button
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+                  className={buttonVariants.destructive}
                   disabled={deleteInvalidRowsMutation.isPending || finalizeMutation.isPending}
                   type="button"
                   onClick={() => deleteInvalidRowsMutation.mutate(session.sessionId)}
@@ -380,19 +380,19 @@ function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalize
       </div>
 
       {result.errors.length ? (
-        <div className="grid gap-2 rounded-2xl border border-amber-900/60 bg-amber-950/40 p-4 text-sm text-amber-100">
+        <Surface as="div" className="grid gap-2 p-4 text-sm" tone="warning">
           <div className="font-semibold">Partial import messages</div>
           {result.errors.map((error) => <p key={error}>{error}</p>)}
-        </div>
+        </Surface>
       ) : null}
 
-      <div className="grid gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+      <Surface as="div" className="grid gap-3 p-4" tone="elevated">
         <div>
           <h3 className="text-base font-semibold text-slate-50">Imported books</h3>
           <p className="text-sm text-slate-400">Saved titles from this CSV finalization.</p>
         </div>
         {result.importedBooks.length ? (
-          <div className="max-h-[min(28rem,55vh)] overflow-auto rounded-xl border border-slate-800">
+          <div className="max-h-[min(28rem,55vh)] overflow-auto border border-slate-800">
             <table className="w-full border-collapse text-left text-sm">
               <thead className="bg-slate-950 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
@@ -413,11 +413,11 @@ function ImportFinalizeSuccess({ result, onClose }: { result: BookImportFinalize
             </table>
           </div>
         ) : (
-          <div className="rounded-xl border border-slate-800 bg-slate-950 px-4 py-6 text-center text-sm text-slate-400">
+          <Surface as="div" className="px-4 py-6 text-center text-sm text-slate-400" tone="muted">
             No books were imported.
-          </div>
+          </Surface>
         )}
-      </div>
+      </Surface>
 
       <div className="flex justify-end">
         <button className={buttonClass} type="button" onClick={onClose}>
@@ -446,7 +446,7 @@ function CancelImportConfirmDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 p-4"
       role="dialog"
       onClick={pending ? undefined : onCancel}
     >
@@ -462,7 +462,7 @@ function CancelImportConfirmDialog({
             Keep editing
           </button>
           <button
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500"
+            className={buttonVariants.destructive}
             disabled={pending}
             type="button"
             onClick={onConfirm}
@@ -713,7 +713,7 @@ function ImportRowShell({
   const busy = savePending || deletePending
 
   return (
-    <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4" data-testid={`import-row-${row.rowId}`}>
+    <Surface as="div" className="grid gap-4 p-4" data-testid={`import-row-${row.rowId}`} tone="elevated">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid min-w-0 flex-1 gap-1">
           <button className="inline-flex items-center gap-2 text-left text-sm font-semibold text-amber-300" type="button" onClick={onToggle}>
@@ -739,19 +739,19 @@ function ImportRowShell({
           >
             {savePending ? 'Saving...' : 'Revalidate row'}
           </button>
-          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500" disabled={busy} type="button" onClick={onDelete}>
+          <button className={buttonVariants.destructive} disabled={busy} type="button" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
             {deletePending ? 'Removing...' : 'Remove row'}
           </button>
         </div>
       </div>
 
-      <div className="grid gap-2 rounded-xl border border-amber-900/60 bg-slate-950 p-3 text-sm text-slate-200">
+      <Surface as="div" className="grid gap-2 p-3 text-sm" tone="warning">
         {row.errors.map((error) => <p key={error}>{error}</p>)}
-      </div>
+      </Surface>
 
       {children}
-    </div>
+    </Surface>
   )
 }
 
@@ -769,17 +769,13 @@ function useDeleteImportRowMutation(sessionId: string, row: BookImportRowDto, on
 }
 
 function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'ok' | 'warn' }) {
-  const toneClass = tone === 'ok'
-    ? 'border-emerald-900/60 bg-emerald-950/40 text-emerald-200'
-    : tone === 'warn'
-      ? 'border-amber-900/60 bg-amber-950/40 text-amber-200'
-      : 'border-slate-700 bg-slate-900 text-slate-100'
+  const surfaceTone = tone === 'ok' ? 'success' : tone === 'warn' ? 'warning' : 'elevated'
 
   return (
-    <div className={`grid gap-0.5 rounded-xl border px-3 py-1.5 ${toneClass}`}>
+    <Surface as="div" className="grid gap-0.5 px-3 py-1.5" tone={surfaceTone}>
       <div className="text-[0.68rem] font-semibold uppercase tracking-wide">{label}</div>
       <div className="truncate text-sm font-semibold">{value}</div>
-    </div>
+    </Surface>
   )
 }
 
@@ -850,7 +846,7 @@ function LabeledInput({
           aria-expanded={suggestions.length > 0 ? open : undefined}
           aria-autocomplete={suggestions.length > 0 ? 'list' : undefined}
           aria-invalid={errorMessage ? 'true' : undefined}
-          className={`${inputClass} ${suggestions.length > 0 ? 'pr-10' : ''} ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+          className={`${inputClass} ${suggestions.length > 0 ? 'pr-10' : ''} ${errorMessage ? '!border-rose-500' : ''}`}
           role={suggestions.length > 0 ? 'combobox' : undefined}
           value={value}
           onBlur={(event) => {
@@ -884,7 +880,7 @@ function LabeledInput({
         ) : null}
         {showSuggestions ? (
           <div
-            className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-md border border-slate-700 bg-slate-900 shadow-xl"
+            className="ui-popover absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden"
             id={listboxId}
             role="listbox"
           >
@@ -914,7 +910,7 @@ function LabeledTextarea({ error = [], label, value, onChange }: { error?: strin
       <span className="font-medium text-slate-300">{label}</span>
       <textarea
         aria-invalid={errorMessage ? 'true' : undefined}
-        className={`${inputClass} min-h-28 ${errorMessage ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+        className={`${inputClass} min-h-28 ${errorMessage ? '!border-rose-500' : ''}`}
         value={value}
         onChange={(event) => onChange(event.target.value)}
       />

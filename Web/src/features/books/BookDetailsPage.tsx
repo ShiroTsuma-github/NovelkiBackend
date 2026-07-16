@@ -80,11 +80,11 @@ export function BookDetailsPage() {
   }, [book?.description, descriptionExpanded])
 
   if (bookQuery.isLoading) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Loading...</div>
+    return <Surface className="p-6 text-slate-500" tone="muted">Loading...</Surface>
   }
 
   if (!book) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Book not found.</div>
+    return <Surface className="p-6 text-slate-500" tone="muted">Book not found.</Surface>
   }
 
   const genreDescriptions = new Map(
@@ -179,7 +179,7 @@ export function BookDetailsPage() {
                         <span className="text-lg font-semibold normal-case tracking-normal text-slate-950">{book.author ?? 'unknown'}</span>
                       </p>
                     </div>
-                    <div className="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <Surface as="div" className="grid gap-4 p-4" tone="muted">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                         <div className="min-w-0 flex-1">
                           <div className="mb-2 flex items-center justify-between gap-3">
@@ -203,7 +203,7 @@ export function BookDetailsPage() {
                           <Pills values={book.tags} empty="No tags." />
                         </div>
                       </div>
-                    </div>
+                    </Surface>
                     <div className="grid gap-2">
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</div>
                       {book.description ? (
@@ -211,7 +211,7 @@ export function BookDetailsPage() {
                           <p className="max-w-4xl text-sm leading-6 text-slate-600" ref={descriptionRef} style={descriptionStyle}>{book.description}</p>
                           {descriptionOverflowing ? (
                             <button
-                              className="w-fit text-sm font-semibold text-cyan-700 hover:text-cyan-900"
+                              className="ui-inline-link w-fit text-sm"
                               type="button"
                               onClick={() => setDescriptionExpanded(!descriptionExpanded)}
                             >
@@ -254,7 +254,7 @@ export function BookDetailsPage() {
         <Panel title="Changelog">
           <div className="grid gap-3">
             {progressHistory.length ? progressHistory.map((entry) => (
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3" key={entry.id}>
+              <Surface as="div" className="px-4 py-3" key={entry.id} tone="muted">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="text-sm font-semibold text-slate-950">
@@ -279,7 +279,7 @@ export function BookDetailsPage() {
                   ) : null}
                   {entry.comment ? <p className="whitespace-pre-line">{entry.comment}</p> : null}
                 </div>
-              </div>
+              </Surface>
             )) : (
               <p className="text-sm text-slate-500">No changelog yet.</p>
             )}
@@ -335,9 +335,9 @@ function ProgressBar({ book }: { book: BookDto }) {
 
   return (
     <div className="grid gap-2">
-      <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+      <div className="ui-progress-track">
         <div
-          className="h-full rounded-full bg-cyan-500 transition-[width]"
+          className="ui-progress-fill transition-[width]"
           style={{ width: percent == null ? '0%' : `${percent}%` }}
         />
       </div>
@@ -454,7 +454,7 @@ function DeleteBookDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
       role="dialog"
       onClick={pending ? undefined : onCancel}
     >
@@ -509,7 +509,7 @@ function GenrePills({ values, descriptions }: { values: string[]; descriptions: 
           <span className="group relative" key={value}>
             <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{value}</span>
             {description ? (
-              <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 rounded-lg bg-slate-950 px-3 py-2 text-xs font-normal leading-5 text-white shadow-xl group-hover:block">
+              <span className="ui-chart-tooltip pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 text-xs font-normal leading-5 group-hover:block">
                 {description}
               </span>
             ) : null}

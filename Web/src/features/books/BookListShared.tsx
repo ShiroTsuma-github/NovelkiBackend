@@ -392,13 +392,13 @@ function PageGapJump({
         ...
       </button>
       {isOpen ? (
-        <div className="absolute bottom-full left-1/2 z-40 mb-2 w-32 -translate-x-1/2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
+        <div className="ui-popover absolute bottom-full left-1/2 mb-2 w-32 -translate-x-1/2 p-3">
           <input
             autoFocus
             aria-invalid={!isValid && value.length > 0 ? 'true' : undefined}
             data-gap-id={gapId}
             aria-label="Page number"
-            className={`${inputClass} min-h-11 w-full bg-white text-center ${!isValid && value.length > 0 ? '!border-rose-500 focus:!border-rose-400 focus:ring-rose-400/20' : ''}`}
+            className={`${inputClass} min-h-11 w-full text-center ${!isValid && value.length > 0 ? '!border-rose-500' : ''}`}
             inputMode="numeric"
             max={totalPages}
             min={1}

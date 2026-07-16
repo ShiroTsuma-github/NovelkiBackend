@@ -45,4 +45,18 @@ describe('quiet structure design system', () => {
     expect(screen.getByText('Reading')).toHaveClass('ui-badge', 'ui-badge--accent')
     expect(screen.getByText('Dialog content')).toHaveClass('ui-dialog-panel')
   })
+
+  it('provides semantic feedback surfaces without page-specific palette classes', () => {
+    render(
+      <>
+        <Surface tone="danger">Danger state</Surface>
+        <Surface tone="success">Success state</Surface>
+        <Surface tone="warning">Warning state</Surface>
+      </>,
+    )
+
+    expect(screen.getByText('Danger state')).toHaveClass('ui-surface--danger')
+    expect(screen.getByText('Success state')).toHaveClass('ui-surface--success')
+    expect(screen.getByText('Warning state')).toHaveClass('ui-surface--warning')
+  })
 })

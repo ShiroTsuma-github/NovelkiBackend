@@ -443,12 +443,12 @@ function BookSummaryPanel({
 
   if (isError) {
     return (
-      <section className="grid gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 shadow-sm" id={id}>
+      <Surface className="grid gap-3 p-4" id={id} tone="danger">
         <div>
           <h2 className="text-sm font-semibold text-rose-950">Library summary</h2>
           <p className="text-sm text-rose-800">Could not load summary.</p>
         </div>
-      </section>
+      </Surface>
     )
   }
 
@@ -475,11 +475,11 @@ function BookSummaryPanel({
         <SummaryMetricCard label="Current chapters" value={formatChapterCount(summary.currentChapters)} />
       </div>
       {summary.totalBooks === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <Surface as="div" className="px-4 py-3 text-sm text-slate-600" tone="muted">
           No books match the current filters.
-        </div>
+        </Surface>
       ) : (
-        <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <Surface as="div" className="grid gap-4 p-4" tone="muted">
           <div className="grid gap-4 xl:grid-cols-2">
             <SummaryCompactSection
               title="Status distribution"
@@ -487,7 +487,7 @@ function BookSummaryPanel({
             />
             <SummaryCompactTypeSection items={summary.typeCounts} />
           </div>
-        </div>
+        </Surface>
       )}
     </Surface>
   )
@@ -495,19 +495,19 @@ function BookSummaryPanel({
 
 function SummaryMetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+    <Surface as="div" className="px-4 py-3" tone="elevated">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div>
-    </div>
+    </Surface>
   )
 }
 
 function SummaryCompactSection({ items, title }: { items: Array<{ label: string; value: string }>; title: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Surface as="div" className="p-4">
       <div className="mb-3 text-sm font-semibold text-slate-950">{title}</div>
       <SummaryCountList items={items} />
-    </div>
+    </Surface>
   )
 }
 
@@ -530,10 +530,10 @@ function SummaryCountList({ items }: { items: Array<{ label: string; value: stri
 
 function SummaryCompactTypeSection({ items }: { items: BookSummaryTypeCountDto[] }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Surface as="div" className="p-4">
       <div className="mb-3 text-sm font-semibold text-slate-950">Book types</div>
       <SummaryTypeDetails items={items} />
-    </div>
+    </Surface>
   )
 }
 
@@ -619,13 +619,13 @@ function BookCardGrid({
               />
               {hasCardField(fields, 'rating') && book.rating != null ? (
                 <span
-                  className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold shadow-lg ${getRatingBadgeClass(book.rating)}`}
+                  className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold ${getRatingBadgeClass(book.rating)}`}
                 >
                   {book.rating}
                 </span>
               ) : null}
               {hasCardField(fields, 'status') ? (
-                <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-lg ${getStatusBadgeClass(book.status)}`}>
+                <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(book.status)}`}>
                   <span className="truncate">{book.status}</span>
                 </span>
               ) : null}
