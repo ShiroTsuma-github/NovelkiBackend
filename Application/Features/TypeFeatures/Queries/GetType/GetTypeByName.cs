@@ -16,7 +16,7 @@ public class GetTypeByNameQueryHandler : IRequestHandler<GetTypeByNameQuery, Typ
     public async Task<TypeDto> Handle(GetTypeByNameQuery request, CancellationToken cancellationToken)
     {
         var type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken)
-            ?? throw new EntityNotFoundException<ContentType, string>(request.Name);
+                   ?? throw new EntityNotFoundException<ContentType, string>(request.Name);
 
         return type.ToDto();
     }

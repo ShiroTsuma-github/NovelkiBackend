@@ -40,7 +40,8 @@ public class ValidationBehaviorTests
     [Fact]
     public async Task Handle_ShouldThrowCombinedValidationErrors_WhenValidationFails()
     {
-        var behavior = new ValidationBehavior<TestRequest, string>([new TestRequestValidator(), new TestRequestLengthValidator()]);
+        var behavior =
+            new ValidationBehavior<TestRequest, string>([new TestRequestValidator(), new TestRequestLengthValidator()]);
 
         var exception = await Assert.ThrowsAsync<ValidationException>(() =>
             behavior.Handle(new TestRequest(""), _ => Task.FromResult("done"), CancellationToken.None));

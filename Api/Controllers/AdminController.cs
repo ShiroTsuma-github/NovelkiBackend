@@ -1,20 +1,20 @@
 namespace Api.Controllers;
 
-using Api.Observability;
+using System.Diagnostics;
 using Application.Features.BookFeatures.Commands;
 using Application.Features.BookFeatures.Queries.GetBook;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.StatusFeatures.Commands;
 using Application.Features.TypeFeatures.Commands;
-using System.Diagnostics;
+using Observability;
 
 [ApiController]
-[Authorize(Roles = "Admin")]
-[Route("api/v1/admin")]
+[Authorize(Roles = AuthorizationRoles.Admin)]
+[Route(ApiRoutes.Admin)]
 public class AdminController : ControllerBase
 {
-    private readonly IMediator _mediator;
     private readonly ILogger<AdminController> _logger;
+    private readonly IMediator _mediator;
 
     public AdminController(IMediator mediator, ILogger<AdminController> logger)
     {
@@ -27,23 +27,24 @@ public class AdminController : ControllerBase
         [FromQuery] int skip = 0,
         [FromQuery] int take = 100,
         [FromQuery] string? query = null,
-        [FromQuery] string? sortBy = "lastModified",
-        [FromQuery] string? sortDirection = "desc",
+        [FromQuery] string? sortBy = BookSortFields.LastModified,
+        [FromQuery] string? sortDirection = SortDirections.Descending,
         CancellationToken cancellationToken = default)
     {
         var request = new GetAllAdminBooksQuery(skip, take, query, sortBy, sortDirection);
-        using var activity = NovelkiTelemetry.ActivitySource.StartActivity("Admin.Book.Search", ActivityKind.Internal);
-        activity?.SetTag("book.query", request.Query);
-        activity?.SetTag("book.sort_by", request.SortBy);
-        activity?.SetTag("book.sort_direction", request.SortDirection);
+        using var activity =
+            NovelkiTelemetry.ActivitySource.StartActivity("Admin.Book.Search", ActivityKind.Internal);
+        activity?.SetTag(NovelkiTelemetryTags.BookQuery, request.Query);
+        activity?.SetTag(NovelkiTelemetryTags.BookSortBy, request.SortBy);
+        activity?.SetTag(NovelkiTelemetryTags.BookSortDirection, request.SortDirection);
         NovelkiTelemetry.BookSearchRequests.Add(1);
         var books = await _mediator.Send(request, cancellationToken);
-        activity?.SetTag("book.result_count", books.Data.Count);
+        activity?.SetTag(NovelkiTelemetryTags.BookResultCount, books.Data.Count);
 
         return Ok(books);
     }
 
-    [HttpGet("books/{id:guid}")]
+    [HttpGet(ApiRouteTemplates.AdminBookById)]
     public async Task<IActionResult> GetBook(Guid id)
     {
         var book = await _mediator.Send(new GetAdminBookQuery(id));
@@ -51,7 +52,7 @@ public class AdminController : ControllerBase
         return Ok(book);
     }
 
-    [HttpPut("books/{id:guid}")]
+    [HttpPut(ApiRouteTemplates.AdminBookById)]
     public async Task<IActionResult> UpdateBook(Guid id, [FromBody] UpdateBookCommand model)
     {
         var command = new UpdateBookCommand(
@@ -72,10 +73,7 @@ public class AdminController : ControllerBase
             model.Description,
             model.Notes,
             model.RawImportedLine,
-            model.Links)
-        {
-            AdminScope = true
-        };
+            model.Links) { AdminScope = true };
 
         await _mediator.Send(command);
         NovelkiTelemetry.BooksUpdated.Add(1);
@@ -88,36 +86,40 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> CreateStatus([FromBody] CreateStatusCommand command)
     {
         var status = await _mediator.Send(command);
-        NovelkiTelemetry.AdminDictionaryCreated.Add(1, new KeyValuePair<string, object?>("dictionary.type", "status"));
+        NovelkiTelemetry.AdminDictionaryCreated.Add(1,
+            new KeyValuePair<string, object?>(NovelkiTelemetryTags.DictionaryType, "status"));
         _logger.LogInformation("Admin created status. StatusId={StatusId}", status.Id);
 
-        return Created($"/api/v1/status/{status.Id}", status);
+        return Created(ApiRoutes.StatusById(status.Id), status);
     }
 
     [HttpPost("types")]
     public async Task<IActionResult> CreateType([FromBody] CreateTypeCommand command)
     {
         var type = await _mediator.Send(command);
-        NovelkiTelemetry.AdminDictionaryCreated.Add(1, new KeyValuePair<string, object?>("dictionary.type", "type"));
+        NovelkiTelemetry.AdminDictionaryCreated.Add(1,
+            new KeyValuePair<string, object?>(NovelkiTelemetryTags.DictionaryType, "type"));
         _logger.LogInformation("Admin created type. TypeId={TypeId}", type.Id);
 
-        return Created($"/api/v1/type/{type.Id}", type);
+        return Created(ApiRoutes.TypeById(type.Id), type);
     }
 
     [HttpPost("genres")]
     public async Task<IActionResult> CreateGenre([FromBody] CreateGenreCommand command)
     {
         var genre = await _mediator.Send(command);
-        NovelkiTelemetry.AdminDictionaryCreated.Add(1, new KeyValuePair<string, object?>("dictionary.type", "genre"));
+        NovelkiTelemetry.AdminDictionaryCreated.Add(1,
+            new KeyValuePair<string, object?>(NovelkiTelemetryTags.DictionaryType, "genre"));
         _logger.LogInformation("Admin created genre. GenreId={GenreId}", genre.Id);
 
-        return Created($"/api/v1/genre/{genre.Id}", genre);
+        return Created(ApiRoutes.GenreById(genre.Id), genre);
     }
 
     [HttpDelete("books/owner/{ownerId:guid}")]
     public async Task<IActionResult> DeleteBooksByOwner(Guid ownerId, CancellationToken cancellationToken)
     {
-        var result = await _mediator.Send(new DeleteBooksByOwnerCommand(ownerId), cancellationToken);
+        var result =
+            await _mediator.Send(new DeleteBooksByOwnerCommand(ownerId), cancellationToken);
         _logger.LogInformation(
             "Admin purged owner library. OwnerId={OwnerId} DeletedBooks={DeletedBooks} DeletedAuthors={DeletedAuthors} DeletedTags={DeletedTags}",
             ownerId,

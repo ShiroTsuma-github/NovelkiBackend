@@ -1,4 +1,5 @@
 ﻿namespace Application.Common.DTOs.Status;
+
 public class StatusDto
 {
     public Guid Id { get; set; }

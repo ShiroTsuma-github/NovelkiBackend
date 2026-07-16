@@ -3,8 +3,7 @@
 public class TokenGeneratorFailedException : Exception
 {
     public TokenGeneratorFailedException()
-    : base("Token Generator Failed. Incorrect User Data")
+        : base("Token Generator Failed. Incorrect User Data")
     {
-        
     }
 }

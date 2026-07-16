@@ -26,7 +26,17 @@ public class AdminControllerTests
             Skip = 40,
             Take = 20,
             Total = 1,
-            Data = [new AdminBookListItemDto { Id = Guid.NewGuid(), PrimaryTitle = "Completed", ContentType = "Novel", Status = "Completed", OwnerId = Guid.NewGuid() }]
+            Data =
+            [
+                new AdminBookListItemDto
+                {
+                    Id = Guid.NewGuid(),
+                    PrimaryTitle = "Completed",
+                    ContentType = "Novel",
+                    Status = "Completed",
+                    OwnerId = Guid.NewGuid()
+                }
+            ]
         };
         var mediator = new Mock<IMediator>();
         mediator
@@ -36,7 +46,8 @@ public class AdminControllerTests
             .ReturnsAsync(expected);
         var controller = CreateController(mediator.Object);
 
-        var result = await controller.GetBooks(40, 20, "status:comple", "lastModified", "desc", CancellationToken.None);
+        var result =
+            await controller.GetBooks(40, 20, "status:comple", "lastModified", "desc", CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
@@ -48,13 +59,7 @@ public class AdminControllerTests
     [Fact]
     public async Task GetBooks_ShouldUseDefaultListParametersWhenQueryStringIsEmpty()
     {
-        var expected = new PaginatedResult<AdminBookListItemDto>
-        {
-            Skip = 0,
-            Take = 100,
-            Total = 0,
-            Data = []
-        };
+        var expected = new PaginatedResult<AdminBookListItemDto> { Skip = 0, Take = 100, Total = 0, Data = [] };
         var mediator = new Mock<IMediator>();
         mediator
             .Setup(mock => mock.Send(
@@ -110,14 +115,20 @@ public class AdminControllerTests
         var status = new StatusDto { Id = Guid.NewGuid(), Name = "Paused" };
         var type = new TypeDto { Id = Guid.NewGuid(), Name = "Audio" };
         var genre = new GenreDto { Id = Guid.NewGuid(), Name = "Drama" };
-        mediator.Setup(mock => mock.Send(It.IsAny<CreateStatusCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(status);
-        mediator.Setup(mock => mock.Send(It.IsAny<CreateTypeCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(type);
-        mediator.Setup(mock => mock.Send(It.IsAny<CreateGenreCommand>(), It.IsAny<CancellationToken>())).ReturnsAsync(genre);
+        mediator.Setup(mock => mock.Send(It.IsAny<CreateStatusCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(status);
+        mediator.Setup(mock => mock.Send(It.IsAny<CreateTypeCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(type);
+        mediator.Setup(mock => mock.Send(It.IsAny<CreateGenreCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(genre);
         var controller = CreateController(mediator.Object);
 
-        var statusResult = Assert.IsType<CreatedResult>(await controller.CreateStatus(new CreateStatusCommand("Paused", null)));
-        var typeResult = Assert.IsType<CreatedResult>(await controller.CreateType(new CreateTypeCommand("Audio", null)));
-        var genreResult = Assert.IsType<CreatedResult>(await controller.CreateGenre(new CreateGenreCommand("Drama", null)));
+        var statusResult =
+            Assert.IsType<CreatedResult>(await controller.CreateStatus(new CreateStatusCommand("Paused", null)));
+        var typeResult =
+            Assert.IsType<CreatedResult>(await controller.CreateType(new CreateTypeCommand("Audio", null)));
+        var genreResult =
+            Assert.IsType<CreatedResult>(await controller.CreateGenre(new CreateGenreCommand("Drama", null)));
 
         Assert.Same(status, statusResult.Value);
         Assert.Same(type, typeResult.Value);

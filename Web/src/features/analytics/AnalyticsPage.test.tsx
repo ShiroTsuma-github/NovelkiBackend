@@ -13,7 +13,7 @@ import { AnalyticsChartCard } from './AnalyticsChartCard'
 import { AnalyticsPage } from './AnalyticsPage'
 import { libraryGrowthChartPoints } from './charts/LibraryGrowthChart'
 import { readingActivityChartPoints } from './charts/ReadingActivityChart'
-import { distributeStackedPercents, statusByTypeRows } from './charts/StatusByTypeChart'
+import { distributeStackedPercents, statusByTypeRows, statusByTypeTooltipRows } from './charts/StatusByTypeChart'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -454,6 +454,39 @@ describe('AnalyticsPage', () => {
     }))
 
     expect(rows).toContainEqual(['Manga', 'On Hold', '1', '0.2%'])
+  })
+
+  it('orders status by type hover rows by share and keeps their colors', () => {
+    const rows = statusByTypeTooltipRows([
+      {
+        color: '#2563eb',
+        name: 'Completed',
+        payload: { CompletedCount: 2, CompletedPercent: 20 },
+        value: 20,
+      },
+      {
+        color: '#0891b2',
+        name: 'Reading',
+        payload: { ReadingCount: 7, ReadingPercent: 70 },
+        value: 70,
+      },
+      {
+        color: '#7c3aed',
+        name: 'On Hold',
+        payload: { 'On HoldCount': 1, 'On HoldPercent': 10 },
+        value: 10,
+      },
+      {
+        color: '#db2777',
+        name: 'Dropped',
+        payload: { DroppedCount: 0, DroppedPercent: 0 },
+        value: 0,
+      },
+    ])
+
+    expect(rows.map((row) => row.status)).toEqual(['Reading', 'Completed', 'On Hold'])
+    expect(rows.map((row) => row.color)).toEqual(['#0891b2', '#2563eb', '#7c3aed'])
+    expect(rows.map((row) => row.percent)).toEqual([70, 20, 10])
   })
 
   it('exposes text-equivalent data tables where raw data adds value', async () => {

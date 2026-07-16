@@ -13,7 +13,8 @@ public class AdminLibraryFeatureTests
         var service = new FakeAdminLibraryService(expected);
         var handler = new DeleteBooksByOwnerHandler(service);
 
-        var result = await handler.Handle(new DeleteBooksByOwnerCommand(ownerId), CancellationToken.None);
+        var result =
+            await handler.Handle(new DeleteBooksByOwnerCommand(ownerId), CancellationToken.None);
 
         Assert.Equal(expected, result);
         Assert.Equal(ownerId, service.LastOwnerId);
@@ -32,7 +33,8 @@ public class AdminLibraryFeatureTests
         public Guid? LastOwnerId { get; private set; }
         public int CallCount { get; private set; }
 
-        public Task<AdminLibraryPurgeResult> DeleteAllBooksForOwnerAsync(Guid ownerId, CancellationToken cancellationToken)
+        public Task<AdminLibraryPurgeResult> DeleteAllBooksForOwnerAsync(Guid ownerId,
+            CancellationToken cancellationToken)
         {
             LastOwnerId = ownerId;
             CallCount++;

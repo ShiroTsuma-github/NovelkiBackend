@@ -2,6 +2,7 @@ namespace Infrastructure.Services;
 
 using Application.Common.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 
 public sealed class AdminLibraryService : IAdminLibraryService
 {
@@ -19,9 +20,11 @@ public sealed class AdminLibraryService : IAdminLibraryService
         _cacheInvalidator = cacheInvalidator;
     }
 
-    public async Task<AdminLibraryPurgeResult> DeleteAllBooksForOwnerAsync(Guid ownerId, CancellationToken cancellationToken)
+    public async Task<AdminLibraryPurgeResult> DeleteAllBooksForOwnerAsync(Guid ownerId,
+        CancellationToken cancellationToken)
     {
-        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+        await using var
+            transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         var books = await _context.Books
             .Where(book => book.OwnerId == ownerId)
@@ -38,7 +41,8 @@ public sealed class AdminLibraryService : IAdminLibraryService
             return new AdminLibraryPurgeResult(0, 0, 0);
         }
 
-        var authorIds = books.Where(book => book.AuthorId.HasValue).Select(book => book.AuthorId!.Value).Distinct().ToArray();
+        var authorIds = books.Where(book => book.AuthorId.HasValue).Select(book => book.AuthorId!.Value).Distinct()
+            .ToArray();
         var deletedBooks = await _context.Books
             .Where(book => book.OwnerId == ownerId)
             .ExecuteDeleteAsync(cancellationToken);

@@ -13,7 +13,8 @@ public class SecurityAttributeTests
     {
         var actionMethods = typeof(BookController).Assembly
             .GetTypes()
-            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) && type.Name.EndsWith("Controller", StringComparison.Ordinal))
+            .Where(type => typeof(ControllerBase).IsAssignableFrom(type) &&
+                           type.Name.EndsWith("Controller", StringComparison.Ordinal))
             .Where(type => type != typeof(AccountController))
             .SelectMany(type => type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly)
                 .Where(IsActionMethod)
@@ -21,8 +22,8 @@ public class SecurityAttributeTests
                 {
                     Controller = type,
                     Method = method,
-                    Authorize = type.GetCustomAttributes<AuthorizeAttribute>(inherit: true)
-                        .Concat(method.GetCustomAttributes<AuthorizeAttribute>(inherit: true))
+                    Authorize = type.GetCustomAttributes<AuthorizeAttribute>(true)
+                        .Concat(method.GetCustomAttributes<AuthorizeAttribute>(true))
                         .ToList()
                 }))
             .ToList();
@@ -35,7 +36,7 @@ public class SecurityAttributeTests
     public void AdminController_ShouldRequireAdminRoleAtControllerLevel()
     {
         var authorize = typeof(AdminController)
-            .GetCustomAttributes<AuthorizeAttribute>(inherit: true)
+            .GetCustomAttributes<AuthorizeAttribute>(true)
             .Single();
 
         Assert.Equal("Admin", authorize.Roles);
@@ -48,11 +49,11 @@ public class SecurityAttributeTests
             return false;
         }
 
-        if (method.GetCustomAttributes<NonActionAttribute>(inherit: true).Any())
+        if (method.GetCustomAttributes<NonActionAttribute>(true).Any())
         {
             return false;
         }
 
-        return method.GetCustomAttributes<HttpMethodAttribute>(inherit: true).Any();
+        return method.GetCustomAttributes<HttpMethodAttribute>(true).Any();
     }
 }

@@ -1,22 +1,25 @@
 ﻿namespace Api.Controllers;
 
-using Application.Features.BookFeatures.Commands;
-using Application.Features.BookFeatures.Queries.GetBook;
-using Application.Common.DTOs.Book;
-using Application.Common.Interfaces;
-using Api.Observability;
 using System.Diagnostics;
 using System.Text;
+using Application.Common.DTOs.Book;
+using Application.Common.Interfaces;
+using Application.Features.BookFeatures.Commands;
+using Application.Features.BookFeatures.Queries.GetBook;
 using Microsoft.AspNetCore.RateLimiting;
+using Observability;
 
 [ApiController]
-[Route("api/v1/book")]
+[Route(ApiRoutes.Book)]
 public partial class BookController : ControllerBase
 {
-    private readonly IMediator _mediator;
-    private readonly IBookCsvImportService _bookCsvImportService;
+    private const string MultipartFormData = "multipart/form-data";
+    private const string CsvContentType = "text/csv; charset=utf-8";
     private readonly IBookCsvExportService _bookCsvExportService;
+    private readonly IBookCsvImportService _bookCsvImportService;
     private readonly ILogger<BookController> _logger;
+
+    private readonly IMediator _mediator;
 
     public BookController(
         IMediator mediator,
@@ -35,7 +38,7 @@ public partial class BookController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateBookCommand command)
     {
         using var activity = NovelkiTelemetry.ActivitySource.StartActivity("Book.Create", ActivityKind.Internal);
-        var bookId= await _mediator.Send(command);
+        var bookId = await _mediator.Send(command);
         activity?.SetTag("book.id", bookId);
         NovelkiTelemetry.BooksCreated.Add(1);
         _logger.LogInformation("Book created. BookId={BookId}", bookId);
@@ -43,17 +46,17 @@ public partial class BookController : ControllerBase
         return CreatedAtAction(nameof(GetById), new { id = bookId }, new { Id = bookId });
     }
 
-    [HttpGet()]
+    [HttpGet]
     [Authorize]
     public async Task<IActionResult> GetAll([FromQuery] GetAllBooksQuery getAllBooks)
     {
         using var activity = NovelkiTelemetry.ActivitySource.StartActivity("Book.Search", ActivityKind.Internal);
-        activity?.SetTag("book.query", getAllBooks.Query);
-        activity?.SetTag("book.sort_by", getAllBooks.SortBy);
-        activity?.SetTag("book.sort_direction", getAllBooks.SortDirection);
+        activity?.SetTag(NovelkiTelemetryTags.BookQuery, getAllBooks.Query);
+        activity?.SetTag(NovelkiTelemetryTags.BookSortBy, getAllBooks.SortBy);
+        activity?.SetTag(NovelkiTelemetryTags.BookSortDirection, getAllBooks.SortDirection);
         NovelkiTelemetry.BookSearchRequests.Add(1);
         var books = await _mediator.Send(getAllBooks);
-        activity?.SetTag("book.result_count", books.Data.Count);
+        activity?.SetTag(NovelkiTelemetryTags.BookResultCount, books.Data.Count);
 
         return Ok(books);
     }
@@ -78,7 +81,7 @@ public partial class BookController : ControllerBase
         return Ok(analytics);
     }
 
-    [HttpGet("{id:guid}")]
+    [HttpGet(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> GetById(Guid id)
     {
@@ -87,7 +90,7 @@ public partial class BookController : ControllerBase
         return Ok(bookDto);
     }
 
-    [HttpPut("{id:guid}")]
+    [HttpPut(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateBookCommand model)
     {
@@ -119,9 +122,9 @@ public partial class BookController : ControllerBase
 
     [HttpPost("import/sessions")]
     [Authorize]
-    [Consumes("multipart/form-data")]
+    [Consumes(MultipartFormData)]
     [RequestSizeLimit(10 * 1024 * 1024)]
-    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> CreateImportSession(IFormFile? file, CancellationToken cancellationToken)
     {
         if (file == null)
@@ -131,11 +134,12 @@ public partial class BookController : ControllerBase
 
         if (file.Length == 0)
         {
-            return BadRequest(new { error = "CSV file is empty." });
+            return BadRequest(new { error = BookCsvValidationMessages.EmptyFile });
         }
 
         await using var stream = file.OpenReadStream();
-        var result = await _bookCsvImportService.CreateSessionAsync(stream, file.FileName, cancellationToken);
+        var result =
+            await _bookCsvImportService.CreateSessionAsync(stream, file.FileName, cancellationToken);
         _logger.LogInformation("Book CSV import session created. SessionId={SessionId}", result.SessionId);
 
         return Ok(result);
@@ -147,24 +151,26 @@ public partial class BookController : ControllerBase
     {
         var template = _bookCsvImportService.CreateTemplate();
         var bytes = Encoding.UTF8.GetBytes(template);
-        return File(bytes, "text/csv; charset=utf-8", "book-import-template.csv");
+        return File(bytes, CsvContentType, "book-import-template.csv");
     }
 
     [HttpGet("export")]
     [Authorize]
-    public async Task<IActionResult> ExportBooks([FromQuery] string? query, [FromQuery] string? sortBy, [FromQuery] string? sortDirection)
+    public async Task<IActionResult> ExportBooks([FromQuery] string? query, [FromQuery] string? sortBy,
+        [FromQuery] string? sortDirection)
     {
-        var firstPage = await _mediator.Send(new GetAllBooksForExportQuery(0, 1, query, sortBy, sortDirection));
+        var firstPage =
+            await _mediator.Send(new GetAllBooksForExportQuery(0, 1, query, sortBy, sortDirection));
         var allBooks = firstPage.Total > 0
             ? await _mediator.Send(new GetAllBooksForExportQuery(0, firstPage.Total, query, sortBy, sortDirection))
             : firstPage;
 
         var csv = _bookCsvExportService.Build(allBooks.Data);
         var bytes = Encoding.UTF8.GetBytes(csv);
-        return File(bytes, "text/csv; charset=utf-8", "books-export.csv");
+        return File(bytes, CsvContentType, "books-export.csv");
     }
 
-    [HttpGet("import/sessions/{sessionId:guid}")]
+    [HttpGet(ApiRouteTemplates.ImportSession)]
     [Authorize]
     public async Task<IActionResult> GetImportSession(Guid sessionId, CancellationToken cancellationToken)
     {
@@ -172,15 +178,17 @@ public partial class BookController : ControllerBase
         return Ok(result);
     }
 
-    [HttpPut("import/sessions/{sessionId:guid}/rows/{rowId:guid}")]
+    [HttpPut(ApiRouteTemplates.ImportSessionRow)]
     [Authorize]
-    public async Task<IActionResult> UpdateImportRow(Guid sessionId, Guid rowId, [FromBody] UpdateBookImportRowRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> UpdateImportRow(Guid sessionId, Guid rowId,
+        [FromBody] UpdateBookImportRowRequest request, CancellationToken cancellationToken)
     {
-        var result = await _bookCsvImportService.UpdateRowAsync(sessionId, rowId, request, cancellationToken);
+        var result =
+            await _bookCsvImportService.UpdateRowAsync(sessionId, rowId, request, cancellationToken);
         return Ok(result);
     }
 
-    [HttpDelete("import/sessions/{sessionId:guid}/rows/{rowId:guid}")]
+    [HttpDelete(ApiRouteTemplates.ImportSessionRow)]
     [Authorize]
     public async Task<IActionResult> DeleteImportRow(Guid sessionId, Guid rowId, CancellationToken cancellationToken)
     {
@@ -198,15 +206,16 @@ public partial class BookController : ControllerBase
 
     [HttpPost("import/sessions/{sessionId:guid}/finalize")]
     [Authorize]
-    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> FinalizeImport(Guid sessionId, CancellationToken cancellationToken)
     {
         var result = await _bookCsvImportService.FinalizeAsync(sessionId, cancellationToken);
-        _logger.LogInformation("Book CSV import finalized. SessionId={SessionId} Imported={Imported} Skipped={Skipped}", sessionId, result.ImportedCount, result.SkippedCount);
+        _logger.LogInformation("Book CSV import finalized. SessionId={SessionId} Imported={Imported} Skipped={Skipped}",
+            sessionId, result.ImportedCount, result.SkippedCount);
         return Ok(result);
     }
 
-    [HttpDelete("import/sessions/{sessionId:guid}")]
+    [HttpDelete(ApiRouteTemplates.ImportSession)]
     [Authorize]
     public async Task<IActionResult> CancelImport(Guid sessionId, CancellationToken cancellationToken)
     {
@@ -218,7 +227,8 @@ public partial class BookController : ControllerBase
     [Authorize]
     public async Task<IActionResult> UpdateProgress(Guid id, UpdateBookProgressCommand model)
     {
-        var command = new UpdateBookProgressCommand(id, model.CurrentChapterNumber, model.CurrentChapterLabel, model.Comment);
+        var command =
+            new UpdateBookProgressCommand(id, model.CurrentChapterNumber, model.CurrentChapterLabel, model.Comment);
         await _mediator.Send(command);
         NovelkiTelemetry.BookProgressUpdated.Add(1);
         _logger.LogInformation("Book progress updated. BookId={BookId}", id);
@@ -226,11 +236,11 @@ public partial class BookController : ControllerBase
         return NoContent();
     }
 
-    [HttpPut("{id:guid}/cover")]
+    [HttpPut(ApiRouteTemplates.BookCover)]
     [Authorize]
-    [Consumes("multipart/form-data")]
+    [Consumes(MultipartFormData)]
     [RequestSizeLimit(10 * 1024 * 1024)]
-    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> UploadCover(Guid id, IFormFile? file)
     {
         if (file == null)
@@ -240,11 +250,12 @@ public partial class BookController : ControllerBase
 
         if (file.Length == 0)
         {
-            return BadRequest(new { error = "Cover file is empty." });
+            return BadRequest(new { error = BookCoverValidationMessages.EmptyFile });
         }
 
         await using var stream = file.OpenReadStream();
-        var cover = await _mediator.Send(new UploadBookCoverCommand(id, stream, file.FileName, file.ContentType, file.Length));
+        var cover =
+            await _mediator.Send(new UploadBookCoverCommand(id, stream, file.FileName, file.ContentType, file.Length));
         _logger.LogInformation("Book cover uploaded. BookId={BookId}", id);
 
         return Ok(cover);
@@ -252,7 +263,7 @@ public partial class BookController : ControllerBase
 
     [HttpPut("{id:guid}/cover/url")]
     [Authorize]
-    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> SetCoverFromUrl(Guid id, [FromBody] SetBookCoverFromUrlRequest request)
     {
         var cover = await _mediator.Send(new SetBookCoverFromUrlCommand(id, request.ImageUrl));
@@ -263,7 +274,7 @@ public partial class BookController : ControllerBase
 
     [HttpPost("{id:guid}/cover/refresh")]
     [Authorize]
-    [EnableRateLimiting(Api.DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
+    [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
     public async Task<IActionResult> RefreshCover(Guid id)
     {
         var cover = await _mediator.Send(new RefreshBookCoverCommand(id));
@@ -272,7 +283,7 @@ public partial class BookController : ControllerBase
         return Accepted(cover);
     }
 
-    [HttpDelete("{id:guid}/cover")]
+    [HttpDelete(ApiRouteTemplates.BookCover)]
     [Authorize]
     public async Task<IActionResult> DeleteCover(Guid id)
     {
@@ -301,7 +312,7 @@ public partial class BookController : ControllerBase
         return File(result.Content, result.MimeType, result.FileName);
     }
 
-    [HttpDelete("{id:guid}")]
+    [HttpDelete(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> Delete(Guid id)
     {

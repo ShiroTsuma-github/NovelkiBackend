@@ -47,12 +47,13 @@ internal static class BookListProjectionMapper
 {
     public static BookListItemDto MapListProjection(BookListProjection projection)
     {
-        return MapListFields(projection, new BookListItemDto
-        {
-            PrimaryTitle = projection.PrimaryTitle,
-            ContentType = projection.ContentType,
-            Status = projection.Status
-        });
+        return MapListFields(projection,
+            new BookListItemDto
+            {
+                PrimaryTitle = projection.PrimaryTitle,
+                ContentType = projection.ContentType,
+                Status = projection.Status
+            });
     }
 
     public static AdminBookListItemDto MapAdminListProjection(
@@ -60,15 +61,16 @@ internal static class BookListProjectionMapper
         IReadOnlyDictionary<Guid, BookOwnerProjection> owners)
     {
         owners.TryGetValue(projection.OwnerId, out var owner);
-        return MapListFields(projection, new AdminBookListItemDto
-        {
-            PrimaryTitle = projection.PrimaryTitle,
-            ContentType = projection.ContentType,
-            Status = projection.Status,
-            OwnerId = projection.OwnerId,
-            OwnerUsername = owner?.Username,
-            OwnerEmail = owner?.Email
-        });
+        return MapListFields(projection,
+            new AdminBookListItemDto
+            {
+                PrimaryTitle = projection.PrimaryTitle,
+                ContentType = projection.ContentType,
+                Status = projection.Status,
+                OwnerId = projection.OwnerId,
+                OwnerUsername = owner?.Username,
+                OwnerEmail = owner?.Email
+            });
     }
 
     private static BookCoverDto? MapCoverProjection(BookListProjection projection)
@@ -79,9 +81,9 @@ internal static class BookListProjectionMapper
         }
 
         var version = projection.CoverLastAttemptAt
-            ?? projection.CoverLastModified
-            ?? projection.CoverCreated
-            ?? DateTimeOffset.UnixEpoch;
+                      ?? projection.CoverLastModified
+                      ?? projection.CoverCreated
+                      ?? DateTimeOffset.UnixEpoch;
 
         return new BookCoverDto
         {
@@ -89,8 +91,13 @@ internal static class BookListProjectionMapper
             Source = projection.CoverSource?.ToString(),
             FailureReason = projection.CoverFailureReason,
             LastAttemptAt = projection.CoverLastAttemptAt,
-            ImageUrl = projection.HasCoverStoragePath ? $"/api/v1/book/{projection.Id}/cover/file?v={version.ToUnixTimeMilliseconds()}" : null,
-            ThumbnailImageUrl = projection.HasCoverThumbnailStoragePath ? $"/api/v1/book/{projection.Id}/cover/thumbnail?v={version.ToUnixTimeMilliseconds()}" : null
+            ImageUrl =
+                projection.HasCoverStoragePath
+                    ? ApiRoutes.BookCoverFile(projection.Id, version.ToUnixTimeMilliseconds())
+                    : null,
+            ThumbnailImageUrl = projection.HasCoverThumbnailStoragePath
+                ? ApiRoutes.BookCoverThumbnail(projection.Id, version.ToUnixTimeMilliseconds())
+                : null
         };
     }
 

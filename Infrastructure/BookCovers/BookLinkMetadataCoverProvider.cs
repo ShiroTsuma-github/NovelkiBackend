@@ -17,7 +17,7 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
         foreach (var link in book.Links.OrderByDescending(l => l.IsPrimary))
         {
             if (!Uri.TryCreate(link.Url, UriKind.Absolute, out var pageUri) ||
-                pageUri.Scheme is not ("http" or "https"))
+                !pageUri.IsHttpOrHttps())
             {
                 continue;
             }
@@ -92,7 +92,7 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
         var uri = Uri.TryCreate(value, UriKind.Absolute, out var absolute)
             ? absolute
             : new Uri(pageUri, value);
-        if (uri.Scheme is not ("http" or "https"))
+        if (!uri.IsHttpOrHttps())
         {
             return false;
         }
@@ -101,9 +101,13 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
         return true;
     }
 
-    [GeneratedRegex("<meta[^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]*|<meta[^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]*", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        "<meta[^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]*|<meta[^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]*",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex MetaRegex();
 
-    [GeneratedRegex("<link[^>]+rel=[\"'][^\"']*(?:image_src|preload)[^\"']*[\"'][^>]+href=[\"'](?<href>[^\"']+)[\"'][^>]*", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        "<link[^>]+rel=[\"'][^\"']*(?:image_src|preload)[^\"']*[\"'][^>]+href=[\"'](?<href>[^\"']+)[\"'][^>]*",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex LinkImageRegex();
 }

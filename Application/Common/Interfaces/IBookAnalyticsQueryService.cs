@@ -4,7 +4,7 @@ using Domain.Models;
 
 public interface IBookAnalyticsQueryService
 {
-    Task<BookAnalyticsSnapshot> GetAnalyticsAsync(
+    public Task<BookAnalyticsSnapshot> GetAnalyticsAsync(
         Guid ownerId,
         BookSearchCriteria criteria,
         BookAnalyticsScopeSnapshot scope,

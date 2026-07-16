@@ -60,10 +60,11 @@ public class BookCoverProcessorTests
         var cache = new FakeBookListCacheInvalidator();
         var processor = CreateProcessor(
             repository,
-            storage: storage,
-            cacheInvalidator: cache,
-            provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.GoogleBooks, "https://cdn.example.com/covers/test.jpg")),
-            httpClientFactory: new FakeHttpClientFactory(new ByteArrayContent([1, 2, 3])));
+            storage,
+            cache,
+            new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.GoogleBooks,
+                "https://cdn.example.com/covers/test.jpg")),
+            new FakeHttpClientFactory(new ByteArrayContent([1, 2, 3])));
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
 
@@ -86,9 +87,10 @@ public class BookCoverProcessorTests
         var cache = new FakeBookListCacheInvalidator();
         var processor = CreateProcessor(
             repository,
-            storage: new FakeBookCoverStorage { SaveException = new ValidationException("invalid image") },
-            cacheInvalidator: cache,
-            provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.OpenLibrary, "https://cdn.example.com/test.png")));
+            new FakeBookCoverStorage { SaveException = new ValidationException("invalid image") },
+            cache,
+            new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.OpenLibrary,
+                "https://cdn.example.com/test.png")));
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
 
@@ -106,7 +108,8 @@ public class BookCoverProcessorTests
         var processor = CreateProcessor(
             repository,
             cacheInvalidator: cache,
-            provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.AniList, "https://cdn.example.com/test.png")),
+            provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.AniList,
+                "https://cdn.example.com/test.png")),
             httpClientFactory: new FakeHttpClientFactory(exception: new JsonException("invalid start of a value")));
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
@@ -124,9 +127,10 @@ public class BookCoverProcessorTests
         var cache = new FakeBookListCacheInvalidator();
         var processor = CreateProcessor(
             repository,
-            storage: new FakeBookCoverStorage { SaveException = new InvalidOperationException(new string('x', 1200)) },
-            cacheInvalidator: cache,
-            provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.Wikidata, "https://cdn.example.com/test.png")));
+            new FakeBookCoverStorage { SaveException = new InvalidOperationException(new string('x', 1200)) },
+            cache,
+            new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.Wikidata,
+                "https://cdn.example.com/test.png")));
 
         await processor.ProcessAsync(BookId, CancellationToken.None);
 
@@ -155,18 +159,10 @@ public class BookCoverProcessorTests
     {
         var book = new Book
         {
-            Id = BookId,
-            OwnerId = OwnerId,
-            PrimaryTitle = "Test Book",
-            NormalizedPrimaryTitle = "test book"
+            Id = BookId, OwnerId = OwnerId, PrimaryTitle = "Test Book", NormalizedPrimaryTitle = "test book"
         };
 
-        return new BookCover
-        {
-            BookId = BookId,
-            Book = book,
-            Status = status
-        };
+        return new BookCover { BookId = BookId, Book = book, Status = status };
     }
 
     private sealed class FakeBookCoverRepository : IBookCoverRepository
@@ -221,7 +217,8 @@ public class BookCoverProcessorTests
             return Task.FromResult<Stream>(new MemoryStream([1]));
         }
 
-        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
+        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
+            string? contentType, CancellationToken cancellationToken)
         {
             SaveCount++;
             if (SaveException != null)
@@ -289,7 +286,8 @@ public class BookCoverProcessorTests
             _exception = exception;
         }
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
         {
             if (_exception != null)
             {

@@ -4,6 +4,9 @@ using Domain.Entities;
 
 namespace Application.UnitTests;
 
+using Common.DTOs.Author;
+using Common.DTOs.Book;
+
 public class MappingExtensionTests
 {
     [Fact]
@@ -92,8 +95,10 @@ public class MappingExtensionTests
         Assert.NotNull(dto.Cover);
         Assert.Equal("Found", dto.Cover.Status);
         Assert.Equal("Jikan", dto.Cover.Source);
-        Assert.Equal($"/api/v1/book/{book.Id}/cover/file?v={coverVersion.ToUnixTimeMilliseconds()}", dto.Cover.ImageUrl);
-        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail?v={coverVersion.ToUnixTimeMilliseconds()}", dto.Cover.ThumbnailImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/file?v={coverVersion.ToUnixTimeMilliseconds()}",
+            dto.Cover.ImageUrl);
+        Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail?v={coverVersion.ToUnixTimeMilliseconds()}",
+            dto.Cover.ThumbnailImageUrl);
     }
 
     [Fact]

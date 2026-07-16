@@ -17,14 +17,17 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
         _bucket = _options.S3?.Bucket ?? throw new InvalidOperationException("BookCovers:S3:Bucket is not configured.");
     }
 
-    public async Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName, string? contentType, CancellationToken cancellationToken)
+    public async Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
+        string? contentType, CancellationToken cancellationToken)
     {
-        var processed = await BookCoverImageProcessor.ProcessAsync(content, contentType, _options.MaxBytes, cancellationToken);
+        var processed =
+            await BookCoverImageProcessor.ProcessAsync(content, contentType, _options.MaxBytes, cancellationToken);
         var storagePath = $"{ownerId:N}/{bookId:N}.jpg";
         var thumbnailStoragePath = $"{ownerId:N}/{bookId:N}.thumb.jpg";
 
         await UploadAsync(storagePath, processed.Original.Bytes, processed.Original.MimeType, cancellationToken);
-        await UploadAsync(thumbnailStoragePath, processed.Thumbnail.Bytes, processed.Thumbnail.MimeType, cancellationToken);
+        await UploadAsync(thumbnailStoragePath, processed.Thumbnail.Bytes, processed.Thumbnail.MimeType,
+            cancellationToken);
 
         return new BookCoverStoredFiles(
             new BookCoverStoredVariant(
@@ -48,7 +51,8 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
             var response = await _s3.GetObjectAsync(_bucket, storagePath, cancellationToken);
             return response.ResponseStream;
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound || ex.ErrorCode == "NoSuchKey")
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound ||
+                                           ex.ErrorCode == "NoSuchKey")
         {
             throw new EntityNotFoundException<BookCover, Guid>(Guid.Empty);
         }
@@ -65,14 +69,16 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
         {
             await _s3.DeleteObjectAsync(_bucket, storagePath, cancellationToken);
         }
-        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound || ex.ErrorCode == "NoSuchKey")
+        catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound ||
+                                           ex.ErrorCode == "NoSuchKey")
         {
         }
     }
 
-    private async Task UploadAsync(string storagePath, byte[] bytes, string mimeType, CancellationToken cancellationToken)
+    private async Task UploadAsync(string storagePath, byte[] bytes, string mimeType,
+        CancellationToken cancellationToken)
     {
-        using var uploadStream = new MemoryStream(bytes, writable: false);
+        using var uploadStream = new MemoryStream(bytes, false);
         var request = new PutObjectRequest
         {
             BucketName = _bucket,

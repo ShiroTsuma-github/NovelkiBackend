@@ -13,13 +13,25 @@ public class ErrorHandlingMiddlewareTests
 {
     public static TheoryData<Exception, int, string> MappedExceptions => new()
     {
-        { new EntityNotFoundException<Infrastructure.Identity.User, string>("missing"), StatusCodes.Status404NotFound, "Authentication Failed" },
+        {
+            new EntityNotFoundException<Infrastructure.Identity.User, string>("missing"), StatusCodes.Status404NotFound,
+            "Authentication Failed"
+        },
         { new WrongPasswordException(), StatusCodes.Status401Unauthorized, "Authentication Failed" },
-        { new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()), StatusCodes.Status409Conflict,
+            "Conflict"
+        },
         { new EntityNotFoundException<Genre, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityAlreadyExistsException<Status, Guid>("Reading", Guid.NewGuid()), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityAlreadyExistsException<Status, Guid>("Reading", Guid.NewGuid()), StatusCodes.Status409Conflict,
+            "Conflict"
+        },
         { new EntityNotFoundException<Status, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityAlreadyExistsException<ContentType, Guid>("Novel", Guid.NewGuid()), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityAlreadyExistsException<ContentType, Guid>("Novel", Guid.NewGuid()), StatusCodes.Status409Conflict,
+            "Conflict"
+        },
         { new EntityNotFoundException<ContentType, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<Book, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<BookCover, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
@@ -47,7 +59,8 @@ public class ErrorHandlingMiddlewareTests
 
     [Theory]
     [MemberData(nameof(MappedExceptions))]
-    public async Task InvokeAsync_ShouldMapKnownExceptions(Exception exception, int expectedStatus, string expectedTitle)
+    public async Task InvokeAsync_ShouldMapKnownExceptions(Exception exception, int expectedStatus,
+        string expectedTitle)
     {
         var context = await InvokeWithException(exception);
 
@@ -84,7 +97,8 @@ public class ErrorHandlingMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ShouldReturnIdentityOperationErrors()
     {
-        var context = await InvokeWithException(new IdentityOperationFailedException(["Password is too weak."]));
+        var context =
+            await InvokeWithException(new IdentityOperationFailedException(["Password is too weak."]));
 
         context.Response.Body.Position = 0;
         using var document = await JsonDocument.ParseAsync(context.Response.Body);
@@ -133,7 +147,8 @@ public class ErrorHandlingMiddlewareTests
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
         Assert.True(errors.TryGetProperty("Username", out var usernameErrors));
-        Assert.Contains("Account with username 'reader' already exists.", usernameErrors.EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("Account with username 'reader' already exists.",
+            usernameErrors.EnumerateArray().Select(e => e.GetString()));
     }
 
     [Fact]
@@ -153,7 +168,8 @@ public class ErrorHandlingMiddlewareTests
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
         Assert.True(errors.TryGetProperty("Email", out var emailErrors));
-        Assert.Contains("The account with email reader@example.com already exists.", emailErrors.EnumerateArray().Select(e => e.GetString()));
+        Assert.Contains("The account with email reader@example.com already exists.",
+            emailErrors.EnumerateArray().Select(e => e.GetString()));
     }
 
     private static async Task<DefaultHttpContext> InvokeWithException(Exception exception)

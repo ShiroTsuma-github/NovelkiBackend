@@ -68,8 +68,11 @@ public sealed class BookReadQueryService : IBookListQueryService
         string? currentSortDirection,
         CancellationToken cancellationToken)
     {
-        var query = ApplyCriteria(BookQueryInclude.IncludeDetails(_context.Books).Where(book => book.OwnerId == ownerId), criteria);
-        return await _sortBuilder.GetNextCycleSortDirectionAsync(query, sortBy, currentSortDirection, cancellationToken);
+        var query =
+            ApplyCriteria(BookQueryInclude.IncludeDetails(_context.Books).Where(book => book.OwnerId == ownerId),
+                criteria);
+        return await _sortBuilder.GetNextCycleSortDirectionAsync(query, sortBy, currentSortDirection,
+            cancellationToken);
     }
 
     private IQueryable<Book> CreateOwnerQuery(Guid ownerId)

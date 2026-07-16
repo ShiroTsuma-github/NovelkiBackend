@@ -8,6 +8,10 @@ namespace Infrastructure.Middleware;
 
 public class ErrorHandlingMiddleware
 {
+    private const string ConflictTitle = "Conflict";
+    private const string NotFoundTitle = "Not Found";
+    private const string AuthenticationFailedTitle = "Authentication Failed";
+
     private readonly RequestDelegate _next;
     private readonly ILogger<ErrorHandlingMiddleware> _logger;
 
@@ -37,25 +41,25 @@ public class ErrorHandlingMiddleware
         var detail = "Please try again later.";
         object? errors = null;
 
-        switch(exception)
+        switch (exception)
         {
             case EntityNotFoundException<User, string>:
                 statusCode = HttpStatusCode.NotFound;
-                title = "Authentication Failed";
+                title = AuthenticationFailedTitle;
                 detail = exception.Message;
                 _logger.LogWarning("User Not Found");
                 break;
 
             case WrongPasswordException:
                 statusCode = HttpStatusCode.Unauthorized;
-                title = "Authentication Failed";
+                title = AuthenticationFailedTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Incorrect Password");
                 break;
 
             case UsernameTakenException:
                 statusCode = HttpStatusCode.Conflict;
-                title = "Conflict";
+                title = ConflictTitle;
                 detail = exception.Message;
                 errors = new Dictionary<string, IReadOnlyCollection<string>>
                 {
@@ -66,7 +70,7 @@ public class ErrorHandlingMiddleware
 
             case EmailInUseException:
                 statusCode = HttpStatusCode.Conflict;
-                title = "Conflict";
+                title = ConflictTitle;
                 detail = exception.Message;
                 errors = new Dictionary<string, IReadOnlyCollection<string>>
                 {
@@ -77,7 +81,7 @@ public class ErrorHandlingMiddleware
 
             case IdentityOperationFailedException identityException:
                 statusCode = HttpStatusCode.BadRequest;
-                title = "Identity operation failed.";
+                title = IdentityOperationFailedException.DefaultMessage;
                 detail = exception.Message;
                 errors = new Dictionary<string, IReadOnlyCollection<string>>
                 {
@@ -105,63 +109,63 @@ public class ErrorHandlingMiddleware
 
             case EntityAlreadyExistsException<Genre, Guid>:
                 statusCode = HttpStatusCode.Conflict;
-                title = "Conflict";
+                title = ConflictTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Genre already exists");
                 break;
 
             case EntityNotFoundException<Genre, Guid>:
                 statusCode = HttpStatusCode.NotFound;
-                title = "Not Found";
+                title = NotFoundTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Genre not found");
                 break;
 
             case EntityAlreadyExistsException<Status, Guid>:
                 statusCode = HttpStatusCode.Conflict;
-                title = "Conflict";
+                title = ConflictTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Status already exists");
                 break;
 
             case EntityNotFoundException<Status, Guid>:
                 statusCode = HttpStatusCode.NotFound;
-                title = "Not Found";
+                title = NotFoundTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Status not found");
                 break;
 
             case EntityAlreadyExistsException<ContentType, Guid>:
                 statusCode = HttpStatusCode.Conflict;
-                title = "Conflict";
+                title = ConflictTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Type already exists");
                 break;
 
             case EntityNotFoundException<ContentType, Guid>:
                 statusCode = HttpStatusCode.NotFound;
-                title = "Not Found";
+                title = NotFoundTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Type not found");
                 break;
 
             case EntityNotFoundException<Book, Guid>:
                 statusCode = HttpStatusCode.NotFound;
-                title = "Not Found";
+                title = NotFoundTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Book not found");
                 break;
 
             case EntityNotFoundException<BookCover, Guid>:
                 statusCode = HttpStatusCode.NotFound;
-                title = "Not Found";
+                title = NotFoundTitle;
                 detail = exception.Message;
                 _logger.LogWarning("Book cover not found");
                 break;
 
             case EntityAlreadyExistsException<Book, Guid> bookConflict:
                 statusCode = HttpStatusCode.Conflict;
-                title = "Conflict";
+                title = ConflictTitle;
                 detail = $"A book named '{bookConflict.Name}' already exists.";
                 _logger.LogWarning("Book already exists. ExistingId={ExistingId}", bookConflict.ExistingId);
                 break;
@@ -171,7 +175,9 @@ public class ErrorHandlingMiddleware
                 detail = "An internal server error occurred. Please check the logs.";
                 _logger.LogError(exception, "Server (500) unhandled error: {Message}", exception.Message);
                 break;
-        };
+        }
+
+        ;
 
         context.Response.StatusCode = (int)statusCode;
         var errorResponse = new

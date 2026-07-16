@@ -1,4 +1,5 @@
 ﻿global using Application.Common.Interfaces;
+global using Application.Common;
 global using Domain.Entities;
 global using Infrastructure.Contexts;
 global using Microsoft.EntityFrameworkCore;
@@ -9,4 +10,3 @@ global using Domain.Common;
 global using Infrastructure.Identity;
 global using Domain.Exceptions;
 global using Domain.Repositories;
-

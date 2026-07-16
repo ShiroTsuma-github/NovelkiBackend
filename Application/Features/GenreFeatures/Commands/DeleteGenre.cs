@@ -1,6 +1,6 @@
 namespace Application.Features.GenreFeatures.Commands;
 
-using Application.Common;
+using Common;
 
 public record DeleteGenreCommand(Guid Id) : IRequest;
 

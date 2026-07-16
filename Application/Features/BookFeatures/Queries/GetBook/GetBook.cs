@@ -18,7 +18,7 @@ public class GetBookHandler : IRequestHandler<GetBookQuery, BookDto>
     public async Task<BookDto> Handle(GetBookQuery request, CancellationToken cancellationToken)
     {
         var book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
-            ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
 
         return book.ToDto();
     }

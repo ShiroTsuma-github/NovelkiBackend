@@ -31,9 +31,13 @@ public sealed class BookExportQueryService : IBookExportQueryService
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        var query = ApplyCriteria(BookQueryInclude.IncludeDetails(_context.Books).Where(book => book.OwnerId == ownerId), criteria);
-        var books = await _sortBuilder.ToSortedPageAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
-        var total = await ApplyCriteria(_context.Books.Where(book => book.OwnerId == ownerId), criteria).CountAsync(cancellationToken);
+        var query =
+            ApplyCriteria(BookQueryInclude.IncludeDetails(_context.Books).Where(book => book.OwnerId == ownerId),
+                criteria);
+        var books =
+            await _sortBuilder.ToSortedPageAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
+        var total = await ApplyCriteria(_context.Books.Where(book => book.OwnerId == ownerId), criteria)
+            .CountAsync(cancellationToken);
 
         return PaginatedResult<BookDto>.Create(skip, take, total, books.Select(book => book.ToDto()));
     }

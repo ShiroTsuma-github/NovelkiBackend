@@ -16,7 +16,7 @@ public class GetStatusDetailsByNameQueryHandler : IRequestHandler<GetStatusDetai
     public async Task<StatusDetailsDto> Handle(GetStatusDetailsByNameQuery request, CancellationToken cancellationToken)
     {
         var status = await _statusRepository.GetByNameAsync(request.Name, cancellationToken)
-            ?? throw new EntityNotFoundException<Status, string>(request.Name);
+                     ?? throw new EntityNotFoundException<Status, string>(request.Name);
 
         return status.ToDetailsDto();
     }

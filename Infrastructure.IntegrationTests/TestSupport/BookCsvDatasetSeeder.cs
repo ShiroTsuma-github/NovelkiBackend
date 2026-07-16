@@ -12,9 +12,15 @@ namespace Infrastructure.IntegrationTests.TestSupport;
 public static class BookCsvDatasetSeeder
 {
     private static readonly string[] TypeNames = ["Novel", "Manga", "Manhwa", "Manhua", "Other"];
-    private static readonly string[] StatusNames = ["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"];
-    private static readonly string[] FallbackGenreNames = ["Fantasy", "Action", "Drama", "Adventure", "Romance", "Comedy", "Xianxia", "Harem"];
-    private static readonly string[] CsvRelativePaths = ["Sample/books-export.csv", "Infrastructure.IntegrationTests/Sample/books-export.csv"];
+
+    private static readonly string[] StatusNames =
+        ["Reading", "Completed", "Plan To Read", "On Hold", "Dropped", "Unknown"];
+
+    private static readonly string[] FallbackGenreNames =
+        ["Fantasy", "Action", "Drama", "Adventure", "Romance", "Comedy", "Xianxia", "Harem"];
+
+    private static readonly string[] CsvRelativePaths =
+        ["Sample/books-export.csv", "Infrastructure.IntegrationTests/Sample/books-export.csv"];
 
     public static async Task<BookCsvDatasetSnapshot> SeedAsync(
         ApplicationDbContext context,
@@ -24,7 +30,8 @@ public static class BookCsvDatasetSeeder
         var rows = ReadRows().ToList();
         if (rows.Count == 0)
         {
-            throw new InvalidOperationException("The local CSV test dataset notes/books-export.csv contains no importable books.");
+            throw new InvalidOperationException(
+                "The local CSV test dataset notes/books-export.csv contains no importable books.");
         }
 
         var contentTypes = await context.ContentTypes
@@ -41,8 +48,10 @@ public static class BookCsvDatasetSeeder
             .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var genres = await EnsureGenresAsync(context, genreNames, cancellationToken);
-        var tags = await EnsureTagsAsync(context, ownerId, rows.SelectMany(row => row.Tags), cancellationToken);
-        var authors = await EnsureAuthorsAsync(context, rows.Select(row => row.Author), cancellationToken);
+        var tags =
+            await EnsureTagsAsync(context, ownerId, rows.SelectMany(row => row.Tags), cancellationToken);
+        var authors =
+            await EnsureAuthorsAsync(context, rows.Select(row => row.Author), cancellationToken);
 
         var random = new Random(1337);
         var usedKeys = new HashSet<BookUniqueKey>();
@@ -88,7 +97,10 @@ public static class BookCsvDatasetSeeder
 
             foreach (var genreName in SelectGenres(row, genreNames, random))
             {
-                book.BookGenres.Add(new BookGenre { Book = book, Genre = genres[MappingExtensions.NormalizeName(genreName)] });
+                book.BookGenres.Add(new BookGenre
+                {
+                    Book = book, Genre = genres[MappingExtensions.NormalizeName(genreName)]
+                });
             }
 
             foreach (var tagName in row.Tags.Distinct(StringComparer.OrdinalIgnoreCase))
@@ -101,8 +113,10 @@ public static class BookCsvDatasetSeeder
                 book.ProgressHistory.Add(new BookProgressHistory
                 {
                     ChapterNumber = row.CurrentChapterNumber,
-                    ChapterLabel = row.CurrentChapterLabel ?? row.CurrentChapterNumber?.ToString(CultureInfo.InvariantCulture),
-                    ChangedAt = DateTimeOffset.Parse("2026-01-01T00:00:00+00:00", CultureInfo.InvariantCulture).AddMinutes(index)
+                    ChapterLabel =
+                        row.CurrentChapterLabel ?? row.CurrentChapterNumber?.ToString(CultureInfo.InvariantCulture),
+                    ChangedAt = DateTimeOffset.Parse("2026-01-01T00:00:00+00:00", CultureInfo.InvariantCulture)
+                        .AddMinutes(index)
                 });
             }
 
@@ -160,7 +174,8 @@ public static class BookCsvDatasetSeeder
     private static void AssertBalanced(IReadOnlyDictionary<string, int> counts)
     {
         Assert.NotEmpty(counts);
-        Assert.True(counts.Values.Max() - counts.Values.Min() <= 1, $"Expected balanced distribution, got {string.Join(", ", counts.Select(item => $"{item.Key}={item.Value}"))}.");
+        Assert.True(counts.Values.Max() - counts.Values.Min() <= 1,
+            $"Expected balanced distribution, got {string.Join(", ", counts.Select(item => $"{item.Key}={item.Value}"))}.");
     }
 
     private static async Task<Dictionary<string, Genre>> EnsureGenresAsync(
@@ -257,7 +272,8 @@ public static class BookCsvDatasetSeeder
         return authors;
     }
 
-    private static IReadOnlyCollection<string> SelectGenres(CsvBookRow row, IReadOnlyList<string> genreNames, Random random)
+    private static IReadOnlyCollection<string> SelectGenres(CsvBookRow row, IReadOnlyList<string> genreNames,
+        Random random)
     {
         var selected = new HashSet<string>(row.Genres, StringComparer.OrdinalIgnoreCase);
         var targetCount = Math.Max(selected.Count, random.Next(1, Math.Min(3, genreNames.Count) + 1));
@@ -269,7 +285,8 @@ public static class BookCsvDatasetSeeder
         return selected;
     }
 
-    private static string MakeUniqueTitle(string baseTitle, Guid ownerId, Guid contentTypeId, HashSet<BookUniqueKey> usedKeys)
+    private static string MakeUniqueTitle(string baseTitle, Guid ownerId, Guid contentTypeId,
+        HashSet<BookUniqueKey> usedKeys)
     {
         var title = baseTitle;
         var suffix = 2;
@@ -287,9 +304,7 @@ public static class BookCsvDatasetSeeder
         var csvPath = FindCsvPath();
         using var parser = new TextFieldParser(csvPath)
         {
-            TextFieldType = FieldType.Delimited,
-            HasFieldsEnclosedInQuotes = true,
-            TrimWhiteSpace = false
+            TextFieldType = FieldType.Delimited, HasFieldsEnclosedInQuotes = true, TrimWhiteSpace = false
         };
         parser.SetDelimiters(",");
 
@@ -328,7 +343,11 @@ public static class BookCsvDatasetSeeder
 
     private static string FindCsvPath([CallerFilePath] string sourceFilePath = "")
     {
-        foreach (var startPath in new[] { AppContext.BaseDirectory, Directory.GetCurrentDirectory(), Path.GetDirectoryName(sourceFilePath) })
+        foreach (var startPath in new[]
+                 {
+                     AppContext.BaseDirectory, Directory.GetCurrentDirectory(),
+                     Path.GetDirectoryName(sourceFilePath)
+                 })
         {
             if (string.IsNullOrWhiteSpace(startPath))
             {
@@ -351,10 +370,12 @@ public static class BookCsvDatasetSeeder
             }
         }
 
-        throw new FileNotFoundException("Expected CSV test dataset at Infrastructure.IntegrationTests/Sample/books-export.csv or copied build output Sample/books-export.csv.");
+        throw new FileNotFoundException(
+            "Expected CSV test dataset at Infrastructure.IntegrationTests/Sample/books-export.csv or copied build output Sample/books-export.csv.");
     }
 
-    private static string? GetField(IReadOnlyList<string> fields, IReadOnlyDictionary<string, int> headerIndexes, string header)
+    private static string? GetField(IReadOnlyList<string> fields, IReadOnlyDictionary<string, int> headerIndexes,
+        string header)
     {
         return headerIndexes.TryGetValue(header, out var index) && index < fields.Count ? fields[index] : null;
     }
@@ -366,7 +387,9 @@ public static class BookCsvDatasetSeeder
 
     private static decimal? TryDecimal(string? value)
     {
-        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result) ? result : null;
+        return decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var result)
+            ? result
+            : null;
     }
 
     private static int? TryInt(string? value)
@@ -412,7 +435,10 @@ public sealed record BookCsvDatasetSnapshot(
     public BookCsvDatasetSample Any => Samples[0];
     public BookCsvDatasetSample WithTag => Samples.First(sample => sample.Tags.Count > 0);
     public BookCsvDatasetSample WithRating => Samples.First(sample => sample.Rating != null);
-    public BookCsvDatasetSample WithTagAndRating => Samples.First(sample => sample.Tags.Count > 0 && sample.Rating != null);
+
+    public BookCsvDatasetSample WithTagAndRating =>
+        Samples.First(sample => sample.Tags.Count > 0 && sample.Rating != null);
+
     public BookCsvDatasetSample WithTotalChapters => Samples.First(sample => sample.TotalChapters != null);
     public BookCsvDatasetSample WithNotes => Samples.First(sample => !string.IsNullOrWhiteSpace(sample.Notes));
 }

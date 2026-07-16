@@ -15,12 +15,6 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
     private const int DefaultRangeDays = 84;
     private const int MaxDailyBucketRangeDays = 366;
     private const int MaxWeeklyBucketRangeDays = 3660;
-    private static readonly HashSet<string> SupportedBuckets = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "day",
-        "week",
-        "month"
-    };
 
     private readonly IBookAnalyticsQueryService _queryService;
     private readonly IUser _user;
@@ -33,8 +27,10 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
     public async Task<BookAnalyticsDto> Handle(GetBookAnalyticsQuery request, CancellationToken cancellationToken)
     {
-        var bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "week" : request.Bucket.Trim().ToLowerInvariant();
-        if (!SupportedBuckets.Contains(bucket))
+        var bucket = string.IsNullOrWhiteSpace(request.Bucket)
+            ? BookAnalyticsBuckets.Default
+            : request.Bucket.Trim().ToLowerInvariant();
+        if (!BookAnalyticsBuckets.IsSupported(bucket))
         {
             throw ValidationError(nameof(request.Bucket), "Bucket must be one of: day, week, month.");
         }
@@ -59,7 +55,8 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
         bucket = ResolveEffectiveBucket(bucket, from, to);
         var scope = new BookAnalyticsScopeSnapshot(request.Query, from, to, bucket);
         var criteria = BookSearchQueryParser.Parse(request.Query);
-        var snapshot = await _queryService.GetAnalyticsAsync(_user.RequiredId, criteria, scope, cancellationToken);
+        var snapshot =
+            await _queryService.GetAnalyticsAsync(_user.RequiredId, criteria, scope, cancellationToken);
 
         return snapshot.ToDto();
     }
@@ -74,12 +71,12 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
         var rangeDays = to.DayNumber - from.DayNumber;
         if (rangeDays > MaxWeeklyBucketRangeDays)
         {
-            return "month";
+            return BookAnalyticsBuckets.Month;
         }
 
-        if (requestedBucket == "day" && rangeDays > MaxDailyBucketRangeDays)
+        if (requestedBucket == BookAnalyticsBuckets.Day && rangeDays > MaxDailyBucketRangeDays)
         {
-            return "week";
+            return BookAnalyticsBuckets.Week;
         }
 
         return requestedBucket;

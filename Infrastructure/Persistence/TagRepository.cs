@@ -19,7 +19,8 @@ public class TagRepository : ITagRepository
             cancellationToken);
     }
 
-    public async Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names, CancellationToken cancellationToken)
+    public async Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,
+        CancellationToken cancellationToken)
     {
         var normalizedNames = names.Select(MappingExtensions.NormalizeName).Distinct().ToList();
         return await _context.Tags
@@ -27,7 +28,8 @@ public class TagRepository : ITagRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take, CancellationToken cancellationToken)
+    public async Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
+        CancellationToken cancellationToken)
     {
         var query = _context.Tags.Where(t => t.OwnerId == ownerId);
         if (!string.IsNullOrWhiteSpace(search))

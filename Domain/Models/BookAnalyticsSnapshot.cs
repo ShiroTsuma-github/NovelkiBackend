@@ -121,19 +121,7 @@ public sealed record BookAnalyticsQualitySnapshot(
     IReadOnlyList<BookAnalyticsCoverStatusSnapshot> CoverStatuses,
     IReadOnlyList<BookAnalyticsCoverSourceSnapshot> CoverSources)
 {
-    public static IReadOnlyList<string> FieldNames { get; } =
-    [
-        "author",
-        "description",
-        "genre",
-        "tag",
-        "rating",
-        "priority",
-        "totalChapters",
-        "link",
-        "alternateTitle",
-        "usableCover"
-    ];
+    public static IReadOnlyList<string> FieldNames { get; } = BookAnalyticsQualityFields.All;
 
     public static BookAnalyticsQualitySnapshot Empty { get; } = new(CreateEmptyFieldCompleteness(), [], [], []);
 

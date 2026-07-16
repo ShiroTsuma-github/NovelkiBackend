@@ -1,18 +1,18 @@
 namespace Infrastructure.BookCovers;
 
+using System.Collections.Concurrent;
+using System.Text.Json;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Microsoft.EntityFrameworkCore;
-using System.Collections.Concurrent;
-using System.Text.Json;
 
 public sealed class BookCoverBackgroundService : BackgroundService
 {
     private readonly ConcurrentDictionary<Guid, byte> _inFlight = new();
+    private readonly ILogger<BookCoverBackgroundService> _logger;
     private readonly InMemoryBookCoverQueue _queue;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ILogger<BookCoverBackgroundService> _logger;
 
     public BookCoverBackgroundService(
         InMemoryBookCoverQueue queue,
@@ -88,12 +88,12 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
 public sealed class BookCoverProcessor
 {
-    private readonly IBookCoverRepository _coverRepository;
-    private readonly IBookCoverStorage _storage;
-    private readonly BookCoverResolver _resolver;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
+    private readonly IBookCoverRepository _coverRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BookCoverProcessor> _logger;
+    private readonly BookCoverResolver _resolver;
+    private readonly IBookCoverStorage _storage;
 
     public BookCoverProcessor(
         IBookCoverRepository coverRepository,
@@ -128,13 +128,14 @@ public sealed class BookCoverProcessor
             if (candidate == null)
             {
                 cover.Status = BookCoverStatus.NotFound;
-                cover.FailureReason = "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
+                cover.FailureReason =
+                    "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
                 CoverLinkHelper.TouchBook(cover.Book);
                 await _coverRepository.SaveAsync(cancellationToken);
                 return;
             }
 
-            using var client = _httpClientFactory.CreateClient("BookCoverImages");
+            using var client = _httpClientFactory.CreateClient(BookCoverHttpClients.Images);
             await using var imageStream = await client.GetStreamAsync(candidate.ImageUrl, cancellationToken);
             var stored = await _storage.SaveAsync(
                 cover.Book.OwnerId,
@@ -164,7 +165,7 @@ public sealed class BookCoverProcessor
             await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
             _logger.LogInformation("Cover found. BookId={BookId} Source={Source}", cover.BookId, candidate.Source);
         }
-        catch (FluentValidation.ValidationException ex)
+        catch (ValidationException ex)
         {
             cover.Status = BookCoverStatus.Failed;
             cover.FailureReason = ex.Message;
@@ -186,12 +187,14 @@ public sealed class BookCoverProcessor
                 cover.Status = BookCoverStatus.Failed;
                 cover.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
             }
+
             CoverLinkHelper.TouchBook(cover.Book);
             await _coverRepository.SaveAsync(cancellationToken);
             if (shouldInvalidateCache)
             {
                 await _cacheInvalidator.InvalidateBooksAsync(cover.Book.OwnerId, cancellationToken);
             }
+
             _logger.LogWarning(ex, "Cover provider failed. BookId={BookId}", cover.BookId);
         }
     }
@@ -226,7 +229,7 @@ internal static class CoverLinkHelper
             Label = source?.ToString(),
             SourceType = "Cover",
             IsPrimary = false,
-            LastReadHere = false,
+            LastReadHere = false
         });
     }
 

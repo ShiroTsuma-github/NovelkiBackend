@@ -1,6 +1,6 @@
 namespace Application.Features.BookFeatures.Queries.GetBook;
 
-using Application.Common.Interfaces;
+using Common.Interfaces;
 using Application.Common.DTOs.Book;
 
 public record GetAllAdminBooksQuery(
@@ -19,10 +19,12 @@ public class GetAllAdminBooksHandler : IRequestHandler<GetAllAdminBooksQuery, Pa
         _queryService = queryService;
     }
 
-    public async Task<PaginatedResult<AdminBookListItemDto>> Handle(GetAllAdminBooksQuery request, CancellationToken cancellationToken)
+    public async Task<PaginatedResult<AdminBookListItemDto>> Handle(GetAllAdminBooksQuery request,
+        CancellationToken cancellationToken)
     {
         var criteria = BookSearchQueryParser.Parse(request.Query);
-        var books = await _queryService.GetAdminBooksAsync(criteria, request.Skip, request.Take, request.SortBy, request.SortDirection, cancellationToken);
+        var books = await _queryService.GetAdminBooksAsync(criteria, request.Skip,
+            request.Take, request.SortBy, request.SortDirection, cancellationToken);
         var total = await _queryService.GetAdminBookCountAsync(criteria, cancellationToken);
 
         return PaginatedResult<AdminBookListItemDto>.Create(request.Skip, request.Take, total, books);
@@ -43,7 +45,7 @@ public class GetAdminBookHandler : IRequestHandler<GetAdminBookQuery, AdminBookD
     public async Task<AdminBookDto> Handle(GetAdminBookQuery request, CancellationToken cancellationToken)
     {
         var book = await _repository.GetByIdAsync(request.Id, cancellationToken)
-            ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
 
         return book.ToAdminDto();
     }

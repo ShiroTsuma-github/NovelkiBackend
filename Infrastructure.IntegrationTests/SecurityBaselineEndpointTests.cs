@@ -24,6 +24,8 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructure.IntegrationTests;
 
+using Microsoft.Extensions.Primitives;
+
 public class SecurityBaselineEndpointTests
 {
     private static readonly Guid UserAId = Guid.Parse("11111111-1111-1111-1111-111111111111");
@@ -33,7 +35,8 @@ public class SecurityBaselineEndpointTests
     public async Task ProtectedBookEndpoint_ShouldReturnUnauthorizedWithoutToken()
     {
         await using var factory = new SecurityApiFactory();
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var client =
+            factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.GetAsync("/api/v1/book");
 
@@ -81,7 +84,8 @@ public class SecurityBaselineEndpointTests
     public async Task ApiResponses_ShouldIncludeBaselineSecurityHeaders()
     {
         await using var factory = new SecurityApiFactory();
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var client =
+            factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var response = await client.GetAsync("/health/live");
         var body = await response.Content.ReadAsStringAsync();
@@ -90,7 +94,8 @@ public class SecurityBaselineEndpointTests
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
         Assert.Equal("no-referrer", response.Headers.GetValues("Referrer-Policy").Single());
-        Assert.Equal("camera=(), microphone=(), geolocation=()", response.Headers.GetValues("Permissions-Policy").Single());
+        Assert.Equal("camera=(), microphone=(), geolocation=()",
+            response.Headers.GetValues("Permissions-Policy").Single());
         Assert.Equal("same-origin", response.Headers.GetValues("Cross-Origin-Opener-Policy").Single());
     }
 
@@ -98,7 +103,8 @@ public class SecurityBaselineEndpointTests
     public async Task Cors_ShouldNotAllowArbitraryOrigins_WhenNoOriginAllowlistIsConfiguredOutsideDevelopment()
     {
         await using var factory = new SecurityApiFactory();
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var client =
+            factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         using var request = new HttpRequestMessage(HttpMethod.Get, "/health/live");
         request.Headers.Add("Origin", "https://evil.example");
 
@@ -113,7 +119,8 @@ public class SecurityBaselineEndpointTests
     public async Task AccountLogin_ShouldRateLimitRepeatedRequestsByRemoteIp()
     {
         await using var factory = new SecurityApiFactory();
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var client =
+            factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
         var firstResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
         var secondResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
@@ -129,8 +136,10 @@ public class SecurityBaselineEndpointTests
         await factory.EnsureCreatedAsync();
         using var client = factory.CreateAuthenticatedClient(UserAId);
 
-        var firstResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
-        var secondResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+        var firstResponse =
+            await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+        var secondResponse =
+            await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
 
         Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
@@ -143,8 +152,10 @@ public class SecurityBaselineEndpointTests
         await factory.EnsureCreatedAsync();
         using var client = factory.CreateAuthenticatedClient(UserAId, "Admin");
 
-        var firstResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
-        var secondResponse = await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+        var firstResponse =
+            await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
+        var secondResponse =
+            await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
 
         Assert.Equal(HttpStatusCode.BadRequest, firstResponse.StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
@@ -153,6 +164,7 @@ public class SecurityBaselineEndpointTests
     private sealed class SecurityApiFactory : WebApplicationFactory<Program>
     {
         private readonly SqliteConnection _connection = new("DataSource=:memory:");
+
         private readonly ServiceProvider _sqliteServices = new ServiceCollection()
             .AddEntityFrameworkSqlite()
             .BuildServiceProvider();
@@ -198,7 +210,8 @@ public class SecurityBaselineEndpointTests
                 services.AddScoped<IBookListCacheInvalidator, NoopBookListCacheInvalidator>();
                 services
                     .AddAuthentication(TestAuthHandler.AuthenticationScheme)
-                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.AuthenticationScheme, _ => { });
+                    .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>(TestAuthHandler.AuthenticationScheme,
+                        _ => { });
                 services.Configure<AuthenticationOptions>(options =>
                 {
                     options.DefaultAuthenticateScheme = TestAuthHandler.AuthenticationScheme;
@@ -211,7 +224,8 @@ public class SecurityBaselineEndpointTests
         public HttpClient CreateAuthenticatedClient(Guid userId, params string[] roles)
         {
             var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
-            client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
+            client.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.ToString());
             if (roles.Length > 0)
             {
@@ -316,7 +330,9 @@ public class SecurityBaselineEndpointTests
                 new(ClaimTypes.Email, $"{userId:N}@example.com")
             };
             var roles = Request.Headers[RolesHeader]
-                .SelectMany(value => value?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ?? Array.Empty<string>());
+                .SelectMany(value =>
+                    value?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ??
+                    Array.Empty<string>());
             claims.AddRange(roles.Select(role => new Claim(ClaimTypes.Role, role)));
 
             var identity = new ClaimsIdentity(claims, AuthenticationScheme);

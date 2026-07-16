@@ -3,11 +3,11 @@
 using Application.Common;
 using Application.Common.DTOs.User;
 using Application.Common.Models;
-using Infrastructure.Authentication;
+using Authentication;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
 using System.Text;
-using Infrastructure.Contexts;
+using Contexts;
 
 public class IdentityService : IIdentityService
 {
@@ -32,7 +32,8 @@ public class IdentityService : IIdentityService
     public async Task<TokenResponse> LoginUser(LoginDto login, CancellationToken cancellation)
     {
         var identifier = login.username ?? login.email ?? "No Identifier";
-        var user = await _userManager.FindByNameAsync(login.username ?? "") ?? await _userManager.FindByEmailAsync(login.email ?? "");
+        var user = await _userManager.FindByNameAsync(login.username ?? "") ??
+                   await _userManager.FindByEmailAsync(login.email ?? "");
         if (user == null)
         {
             throw new EntityNotFoundException<User, string>(identifier);
@@ -40,10 +41,11 @@ public class IdentityService : IIdentityService
 
         var result = await _signInManager.CheckPasswordSignInAsync(user, login.password, false);
 
-        if (!result.Succeeded) 
+        if (!result.Succeeded)
         {
             throw new WrongPasswordException();
         }
+
         var authUser = new AuthUser
         {
             Username = user.UserName,
@@ -62,19 +64,22 @@ public class IdentityService : IIdentityService
         }
 
         var refreshToken = await IssueRefreshTokenAsync(user.Id, cancellation);
-        return tokenResponse with
-        {
-            RefreshToken = refreshToken.Token,
-            RefreshTokenExpiresAt = refreshToken.ExpiresAt
-        };
+        return tokenResponse with { RefreshToken = refreshToken.Token, RefreshTokenExpiresAt = refreshToken.ExpiresAt };
     }
 
     public async Task<RegisterResponse> RegisterUser(RegisterDto register, CancellationToken cancellation)
     {
         var exists = await _userManager.FindByNameAsync(register.username);
-        if (exists != null) throw new UsernameTakenException(register.username);
+        if (exists != null)
+        {
+            throw new UsernameTakenException(register.username);
+        }
+
         exists = await _userManager.FindByEmailAsync(register.email);
-        if (exists != null) throw new EmailInUseException(register.email);
+        if (exists != null)
+        {
+            throw new EmailInUseException(register.email);
+        }
 
         var createdAt = DateTimeOffset.UtcNow;
         var user = new User { UserName = register.username, Email = register.email, CreatedAt = createdAt };
@@ -84,12 +89,7 @@ public class IdentityService : IIdentityService
             throw new IdentityOperationFailedException(result.Errors.Select(e => e.Description));
         }
 
-        return new RegisterResponse
-        {
-            Id = user.Id,
-            Name = register.username,
-            CreatedAt = createdAt
-        };
+        return new RegisterResponse { Id = user.Id, Name = register.username, CreatedAt = createdAt };
     }
 
     public async Task<TokenResponse> RefreshTokenAsync(string refreshToken, CancellationToken cancellationToken)
@@ -108,7 +108,7 @@ public class IdentityService : IIdentityService
         }
 
         var user = await _userManager.FindByIdAsync(storedToken.UserId.ToString())
-            ?? throw new UnauthorizedAccessException("Refresh token user no longer exists.");
+                   ?? throw new UnauthorizedAccessException("Refresh token user no longer exists.");
 
         storedToken.RevokedAt = DateTimeOffset.UtcNow;
         storedToken.ReasonRevoked = "Rotated";
@@ -117,9 +117,7 @@ public class IdentityService : IIdentityService
         storedToken.ReplacedByTokenHash = HashToken(nextRefreshToken.Token);
         _context.RefreshTokens.Add(new RefreshToken
         {
-            UserId = user.Id,
-            TokenHash = storedToken.ReplacedByTokenHash,
-            ExpiresAt = nextRefreshToken.ExpiresAt
+            UserId = user.Id, TokenHash = storedToken.ReplacedByTokenHash, ExpiresAt = nextRefreshToken.ExpiresAt
         });
 
         var authUser = new AuthUser
@@ -134,14 +132,13 @@ public class IdentityService : IIdentityService
         };
 
         var accessToken = _jwtTokenGenerator.GenerateToken(authUser)
-            ?? throw new TokenGeneratorFailedException();
+                          ?? throw new TokenGeneratorFailedException();
 
         await _context.SaveChangesAsync(cancellationToken);
 
         return accessToken with
         {
-            RefreshToken = nextRefreshToken.Token,
-            RefreshTokenExpiresAt = nextRefreshToken.ExpiresAt
+            RefreshToken = nextRefreshToken.Token, RefreshTokenExpiresAt = nextRefreshToken.ExpiresAt
         };
     }
 
@@ -165,14 +162,13 @@ public class IdentityService : IIdentityService
         await _context.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task<(string Token, DateTimeOffset ExpiresAt)> IssueRefreshTokenAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task<(string Token, DateTimeOffset ExpiresAt)> IssueRefreshTokenAsync(Guid userId,
+        CancellationToken cancellationToken)
     {
         var nextRefreshToken = CreateRefreshToken(userId);
         _context.RefreshTokens.Add(new RefreshToken
         {
-            UserId = userId,
-            TokenHash = HashToken(nextRefreshToken.Token),
-            ExpiresAt = nextRefreshToken.ExpiresAt
+            UserId = userId, TokenHash = HashToken(nextRefreshToken.Token), ExpiresAt = nextRefreshToken.ExpiresAt
         });
         await _context.SaveChangesAsync(cancellationToken);
         return nextRefreshToken;

@@ -6,17 +6,17 @@ using System.Text.Json;
 public sealed class AniListBookCoverProvider : IBookCoverProvider
 {
     private const string Query = """
-        query ($search: String) {
-          Page(page: 1, perPage: 5) {
-            media(search: $search, type: MANGA) {
-              coverImage {
-                extraLarge
-                large
-              }
-            }
-          }
-        }
-        """;
+                                 query ($search: String) {
+                                   Page(page: 1, perPage: 5) {
+                                     media(search: $search, type: MANGA) {
+                                       coverImage {
+                                         extraLarge
+                                         large
+                                       }
+                                     }
+                                   }
+                                 }
+                                 """;
 
     private readonly HttpClient _httpClient;
 
@@ -47,7 +47,7 @@ public sealed class AniListBookCoverProvider : IBookCoverProvider
             foreach (var item in media.Value.EnumerateArray())
             {
                 var imageUrl = BookCoverJson.TryGetString(item, "coverImage", "extraLarge")
-                    ?? BookCoverJson.TryGetString(item, "coverImage", "large");
+                               ?? BookCoverJson.TryGetString(item, "coverImage", "large");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.AniList, imageUrl);
@@ -57,5 +57,4 @@ public sealed class AniListBookCoverProvider : IBookCoverProvider
 
         return null;
     }
-
 }

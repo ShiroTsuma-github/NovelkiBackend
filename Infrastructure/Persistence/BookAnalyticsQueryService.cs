@@ -1,19 +1,11 @@
 namespace Infrastructure.Persistence;
 
-using Domain.Models;
 using System.Globalization;
+using Domain.Models;
 
-public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
+public sealed class BookAnalyticsQueryService(ApplicationDbContext context, BookSearchCriteriaApplier criteriaApplier)
+    : IBookAnalyticsQueryService
 {
-    private readonly ApplicationDbContext _context;
-    private readonly BookSearchCriteriaApplier _criteriaApplier;
-
-    public BookAnalyticsQueryService(ApplicationDbContext context, BookSearchCriteriaApplier criteriaApplier)
-    {
-        _context = context;
-        _criteriaApplier = criteriaApplier;
-    }
-
     public async Task<BookAnalyticsSnapshot> GetAnalyticsAsync(
         Guid ownerId,
         BookSearchCriteria criteria,
@@ -21,15 +13,18 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         CancellationToken cancellationToken)
     {
         var query = ApplyScope(
-            ApplyCriteria(_context.Books.AsNoTracking().Where(book => book.OwnerId == ownerId), criteria),
+            ApplyCriteria(context.Books.AsNoTracking().Where(book => book.OwnerId == ownerId), criteria),
             scope);
         var overview = await GetOverviewAsync(query, cancellationToken);
-        var composition = await GetCompositionAsync(query, overview.TotalBooks, cancellationToken);
+        var composition =
+            await GetCompositionAsync(query, overview.TotalBooks, cancellationToken);
         var ratings = await GetRatingsAsync(query, overview, cancellationToken);
         var planning = await GetPlanningAsync(query, overview.TotalBooks, cancellationToken);
         var progress = await GetProgressAsync(query, overview.TotalBooks, cancellationToken);
-        var activity = await GetActivityAsync(query, scope, overview.TotalBooks, cancellationToken);
-        var libraryGrowth = await GetLibraryGrowthAsync(query, scope, overview.TotalBooks, cancellationToken);
+        var activity =
+            await GetActivityAsync(query, scope, overview.TotalBooks, cancellationToken);
+        var libraryGrowth =
+            await GetLibraryGrowthAsync(query, scope, overview.TotalBooks, cancellationToken);
         var quality = await GetQualityAsync(query, overview.TotalBooks, cancellationToken);
 
         return new BookAnalyticsSnapshot(
@@ -47,21 +42,23 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
 
     private IQueryable<Book> ApplyCriteria(IQueryable<Book> query, BookSearchCriteria criteria)
     {
-        return criteria.HasFilters ? _criteriaApplier.Apply(query, criteria) : query;
+        return criteria.HasFilters ? criteriaApplier.Apply(query, criteria) : query;
     }
 
     private IQueryable<Book> ApplyScope(IQueryable<Book> query, BookAnalyticsScopeSnapshot scope)
     {
         var from = ToUtcDateTimeOffset(scope.From);
         var to = ToUtcDateTimeOffset(scope.To);
-        if (IsSqliteProvider())
+        if (!IsSqliteProvider())
         {
-            var fromText = ToSqliteDateTimeOffsetString(from);
-            var toText = ToSqliteDateTimeOffsetString(to);
-            return query.Where(book => string.Compare(book.Created.ToString(), fromText) >= 0 && string.Compare(book.Created.ToString(), toText) < 0);
+            return query.Where(book => book.Created >= from && book.Created < to);
         }
 
-        return query.Where(book => book.Created >= from && book.Created < to);
+        var fromText = ToSqliteDateTimeOffsetString(from);
+        var toText = ToSqliteDateTimeOffsetString(to);
+        return query.Where(book =>
+            string.Compare(book.Created.ToString(), fromText) >= 0 &&
+            string.Compare(book.Created.ToString(), toText) < 0);
     }
 
     private static async Task<BookAnalyticsOverviewSnapshot> GetOverviewAsync(
@@ -82,7 +79,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
                     .Where(book => book.CurrentChapterNumber != null)
                     .Select(book => book.CurrentChapterNumber ?? 0)
                     .Sum(),
-                BooksWithKnownCurrentChapter = group.Count(book => book.CurrentChapterNumber != null),
+                BooksWithKnownCurrentChapter = group.Count(book => book.CurrentChapterNumber != null)
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -110,10 +107,13 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             return BookAnalyticsCompositionSnapshot.Empty;
         }
 
-        var statusByType = await GetStatusByTypeAsync(query, cancellationToken);
+        var statusByType =
+            await GetStatusByTypeAsync(query, cancellationToken);
         var bookIds = query.Select(book => book.Id);
-        var genres = await GetGenreCountsAsync(bookIds, totalBooks, cancellationToken);
-        var tags = await GetTagCountsAsync(bookIds, totalBooks, cancellationToken);
+        var genres =
+            await GetGenreCountsAsync(bookIds, totalBooks, cancellationToken);
+        var tags =
+            await GetTagCountsAsync(bookIds, totalBooks, cancellationToken);
 
         return new BookAnalyticsCompositionSnapshot(statusByType, genres, tags);
     }
@@ -124,12 +124,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
     {
         var rows = await query
             .GroupBy(book => new { Type = book.ContentType.Name, Status = book.Status.Name })
-            .Select(group => new
-            {
-                group.Key.Type,
-                group.Key.Status,
-                BookCount = group.Count(),
-            })
+            .Select(group => new { group.Key.Type, group.Key.Status, BookCount = group.Count() })
             .OrderBy(group => group.Type)
             .ThenByDescending(group => group.BookCount)
             .ThenBy(group => group.Status)
@@ -153,17 +148,13 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         int totalBooks,
         CancellationToken cancellationToken)
     {
-        var rows = await _context.Set<BookGenre>()
+        var rows = await context.Set<BookGenre>()
             .AsNoTracking()
             .Where(bookGenre => bookIds.Contains(bookGenre.BookId))
-            .Select(bookGenre => new { Id = bookGenre.BookId, Name = bookGenre.Genre.Name })
+            .Select(bookGenre => new { Id = bookGenre.BookId, bookGenre.Genre.Name })
             .Distinct()
             .GroupBy(row => row.Name)
-            .Select(group => new
-            {
-                Name = group.Key,
-                BookCount = group.Count(),
-            })
+            .Select(group => new { Name = group.Key, BookCount = group.Count() })
             .OrderByDescending(group => group.BookCount)
             .ThenBy(group => group.Name)
             .ToListAsync(cancellationToken);
@@ -176,17 +167,13 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         int totalBooks,
         CancellationToken cancellationToken)
     {
-        var rows = await _context.Set<BookTag>()
+        var rows = await context.Set<BookTag>()
             .AsNoTracking()
             .Where(bookTag => bookIds.Contains(bookTag.BookId))
-            .Select(bookTag => new { Id = bookTag.BookId, Name = bookTag.Tag.Name })
+            .Select(bookTag => new { Id = bookTag.BookId, bookTag.Tag.Name })
             .Distinct()
             .GroupBy(row => row.Name)
-            .Select(group => new
-            {
-                Name = group.Key,
-                BookCount = group.Count(),
-            })
+            .Select(group => new { Name = group.Key, BookCount = group.Count() })
             .OrderByDescending(group => group.BookCount)
             .ThenBy(group => group.Name)
             .ToListAsync(cancellationToken);
@@ -214,11 +201,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         var rows = await query
             .Where(book => book.Rating != null)
             .GroupBy(book => book.Rating!.Value)
-            .Select(group => new
-            {
-                Rating = group.Key,
-                BookCount = group.Count(),
-            })
+            .Select(group => new { Rating = group.Key, BookCount = group.Count() })
             .ToListAsync(cancellationToken);
 
         var countsByRating = rows.ToDictionary(row => row.Rating, row => row.BookCount);
@@ -246,17 +229,8 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         }
 
         var rows = await query
-            .GroupBy(book => new
-            {
-                Status = book.Status.Name,
-                Priority = book.Priority,
-            })
-            .Select(group => new
-            {
-                group.Key.Status,
-                group.Key.Priority,
-                BookCount = group.Count(),
-            })
+            .GroupBy(book => new { Status = book.Status.Name, book.Priority })
+            .Select(group => new { group.Key.Status, group.Key.Priority, BookCount = group.Count() })
             .ToListAsync(cancellationToken);
 
         var prioritiesByStatus = rows
@@ -264,13 +238,14 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
             .Select(group =>
             {
                 var countsByPriority = group.ToDictionary(
-                    row => row.Priority?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "Unset",
+                    row => row.Priority?.ToString(CultureInfo.InvariantCulture) ?? "Unset",
                     row => row.BookCount);
                 var priorities = Enumerable.Range(1, 5)
                     .Select(priority => new BookAnalyticsPriorityCountSnapshot(
-                        priority.ToString(System.Globalization.CultureInfo.InvariantCulture),
-                        countsByPriority.GetValueOrDefault(priority.ToString(System.Globalization.CultureInfo.InvariantCulture))))
-                    .Append(new BookAnalyticsPriorityCountSnapshot("Unset", countsByPriority.GetValueOrDefault("Unset")))
+                        priority.ToString(CultureInfo.InvariantCulture),
+                        countsByPriority.GetValueOrDefault(priority.ToString(CultureInfo.InvariantCulture))))
+                    .Append(
+                        new BookAnalyticsPriorityCountSnapshot("Unset", countsByPriority.GetValueOrDefault("Unset")))
                     .ToList();
 
                 return new BookAnalyticsPrioritiesByStatusSnapshot(
@@ -299,11 +274,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         // so keep the database work to the filtered scalar projection and compute
         // per-type medians from chapter values only.
         var rows = await query
-            .Select(book => new
-            {
-                Type = book.ContentType.Name,
-                book.CurrentChapterNumber,
-            })
+            .Select(book => new { Type = book.ContentType.Name, book.CurrentChapterNumber })
             .OrderBy(row => row.Type)
             .ToListAsync(cancellationToken);
 
@@ -359,7 +330,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
 
         var bookIds = query.Select(book => book.Id);
         var to = ToUtcDateTimeOffset(scope.To);
-        var historyQuery = _context.BookProgressHistory
+        var historyQuery = context.BookProgressHistory
             .AsNoTracking()
             .Where(history => bookIds.Contains(history.BookId));
         if (!IsSqliteProvider())
@@ -382,10 +353,10 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
 
         var points = CreateEmptyActivityPoints(scope);
         foreach (var group in rows
-            .OrderBy(row => row.BookId)
-            .ThenBy(row => row.ChangedAt)
-            .ThenBy(row => row.Id)
-            .GroupBy(row => row.BookId))
+                     .OrderBy(row => row.BookId)
+                     .ThenBy(row => row.ChangedAt)
+                     .ThenBy(row => row.Id)
+                     .GroupBy(row => row.BookId))
         {
             ProgressHistoryRow? previous = null;
             foreach (var row in group)
@@ -404,7 +375,8 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
                     {
                         point.ProgressEvents++;
                         point.BookIds.Add(row.BookId);
-                        point.ChaptersAdvanced += CalculatePositiveChapterAdvance(previous.ChapterNumber, row.ChapterNumber);
+                        point.ChaptersAdvanced +=
+                            CalculatePositiveChapterAdvance(previous.ChapterNumber, row.ChapterNumber);
                     }
                 }
 
@@ -504,7 +476,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
                 book.Cover != null ? book.Cover.StoragePath : null,
                 book.Cover != null ? book.Cover.ThumbnailStoragePath : null))
             .ToListAsync(cancellationToken);
-        var alternateTitleRows = await _context.Set<BookTitle>()
+        var alternateTitleRows = await context.Set<BookTitle>()
             .AsNoTracking()
             .Where(title => bookIds.Contains(title.BookId) && !title.IsPrimary)
             .Select(title => new { title.BookId, title.Title })
@@ -520,23 +492,26 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
 
         var completeCounts = new Dictionary<string, int>
         {
-            ["author"] = completenessRows.Count(row => row.HasAuthor),
-            ["description"] = completenessRows.Count(row => !string.IsNullOrWhiteSpace(row.Description)),
-            ["genre"] = completenessRows.Count(row => row.HasGenre),
-            ["tag"] = completenessRows.Count(row => row.HasTag),
-            ["rating"] = completenessRows.Count(row => row.HasRating),
-            ["priority"] = completenessRows.Count(row => row.HasPriority),
-            ["totalChapters"] = completenessRows.Count(row => row.HasTotalChapters),
-            ["link"] = completenessRows.Count(row => row.HasLink),
-            ["alternateTitle"] = alternateTitleRows
+            [BookAnalyticsQualityFields.Author] = completenessRows.Count(row => row.HasAuthor),
+            [BookAnalyticsQualityFields.Description] =
+                completenessRows.Count(row => !string.IsNullOrWhiteSpace(row.Description)),
+            [BookAnalyticsQualityFields.Genre] = completenessRows.Count(row => row.HasGenre),
+            [BookAnalyticsQualityFields.Tag] = completenessRows.Count(row => row.HasTag),
+            [BookAnalyticsQualityFields.Rating] = completenessRows.Count(row => row.HasRating),
+            [BookAnalyticsQualityFields.Priority] = completenessRows.Count(row => row.HasPriority),
+            [BookAnalyticsQualityFields.TotalChapters] = completenessRows.Count(row => row.HasTotalChapters),
+            [BookAnalyticsQualityFields.Link] = completenessRows.Count(row => row.HasLink),
+            [BookAnalyticsQualityFields.AlternateTitle] = alternateTitleRows
                 .Where(row => !string.IsNullOrWhiteSpace(row.Title))
                 .Select(row => row.BookId)
                 .Distinct()
                 .Count(),
-            ["usableCover"] = completenessRows.Count(row => IsUsableCover(row.Status, row.StoragePath, row.ThumbnailStoragePath)),
+            [BookAnalyticsQualityFields.UsableCover] =
+                completenessRows.Count(row => IsUsableCover(row.Status, row.StoragePath, row.ThumbnailStoragePath))
         };
 
-        var linkSources = await GetLinkSourcesAsync(bookIds, totalBooks, cancellationToken);
+        var linkSources =
+            await GetLinkSourcesAsync(bookIds, totalBooks, cancellationToken);
         var coverStatuses = coverRows
             .Where(row => row.Status != null)
             .GroupBy(row => row.Status!.Value.ToString())
@@ -575,14 +550,10 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
         int totalBooks,
         CancellationToken cancellationToken)
     {
-        var rows = await _context.BookLinks
+        var rows = await context.BookLinks
             .AsNoTracking()
             .Where(link => bookIds.Contains(link.BookId))
-            .Select(link => new
-            {
-                link.BookId,
-                link.SourceType,
-            })
+            .Select(link => new { link.BookId, link.SourceType })
             .ToListAsync(cancellationToken);
 
         return rows
@@ -605,7 +576,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
     private static bool IsUsableCover(BookCoverStatus? status, string? storagePath, string? thumbnailStoragePath)
     {
         return status is BookCoverStatus.Found or BookCoverStatus.Uploaded
-            && (!string.IsNullOrWhiteSpace(storagePath) || !string.IsNullOrWhiteSpace(thumbnailStoragePath));
+               && (!string.IsNullOrWhiteSpace(storagePath) || !string.IsNullOrWhiteSpace(thumbnailStoragePath));
     }
 
     private static double CalculateShare(int count, int totalBooks)
@@ -625,7 +596,7 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
 
     private bool IsSqliteProvider()
     {
-        return _context.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
+        return context.Database.ProviderName?.Contains("Sqlite", StringComparison.OrdinalIgnoreCase) == true;
     }
 
     private static SortedDictionary<DateOnly, ActivityPointAccumulator> CreateEmptyActivityPoints(
@@ -654,10 +625,10 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
     {
         var bucketDate = bucket switch
         {
-            "day" => date,
-            "week" => StartOfWeek(date),
-            "month" => new DateOnly(date.Year, date.Month, 1),
-            _ => date,
+            BookAnalyticsBuckets.Day => date,
+            BookAnalyticsBuckets.Week => StartOfWeek(date),
+            BookAnalyticsBuckets.Month => new DateOnly(date.Year, date.Month, 1),
+            _ => date
         };
 
         return bucketDate < from ? from : bucketDate;
@@ -667,10 +638,10 @@ public sealed class BookAnalyticsQueryService : IBookAnalyticsQueryService
     {
         return bucketSize switch
         {
-            "day" => bucket.AddDays(1),
-            "week" => StartOfWeek(bucket).AddDays(7),
-            "month" => new DateOnly(bucket.Year, bucket.Month, 1).AddMonths(1),
-            _ => bucket.AddDays(1),
+            BookAnalyticsBuckets.Day => bucket.AddDays(1),
+            BookAnalyticsBuckets.Week => StartOfWeek(bucket).AddDays(7),
+            BookAnalyticsBuckets.Month => new DateOnly(bucket.Year, bucket.Month, 1).AddMonths(1),
+            _ => bucket.AddDays(1)
         };
     }
 

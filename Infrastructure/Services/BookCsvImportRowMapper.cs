@@ -1,8 +1,7 @@
 namespace Infrastructure.Services;
 
-using Application.Common;
-using Application.Common.DTOs.Book;
 using System.Globalization;
+using Application.Common.DTOs.Book;
 
 internal static class BookCsvImportRowMapper
 {
@@ -12,19 +11,19 @@ internal static class BookCsvImportRowMapper
         {
             RowId = Guid.NewGuid(),
             LineNumber = lineNumber,
-            PrimaryTitle = CleanName(values, "primaryTitle"),
-            AuthorName = CleanName(values, "authorName"),
-            ContentType = CleanName(values, "contentType"),
-            Status = CleanName(values, "status"),
-            Tags = NormalizeTags(Clean(values, "tags")),
-            TotalChapters = Clean(values, "totalChapters"),
-            CurrentChapterNumber = Clean(values, "currentChapterNumber"),
-            CurrentChapterLabel = Clean(values, "currentChapterLabel"),
-            Rating = Clean(values, "rating"),
-            Priority = Clean(values, "priority"),
-            Description = Clean(values, "description"),
-            Notes = NormalizeNotes(Clean(values, "notes")),
-            RawImportedLine = Clean(values, "rawImportedLine")
+            PrimaryTitle = CleanName(values, BookCsvColumns.PrimaryTitle),
+            AuthorName = CleanName(values, BookCsvColumns.AuthorName),
+            ContentType = CleanName(values, BookCsvColumns.ContentType),
+            Status = CleanName(values, BookCsvColumns.Status),
+            Tags = NormalizeTags(Clean(values, BookCsvColumns.Tags)),
+            TotalChapters = Clean(values, BookCsvColumns.TotalChapters),
+            CurrentChapterNumber = Clean(values, BookCsvColumns.CurrentChapterNumber),
+            CurrentChapterLabel = Clean(values, BookCsvColumns.CurrentChapterLabel),
+            Rating = Clean(values, BookCsvColumns.Rating),
+            Priority = Clean(values, BookCsvColumns.Priority),
+            Description = Clean(values, BookCsvColumns.Description),
+            Notes = NormalizeNotes(Clean(values, BookCsvColumns.Notes)),
+            RawImportedLine = Clean(values, BookCsvColumns.RawImportedLine)
         };
     }
 

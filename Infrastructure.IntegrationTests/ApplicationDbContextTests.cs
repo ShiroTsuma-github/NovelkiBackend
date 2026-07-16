@@ -4,6 +4,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.IntegrationTests;
 
+using Contexts;
+
 public class ApplicationDbContextTests
 {
     [Fact]
@@ -60,7 +62,7 @@ public class ApplicationDbContextTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-        context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
+        context.Users.Add(new Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
         context.Tags.Add(TestData.Tag(database.UserId, "favorite"));
         context.Tags.Add(TestData.Tag(otherOwnerId, "favorite"));
 

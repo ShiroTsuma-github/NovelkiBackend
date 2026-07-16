@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { AlertCircle, ChevronDown, Download, FileUp, LoaderCircle, Save, Trash2, Upload, X } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { toast } from 'sonner'
@@ -36,7 +37,6 @@ export function getImportSessionStats(session: BookImportSessionDto | null) {
 export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDialogProps) {
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
-  const [allowInvalidRowAutoExpand, setAllowInvalidRowAutoExpand] = useState(true)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [dropzoneActive, setDropzoneActive] = useState(false)
   const [finalizeResult, setFinalizeResult] = useState<BookImportFinalizeResult | null>(null)
@@ -48,8 +48,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     mutationFn: (file: File) => api.createBookImportSession(file),
     onSuccess: (nextSession) => {
       setSession(nextSession)
-      setAllowInvalidRowAutoExpand(true)
-      setExpandedRowId(nextSession.rows.find((row) => !row.isValid)?.rowId ?? null)
+      setExpandedRowId(null)
       toast.success('Import draft created.')
     },
     onError: (error) => {
@@ -77,8 +76,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     mutationFn: (sessionId: string) => api.deleteInvalidBookImportRows(sessionId),
     onSuccess: (nextSession) => {
       setSession(nextSession)
-      setAllowInvalidRowAutoExpand(true)
-      setExpandedRowId(nextSession.rows.find((row) => !row.isValid)?.rowId ?? null)
+      setExpandedRowId(null)
       toast.success('Invalid rows removed.')
     },
     onError: (error) => {
@@ -107,7 +105,6 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
     if (!open) {
       setSession(null)
       setExpandedRowId(null)
-      setAllowInvalidRowAutoExpand(true)
       setConfirmCancelOpen(false)
       setDropzoneActive(false)
       setFinalizeResult(null)
@@ -124,10 +121,8 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       return
     }
 
-    if (allowInvalidRowAutoExpand) {
-      setExpandedRowId(invalidRows[0]?.rowId ?? null)
-    }
-  }, [allowInvalidRowAutoExpand, expandedRowId, invalidRows])
+    setExpandedRowId(null)
+  }, [expandedRowId, invalidRows])
 
   if (!open) {
     return null
@@ -194,7 +189,6 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
         setConfirmCancelOpen(false)
         setSession(null)
         setExpandedRowId(null)
-        setAllowInvalidRowAutoExpand(true)
         onClose()
       },
       onError: (error) => {
@@ -206,15 +200,17 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/70 p-1 backdrop-blur-sm sm:p-2"
       role="dialog"
       onClick={handleDismiss}
     >
-      <div className="mx-auto my-4 flex max-h-[calc(100vh-2rem)] w-full max-w-6xl flex-col gap-4 overflow-hidden rounded-3xl border border-slate-800 bg-slate-950 p-6 text-slate-100 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4">
+      <div data-testid="import-dialog-panel" className={`${session && !finalizeResult ? 'h-[calc(100vh-0.5rem)] sm:h-[calc(100vh-1rem)]' : 'max-h-[calc(100vh-0.5rem)] sm:max-h-[calc(100vh-1rem)]'} flex w-full max-w-6xl flex-col gap-2 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 p-3 text-slate-100 shadow-2xl sm:p-4`} onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-2">
           <div className="grid gap-1">
-            <h2 className="text-lg font-semibold text-slate-50">Import books from CSV</h2>
-            <p className="text-sm text-slate-400">Upload a file, fix invalid rows, then finalize to save books to your library.</p>
+            <h2 className={`${session && !finalizeResult ? 'text-base' : 'text-lg'} font-semibold text-slate-50`}>Import books from CSV</h2>
+            {session && !finalizeResult ? null : (
+              <p className="text-sm text-slate-400">Upload a file, fix invalid rows, then finalize to save books to your library.</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -275,20 +271,20 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             </div>
           </div>
         ) : (
-          <>
-            <div className="grid gap-4 md:grid-cols-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
               <SummaryCard label="File" value={session.fileName} />
               <SummaryCard label="Rows" value={formatImportCount(importStats.totalRows)} />
               <SummaryCard label="Positive" value={formatImportCount(importStats.validRows)} />
               <SummaryCard label="Negative" value={formatImportCount(importStats.invalidRowsCount)} tone={importStats.invalidRowsCount ? 'warn' : 'ok'} />
             </div>
 
-            <div className="grid gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <div className="grid gap-1 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-slate-100">Progress</div>
                 <div className="text-sm text-slate-300">{formatImportCount(importStats.validRows)} / {formatImportCount(importStats.totalRows)} valid</div>
               </div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-800">
+              <div className="h-2 overflow-hidden rounded-full bg-slate-800">
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-[width]"
                   style={{ width: `${importStats.progressPercent}%` }}
@@ -296,7 +292,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
               </div>
             </div>
 
-            <div className="h-[min(60vh,44rem)] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-2" data-testid="import-invalid-rows-panel">
               {invalidRows.length ? (
                 <div className="grid h-full min-h-0 gap-3">
                   <Virtuoso
@@ -305,7 +301,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                     data={invalidRows}
                     increaseViewportBy={{ bottom: 160, top: 160 }}
                     itemContent={(_, row) => (
-                      <div className="pb-3 pr-3">
+                      <div className="pb-2 pr-2">
                         <ImportRowEditor
                           availableContentTypes={session.availableContentTypes}
                           availableStatuses={session.availableStatuses}
@@ -316,7 +312,6 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                           onToggle={() => {
                             setExpandedRowId((current) => {
                               const isCollapsing = current === row.rowId
-                              setAllowInvalidRowAutoExpand(!isCollapsing)
                               return isCollapsing ? null : row.rowId
                             })
                           }}
@@ -361,7 +356,7 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
                 {finalizeMutation.isPending ? 'Saving...' : 'Finalize import'}
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
       <CancelImportConfirmDialog
@@ -495,6 +490,71 @@ function ImportRowEditor({
   sessionId: string
   onSessionChange: (session: BookImportSessionDto) => void
 }) {
+  if (expanded) {
+    return (
+      <ExpandedImportRowEditor
+        availableContentTypes={availableContentTypes}
+        availableStatuses={availableStatuses}
+        row={row}
+        sessionId={sessionId}
+        onSessionChange={onSessionChange}
+        onToggle={onToggle}
+      />
+    )
+  }
+
+  return (
+    <CollapsedImportRowEditor
+      row={row}
+      sessionId={sessionId}
+      onSessionChange={onSessionChange}
+      onToggle={onToggle}
+    />
+  )
+}
+
+function CollapsedImportRowEditor({
+  onToggle,
+  row,
+  sessionId,
+  onSessionChange,
+}: {
+  onToggle: () => void
+  row: BookImportRowDto
+  sessionId: string
+  onSessionChange: (session: BookImportSessionDto) => void
+}) {
+  const deleteMutation = useDeleteImportRowMutation(sessionId, row, onSessionChange)
+
+  return (
+    <ImportRowShell
+      deletePending={deleteMutation.isPending}
+      expanded={false}
+      row={row}
+      savePending={false}
+      onDelete={() => deleteMutation.mutate()}
+      onRevalidate={undefined}
+      onToggle={onToggle}
+    />
+  )
+}
+
+function ExpandedImportRowEditor({
+  availableContentTypes,
+  availableStatuses,
+  onToggle,
+  row,
+  sessionId,
+  onSessionChange,
+}: {
+  availableContentTypes: string[]
+  availableStatuses: string[]
+  onToggle: () => void
+  row: BookImportRowDto
+  sessionId: string
+  onSessionChange: (session: BookImportSessionDto) => void
+}) {
+  const formEndRef = useRef<HTMLDivElement | null>(null)
   const [draft, setDraft] = useState<BookImportRowUpdateRequest>({
     primaryTitle: row.primaryTitle ?? '',
     authorName: row.authorName ?? '',
@@ -529,6 +589,29 @@ function ImportRowEditor({
     })
   }, [row])
 
+  useEffect(() => {
+    let frame = 0
+    let cancelled = false
+
+    const scrollAfterLayout = (attempt: number) => {
+      if (cancelled) {
+        return
+      }
+
+      scrollElementIntoNearestImportScroller(formEndRef.current)
+      if (attempt < 6) {
+        frame = requestAnimationFrame(() => scrollAfterLayout(attempt + 1))
+      }
+    }
+
+    frame = requestAnimationFrame(() => scrollAfterLayout(0))
+
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(frame)
+    }
+  }, [])
+
   const mutation = useMutation({
     mutationFn: () => api.updateBookImportRow(sessionId, row.rowId, draft),
     onSuccess: (session) => {
@@ -540,16 +623,7 @@ function ImportRowEditor({
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: () => api.deleteBookImportRow(sessionId, row.rowId),
-    onSuccess: (session) => {
-      onSessionChange(session)
-      toast.success(`Line ${row.lineNumber} removed.`)
-    },
-    onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not remove import row.')
-    },
-  })
+  const deleteMutation = useDeleteImportRowMutation(sessionId, row, onSessionChange)
 
   function update<K extends keyof BookImportRowUpdateRequest>(key: K, value: string) {
     setDraft((current) => ({ ...current, [key]: value }))
@@ -560,7 +634,84 @@ function ImportRowEditor({
   }
 
   return (
-      <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4">
+    <ImportRowShell
+      deletePending={deleteMutation.isPending}
+      expanded
+      row={row}
+      savePending={mutation.isPending}
+      onDelete={() => deleteMutation.mutate()}
+      onRevalidate={() => mutation.mutate()}
+      onToggle={onToggle}
+    >
+      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-4">
+        <LabeledInput error={fieldError('primaryTitle')} label="Title" value={draft.primaryTitle ?? ''} onChange={(value) => update('primaryTitle', value)} />
+        <LabeledInput error={fieldError('authorName')} label="Author" value={draft.authorName ?? ''} onChange={(value) => update('authorName', value)} />
+        <LabeledInput error={fieldError('tags')} label="Tags" value={draft.tags ?? ''} onChange={(value) => update('tags', value)} />
+        <LabeledInput error={fieldError('contentType')} label="Type" suggestions={availableContentTypes} value={draft.contentType ?? ''} onChange={(value) => update('contentType', value)} />
+        <LabeledInput error={fieldError('status')} label="Status" suggestions={availableStatuses} value={draft.status ?? ''} onChange={(value) => update('status', value)} />
+        <LabeledInput error={fieldError('currentChapterLabel')} label="Current label" value={draft.currentChapterLabel ?? ''} onChange={(value) => update('currentChapterLabel', value)} />
+        <LabeledInput error={fieldError('currentChapterNumber')} label="Current chapter" value={draft.currentChapterNumber ?? ''} onChange={(value) => update('currentChapterNumber', value)} />
+        <LabeledInput error={fieldError('totalChapters')} label="Total chapters" value={draft.totalChapters ?? ''} onChange={(value) => update('totalChapters', value)} />
+        <LabeledInput error={fieldError('rating')} label="Rating" value={draft.rating ?? ''} onChange={(value) => update('rating', value)} />
+        <LabeledInput error={fieldError('priority')} label="Priority" value={draft.priority ?? ''} onChange={(value) => update('priority', value)} />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <LabeledTextarea error={fieldError('notes')} label="Notes" value={draft.notes ?? ''} onChange={(value) => update('notes', value)} />
+        <LabeledTextarea error={fieldError('description')} label="Description" value={draft.description ?? ''} onChange={(value) => update('description', value)} />
+      </div>
+      <div ref={formEndRef} aria-hidden="true" />
+    </ImportRowShell>
+  )
+}
+
+function scrollElementIntoNearestImportScroller(element: HTMLElement | null) {
+  const scroller = element?.closest('.import-rows-scroll')
+  if (!(element instanceof HTMLElement) || !(scroller instanceof HTMLElement)) {
+    if (typeof element?.scrollIntoView === 'function') {
+      element.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    }
+    return
+  }
+
+  const elementBox = element.getBoundingClientRect()
+  const scrollerBox = scroller.getBoundingClientRect()
+  const bottomOverflow = elementBox.bottom - scrollerBox.bottom
+  const topOverflow = scrollerBox.top - elementBox.top
+
+  if (bottomOverflow > 0) {
+    scroller.scrollTop += bottomOverflow + 8
+    return
+  }
+
+  if (topOverflow > 0) {
+    scroller.scrollTop -= topOverflow + 8
+  }
+}
+
+function ImportRowShell({
+  children,
+  deletePending,
+  expanded,
+  onDelete,
+  onRevalidate,
+  onToggle,
+  row,
+  savePending,
+}: {
+  children?: ReactNode
+  deletePending: boolean
+  expanded: boolean
+  onDelete: () => void
+  onRevalidate: (() => void) | undefined
+  onToggle: () => void
+  row: BookImportRowDto
+  savePending: boolean
+}) {
+  const busy = savePending || deletePending
+
+  return (
+    <div className="grid gap-4 rounded-2xl border border-slate-700 bg-slate-900 p-4" data-testid={`import-row-${row.rowId}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid min-w-0 flex-1 gap-1">
           <button className="inline-flex items-center gap-2 text-left text-sm font-semibold text-amber-300" type="button" onClick={onToggle}>
@@ -572,20 +723,23 @@ function ImportRowEditor({
               {row.primaryTitle?.trim() || 'Untitled row'}
             </span>
           </div>
-          <div className="line-clamp-2 max-w-full text-xs text-slate-400">
-            {row.errors.join(' ')}
-          </div>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <button className={secondaryButtonClass} type="button" onClick={onToggle}>
             {expanded ? 'Collapse' : 'Edit row'}
           </button>
-          <button className={secondaryButtonClass} disabled={mutation.isPending || deleteMutation.isPending} type="button" onClick={() => mutation.mutate()}>
-            {mutation.isPending ? 'Saving...' : 'Revalidate row'}
+          <button
+            className={secondaryButtonClass}
+            disabled={!expanded || busy}
+            title={expanded ? undefined : 'Edit the row before revalidating it.'}
+            type="button"
+            onClick={onRevalidate}
+          >
+            {savePending ? 'Saving...' : 'Revalidate row'}
           </button>
-          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500" disabled={mutation.isPending || deleteMutation.isPending} type="button" onClick={() => deleteMutation.mutate()}>
+          <button className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-rose-900 bg-rose-950 px-4 py-2 text-sm font-semibold text-rose-200 transition hover:bg-rose-900 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-900 disabled:text-slate-500" disabled={busy} type="button" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
-            {deleteMutation.isPending ? 'Removing...' : 'Remove row'}
+            {deletePending ? 'Removing...' : 'Remove row'}
           </button>
         </div>
       </div>
@@ -594,29 +748,22 @@ function ImportRowEditor({
         {row.errors.map((error) => <p key={error}>{error}</p>)}
       </div>
 
-      {expanded ? (
-        <>
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <LabeledInput error={fieldError('primaryTitle')} label="Title" value={draft.primaryTitle ?? ''} onChange={(value) => update('primaryTitle', value)} />
-            <LabeledInput error={fieldError('authorName')} label="Author" value={draft.authorName ?? ''} onChange={(value) => update('authorName', value)} />
-            <LabeledInput error={fieldError('tags')} label="Tags" value={draft.tags ?? ''} onChange={(value) => update('tags', value)} />
-            <LabeledInput error={fieldError('contentType')} label="Type" suggestions={availableContentTypes} value={draft.contentType ?? ''} onChange={(value) => update('contentType', value)} />
-            <LabeledInput error={fieldError('status')} label="Status" suggestions={availableStatuses} value={draft.status ?? ''} onChange={(value) => update('status', value)} />
-            <LabeledInput error={fieldError('currentChapterLabel')} label="Current label" value={draft.currentChapterLabel ?? ''} onChange={(value) => update('currentChapterLabel', value)} />
-            <LabeledInput error={fieldError('currentChapterNumber')} label="Current chapter" value={draft.currentChapterNumber ?? ''} onChange={(value) => update('currentChapterNumber', value)} />
-            <LabeledInput error={fieldError('totalChapters')} label="Total chapters" value={draft.totalChapters ?? ''} onChange={(value) => update('totalChapters', value)} />
-            <LabeledInput error={fieldError('rating')} label="Rating" value={draft.rating ?? ''} onChange={(value) => update('rating', value)} />
-            <LabeledInput error={fieldError('priority')} label="Priority" value={draft.priority ?? ''} onChange={(value) => update('priority', value)} />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <LabeledTextarea error={fieldError('notes')} label="Notes" value={draft.notes ?? ''} onChange={(value) => update('notes', value)} />
-            <LabeledTextarea error={fieldError('description')} label="Description" value={draft.description ?? ''} onChange={(value) => update('description', value)} />
-          </div>
-        </>
-      ) : null}
+      {children}
     </div>
   )
+}
+
+function useDeleteImportRowMutation(sessionId: string, row: BookImportRowDto, onSessionChange: (session: BookImportSessionDto) => void) {
+  return useMutation({
+    mutationFn: () => api.deleteBookImportRow(sessionId, row.rowId),
+    onSuccess: (session) => {
+      onSessionChange(session)
+      toast.success(`Line ${row.lineNumber} removed.`)
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not remove import row.')
+    },
+  })
 }
 
 function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value: string; tone?: 'neutral' | 'ok' | 'warn' }) {
@@ -627,9 +774,9 @@ function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value:
       : 'border-slate-700 bg-slate-900 text-slate-100'
 
   return (
-    <div className={`grid gap-1 rounded-2xl border px-4 py-3 ${toneClass}`}>
-      <div className="text-xs font-semibold uppercase tracking-wide">{label}</div>
-      <div className="truncate text-base font-semibold">{value}</div>
+    <div className={`grid gap-0.5 rounded-xl border px-3 py-1.5 ${toneClass}`}>
+      <div className="text-[0.68rem] font-semibold uppercase tracking-wide">{label}</div>
+      <div className="truncate text-sm font-semibold">{value}</div>
     </div>
   )
 }
