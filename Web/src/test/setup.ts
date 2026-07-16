@@ -18,6 +18,11 @@ Object.defineProperty(window, 'localStorage', {
   },
 })
 
+Object.defineProperty(window, 'scrollTo', {
+  configurable: true,
+  value: vi.fn(),
+})
+
 afterEach(() => {
   cleanup()
   window.localStorage.clear()

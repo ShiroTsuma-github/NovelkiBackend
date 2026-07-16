@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "test:run": "vitest run",
     "test:layout": "node ./scripts/run-playwright-layout.mjs",
+    "test:layout:desktop": "node ./scripts/run-playwright-layout.mjs --project chromium-desktop",
+    "test:layout:mobile": "node ./scripts/run-playwright-layout.mjs --project chromium-mobile",
     "test:all": "npm run lint && npm run test:run && npm run test:layout"
   },
   "dependencies": {
