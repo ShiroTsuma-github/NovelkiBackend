@@ -289,8 +289,46 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
   await expect(page.getByRole('heading', { name: 'Add book' })).toBeVisible()
 
   await expectNoHorizontalOverflow(page)
-  await expectFitsViewportWidth(page.getByText('Basics').locator('xpath=ancestor::section[1]'))
-  await expectFitsViewportWidth(page.getByText('Additional').locator('xpath=ancestor::section[1]'))
+  const identity = page.getByRole('heading', { name: 'Book identity' }).locator('xpath=ancestor::section[1]')
+  await expectFitsViewportWidth(identity)
+  await expectFitsViewportWidth(page.getByRole('heading', { name: 'Reading state' }).locator('xpath=ancestor::section[1]'))
+  await expectFitsViewportWidth(page.getByRole('heading', { name: 'Library details' }).locator('xpath=ancestor::section[1]'))
+
+  const cover = page.locator('.book-form-cover-artwork')
+  const actions = page.getByTestId('book-form-rail').locator('.book-form-actions')
+  const saveButton = actions.getByRole('button', { name: 'Save' })
+  const identityBox = await requiredBox(identity)
+  const coverBox = await requiredBox(cover)
+  const ratingOption = page.getByRole('button', { name: 'Set rating to 1/10' })
+
+  await expect(ratingOption).toHaveCSS('border-top-width', '0px')
+  await expect(ratingOption).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
+  await expectMinHeight(ratingOption, page.viewportSize()!.width < 768 ? 44 : 32)
+
+  const descriptionBox = await requiredBox(page.locator('textarea[name="description"]'))
+  const alternativeTitlesBox = await requiredBox(page.locator('textarea[name="alternativeTitlesText"]'))
+  const linksBox = await requiredBox(page.locator('textarea[name="linksText"]'))
+  const notesBox = await requiredBox(page.locator('textarea[name="notes"]'))
+  expect(descriptionBox.height).toBeGreaterThanOrEqual(176)
+  expect(alternativeTitlesBox.height).toBeGreaterThanOrEqual(192)
+  expect(linksBox.height).toBeGreaterThanOrEqual(192)
+  expect(notesBox.height).toBeGreaterThanOrEqual(144)
+
+  if (page.viewportSize()!.width < 1280) {
+    expect(coverBox.y).toBeGreaterThan(identityBox.y + identityBox.height)
+    expect(coverBox.width).toBeLessThanOrEqual(136)
+    await expect(actions).toHaveCSS('position', 'fixed')
+    await expectMinHeight(saveButton, 44)
+  } else {
+    expect(coverBox.y).toBeGreaterThanOrEqual(identityBox.y)
+    expect(coverBox.width).toBeGreaterThanOrEqual(300)
+    expect(coverBox.width).toBeLessThanOrEqual(320)
+    await expect(actions).toHaveCSS('position', 'static')
+  }
+
+  if (page.viewportSize()!.width < 1280) {
+    await expectInViewport(saveButton)
+  }
 })
 
 test('csv import invalid rows panel keeps usable height in the browser layout', async ({ page }) => {
