@@ -1,6 +1,7 @@
 import { X, ZoomIn } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { BookCoverDto } from '@/api/types'
+import { useBodyScrollLock } from '@/components/app/DesignSystem'
 import { loadCoverBlobUrl } from './coverCache'
 
 type BookCoverArtworkProps = {
@@ -186,7 +187,7 @@ export function BookCoverArtwork({
         {resolvedImageUrl && onRemove ? (
           <button
             aria-label={removeLabel}
-            className="absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600/90 text-white opacity-0 shadow-lg transition hover:bg-red-700 group-hover:opacity-100"
+            className="absolute left-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 transition hover:bg-red-700 group-hover:opacity-100"
             type="button"
             onClick={onRemove}
           >
@@ -209,7 +210,7 @@ export function BookCoverArtwork({
             onRemove()
           }}
         >
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-red-600/90 text-white opacity-0 shadow-lg transition hover:bg-red-700 group-hover:opacity-100">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-red-600/90 text-white opacity-0 transition hover:bg-red-700 group-hover:opacity-100">
             <X className="h-4 w-4" />
           </span>
         </span>
@@ -221,7 +222,7 @@ export function BookCoverArtwork({
         </span>
       ) : null}
       {resolvedImageUrl && hoverFooter ? (
-        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950/85 via-slate-950/55 to-transparent px-4 pb-3 pt-8 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
+        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-slate-950/85 px-4 py-3 text-center text-xs font-medium text-white opacity-0 transition group-hover:opacity-100">
           {hoverFooter}
         </span>
       ) : null}
@@ -237,6 +238,8 @@ export function CoverLightbox({
   footer,
   onClose,
 }: CoverLightboxProps) {
+  useBodyScrollLock(open)
+
   useEffect(() => {
     if (!open) {
       return
@@ -266,7 +269,7 @@ export function CoverLightbox({
       <div className="relative max-h-[90vh] w-full max-w-4xl" onClick={(event) => event.stopPropagation()}>
         <button
           aria-label="Close preview"
-          className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-950/80 text-white transition hover:bg-slate-950"
+          className="absolute right-3 top-3 z-10 inline-flex h-10 w-10 items-center justify-center rounded-md bg-slate-950/80 text-white transition hover:bg-slate-950"
           type="button"
           onClick={onClose}
         >

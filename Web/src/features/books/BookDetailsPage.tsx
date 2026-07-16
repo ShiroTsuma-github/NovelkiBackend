@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { BookDto, BookLinkDto, BookProgressHistoryDto } from '@/api/types'
 import { HttpError } from '@/api/http'
+import { Badge, buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { ProgressDialog } from './ProgressDialog'
@@ -125,7 +126,7 @@ export function BookDetailsPage() {
               Edit
             </Link>
             <button
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+              className={buttonVariants.destructive}
               disabled={deleteMutation.isPending}
               type="button"
               onClick={() => setDeleteConfirmOpen(true)}
@@ -136,7 +137,7 @@ export function BookDetailsPage() {
           </div>
         </div>
 
-        <section className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm">
+        <Surface className="p-5">
           <div className="flex flex-col gap-6">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
               <div className="flex-none lg:w-[320px]">
@@ -227,7 +228,7 @@ export function BookDetailsPage() {
               </div>
             </div>
           </div>
-        </section>
+        </Surface>
 
         <section className="grid gap-4 md:grid-cols-2">
           <Panel title="Links">
@@ -368,22 +369,22 @@ function RatingSummary({ rating }: { rating?: number | null }) {
 
 function StatusPill({ status }: { status: string }) {
   const normalized = status.trim().toLowerCase()
-  const className = normalized === 'reading'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  const tone = normalized === 'reading'
+    ? 'success'
     : normalized === 'completed'
-      ? 'border-cyan-200 bg-cyan-50 text-cyan-700'
-      : normalized === 'plan to read'
-        ? 'border-amber-200 bg-amber-50 text-amber-700'
-        : normalized === 'on hold'
-          ? 'border-orange-200 bg-orange-50 text-orange-700'
-          : normalized === 'dropped'
-            ? 'border-rose-200 bg-rose-50 text-rose-700'
-            : 'border-slate-200 bg-slate-100 text-slate-700'
+      ? 'accent'
+    : normalized === 'plan to read'
+        ? 'warning'
+      : normalized === 'on hold'
+          ? 'warning'
+        : normalized === 'dropped'
+            ? 'danger'
+            : 'neutral'
 
   return (
-    <span className={`inline-flex min-h-10 items-center self-center rounded-full border px-4 py-1.5 text-sm font-semibold uppercase tracking-wide ${className}`}>
+    <Badge className="min-h-10 self-center px-4 py-1.5 text-sm uppercase tracking-wide" tone={tone}>
       {status}
-    </span>
+    </Badge>
   )
 }
 
@@ -424,10 +425,10 @@ function getBookLinkLabel(link: BookLinkDto) {
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <Surface className="p-5">
       <h2 className="mb-3 text-base font-semibold text-slate-950">{title}</h2>
       {children}
-    </section>
+    </Surface>
   )
 }
 
@@ -444,6 +445,8 @@ function DeleteBookDialog({
   onCancel: () => void
   onConfirm: () => void
 }) {
+  useBodyScrollLock(open)
+
   if (!open) {
     return null
   }
@@ -455,7 +458,7 @@ function DeleteBookDialog({
       role="dialog"
       onClick={pending ? undefined : onCancel}
     >
-      <div className="grid w-full max-w-md gap-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <DialogPanel className="grid max-w-md gap-5 p-6" onClick={(event) => event.stopPropagation()}>
         <div className="grid gap-2">
           <h2 className="text-lg font-semibold text-slate-950">Delete book</h2>
           <p className="text-sm leading-6 text-slate-600">
@@ -467,7 +470,7 @@ function DeleteBookDialog({
             Cancel
           </button>
           <button
-            className="inline-flex min-h-10 items-center justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-300"
+            className={buttonVariants.destructive}
             disabled={pending}
             type="button"
             onClick={onConfirm}
@@ -475,7 +478,7 @@ function DeleteBookDialog({
             {pending ? 'Deleting...' : 'Delete'}
           </button>
         </div>
-      </div>
+      </DialogPanel>
     </div>
   )
 }

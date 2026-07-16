@@ -23,6 +23,11 @@ export async function expectNoVerticalDocumentOverflow(page: Page) {
   const hasOverflow = await page.evaluate(() => {
     const root = document.documentElement
     const body = document.body
+    const rootOverflow = getComputedStyle(root).overflowY
+    const bodyOverflow = getComputedStyle(body).overflowY
+    if (rootOverflow === 'hidden' || bodyOverflow === 'hidden') {
+      return false
+    }
     return root.scrollHeight > root.clientHeight + 1 || body.scrollHeight > body.clientHeight + 1
   })
   expect(hasOverflow).toBe(false)

@@ -10,6 +10,7 @@ import {
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
+import { DialogPanel, useBodyScrollLock } from '@/components/app/DesignSystem'
 
 const chapterNumberPattern = /^\d+(?:\.\d+)?$/
 const chapterLabelMaxLength = 100
@@ -24,6 +25,7 @@ export function ProgressDialog({ book }: { book: BookDto }) {
     book.currentChapterLabel ?? '',
   )
   const [comment, setComment] = useState('')
+  useBodyScrollLock(open)
   const queryClient = useQueryClient()
   const totalChapters = typeof book.totalChapters === 'number' ? Number(book.totalChapters) : null
   const chapterNumberText = currentChapterNumber.trim()
@@ -65,8 +67,9 @@ export function ProgressDialog({ book }: { book: BookDto }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4">
-      <section className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+    <div aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-slate-950/70 p-4" role="dialog" onClick={() => setOpen(false)}>
+      <DialogPanel className="max-w-md p-5" onClick={(event) => event.stopPropagation()}>
+        <div className="ui-eyebrow">Reading record</div>
         <h2 className="text-lg font-semibold text-slate-950">Update progress</h2>
         <div className="mt-4 grid gap-3">
           {totalChapters != null ? <p className="text-sm text-slate-500">Total chapters: {totalChapters}</p> : null}
@@ -90,7 +93,7 @@ export function ProgressDialog({ book }: { book: BookDto }) {
             Save
           </button>
         </div>
-      </section>
+      </DialogPanel>
     </div>
   )
 }

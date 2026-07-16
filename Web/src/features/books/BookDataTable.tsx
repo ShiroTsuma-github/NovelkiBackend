@@ -52,7 +52,7 @@ export function BookDataTable<T extends { id: string }>({
                 onSort={onSort}
               />
             ))}
-            <th className="sticky right-0 z-10 bg-slate-100 px-3 py-3 text-right shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)]">{actionHeader}</th>
+            <th className="sticky right-0 z-10 border-l border-slate-200 bg-slate-100 px-3 py-3 text-right">{actionHeader}</th>
           </tr>
         </thead>
         <tbody>
@@ -68,7 +68,7 @@ export function BookDataTable<T extends { id: string }>({
                   </div>
                 </td>
               ))}
-              <td className="book-table-actions-cell sticky right-0 z-10 bg-white px-3 py-3 shadow-[-10px_0_12px_-14px_rgba(15,23,42,0.45)]" data-testid={`book-table-actions-cell-${item.id}`}>
+              <td className="book-table-actions-cell sticky right-0 z-10 border-l border-slate-200 bg-white px-3 py-3" data-testid={`book-table-actions-cell-${item.id}`}>
                 <div className="flex justify-end gap-2 whitespace-nowrap">
                   {renderActions(item)}
                 </div>

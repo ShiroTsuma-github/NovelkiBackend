@@ -15,10 +15,11 @@ describe('AppShell', () => {
     renderAt('/books')
 
     expect(screen.getByRole('banner')).toBeInTheDocument()
-    expect(screen.getByRole('navigation')).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: /primary/i })).toBeInTheDocument()
     expect(screen.getByRole('main')).toBeInTheDocument()
     expect(screen.getByText('Novelki')).toBeInTheDocument()
-    expect(screen.getByText('Reading library')).toBeInTheDocument()
+    expect(screen.getByText('Personal library system')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /skip to content/i })).toHaveAttribute('href', '#main-content')
     expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument()
   })
 

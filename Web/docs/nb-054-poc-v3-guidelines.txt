@@ -1,0 +1,78 @@
+NB-054 POC v3 — Quiet Structure
+
+Intent
+
+Quiet Structure is a dark, restrained interface language for Novelki. It keeps the
+existing information density and horizontal application shell while replacing
+rounded-card composition, neon accents, gradients, and glow with flat layers,
+precise borders, and muted indigo.
+
+Core tokens
+
+- Background: #05070b
+- Surface: #0d121a
+- Raised surface: #121925
+- Border: #273142
+- Primary text: #eef2f7
+- Supporting text: #9aa5b4
+- Accent: #8b92d8
+- UI typeface: Inter Variable
+- Heading typeface: IBM Plex Sans Variable
+
+Geometry
+
+- Main panels, cards, and regular surfaces: 0px radius.
+- Inputs, selects, buttons, navigation items, and compact controls: 3px radius.
+- Dialog panels: 4px radius.
+- Full pills are reserved for statuses, tags, badges, and switch tracks.
+- Icon-only actions, pagination controls, and scroll shortcuts are square.
+
+Surface and hierarchy rules
+
+- Use solid colors only for buttons, navigation, cards, controls, and focus.
+- Do not use glow, luminous shadows, gradient buttons, or gradient panels.
+- Use one-pixel borders, surface contrast, typography, spacing, and dividers to
+  establish hierarchy.
+- Regular surfaces and buttons do not cast shadows. A strong shadow is allowed
+  only below modal dialog panels.
+- The page background may use the static low-contrast 36px structural grid. It
+  must not include radial light, mesh effects, or animated texture.
+
+Components
+
+- Use buttonVariants for primary, secondary, destructive, and ghost actions.
+- Use controlClass (or the inputClass compatibility alias) for form controls.
+- Use Surface for page panels and cards.
+- Use PageHeader for the page title, description, eyebrow, and action cluster.
+- Use Badge for statuses and semantic compact labels.
+- Use DialogPanel for modal content and useBodyScrollLock for open dialogs.
+- Keep buttonClass, secondaryButtonClass, and inputClass exports as compatibility
+  aliases for existing screens.
+
+Application shell and accessibility
+
+- Keep header, nav, and main landmarks, with exactly one main element.
+- Primary navigation remains visible and horizontally scrollable on mobile.
+- Active navigation uses a flat indigo bottom marker without glow.
+- Keep the skip link targeting #main-content.
+- Interactive mobile targets are at least 44px tall.
+- Focus is a plain indigo outline; it must not use a blurred ring or shadow.
+- Respect prefers-reduced-motion and avoid motion that is necessary to understand
+  state.
+
+Books experience
+
+- Preserve the current table/card density and content order.
+- Table hover covers the entire row, including the sticky Actions cell.
+- Sticky Actions remains visually part of the same surface.
+- Cards use square outer geometry and constrain long titles.
+- Details, form sections, progress dialog, cover dialogs, and CSV import dialogs
+  use the same tokens and geometry.
+- Validation, API behavior, routes, localStorage keys, and import flow remain
+  unchanged.
+
+Acceptance
+
+The POC is accepted only when it is unmistakably dark, restrained rather than
+retro or science-fiction, does not build its composition from rounded cards, and
+retains a subtle static grid without luminous effects.

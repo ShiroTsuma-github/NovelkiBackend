@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { BookCoverDto, BookMutationRequest } from '@/api/types'
+import { DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
@@ -336,12 +337,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   return (
     <>
       <form className="mx-auto grid w-full max-w-7xl gap-5" noValidate onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-950">{admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}</h1>
-            <p className="text-sm text-slate-500">Changes are saved directly to the backend.</p>
-          </div>
-          <div className="flex gap-2">
+        <PageHeader
+          description="Changes are saved directly to the backend."
+          eyebrow={admin ? 'Administration' : 'Library editor'}
+          title={admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}
+          actions={(
+            <>
             <Link className={secondaryButtonClass} to={admin ? '/admin' : mode === 'edit' && id ? `/books/${id}` : '/books'}>
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -350,10 +351,11 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
               <Save className="h-4 w-4" />
               Save
             </button>
-          </div>
-        </div>
+            </>
+          )}
+        />
 
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <Surface className="grid gap-4 p-5">
           <h2 className="text-base font-semibold text-slate-950">Basics</h2>
           <div className="flex flex-col gap-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
@@ -536,9 +538,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
               </div>
             </div>
           </div>
-        </section>
+        </Surface>
 
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <Surface className="grid gap-4 p-5">
           <h2 className="text-base font-semibold text-slate-950">Additional</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <FormField error={errors.alternativeTitlesText?.message} label="Alternative titles, one per line">
@@ -554,7 +556,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
               <textarea className={`${inputClass} min-h-32 md:col-span-2`} {...form.register('description')} />
             </FormField>
           </div>
-        </section>
+        </Surface>
       </form>
 
       <CoverSourceDialog
@@ -824,6 +826,8 @@ function CoverSourceDialog({
   onUrlChange: (value: string) => void
   onUrlSubmit: () => void
 }) {
+  useBodyScrollLock(open)
+
   if (!open) {
     return null
   }
@@ -840,13 +844,13 @@ function CoverSourceDialog({
       role="dialog"
       onClick={onClose}
     >
-      <div className="grid w-full max-w-xl gap-4 rounded-3xl border border-slate-700 bg-slate-950 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <DialogPanel className="grid max-w-xl gap-4 p-6" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div className="grid gap-1">
             <h2 className="text-lg font-semibold text-white">Add cover</h2>
             <p className="text-sm text-slate-400">{introText}</p>
           </div>
-          <button className="rounded-full border border-slate-700 p-2 text-slate-300 hover:bg-slate-900" type="button" onClick={onClose}>
+          <button className="min-h-11 min-w-11 rounded-md border border-slate-700 p-2 text-slate-300 hover:bg-slate-900" type="button" onClick={onClose}>
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -854,7 +858,7 @@ function CoverSourceDialog({
         {view === 'choice' ? (
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-2 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-cyan-400 hover:bg-slate-900/80">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-300">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/15 text-cyan-300">
                 <Upload className="h-4 w-4" />
               </div>
               <div className="text-base font-semibold">Upload image</div>
@@ -878,7 +882,7 @@ function CoverSourceDialog({
               type="button"
               onClick={onOpenUrl}
             >
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-300">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-md bg-cyan-500/15 text-cyan-300">
                 <Link2 className="h-4 w-4" />
               </div>
               <div className="text-base font-semibold">Paste image URL</div>
@@ -903,7 +907,7 @@ function CoverSourceDialog({
             </div>
           </div>
         )}
-      </div>
+      </DialogPanel>
     </div>
   )
 }

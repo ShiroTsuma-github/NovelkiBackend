@@ -121,7 +121,7 @@ describe('BookDetailsPage', () => {
     expect(screen.getByText('-4')).toHaveClass('bg-rose-100', 'text-rose-700')
   })
 
-  it('keeps the delete dialog title readable against the light dialog surface', async () => {
+  it('uses the shared dialog surface and readable title hierarchy', async () => {
     vi.mocked(api.getGenres).mockResolvedValue({ skip: 0, take: 100, total: genres.length, data: genres })
     vi.mocked(api.getBook).mockResolvedValue(books[0])
     const user = userEvent.setup()
@@ -141,6 +141,6 @@ describe('BookDetailsPage', () => {
 
     expect(screen.getByRole('heading', { name: /delete book/i })).toHaveClass('text-slate-950')
     expect(within(dialog).getByText('Lord of Mysteries')).toHaveClass('text-slate-950')
-    expect(panel).toHaveClass('bg-white')
+    expect(panel).toHaveClass('ui-dialog-panel')
   })
 })

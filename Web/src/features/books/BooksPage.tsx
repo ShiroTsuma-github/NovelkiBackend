@@ -11,6 +11,7 @@ import {
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
+import { PageHeader, Surface } from '@/components/app/DesignSystem'
 import { BookDataTable } from './BookDataTable'
 import { BookCoverArtwork } from './BookCoverSection'
 import { formatProgress } from './bookProgress'
@@ -195,12 +196,11 @@ export function BooksPage() {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-950">Books</h1>
-          <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        description="List, search, and quick navigation through your library."
+        title="Books"
+        actions={(
+          <>
           <button
             aria-controls="books-summary-panel"
             aria-expanded={summaryOpen}
@@ -223,11 +223,12 @@ export function BooksPage() {
             <Plus className="h-4 w-4" />
             Add book
           </Link>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {lastImportResult ? (
-        <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <Surface className="grid gap-2 p-4">
           <div className="text-sm font-semibold text-slate-950">Last import</div>
           <p className="text-sm text-slate-600">
             Imported: {lastImportResult.importedCount}. Skipped: {lastImportResult.skippedCount}.
@@ -242,7 +243,7 @@ export function BooksPage() {
               ) : null}
             </div>
           ) : null}
-        </section>
+        </Surface>
       ) : null}
 
       {summaryOpen ? (
@@ -257,7 +258,7 @@ export function BooksPage() {
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <Surface className="min-w-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {(booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
@@ -282,8 +283,8 @@ export function BooksPage() {
             items={booksQuery.data?.data ?? []}
             renderActions={(book) => (
               <div className="flex justify-end gap-2">
-                <Link className={secondaryButtonClass} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
-                <Link className={secondaryButtonClass} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
+                <Link aria-label={`View ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
+                <Link aria-label={`Edit ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
               </div>
             )}
             sortBy={sortBy}
@@ -313,7 +314,7 @@ export function BooksPage() {
           visiblePages={pagination.visiblePages}
           onGoToPage={pagination.onGoToPage}
         />
-      </section>
+      </Surface>
       <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
       <ScrollShortcutButtons
         showBackToTop={scrollShortcuts.showBackToTop}
@@ -358,9 +359,10 @@ export function ViewModeToggle({
   onChange: (value: BookViewMode) => void
 }) {
   return (
-    <div className="inline-flex items-center rounded-md border border-slate-300 bg-white p-1 shadow-sm">
+    <div className="ui-segmented-control">
       <button
-        className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ${value === 'table' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+        aria-pressed={value === 'table'}
+        className={`ui-segmented-control__item ${value === 'table' ? 'ui-segmented-control__item--active' : ''}`}
         type="button"
         onClick={() => onChange('table')}
       >
@@ -368,7 +370,8 @@ export function ViewModeToggle({
         Table
       </button>
       <button
-        className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ${value === 'cards' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+        aria-pressed={value === 'cards'}
+        className={`ui-segmented-control__item ${value === 'cards' ? 'ui-segmented-control__item--active' : ''}`}
         type="button"
         onClick={() => onChange('cards')}
       >
@@ -393,7 +396,7 @@ export function BookAdvancedSearch({
   }, [value])
 
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <Surface className="grid gap-3 p-4" tone="muted">
       <label className="relative">
         <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
         <input
@@ -410,7 +413,7 @@ export function BookAdvancedSearch({
       <p className="text-xs text-slate-500">
         Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, <code>total-chapters:&gt;500</code>, and wildcard searches like <code>title:i*</code>.
       </p>
-    </section>
+    </Surface>
   )
 }
 
@@ -429,12 +432,12 @@ function BookSummaryPanel({
 }) {
   if (isLoading) {
     return (
-      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+      <Surface className="grid gap-3 p-4" id={id}>
         <div>
           <h2 className="text-sm font-semibold text-slate-950">Library summary</h2>
           <p className="text-sm text-slate-500">Loading summary...</p>
         </div>
-      </section>
+      </Surface>
     )
   }
 
@@ -454,7 +457,7 @@ function BookSummaryPanel({
   }
 
   return (
-    <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+    <Surface className="grid gap-4 p-4" id={id}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-950">Library summary</h2>
@@ -486,7 +489,7 @@ function BookSummaryPanel({
           </div>
         </div>
       )}
-    </section>
+    </Surface>
   )
 }
 
@@ -604,7 +607,7 @@ function BookCardGrid({
   return (
     <div className={`grid gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
-        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
+        <Surface as="article" className="book-card p-3" key={book.id} tone="muted">
           <Link className="grid gap-3" to={`/books/${book.id}`}>
             <div className="relative">
               <BookCoverArtwork
@@ -659,7 +662,7 @@ function BookCardGrid({
               ) : null}
             </div>
           </Link>
-        </article>
+        </Surface>
       ))}
     </div>
   )

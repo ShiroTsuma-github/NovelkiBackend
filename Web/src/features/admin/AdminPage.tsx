@@ -179,7 +179,7 @@ export function AdminPage() {
           items={adminBooksQuery.data?.data ?? []}
           renderActions={(book) => (
             <div className="flex justify-end">
-              <Link className={secondaryButtonClass} to={`/admin/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
+              <Link aria-label={`Edit ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/admin/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
             </div>
           )}
           sortBy={sortBy}
