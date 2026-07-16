@@ -35,7 +35,7 @@ export function ChapterVolumeChart({ data }: ChapterVolumeChartProps) {
               <Tooltip {...analyticsTooltipProps} formatter={(value) => [`${formatCount(Number(value))} books`, 'Books']} />
               <Bar
                 dataKey="bookCount"
-                fill="#0891b2"
+                fill="#8b92d8"
                 name="Books"
                 radius={[6, 6, 0, 0]}
               />
@@ -68,7 +68,7 @@ export function ChapterVolumeChart({ data }: ChapterVolumeChartProps) {
               <Tooltip {...analyticsTooltipProps} formatter={(value) => [`${formatChapterCount(Number(value))} chapters`, 'Current chapters']} />
               <Bar
                 dataKey="currentChapters"
-                fill="#7c3aed"
+                fill="#75b69c"
                 name="Current chapters"
                 radius={[6, 6, 0, 0]}
               />

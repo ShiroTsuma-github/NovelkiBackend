@@ -6,7 +6,7 @@ import { useSearchParams } from 'react-router-dom'
 import { api } from '@/api/client'
 import { getStoredSession } from '@/api/http'
 import type { BookAnalyticsDto } from '@/api/types'
-import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { Badge, buttonVariants, controlClass, PageHeader, Surface } from '@/components/app/DesignSystem'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
 import { ChapterVolumeChart, chapterVolumeRows } from './charts/ChapterVolumeChart'
@@ -61,32 +61,29 @@ export function AnalyticsPage() {
 
   return (
     <div className="grid min-w-0 gap-5 overflow-x-hidden">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-950">Analytics</h1>
-          <p className="text-sm text-slate-500">Library metrics scoped by book search and created-date range.</p>
-        </div>
-        {analyticsQuery.isFetching && data ? (
-          <span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800">Refreshing...</span>
-        ) : null}
-      </div>
+      <PageHeader
+        actions={analyticsQuery.isFetching && data ? <Badge tone="accent">Refreshing...</Badge> : undefined}
+        description="Library metrics scoped by book search and created-date range."
+        eyebrow="Library intelligence"
+        title="Analytics"
+      />
 
-      <section className="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <Surface className="grid gap-3 p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem_9rem_auto]">
-          <label className="grid min-w-0 gap-1.5 text-sm font-semibold text-slate-700">
-            Query
+          <label className="ui-form-field min-w-0">
+            <span className="ui-field-label">Query</span>
             <input
-              className={`${inputClass} border-slate-300 bg-white text-slate-950 placeholder:text-slate-500 focus:border-cyan-500`}
+              className={controlClass}
               placeholder="author:Toika rating:>=8"
               value={draftFilters.query}
               onChange={(event) => setDraftFilters((current) => ({ ...current, query: event.target.value }))}
             />
           </label>
           <DateRangeChooser filters={draftFilters} onChange={setDraftFilters} />
-          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
-            Bucket
+          <label className="ui-form-field">
+            <span className="ui-field-label">Bucket</span>
             <select
-              className={`${inputClass} border-slate-300 bg-white text-slate-950 focus:border-cyan-500`}
+              className={controlClass}
               value={draftFilters.bucket}
               onChange={(event) => setDraftFilters((current) => ({ ...current, bucket: normalizeBucket(event.target.value) }))}
             >
@@ -94,25 +91,25 @@ export function AnalyticsPage() {
             </select>
           </label>
           <div className="flex items-end">
-            <button className={`${secondaryButtonClass} w-full`} type="button" onClick={applyFilters}>Apply filters</button>
+            <button className={`${buttonVariants.secondary} w-full`} type="button" onClick={applyFilters}>Apply filters</button>
           </div>
         </div>
-      </section>
+      </Surface>
 
       {analyticsQuery.isError && !data ? (
-        <section className="rounded-xl border border-rose-500/40 bg-rose-950/40 p-4 text-rose-100 shadow-sm">
-          <h2 className="text-sm font-semibold">Could not load analytics.</h2>
-          <p className="mt-1 text-sm text-rose-200">Check filters and retry the request.</p>
-          <button className="mt-3 rounded-md border border-rose-400/50 bg-rose-500/20 px-3 py-2 text-sm font-semibold text-rose-50 hover:bg-rose-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70" type="button" onClick={() => analyticsQuery.refetch()}>
+        <Surface className="p-4" tone="danger">
+          <h2 className="ui-panel-title text-inherit">Could not load analytics.</h2>
+          <p className="mt-1 text-sm text-inherit opacity-85">Check filters and retry the request.</p>
+          <button className={`${buttonVariants.destructive} mt-3`} type="button" onClick={() => analyticsQuery.refetch()}>
             Retry
           </button>
-        </section>
+        </Surface>
       ) : null}
 
       {emptyMessage ? (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+        <Surface className="p-4 text-sm text-slate-600" tone="muted">
           {emptyMessage}
-        </section>
+        </Surface>
       ) : null}
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
@@ -396,12 +393,12 @@ function DateRangeChooser({
   }
 
   return (
-    <div className="relative grid gap-1.5 text-sm font-semibold text-slate-700" ref={rootRef}>
-      Date range
+    <div className="ui-form-field relative" ref={rootRef}>
+      <span className="ui-field-label">Date range</span>
       <button
         aria-expanded={isOpen}
         aria-label={`Date range: ${display.label}. ${display.title}`}
-        className="flex min-h-10 w-full items-center justify-between gap-3 rounded-md border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-950 shadow-sm hover:border-cyan-500 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+        className={`${controlClass} flex items-center justify-between gap-3 text-left`}
         title={display.title}
         type="button"
         onClick={() => {
@@ -415,13 +412,11 @@ function DateRangeChooser({
       >
         <span className="truncate">{display.label}</span>
         {display.toLabel ? (
-          <span className="shrink-0 rounded-full bg-cyan-500/15 px-2 py-0.5 text-xs font-semibold text-cyan-300">
-            {display.toLabel}
-          </span>
+          <Badge className="shrink-0" tone="accent">{display.toLabel}</Badge>
         ) : null}
       </button>
       {isOpen ? (
-        <div className="absolute right-0 top-full z-30 mt-2 w-[min(44rem,calc(100vw-2rem))] rounded-2xl border border-slate-700 bg-slate-950 p-3 text-slate-100 shadow-xl">
+        <div className="ui-popover absolute right-0 top-full mt-2 w-[min(44rem,calc(100vw-2rem))] p-3">
           <div className="mb-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
             {analyticsRangePresets.map((preset) => {
               const today = getToday()
@@ -430,13 +425,7 @@ function DateRangeChooser({
               return (
                 <button
                   aria-disabled={isDisabled}
-                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                    isActive
-                      ? 'border-cyan-400 bg-cyan-500/20 text-cyan-100'
-                      : isDisabled
-                        ? 'cursor-not-allowed border-slate-800 bg-slate-950 text-slate-600'
-                      : 'border-slate-700 bg-slate-900 text-slate-300 hover:border-cyan-500 hover:bg-slate-800 hover:text-white'
-                  }`}
+                  className={`ui-filter-chip ${isActive ? 'ui-filter-chip--active' : ''}`}
                   disabled={isDisabled}
                   key={preset.label}
                   type="button"
@@ -467,10 +456,10 @@ function DateRangeChooser({
 
 function MetricCard({ label, loading, value }: { label: string; loading: boolean; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <Surface as="div" className="px-4 py-3" tone="elevated">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-slate-950">{loading ? <span className="inline-block h-8 w-16 animate-pulse rounded bg-slate-200" /> : value}</div>
-    </div>
+    </Surface>
   )
 }
 
@@ -604,28 +593,28 @@ function getDateRangeDisplay(filters: ReturnType<typeof getAnalyticsFilters>, ac
 }
 
 const dayPickerClassNames = {
-  root: 'text-slate-100',
+  root: 'text-[var(--qs-text)]',
   months: 'grid gap-4 md:grid-cols-2',
   month: 'space-y-3',
-  month_caption: 'flex items-center justify-center px-8 py-1 text-sm font-semibold text-slate-100',
-  caption_label: 'rounded-md px-2 py-1',
+  month_caption: 'flex items-center justify-center px-8 py-1 text-sm font-semibold text-[var(--qs-text)]',
+  caption_label: 'px-2 py-1',
   nav: 'absolute right-3 top-[4.75rem] flex gap-2',
-  button_previous: 'grid h-8 w-8 place-items-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-500 hover:text-cyan-100',
-  button_next: 'grid h-8 w-8 place-items-center rounded-md border border-slate-700 bg-slate-900 text-slate-200 hover:border-cyan-500 hover:text-cyan-100',
+  button_previous: 'grid h-11 w-11 place-items-center rounded-[var(--qs-control-radius)] border border-[var(--qs-border)] bg-[var(--qs-surface-muted)] text-[var(--qs-muted)] hover:border-[var(--qs-accent)] hover:text-[var(--qs-text)]',
+  button_next: 'grid h-11 w-11 place-items-center rounded-[var(--qs-control-radius)] border border-[var(--qs-border)] bg-[var(--qs-surface-muted)] text-[var(--qs-muted)] hover:border-[var(--qs-accent)] hover:text-[var(--qs-text)]',
   chevron: 'h-4 w-4 fill-current',
   month_grid: 'w-full border-separate border-spacing-1',
-  weekdays: 'text-xs uppercase tracking-wide text-slate-500',
+  weekdays: 'text-xs uppercase tracking-wide text-[var(--qs-subtle)]',
   weekday: 'h-8 text-center font-semibold',
   week: '',
-  day: 'h-9 w-9 rounded-md text-center text-sm text-slate-200',
-  day_button: 'h-9 w-9 rounded-md font-medium hover:bg-cyan-500/20 hover:text-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-400/60',
-  today: 'text-cyan-200',
-  selected: 'bg-cyan-500 text-slate-950',
-  range_start: 'rounded-l-full bg-cyan-400 text-slate-950',
-  range_middle: 'rounded-none bg-cyan-500/20 text-cyan-100',
-  range_end: 'rounded-r-full bg-cyan-400 text-slate-950',
-  outside: 'text-slate-600',
-  disabled: 'text-slate-700 opacity-40 line-through',
+  day: 'analytics-calendar-day h-11 w-11 text-center text-sm',
+  day_button: 'analytics-calendar-day-button h-11 w-11 rounded-[var(--qs-control-radius)] font-medium',
+  today: 'analytics-calendar-day--today',
+  selected: 'analytics-calendar-day--selected',
+  range_start: 'analytics-calendar-day--range-start rounded-l-full',
+  range_middle: 'analytics-calendar-day--range-middle rounded-none',
+  range_end: 'analytics-calendar-day--range-end rounded-r-full',
+  outside: 'analytics-calendar-day--outside',
+  disabled: 'analytics-calendar-day--disabled opacity-40 line-through',
 }
 
 function getAnalyticsEmptyMessage(data: BookAnalyticsDto | undefined, query: string) {

@@ -16,6 +16,14 @@ const optionalIntegerString = optionalNumberString.refine(
   'Value must be an integer.',
 )
 
+const requiredCurrentChapterString = z
+  .string()
+  .refine((value) => value.trim().length > 0, 'Current chapter is required.')
+  .refine(
+    (value) => !value.trim() || /^\d+$/.test(value.trim()),
+    'Current chapter must be a non-negative integer.',
+  )
+
 export const bookFormSchema = z
   .object({
     primaryTitle: z.string().refine((value) => value.trim().length > 0, 'Title is required.').refine((value) => value.trim().length <= 500, 'Title must be 500 characters or fewer.'),
@@ -27,7 +35,7 @@ export const bookFormSchema = z
     alternativeTitlesText: z.string(),
     tagsText: z.string(),
     totalChapters: optionalPositiveNumberString,
-    currentChapterNumber: optionalNumberString,
+    currentChapterNumber: requiredCurrentChapterString,
     currentChapterLabel: z.string().max(100).optional(),
     rating: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 10), 'Rating must be between 1 and 10.'),
     priority: optionalIntegerString.refine((value) => !value.trim() || (Number(value) >= 1 && Number(value) <= 5), 'Priority must be between 1 and 5.'),
@@ -63,7 +71,7 @@ export function toBookMutationRequest(values: BookFormValues): BookMutationReque
     genreIds: values.genreIds,
     tags: splitComma(values.tagsText),
     totalChapters: toOptionalNumber(values.totalChapters),
-    currentChapterNumber: toOptionalNumber(values.currentChapterNumber),
+    currentChapterNumber: Number(values.currentChapterNumber.trim()),
     currentChapterLabel: values.currentChapterLabel?.trim() || null,
     rating: toOptionalNumber(values.rating),
     priority: toOptionalNumber(values.priority),

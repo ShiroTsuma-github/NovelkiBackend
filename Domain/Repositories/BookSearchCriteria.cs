@@ -70,10 +70,12 @@ public enum BookSearchMissingField
     Rating,
     Priority,
     Author,
+    Description,
     Genre,
     Tag,
     CurrentChapter,
     TotalChapters,
+    AlternateTitle,
     Cover,
     Link
 }

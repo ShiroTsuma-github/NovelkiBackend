@@ -1,4 +1,5 @@
 import { useId, useState, type ReactNode } from 'react'
+import { buttonVariants, Surface } from '@/components/app/DesignSystem'
 
 type AnalyticsChartCardProps = {
   title: string
@@ -34,22 +35,22 @@ export function AnalyticsChartCard({
   const tableId = `${reactId}-data-table`
 
   return (
-    <section
+    <Surface
       aria-describedby={descriptionId}
       aria-labelledby={titleId}
-      className="grid min-w-0 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+      className="grid min-w-0 gap-4 p-4"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-slate-950" id={titleId}>{title}</h2>
-          <p className="mt-1 text-sm text-slate-600" id={descriptionId}>{description}</p>
+          <h2 className="ui-panel-title" id={titleId}>{title}</h2>
+          <p className="ui-panel-description mt-1" id={descriptionId}>{description}</p>
         </div>
         {dataTableEnabled ? (
           <button
             aria-controls={tableId}
             aria-expanded={showData}
             aria-label={`${showData ? 'Hide' : 'View'} data for ${title}`}
-            className="inline-flex min-h-11 items-center justify-center rounded-md border border-slate-500 bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:border-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+            className={buttonVariants.ghost}
             type="button"
             onClick={() => setShowData((current) => !current)}
           >
@@ -59,37 +60,37 @@ export function AnalyticsChartCard({
       </div>
 
       {isLoading ? (
-        <div aria-label={`${title} loading`} className="grid h-64 animate-pulse gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4" data-testid="analytics-card-skeleton" role="status">
+        <Surface aria-label={`${title} loading`} as="div" className="grid h-64 animate-pulse gap-3 p-4" data-testid="analytics-card-skeleton" role="status" tone="muted">
           <div className="h-4 w-1/3 rounded bg-slate-200" />
           <div className="mt-auto grid gap-2">
             <div className="h-8 rounded bg-slate-200" />
             <div className="h-12 rounded bg-slate-200" />
             <div className="h-20 rounded bg-slate-200" />
           </div>
-        </div>
+        </Surface>
       ) : isError ? (
-        <div className="grid min-h-64 place-items-center rounded-lg border border-rose-500/40 bg-rose-950/40 p-4 text-center shadow-[inset_0_0_0_1px_rgb(244_63_94_/_0.08)]" role="alert">
+        <Surface as="div" className="grid min-h-64 place-items-center p-4 text-center" role="alert" tone="danger">
           <div>
-            <p className="text-sm font-semibold text-rose-100">Could not load this analytics card.</p>
+            <p className="text-sm font-semibold text-inherit">Could not load this analytics card.</p>
             {onRetry ? (
-              <button className="mt-3 inline-flex min-h-11 items-center rounded-md border border-rose-400/50 bg-rose-500/20 px-4 py-2 text-sm font-semibold text-rose-50 hover:bg-rose-500/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70" type="button" onClick={onRetry}>
+              <button className={`${buttonVariants.destructive} mt-3`} type="button" onClick={onRetry}>
                 Retry
               </button>
             ) : null}
           </div>
-        </div>
+        </Surface>
       ) : isEmpty ? (
-        <div className="grid min-h-64 place-items-center rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+        <Surface as="div" className="grid min-h-64 place-items-center p-4 text-center text-sm text-slate-500" tone="muted">
           {emptyMessage}
-        </div>
+        </Surface>
       ) : (
-        <div className="analytics-chart-surface min-h-64 min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4">
+        <Surface as="div" className="analytics-chart-surface min-h-64 min-w-0 p-4" tone="muted">
           {children}
-        </div>
+        </Surface>
       )}
 
       {dataTableEnabled && showData ? (
-        <div className="max-h-80 overflow-auto rounded-lg border border-slate-700 bg-slate-950" id={tableId}>
+        <Surface as="div" className="max-h-80 overflow-auto" id={tableId} tone="elevated">
           <table className="min-w-full divide-y divide-slate-800 text-sm">
             <caption className="sr-only">{title} data table</caption>
             <thead className="bg-slate-900 text-left text-xs font-semibold uppercase tracking-wide text-slate-300">
@@ -113,8 +114,8 @@ export function AnalyticsChartCard({
               )}
             </tbody>
           </table>
-        </div>
+        </Surface>
       ) : null}
-    </section>
+    </Surface>
   )
 }

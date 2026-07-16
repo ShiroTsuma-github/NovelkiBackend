@@ -48,6 +48,7 @@ public static class BookSearchQueryParser
             ["rating"] = BookSearchMissingField.Rating,
             ["priority"] = BookSearchMissingField.Priority,
             ["author"] = BookSearchMissingField.Author,
+            ["description"] = BookSearchMissingField.Description,
             ["genre"] = BookSearchMissingField.Genre,
             ["tag"] = BookSearchMissingField.Tag,
             ["current"] = BookSearchMissingField.CurrentChapter,
@@ -58,6 +59,8 @@ public static class BookSearchQueryParser
             ["chapters"] = BookSearchMissingField.TotalChapters,
             ["total-chapters"] = BookSearchMissingField.TotalChapters,
             ["totalChapters"] = BookSearchMissingField.TotalChapters,
+            ["alternateTitle"] = BookSearchMissingField.AlternateTitle,
+            ["alternativeTitle"] = BookSearchMissingField.AlternateTitle,
             ["cover"] = BookSearchMissingField.Cover,
             ["link"] = BookSearchMissingField.Link,
             ["links"] = BookSearchMissingField.Link

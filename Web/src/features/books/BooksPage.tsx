@@ -11,6 +11,7 @@ import {
   inputClass,
   secondaryButtonClass,
 } from '@/components/app/FormField'
+import { PageHeader, Surface } from '@/components/app/DesignSystem'
 import { BookDataTable } from './BookDataTable'
 import { BookCoverArtwork } from './BookCoverSection'
 import { formatProgress } from './bookProgress'
@@ -195,12 +196,11 @@ export function BooksPage() {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-950">Books</h1>
-          <p className="text-sm text-slate-500">List, search, and quick navigation through your library.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+      <PageHeader
+        description="List, search, and quick navigation through your library."
+        title="Books"
+        actions={(
+          <>
           <button
             aria-controls="books-summary-panel"
             aria-expanded={summaryOpen}
@@ -223,11 +223,12 @@ export function BooksPage() {
             <Plus className="h-4 w-4" />
             Add book
           </Link>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
       {lastImportResult ? (
-        <section className="grid gap-2 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <Surface className="grid gap-2 p-4">
           <div className="text-sm font-semibold text-slate-950">Last import</div>
           <p className="text-sm text-slate-600">
             Imported: {lastImportResult.importedCount}. Skipped: {lastImportResult.skippedCount}.
@@ -242,7 +243,7 @@ export function BooksPage() {
               ) : null}
             </div>
           ) : null}
-        </section>
+        </Surface>
       ) : null}
 
       {summaryOpen ? (
@@ -257,7 +258,7 @@ export function BooksPage() {
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <Surface className="min-w-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {(booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
@@ -282,8 +283,8 @@ export function BooksPage() {
             items={booksQuery.data?.data ?? []}
             renderActions={(book) => (
               <div className="flex justify-end gap-2">
-                <Link className={secondaryButtonClass} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
-                <Link className={secondaryButtonClass} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
+                <Link aria-label={`View ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
+                <Link aria-label={`Edit ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
               </div>
             )}
             sortBy={sortBy}
@@ -313,7 +314,7 @@ export function BooksPage() {
           visiblePages={pagination.visiblePages}
           onGoToPage={pagination.onGoToPage}
         />
-      </section>
+      </Surface>
       <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
       <ScrollShortcutButtons
         showBackToTop={scrollShortcuts.showBackToTop}
@@ -338,13 +339,13 @@ function CardsPerRowControl({
       <span className="relative inline-flex">
         <select
           aria-label="Cards per row"
-          className={`${inputClass} h-10 w-20 appearance-none bg-white pr-9 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
+          className={`${inputClass} ui-control--compact-select bg-white text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white focus:bg-white`}
           value={value}
           onChange={(event) => onChange(Number(event.target.value))}
         >
           {cardsPerRowOptions.map((option) => <option key={option} value={option}>{option}</option>)}
         </select>
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       </span>
     </label>
   )
@@ -358,9 +359,10 @@ export function ViewModeToggle({
   onChange: (value: BookViewMode) => void
 }) {
   return (
-    <div className="inline-flex items-center rounded-md border border-slate-300 bg-white p-1 shadow-sm">
+    <div className="ui-segmented-control">
       <button
-        className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ${value === 'table' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+        aria-pressed={value === 'table'}
+        className={`ui-segmented-control__item ${value === 'table' ? 'ui-segmented-control__item--active' : ''}`}
         type="button"
         onClick={() => onChange('table')}
       >
@@ -368,7 +370,8 @@ export function ViewModeToggle({
         Table
       </button>
       <button
-        className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold uppercase tracking-wide ${value === 'cards' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'}`}
+        aria-pressed={value === 'cards'}
+        className={`ui-segmented-control__item ${value === 'cards' ? 'ui-segmented-control__item--active' : ''}`}
         type="button"
         onClick={() => onChange('cards')}
       >
@@ -393,11 +396,11 @@ export function BookAdvancedSearch({
   }, [value])
 
   return (
-    <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <Surface className="grid gap-3 p-4" tone="muted">
       <label className="relative">
-        <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
-          className={`${inputClass} w-full pl-9`}
+          className={`${inputClass} ui-control--search`}
           placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating:>=8'}
           value={draftValue}
           onChange={(event) => {
@@ -410,7 +413,7 @@ export function BookAdvancedSearch({
       <p className="text-xs text-slate-500">
         Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, <code>total-chapters:&gt;500</code>, and wildcard searches like <code>title:i*</code>.
       </p>
-    </section>
+    </Surface>
   )
 }
 
@@ -429,23 +432,23 @@ function BookSummaryPanel({
 }) {
   if (isLoading) {
     return (
-      <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+      <Surface className="grid gap-3 p-4" id={id}>
         <div>
           <h2 className="text-sm font-semibold text-slate-950">Library summary</h2>
           <p className="text-sm text-slate-500">Loading summary...</p>
         </div>
-      </section>
+      </Surface>
     )
   }
 
   if (isError) {
     return (
-      <section className="grid gap-3 rounded-lg border border-rose-200 bg-rose-50 p-4 shadow-sm" id={id}>
+      <Surface className="grid gap-3 p-4" id={id} tone="danger">
         <div>
           <h2 className="text-sm font-semibold text-rose-950">Library summary</h2>
           <p className="text-sm text-rose-800">Could not load summary.</p>
         </div>
-      </section>
+      </Surface>
     )
   }
 
@@ -454,7 +457,7 @@ function BookSummaryPanel({
   }
 
   return (
-    <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm" id={id}>
+    <Surface className="grid gap-4 p-4" id={id}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-950">Library summary</h2>
@@ -472,11 +475,11 @@ function BookSummaryPanel({
         <SummaryMetricCard label="Current chapters" value={formatChapterCount(summary.currentChapters)} />
       </div>
       {summary.totalBooks === 0 ? (
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <Surface as="div" className="px-4 py-3 text-sm text-slate-600" tone="muted">
           No books match the current filters.
-        </div>
+        </Surface>
       ) : (
-        <div className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <Surface as="div" className="grid gap-4 p-4" tone="muted">
           <div className="grid gap-4 xl:grid-cols-2">
             <SummaryCompactSection
               title="Status distribution"
@@ -484,27 +487,27 @@ function BookSummaryPanel({
             />
             <SummaryCompactTypeSection items={summary.typeCounts} />
           </div>
-        </div>
+        </Surface>
       )}
-    </section>
+    </Surface>
   )
 }
 
 function SummaryMetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+    <Surface as="div" className="px-4 py-3" tone="elevated">
       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
       <div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div>
-    </div>
+    </Surface>
   )
 }
 
 function SummaryCompactSection({ items, title }: { items: Array<{ label: string; value: string }>; title: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Surface as="div" className="p-4">
       <div className="mb-3 text-sm font-semibold text-slate-950">{title}</div>
       <SummaryCountList items={items} />
-    </div>
+    </Surface>
   )
 }
 
@@ -527,10 +530,10 @@ function SummaryCountList({ items }: { items: Array<{ label: string; value: stri
 
 function SummaryCompactTypeSection({ items }: { items: BookSummaryTypeCountDto[] }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Surface as="div" className="p-4">
       <div className="mb-3 text-sm font-semibold text-slate-950">Book types</div>
       <SummaryTypeDetails items={items} />
-    </div>
+    </Surface>
   )
 }
 
@@ -604,11 +607,11 @@ function BookCardGrid({
   return (
     <div className={`grid gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
-        <article className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm" key={book.id}>
-          <Link className="grid gap-3" to={`/books/${book.id}`}>
+        <Surface as="article" className="book-card" key={book.id} tone="muted">
+          <Link className="grid" to={`/books/${book.id}`}>
             <div className="relative">
               <BookCoverArtwork
-                className="w-full"
+                className="book-card__cover w-full"
                 cover={book.cover}
                 emptyLabel="No cover"
                 preferredVariant="thumbnail"
@@ -616,18 +619,18 @@ function BookCardGrid({
               />
               {hasCardField(fields, 'rating') && book.rating != null ? (
                 <span
-                  className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold shadow-lg ${getRatingBadgeClass(book.rating)}`}
+                  className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold ${getRatingBadgeClass(book.rating)}`}
                 >
                   {book.rating}
                 </span>
               ) : null}
               {hasCardField(fields, 'status') ? (
-                <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide shadow-lg ${getStatusBadgeClass(book.status)}`}>
+                <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(book.status)}`}>
                   <span className="truncate">{book.status}</span>
                 </span>
               ) : null}
             </div>
-            <div className={`grid gap-1 ${cardDetailsClass}`}>
+            <div className={`grid gap-1 p-3 ${cardDetailsClass}`}>
               {showTitle ? (
                 <div className="min-h-10">
                   <h2 className={`line-clamp-2 font-semibold text-slate-950 ${cardText.title}`}>{book.primaryTitle}</h2>
@@ -659,7 +662,7 @@ function BookCardGrid({
               ) : null}
             </div>
           </Link>
-        </article>
+        </Surface>
       ))}
     </div>
   )

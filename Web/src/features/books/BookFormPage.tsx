@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { BookCoverDto, BookMutationRequest } from '@/api/types'
+import { buttonVariants, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
@@ -189,14 +190,14 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   }
 
   function setNumericFieldValue(
-    field: 'currentChapterNumber' | 'totalChapters',
+    field: 'totalChapters',
     rawValue: string,
   ) {
     form.setValue(field, sanitizeDecimalInput(rawValue), { shouldDirty: true, shouldValidate: true })
   }
 
   function setIntegerFieldValue(
-    field: 'priority',
+    field: 'currentChapterNumber' | 'priority',
     rawValue: string,
   ) {
     form.setValue(field, sanitizeIntegerInput(rawValue), { shouldDirty: true, shouldValidate: true })
@@ -328,233 +329,281 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       : existingCoverChange.kind === 'remove'
         ? [{ text: 'Status: Will be removed on save' }]
         : [{ text: 'Status: Missing' }]
+  const backHref = admin ? '/admin' : mode === 'edit' && id ? `/books/${id}` : '/books'
+  const pageDescription = mode === 'create'
+    ? 'Start with the book identity and reading state. Optional library context can be added below.'
+    : 'Update metadata, reading state, artwork, and private library context in one workspace.'
 
   if (isLoadingDictionaries || isLoadingBook) {
-    return <div className="rounded-lg border border-slate-200 bg-white p-6 text-slate-500">Loading form...</div>
+    return <Surface className="p-6 text-slate-500" tone="muted">Loading form...</Surface>
   }
 
   return (
     <>
-      <form className="mx-auto grid w-full max-w-7xl gap-5" noValidate onSubmit={form.handleSubmit((values) => mutation.mutate(values))}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-950">{admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}</h1>
-            <p className="text-sm text-slate-500">Changes are saved directly to the backend.</p>
-          </div>
-          <div className="flex gap-2">
-            <Link className={secondaryButtonClass} to={admin ? '/admin' : mode === 'edit' && id ? `/books/${id}` : '/books'}>
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Link>
-            <button className={buttonClass} disabled={mutation.isPending} type="submit">
-              <Save className="h-4 w-4" />
-              Save
-            </button>
-          </div>
-        </div>
+      <form
+        className="book-form-page mx-auto grid w-full max-w-7xl gap-5"
+        data-testid="book-form"
+        noValidate
+        onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
+      >
+        <PageHeader
+          description={pageDescription}
+          eyebrow={admin ? 'Administration' : 'Library editor'}
+          title={admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}
+        />
 
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-950">Basics</h2>
-          <div className="flex flex-col gap-5">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
-              <div className="flex-none lg:w-[320px]">
-                <BookCoverArtwork
-                  className="w-full lg:w-[320px]"
-                  cover={mode === 'edit' ? effectiveCurrentCover : null}
-                  emptyLabel="Click to add a cover."
-                  hint={mode === 'create' ? 'The cover will be uploaded right after the book is created.' : 'Choose file upload or image URL.'}
-                  imageUrl={visibleCoverUrl}
-                  interactive
-                  removeLabel="Remove cover"
-                  title={primaryTitle || 'Book cover'}
-                  onClick={() => {
-                    if (visibleCoverUrl) {
-                      setCoverPreviewOpen(true)
-                      return
-                    }
+        <div className="book-form-layout">
+          <Surface className="book-form-section book-form-identity">
+            <FormSectionHeader
+              description="The fields used to identify and classify this book across the library."
+              index="01"
+              title="Book identity"
+            />
+            <div className="grid items-start gap-4 md:grid-cols-2">
+              <FormField error={errors.primaryTitle?.message} label="Primary title *">
+                <input aria-label="Primary title" autoFocus className={inputClass} {...form.register('primaryTitle')} />
+              </FormField>
+              <FormField error={errors.authorName?.message} label="Author">
+                <div className="relative">
+                  <input
+                    aria-label="Author"
+                    autoComplete="off"
+                    className={`${inputClass} w-full`}
+                    name="authorName"
+                    value={authorName}
+                    onBlur={() => window.setTimeout(() => setAuthorSuggestionsOpen(false), 120)}
+                    onChange={(event) => {
+                      form.setValue('authorName', event.target.value, { shouldDirty: true, shouldValidate: true })
+                      form.setValue('authorId', '', { shouldDirty: true, shouldValidate: true })
+                      setAuthorSuggestionsOpen(true)
+                    }}
+                    onFocus={() => setAuthorSuggestionsOpen(true)}
+                  />
+                  {authorSuggestionsOpen && authorName.trim().length >= 2 ? (
+                    <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto">
+                      {authorSuggestionsQuery.isLoading ? (
+                        <div className="px-3 py-2 text-sm text-slate-400">Searching authors...</div>
+                      ) : null}
+                      {authorSuggestionsQuery.data?.map((author) => (
+                        <button
+                          className="grid w-full gap-0.5 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                          key={author.id}
+                          type="button"
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => selectAuthor(author)}
+                        >
+                          <span className="font-medium">{author.primaryName}</span>
+                          {author.otherNames.length ? (
+                            <span className="text-xs text-slate-400">{author.otherNames.slice(0, 3).join(', ')}</span>
+                          ) : null}
+                        </button>
+                      ))}
+                      {!authorSuggestionsQuery.isLoading && authorSuggestionsQuery.data?.length === 0 ? (
+                        <div className="px-3 py-2 text-sm text-slate-400">No author found. A new one will be created.</div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </FormField>
+              <FormField error={errors.contentTypeId?.message} label="Type *">
+                <select className={inputClass} {...form.register('contentTypeId')}>
+                  {typesQuery.data?.data.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+                </select>
+                <DescriptionHelp value={selectedType?.description} />
+              </FormField>
+              <FormField error={errors.statusId?.message} label="Status *">
+                <select className={inputClass} {...form.register('statusId')}>
+                  {statusesQuery.data?.data.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
+                </select>
+                <DescriptionHelp value={selectedStatus?.description} />
+              </FormField>
+            </div>
+          </Surface>
 
-                    openCoverDialog()
-                  }}
-                  onRemove={() => {
-                    if (mode === 'create') {
-                      replaceDraftCover(null)
-                      return
-                    }
+          <aside className="book-form-rail" data-testid="book-form-rail">
+            <Surface className="book-form-cover-panel" data-testid="book-cover-editor">
+              <BookCoverArtwork
+                className="book-form-cover-artwork"
+                cover={mode === 'edit' ? effectiveCurrentCover : null}
+                emptyLabel="Add cover"
+                hint={mode === 'create' ? 'Upload or paste an image URL.' : 'Upload or replace from a URL.'}
+                imageUrl={visibleCoverUrl}
+                interactive
+                removeLabel="Remove cover"
+                title={primaryTitle || 'Book cover'}
+                onClick={() => {
+                  if (visibleCoverUrl) {
+                    setCoverPreviewOpen(true)
+                    return
+                  }
 
-                    if (draftCover) {
-                      replaceDraftCover(null)
-                      setExistingCoverChange({ kind: 'keep' })
-                      toast.success('Draft cover removed.')
-                      return
-                    }
+                  openCoverDialog()
+                }}
+                onRemove={() => {
+                  if (mode === 'create') {
+                    replaceDraftCover(null)
+                    return
+                  }
 
-                    setExistingCoverChange({ kind: 'remove' })
-                    toast.success('Cover will be removed after saving the book.')
-                  }}
-                />
-                <div className="mt-2 grid content-start gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                  {coverInfo.map((item) => (
-                    <p
-                      className={`${item.text === effectiveCurrentCover?.failureReason ? 'text-red-600' : ''} ${item.truncate ? 'truncate' : ''}`}
-                      key={item.text}
-                      title={item.truncate ? item.text : undefined}
-                    >
-                      {item.text}
-                    </p>
-                  ))}
-                  <p className="text-xs text-slate-500">
-                    Cover source URLs are appended to book links automatically.
+                  if (draftCover) {
+                    replaceDraftCover(null)
+                    setExistingCoverChange({ kind: 'keep' })
+                    toast.success('Draft cover removed.')
+                    return
+                  }
+
+                  setExistingCoverChange({ kind: 'remove' })
+                  toast.success('Cover will be removed after saving the book.')
+                }}
+              />
+              <div className="book-form-cover-meta">
+                {coverInfo.map((item) => (
+                  <p
+                    className={`${item.text === effectiveCurrentCover?.failureReason ? 'text-[var(--qs-danger)]' : ''} ${item.truncate ? 'truncate' : ''}`}
+                    key={item.text}
+                    title={item.truncate ? item.text : undefined}
+                  >
+                    {item.text}
                   </p>
+                ))}
+              </div>
+            </Surface>
+
+            <Surface as="div" className="book-form-actions" tone="elevated">
+              <div className="book-form-actions-copy">
+                <div className="text-sm font-semibold text-[var(--qs-text)]">
+                  {mode === 'create' ? 'Save book' : 'Save changes'}
+                </div>
+              </div>
+              <div className="book-form-action-buttons">
+                <Link className={secondaryButtonClass} to={backHref}>
+                  <ArrowLeft className="h-4 w-4" />
+                  Back
+                </Link>
+                <button className={buttonClass} disabled={mutation.isPending} type="submit">
+                  <Save className="h-4 w-4" />
+                  {mutation.isPending ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </Surface>
+          </aside>
+
+          <Surface className="book-form-section book-form-reading">
+            <FormSectionHeader
+              description="Track the current position and the signals you use to plan what to read next."
+              index="02"
+              title="Reading state"
+            />
+            <div className="grid gap-6">
+              <div className="book-form-field-group">
+                <div className="book-form-field-group-heading">
+                  <h3>Progress</h3>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <FormField error={errors.currentChapterNumber?.message} label="Current chapter *">
+                    <input
+                      aria-label="Current chapter"
+                      aria-invalid={errors.currentChapterNumber ? 'true' : undefined}
+                      className={inputClass}
+                      inputMode="numeric"
+                      name="currentChapterNumber"
+                      value={currentChapterNumber}
+                      onChange={(event) => setIntegerFieldValue('currentChapterNumber', event.target.value)}
+                    />
+                  </FormField>
+                  <FormField error={errors.currentChapterLabel?.message} label="Chapter label">
+                    <input className={inputClass} {...form.register('currentChapterLabel')} />
+                  </FormField>
+                  <FormField error={errors.totalChapters?.message} label="Total chapters">
+                    <input
+                      aria-label="Total chapters"
+                      aria-invalid={errors.totalChapters ? 'true' : undefined}
+                      className={inputClass}
+                      inputMode="decimal"
+                      name="totalChapters"
+                      value={totalChapters}
+                      onBlur={() => void form.trigger('totalChapters')}
+                      onChange={(event) => setNumericFieldValue('totalChapters', event.target.value)}
+                    />
+                  </FormField>
                 </div>
               </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="grid gap-5">
-                  <div className="grid items-start gap-x-4 gap-y-4 md:grid-cols-2">
-                    <FormField error={errors.primaryTitle?.message} label="Primary title">
-                      <input aria-label="Primary title" className={inputClass} {...form.register('primaryTitle')} />
-                    </FormField>
-                    <FormField error={errors.authorName?.message} label="Author">
-                      <div className="relative">
-                        <input
-                          aria-label="Author"
-                          className={`${inputClass} w-full`}
-                          name="authorName"
-                          value={authorName}
-                          onBlur={() => window.setTimeout(() => setAuthorSuggestionsOpen(false), 120)}
-                          onChange={(event) => {
-                            form.setValue('authorName', event.target.value, { shouldDirty: true, shouldValidate: true })
-                            form.setValue('authorId', '', { shouldDirty: true, shouldValidate: true })
-                            setAuthorSuggestionsOpen(true)
-                          }}
-                          onFocus={() => setAuthorSuggestionsOpen(true)}
-                        />
-                        {authorSuggestionsOpen && authorName.trim().length >= 2 ? (
-                          <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
-                            {authorSuggestionsQuery.isLoading ? (
-                              <div className="px-3 py-2 text-sm text-slate-400">Searching authors...</div>
-                            ) : null}
-                            {authorSuggestionsQuery.data?.map((author) => (
-                              <button
-                                className="grid w-full gap-0.5 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
-                                key={author.id}
-                                type="button"
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => selectAuthor(author)}
-                              >
-                                <span className="font-medium">{author.primaryName}</span>
-                                {author.otherNames.length ? (
-                                  <span className="text-xs text-slate-400">{author.otherNames.slice(0, 3).join(', ')}</span>
-                                ) : null}
-                              </button>
-                            ))}
-                            {!authorSuggestionsQuery.isLoading && authorSuggestionsQuery.data?.length === 0 ? (
-                              <div className="px-3 py-2 text-sm text-slate-400">No author found. A new one will be created.</div>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </div>
-                    </FormField>
-                    <FormField error={errors.contentTypeId?.message} label="Type">
-                      <select className={inputClass} {...form.register('contentTypeId')}>
-                        {typesQuery.data?.data.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-                      </select>
-                      <DescriptionHelp value={selectedType?.description} />
-                    </FormField>
-                    <FormField error={errors.statusId?.message} label="Status">
-                      <select className={inputClass} {...form.register('statusId')}>
-                        {statusesQuery.data?.data.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
-                      </select>
-                      <DescriptionHelp value={selectedStatus?.description} />
-                    </FormField>
-                  </div>
-
-                  <div className="grid max-w-4xl gap-5">
-                    <div className="grid gap-x-5 gap-y-4 md:grid-cols-3">
-                    <FormField error={errors.currentChapterNumber?.message} label="Current chapter">
-                      <input
-                        aria-label="Current chapter"
-                        aria-invalid={errors.currentChapterNumber ? 'true' : undefined}
-                        className={inputClass}
-                        inputMode="decimal"
-                        name="currentChapterNumber"
-                        value={currentChapterNumber}
-                        onBlur={() => void form.trigger('currentChapterNumber')}
-                        onChange={(event) => setNumericFieldValue('currentChapterNumber', event.target.value)}
-                      />
-                    </FormField>
-                      <FormField error={errors.currentChapterLabel?.message} label="Label">
-                        <input className={inputClass} {...form.register('currentChapterLabel')} />
-                      </FormField>
-                    <FormField error={errors.totalChapters?.message} label="Total chapters">
-                      <input
-                        aria-label="Total chapters"
-                        aria-invalid={errors.totalChapters ? 'true' : undefined}
-                        className={inputClass}
-                        inputMode="decimal"
-                        name="totalChapters"
-                        value={totalChapters}
-                        onBlur={() => void form.trigger('totalChapters')}
-                        onChange={(event) => setNumericFieldValue('totalChapters', event.target.value)}
-                      />
-                    </FormField>
-                    </div>
-                    <div className="grid gap-x-5 gap-y-4 md:grid-cols-2">
-                      <FormField error={errors.priority?.message} label="Priority 1-5">
-                        <input
-                          aria-label="Priority 1-5"
-                          aria-invalid={errors.priority ? 'true' : undefined}
-                          className={inputClass}
-                          inputMode="numeric"
-                          name="priority"
-                          value={priority}
-                          onBlur={() => void form.trigger('priority')}
-                          onChange={(event) => setIntegerFieldValue('priority', event.target.value)}
-                        />
-                      </FormField>
-                      <FormField error={errors.rating?.message} label="Rating">
-                        <RatingStars
-                          value={form.watch('rating') ?? ''}
-                          onChange={(value) => form.setValue('rating', value, { shouldDirty: true, shouldValidate: true })}
-                        />
-                      </FormField>
-                    </div>
-                    <div className="grid max-w-4xl gap-4">
-                      <FormField label="Genres">
-                        <GenreChipSelect
-                          options={genresQuery.data?.data ?? []}
-                          selectedIds={selectedGenreIds}
-                          onChange={setSelectedGenreIds}
-                        />
-                      </FormField>
-                      <FormField error={errors.tagsText?.message} label="Tags">
-                        <TagChipSelect selected={selectedTags} onChange={setSelectedTags} />
-                      </FormField>
-                    </div>
-                  </div>
+              <div className="book-form-field-group">
+                <div className="book-form-field-group-heading">
+                  <h3>Personal signal</h3>
                 </div>
+                <div className="grid items-start gap-4 lg:grid-cols-[minmax(10rem,0.35fr)_minmax(0,1fr)]">
+                  <FormField error={errors.priority?.message} label="Priority 1-5">
+                    <input
+                      aria-label="Priority 1-5"
+                      aria-invalid={errors.priority ? 'true' : undefined}
+                      className={inputClass}
+                      inputMode="numeric"
+                      name="priority"
+                      value={priority}
+                      onBlur={() => void form.trigger('priority')}
+                      onChange={(event) => setIntegerFieldValue('priority', event.target.value)}
+                    />
+                  </FormField>
+                  <FormField error={errors.rating?.message} label="Rating">
+                    <RatingStars
+                      value={form.watch('rating') ?? ''}
+                      onChange={(value) => form.setValue('rating', value, { shouldDirty: true, shouldValidate: true })}
+                    />
+                  </FormField>
+                </div>
+              </div>
+
+              <div className="grid items-start gap-4 md:grid-cols-2">
+                <FormField label="Genres">
+                  <GenreChipSelect
+                    options={genresQuery.data?.data ?? []}
+                    selectedIds={selectedGenreIds}
+                    onChange={setSelectedGenreIds}
+                  />
+                </FormField>
+                <FormField error={errors.tagsText?.message} label="Tags">
+                  <TagChipSelect selected={selectedTags} onChange={setSelectedTags} />
+                </FormField>
               </div>
             </div>
-          </div>
-        </section>
+          </Surface>
 
-        <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-950">Additional</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <FormField error={errors.alternativeTitlesText?.message} label="Alternative titles, one per line">
-              <textarea className={`${inputClass} min-h-32`} {...form.register('alternativeTitlesText')} />
-            </FormField>
-            <FormField error={errors.linksText?.message} label="Links, one per line">
-              <textarea className={`${inputClass} min-h-32`} {...form.register('linksText')} />
-            </FormField>
-            <FormField error={errors.notes?.message} label="Notes">
-              <textarea className={`${inputClass} min-h-32`} {...form.register('notes')} />
-            </FormField>
-            <FormField error={errors.description?.message} label="Description">
-              <textarea className={`${inputClass} min-h-32 md:col-span-2`} {...form.register('description')} />
-            </FormField>
-          </div>
-        </section>
+          <Surface className="book-form-section book-form-details">
+            <FormSectionHeader
+              description="Long-form context and reference data that enrich the record without blocking creation."
+              index="03"
+              title="Library details"
+            />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="md:col-span-2">
+                <FormField error={errors.description?.message} label="Description">
+                  <textarea className={`${inputClass} book-form-textarea--description resize-y`} {...form.register('description')} />
+                </FormField>
+              </div>
+              <FormField error={errors.alternativeTitlesText?.message} label="Alternative titles">
+                <textarea
+                  className={`${inputClass} book-form-textarea--list resize-y`}
+                  placeholder="One title per line"
+                  {...form.register('alternativeTitlesText')}
+                />
+              </FormField>
+              <FormField error={errors.linksText?.message} label="Links">
+                <textarea
+                  className={`${inputClass} book-form-textarea--list resize-y`}
+                  placeholder="One URL per line"
+                  {...form.register('linksText')}
+                />
+              </FormField>
+              <div className="md:col-span-2">
+                <FormField error={errors.notes?.message} label="Private notes">
+                  <textarea className={`${inputClass} book-form-textarea--notes resize-y`} {...form.register('notes')} />
+                </FormField>
+              </div>
+            </div>
+          </Surface>
+        </div>
       </form>
 
       <CoverSourceDialog
@@ -586,6 +635,26 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
         onClose={() => setCoverPreviewOpen(false)}
       />
     </>
+  )
+}
+
+function FormSectionHeader({
+  description,
+  index,
+  title,
+}: {
+  description: string
+  index: string
+  title: string
+}) {
+  return (
+    <header className="book-form-section-header">
+      <div className="min-w-0">
+        <div className="book-form-section-index">{index}</div>
+        <h2 className="book-form-section-title">{title}</h2>
+        <p className="book-form-section-description">{description}</p>
+      </div>
+    </header>
   )
 }
 
@@ -734,9 +803,9 @@ function ChipBox({
 
   return (
     <div className="relative">
-      <div className="flex min-h-12 flex-wrap items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 focus-within:border-slate-500">
+      <div className="ui-control flex min-h-12 flex-wrap items-center gap-2 py-2 focus-within:border-[var(--qs-accent)]">
         {selected.map((item) => (
-          <span className="inline-flex items-center gap-1 rounded-full border border-slate-500 bg-slate-900 px-2.5 py-1 text-xs text-white shadow-sm" key={item.key}>
+          <span className="ui-badge inline-flex items-center gap-1" key={item.key}>
             {item.label}
             <button
               aria-label={`Remove ${item.label}`}
@@ -765,7 +834,7 @@ function ChipBox({
         />
       </div>
       {trimmed ? (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 shadow-xl">
+        <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto">
           {suggestions.map((item) => (
             <button
               className="w-full px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
@@ -780,7 +849,7 @@ function ChipBox({
           ))}
           {canCreate ? (
             <button
-              className="w-full px-3 py-2 text-left text-sm text-cyan-100 hover:bg-slate-800"
+              className="w-full px-3 py-2 text-left text-sm text-[var(--qs-accent-strong)] hover:bg-slate-800"
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onCreate?.(trimmed)}
@@ -824,6 +893,8 @@ function CoverSourceDialog({
   onUrlChange: (value: string) => void
   onUrlSubmit: () => void
 }) {
+  useBodyScrollLock(open)
+
   if (!open) {
     return null
   }
@@ -836,25 +907,25 @@ function CoverSourceDialog({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4"
       role="dialog"
       onClick={onClose}
     >
-      <div className="grid w-full max-w-xl gap-4 rounded-3xl border border-slate-700 bg-slate-950 p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+      <DialogPanel className="grid max-w-xl gap-4 p-6" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4">
           <div className="grid gap-1">
             <h2 className="text-lg font-semibold text-white">Add cover</h2>
             <p className="text-sm text-slate-400">{introText}</p>
           </div>
-          <button className="rounded-full border border-slate-700 p-2 text-slate-300 hover:bg-slate-900" type="button" onClick={onClose}>
+          <button aria-label="Close cover dialog" className={`${buttonVariants.ghost} ui-icon-button`} type="button" onClick={onClose}>
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {view === 'choice' ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="grid gap-2 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-cyan-400 hover:bg-slate-900/80">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-300">
+            <label className="ui-choice-card">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--qs-control-radius)] bg-[#262b4e] text-[var(--qs-accent-strong)]">
                 <Upload className="h-4 w-4" />
               </div>
               <div className="text-base font-semibold">Upload image</div>
@@ -874,11 +945,11 @@ function CoverSourceDialog({
               />
             </label>
             <button
-              className="grid gap-2 rounded-2xl border border-slate-700 bg-slate-900 p-4 text-left text-slate-200 transition hover:border-cyan-400 hover:bg-slate-900/80"
+              className="ui-choice-card"
               type="button"
               onClick={onOpenUrl}
             >
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/15 text-cyan-300">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-[var(--qs-control-radius)] bg-[#262b4e] text-[var(--qs-accent-strong)]">
                 <Link2 className="h-4 w-4" />
               </div>
               <div className="text-base font-semibold">Paste image URL</div>
@@ -903,7 +974,7 @@ function CoverSourceDialog({
             </div>
           </div>
         )}
-      </div>
+      </DialogPanel>
     </div>
   )
 }
@@ -979,27 +1050,47 @@ function RatingStars({
 }) {
   const numericValue = Number(value)
   const normalizedValue = Number.isFinite(numericValue) && numericValue > 0 ? numericValue : 0
+  const [previewValue, setPreviewValue] = useState(0)
+  const displayedValue = previewValue || normalizedValue
 
   return (
-    <div className="flex min-h-10 min-w-0 flex-wrap items-center gap-2">
-      <div className="flex w-14 shrink-0 items-center text-base font-bold text-slate-100">
-        {normalizedValue ? `${normalizedValue}/10` : '?/10'}
+    <div className="book-form-rating">
+      <div className="book-form-rating-readout">
+        {displayedValue ? `${displayedValue}/10` : '?/10'}
       </div>
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+      <div
+        aria-label="Rating"
+        className="book-form-rating-scale"
+        role="group"
+        onBlur={(event) => {
+          if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) {
+            setPreviewValue(0)
+          }
+        }}
+        onMouseLeave={() => setPreviewValue(0)}
+      >
         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => {
-          const active = normalizedValue >= star
+          const active = displayedValue >= star
           return (
-            <div className="relative flex h-7 w-7 shrink-0 items-center justify-center" key={star}>
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <Star className={`h-5 w-5 ${active ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-300'}`} />
-              </div>
-              <button
-                aria-label={`Set rating to ${star}/10`}
-                className="absolute inset-0 z-10"
-                type="button"
-                onClick={() => onChange(normalizedValue === star ? '' : String(star))}
-              />
-            </div>
+            <button
+              aria-label={`Set rating to ${star}/10`}
+              aria-pressed={normalizedValue === star}
+              className="book-form-rating-option"
+              key={star}
+              title={`${star}/10`}
+              type="button"
+              onFocus={() => setPreviewValue(star)}
+              onMouseEnter={() => setPreviewValue(star)}
+              onClick={() => {
+                const clearingSelection = normalizedValue === star
+                onChange(clearingSelection ? '' : String(star))
+                if (clearingSelection) {
+                  setPreviewValue(0)
+                }
+              }}
+            >
+              <Star className={`h-5 w-5 ${active ? 'fill-amber-400 text-amber-400' : 'text-[var(--qs-subtle)]'}`} />
+            </button>
           )
         })}
       </div>

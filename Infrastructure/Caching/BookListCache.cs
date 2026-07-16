@@ -19,7 +19,7 @@ public sealed class BookListCache : IBookListCache, IBookListCacheInvalidator
     private const string CacheVersionTag = "cache.version";
     private const string CacheVersionInitializedTag = "cache.version.initialized";
     private const string BookListCacheType = "book-list";
-    private const string BookCacheKeyPrefix = "books";
+    private const string BookCacheKeyPrefix = "books:v2";
 
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
     private readonly IDistributedCache _cache;

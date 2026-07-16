@@ -2,21 +2,21 @@ import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { addDays, addMonths, addWeeks, format, parseISO } from 'date-fns'
 
-export const chartColors = ['#0891b2', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#ca8a04', '#65a30d', '#0f766e']
+export const chartColors = ['#8b92d8', '#75b69c', '#d1aa6e', '#8e7ea8', '#6f91aa', '#b47f8d', '#879b70', '#657b78']
 
 export const analyticsTooltipProps = {
   contentStyle: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #334155',
-    borderRadius: '0.75rem',
-    boxShadow: '0 18px 45px rgb(0 0 0 / 0.28)',
-    color: '#e2e8f0',
+    backgroundColor: '#121925',
+    border: '1px solid #3a465b',
+    borderRadius: '3px',
+    boxShadow: 'none',
+    color: '#eef2f7',
   },
   itemStyle: {
-    color: '#e2e8f0',
+    color: '#eef2f7',
   },
   labelStyle: {
-    color: '#f8fafc',
+    color: '#eef2f7',
     fontWeight: 700,
   },
 }
@@ -62,7 +62,7 @@ export function quoteQueryValue(value: string) {
 export function DrilldownLink({ children, className = '', query }: { children: ReactNode; className?: string; query: string }) {
   return (
     <Link
-      className={`inline-flex min-h-11 items-center gap-1 rounded-md px-2 font-semibold text-cyan-700 underline decoration-cyan-700/60 underline-offset-4 hover:text-cyan-900 hover:decoration-cyan-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${className}`}
+      className={`ui-drilldown-link ${className}`}
       title={`Open books filtered by ${query}`}
       to={booksHref(query)}
     >

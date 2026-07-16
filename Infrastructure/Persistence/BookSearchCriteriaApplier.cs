@@ -97,11 +97,20 @@ public sealed class BookSearchCriteriaApplier
             BookSearchMissingField.Rating => book => book.Rating == null,
             BookSearchMissingField.Priority => book => book.Priority == null,
             BookSearchMissingField.Author => book => book.Author == null,
+            BookSearchMissingField.Description => book =>
+                book.Description == null || book.Description.Trim() == string.Empty,
             BookSearchMissingField.Genre => book => !book.BookGenres.Any(),
             BookSearchMissingField.Tag => book => !book.BookTags.Any(),
             BookSearchMissingField.CurrentChapter => book => book.CurrentChapterNumber == null,
             BookSearchMissingField.TotalChapters => book => book.TotalChapters == null,
-            BookSearchMissingField.Cover => book => book.Cover == null,
+            BookSearchMissingField.AlternateTitle => book =>
+                !book.Titles.Any(title => !title.IsPrimary && title.Title.Trim() != string.Empty),
+            BookSearchMissingField.Cover => book =>
+                book.Cover == null ||
+                !((book.Cover.Status == BookCoverStatus.Found ||
+                   book.Cover.Status == BookCoverStatus.Uploaded) &&
+                  ((book.Cover.StoragePath != null && book.Cover.StoragePath != string.Empty) ||
+                   (book.Cover.ThumbnailStoragePath != null && book.Cover.ThumbnailStoragePath != string.Empty))),
             BookSearchMissingField.Link => book => !book.Links.Any(),
             _ => null
         };
