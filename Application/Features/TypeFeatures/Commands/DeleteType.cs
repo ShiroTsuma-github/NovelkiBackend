@@ -1,4 +1,5 @@
 namespace Application.Features.TypeFeatures.Commands;
+
 public record DeleteTypeCommand(Guid Id) : IRequest;
 
 public class DeleteTypeCommandHandler : IRequestHandler<DeleteTypeCommand>

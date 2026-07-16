@@ -16,7 +16,7 @@ public sealed class DatabaseReadyHealthCheck : IHealthCheck
         HealthCheckContext context,
         CancellationToken cancellationToken = default)
     {
-        var canConnect = await _context.Database.CanConnectAsync(cancellationToken);
+        bool canConnect = await _context.Database.CanConnectAsync(cancellationToken);
         return canConnect
             ? HealthCheckResult.Healthy("Database connection is ready.")
             : HealthCheckResult.Unhealthy("Database connection is not ready.");

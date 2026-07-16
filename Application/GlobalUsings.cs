@@ -7,6 +7,3 @@ global using System.Text.Json.Serialization;
 global using Domain.Exceptions;
 global using Application.Common.Models;
 global using Application.Common;
-
-
-

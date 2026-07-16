@@ -1,6 +1,7 @@
 # NovelkiBackend
 
-Backend ASP.NET Core dla aplikacji do zarzadzania novelkami/ksiazkami. Projekt jest ulozony warstwowo w stylu Clean Architecture:
+Backend ASP.NET Core dla aplikacji do zarzadzania novelkami/ksiazkami. Projekt jest ulozony warstwowo w stylu Clean
+Architecture:
 
 - `Api` - punkt wejscia HTTP, kontrolery, Swagger, Serilog i konfiguracja middleware.
 - `Application` - use case'y CQRS/MediatR, walidatory FluentValidation, DTO i mapowania extension methods.
@@ -11,7 +12,7 @@ Backend ASP.NET Core dla aplikacji do zarzadzania novelkami/ksiazkami. Projekt j
 
 ## Stack
 
-- .NET 9 (`net9.0`)
+- .NET 10 (`net10.0`)
 - ASP.NET Core Web API
 - MediatR 13
 - FluentValidation 12
@@ -37,8 +38,10 @@ dotnet user-secrets set "ConnectionStrings:DB" "Host=localhost;Port=5432;Databas
 dotnet user-secrets set "Admin:Emails:0" "<admin-email>" --project Api
 ```
 
-Frontend uruchamiany jako osobny dev server powinien miec origin dopisany w `Cors:AllowedOrigins`. Domyslnie `Api/appsettings.json` dopuszcza `http://localhost:5173`, `http://localhost:3000` i `http://localhost:4200`.
-Rola `Admin` jest tworzona przy starcie API. Uzytkownicy z mailami z `Admin:Emails` dostaja role automatycznie i musza zalogowac sie ponownie, zeby token JWT zawieral uprawnienia admina.
+Frontend uruchamiany jako osobny dev server powinien miec origin dopisany w `Cors:AllowedOrigins`. Domyslnie
+`Api/appsettings.json` dopuszcza `http://localhost:5173`, `http://localhost:3000` i `http://localhost:4200`.
+Rola `Admin` jest tworzona przy starcie API. Uzytkownicy z mailami z `Admin:Emails` dostaja role automatycznie i musza
+zalogowac sie ponownie, zeby token JWT zawieral uprawnienia admina.
 
 Start API:
 
@@ -55,7 +58,8 @@ W trybie `Development` endpoint root przekierowuje do Swaggera pod `/swagger`.
 
 ## Lokalny stack Docker + observability
 
-Repo zawiera lokalny stack: Web, API, OpenTelemetry Collector, Loki, Tempo, Prometheus i Grafana. Baza danych jest brana z connection stringa w `.env`.
+Repo zawiera lokalny stack: Web, API, OpenTelemetry Collector, Loki, Tempo, Prometheus i Grafana. Baza danych jest brana
+z connection stringa w `.env`.
 
 1. Skopiuj `.env.example` do `.env` i ustaw przynajmniej `DB_CONNECTION_STRING`, `JWT_KEY` i `ADMIN_EMAIL`.
 2. Uruchom:
@@ -74,7 +78,9 @@ Domyslne adresy:
 - Loki: `http://localhost:3100`
 - Tempo: `http://localhost:3200`
 
-Porty Web, API i Grafany mozna zmienic przez `WEB_PORT`, `API_PORT` i `GRAFANA_PORT` w `.env`. W compose API ustawia `Database:AutoMigrate=true`, wiec migracje EF sa aplikowane przy starcie kontenera. Poza compose domyslnie zostaje `false`.
+Porty Web, API i Grafany mozna zmienic przez `WEB_PORT`, `API_PORT` i `GRAFANA_PORT` w `.env`. W compose API ustawia
+`Database:AutoMigrate=true`, wiec migracje EF sa aplikowane przy starcie kontenera. Poza compose domyslnie zostaje
+`false`.
 
 Observability flow:
 
@@ -95,7 +101,8 @@ dotnet ef migrations add <name> --project Infrastructure --startup-project Api
 dotnet ef database update --project Infrastructure --startup-project Api
 ```
 
-`ApplicationDbContext` mieszka w `Infrastructure/Contexts/ApplicationDbContext.cs` i dziedziczy po `IdentityDbContext<User, IdentityRole<Guid>, Guid>`.
+`ApplicationDbContext` mieszka w `Infrastructure/Contexts/ApplicationDbContext.cs` i dziedziczy po
+`IdentityDbContext<User, IdentityRole<Guid>, Guid>`.
 
 ## Flow requestu
 
@@ -106,30 +113,33 @@ Standardowa sciezka HTTP wyglada tak:
 3. MediatR uruchamia `ValidationBehavior<TRequest,TResponse>`.
 4. Jesli istnieje validator FluentValidation dla requestu, bledy koncza sie `ValidationException`.
 5. Handler w `Application/Features/...` wykonuje use case.
-6. Handler korzysta z interfejsow repozytoriow z `Domain/Repositories` oraz extension methods z `Application/Common/MappingExtensions.cs`.
+6. Handler korzysta z interfejsow repozytoriow z `Domain/Repositories` oraz extension methods z
+   `Application/Common/MappingExtensions.cs`.
 7. Implementacja repozytorium w `Infrastructure/Persistence` operuje na `ApplicationDbContext`.
-8. `SaveChangesAsync` automatycznie uzupelnia pola audytowe `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy` dla `BaseAuditableEntity`.
-9. Wyjatki przechwytuje `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`, ktory zwraca JSON z `type`, `title`, `status`, `detail`, `instance` i opcjonalnym `errors`.
+8. `SaveChangesAsync` automatycznie uzupelnia pola audytowe `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy` dla
+   `BaseAuditableEntity`.
+9. Wyjatki przechwytuje `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`, ktory zwraca JSON z `type`, `title`,
+   `status`, `detail`, `instance` i opcjonalnym `errors`.
 
 ## Rejestracja zaleznosci
 
 Rejestracja jest rozbita na warstwy:
 
 - `Api/DependencyInjection.cs`
-  - kontrolery,
-  - Swagger,
-  - schemat JWT Bearer w Swagger UI.
+    - kontrolery,
+    - Swagger,
+    - schemat JWT Bearer w Swagger UI.
 - `Application/DependencyInjection.cs`
-  - MediatR,
-  - FluentValidation,
-  - pipeline `ValidationBehavior`.
+    - MediatR,
+    - FluentValidation,
+    - pipeline `ValidationBehavior`.
 - `Infrastructure/DependencyInjection.cs`
-  - `ApplicationDbContext` na PostgreSQL,
-  - repozytoria,
-  - `CurrentUser`,
-  - JWT,
-  - Identity,
-  - authentication/authorization.
+    - `ApplicationDbContext` na PostgreSQL,
+    - repozytoria,
+    - `CurrentUser`,
+    - JWT,
+    - Identity,
+    - authentication/authorization.
 
 `CurrentUser` korzysta z `IHttpContextAccessor`, ktory jest rejestrowany w `Infrastructure/DependencyInjection.cs`.
 
@@ -153,13 +163,16 @@ Pozostale kontrolery sa zasadniczo chronione `[Authorize]`, wiec wymagaja naglow
 Authorization: Bearer <access_token>
 ```
 
-Token zawiera m.in. `sub` jako `Guid` uzytkownika oraz email. `CurrentUser` odczytuje identyfikator z `ClaimTypes.NameIdentifier`; przy problemach z audytem/OwnerId trzeba sprawdzic zgodnosc claimow generowanych w `JwtTokenGenerator` z tym, czego oczekuje `CurrentUser`.
+Token zawiera m.in. `sub` jako `Guid` uzytkownika oraz email. `CurrentUser` odczytuje identyfikator z
+`ClaimTypes.NameIdentifier`; przy problemach z audytem/OwnerId trzeba sprawdzic zgodnosc claimow generowanych w
+`JwtTokenGenerator` z tym, czego oczekuje `CurrentUser`.
 
 ## Glowne obszary domeny
 
 Glowne encje w `Domain/Entities`:
 
-- `Book` - prywatna pozycja uzytkownika, z primary title, alternatywnymi tytulami, postepem, linkami, tagami, gatunkami i historia progresu.
+- `Book` - prywatna pozycja uzytkownika, z primary title, alternatywnymi tytulami, postepem, linkami, tagami, gatunkami
+  i historia progresu.
 - `BookTitle` - primary/alternative titles, np. tytuly chinskie i angielskie.
 - `Author` i `AuthorName` - globalny autor oraz aliasy/pen name'y.
 - `Genre`
@@ -200,7 +213,8 @@ Typowy wzorzec dla zasobow slownikowych (`Genre`, `Status`, `Type`):
 - `Create*Command` sprawdza duplikat po nazwie przez repozytorium i rzuca `EntityAlreadyExistsException`.
 - `Update*Command` pobiera encje, rzuca `EntityNotFoundException` przy braku rekordu, aplikuje zmiany i zapisuje.
 - `Delete*Command` usuwa po `Guid`.
-- Jawne query, np. `GetGenreQuery`, `GetGenreDetailsQuery`, `GetGenreByNameQuery` i `GetGenreDetailsByNameQuery`, zwracaja konkretny DTO bez generycznego `TDto`.
+- Jawne query, np. `GetGenreQuery`, `GetGenreDetailsQuery`, `GetGenreByNameQuery` i `GetGenreDetailsByNameQuery`,
+  zwracaja konkretny DTO bez generycznego `TDto`.
 - `GetAll*Query` zwraca `PaginatedResult<TDto>` z `Skip`, `Take`, `Total`, `Data`.
 
 Przy dodawaniu nowego zasobu najlepiej skopiowac ten schemat:
@@ -222,36 +236,40 @@ Przy dodawaniu nowego zasobu najlepiej skopiowac ten schemat:
 Aktualne kontrolery:
 
 - `api/v1/account`
-  - `POST register`
-  - `POST login`
+    - `POST register`
+    - `POST login`
 - `api/v1/book`
-  - `POST`
-  - `GET`
-  - `GET {id:guid}`
-  - `PUT {id:guid}`
-  - `PATCH {id:guid}/progress`
-  - `DELETE {id:guid}`
+    - `POST`
+    - `GET`
+    - `GET {id:guid}`
+    - `PUT {id:guid}`
+    - `PATCH {id:guid}/progress`
+    - `DELETE {id:guid}`
 - `api/v1/author`
-  - `GET` autocomplete/search
+    - `GET` autocomplete/search
 - `api/v1/tag`
-  - `GET` autocomplete/search prywatnych tagow uzytkownika
+    - `GET` autocomplete/search prywatnych tagow uzytkownika
 - `api/v1/genre`
-  - `POST`
-  - `GET`
-  - `GET {id:guid}`
-  - `GET {id:guid}/details`
-  - `GET by-name/{name}`
-  - `GET by-name/{name}/details`
-  - `PUT {id:guid}`
-  - `DELETE {id:guid}`
+    - `POST`
+    - `GET`
+    - `GET {id:guid}`
+    - `GET {id:guid}/details`
+    - `GET by-name/{name}`
+    - `GET by-name/{name}/details`
+    - `PUT {id:guid}`
+    - `DELETE {id:guid}`
 - `api/v1/status`
 - `api/v1/type`
 
 Przyklady pelnych wywolan HTTP, custom query dla ksiazek i flow dodawania ksiazki sa w `docs/http-examples.md`.
 
-Custom query dla `GET /api/v1/book` przyjmuje parametr `query`, np. `title:"Lord of Mysteries" tag:favorite rating>=8`. Obslugiwane sa filtry `title`, `author`, `tag`, `genre`, `status`, `type` oraz porownania numeryczne dla `rating`, `priority`, `current/currentChapter` i `total/totalChapters`. Brakujace metadane mozna filtrowac przez wartosc `none`, np. `author:none`, `rating:none`, `progress:none`, `cover:none` lub `links:none`.
+Custom query dla `GET /api/v1/book` przyjmuje parametr `query`, np. `title:"Lord of Mysteries" tag:favorite rating>=8`.
+Obslugiwane sa filtry `title`, `author`, `tag`, `genre`, `status`, `type` oraz porownania numeryczne dla `rating`,
+`priority`, `current/currentChapter` i `total/totalChapters`. Brakujace metadane mozna filtrowac przez wartosc `none`,
+np. `author:none`, `rating:none`, `progress:none`, `cover:none` lub `links:none`.
 
-`StatusController` i `TypeController` sa analogiczne do `GenreController`; `TypeController` operuje pod spodem na encji `ContentType`.
+`StatusController` i `TypeController` sa analogiczne do `GenreController`; `TypeController` operuje pod spodem na encji
+`ContentType`.
 
 ## Obsluga bledow
 
@@ -271,7 +289,8 @@ Aktualnie rozpoznaje m.in.:
 - `EntityNotFoundException<User, string>` -> 404
 - inne wyjatki -> 500
 
-Jesli dodajesz nowe wyjatki domenowe albo nowy typ encji, trzeba dopisac mapowanie w middleware, inaczej klient dostanie 500.
+Jesli dodajesz nowe wyjatki domenowe albo nowy typ encji, trzeba dopisac mapowanie w middleware, inaczej klient dostanie
+500.
 
 ## Testy
 
@@ -287,18 +306,26 @@ Raport coverage z HTML:
 .\tools\coverage.ps1
 ```
 
-Skrypt uruchamia testy z `coverage.runsettings`, generuje HTML w `artifacts/coverage/html/index.html` i zapisuje krotki raport najnizszego pokrycia w `artifacts/coverage/least-covered-files.txt`.
+Skrypt uruchamia testy z `coverage.runsettings`, generuje HTML w `artifacts/coverage/html/index.html` i zapisuje krotki
+raport najnizszego pokrycia w `artifacts/coverage/least-covered-files.txt`.
 
 Struktura:
 
-- `Application.UnitTests` - szybkie testy jednostkowe bez bazy: walidatory account, flow handlerow `Genre`, tworzenie ksiazki z aliasami tytulow/autorem/tagami/linkami/progresem, update progresu, autocomplete autorow i tagow, mapowania DTO.
-- `Infrastructure.IntegrationTests` - SQLite in-memory z prawdziwym EF Core: seed slownikow systemowych, audit fields, unikalnosc autorow/tagow, multi-tenant scope tagow i ksiazek, kaskady, restrict FK autora, eager loading repozytorium ksiazek, wyszukiwanie aliasow autora, paginacja/count gatunkow.
+- `Application.UnitTests` - szybkie testy jednostkowe bez bazy: walidatory account, flow handlerow `Genre`, tworzenie
+  ksiazki z aliasami tytulow/autorem/tagami/linkami/progresem, update progresu, autocomplete autorow i tagow, mapowania
+  DTO.
+- `Infrastructure.IntegrationTests` - SQLite in-memory z prawdziwym EF Core: seed slownikow systemowych, audit fields,
+  unikalnosc autorow/tagow, multi-tenant scope tagow i ksiazek, kaskady, restrict FK autora, eager loading repozytorium
+  ksiazek, wyszukiwanie aliasow autora, paginacja/count gatunkow.
 
-Stan po ostatniej weryfikacji: 238 testow, wszystkie zielone (`164` unit + `74` integration). Kazdy nowy feature powinien miec test jednostkowy albo integracyjny; dla zachowan zaleznych od EF/relacji uzywamy SQLite in-memory zamiast providera `InMemory`.
+Stan po ostatniej weryfikacji: 238 testow, wszystkie zielone (`164` unit + `74` integration). Kazdy nowy feature
+powinien miec test jednostkowy albo integracyjny; dla zachowan zaleznych od EF/relacji uzywamy SQLite in-memory zamiast
+providera `InMemory`.
 
 ## Znane miejsca wymagajace uwagi
 
-W repo istnieje tez `Analysis.md` z szerszym audytem architektury. Najbardziej praktyczne punkty do sprawdzenia przy kolejnych pracach:
+W repo istnieje tez `Analysis.md` z szerszym audytem architektury. Najbardziej praktyczne punkty do sprawdzenia przy
+kolejnych pracach:
 
 - Middleware obslugi bledow ma twardo wypisane typy encji, wiec nowe encje wymagaja aktualizacji.
 - Testow API/end-to-end jeszcze nie ma; obecny zakres konczy sie na warstwie Application i integracji Infrastructure/EF.

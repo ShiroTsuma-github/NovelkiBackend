@@ -4,7 +4,7 @@ using Application.Common.DTOs.Book;
 
 public interface IBookListCache
 {
-    Task<PaginatedResult<BookListItemDto>?> GetBooksAsync(
+    public Task<PaginatedResult<BookListItemDto>?> GetBooksAsync(
         Guid ownerId,
         int skip,
         int take,
@@ -13,7 +13,7 @@ public interface IBookListCache
         string? sortDirection,
         CancellationToken cancellationToken);
 
-    Task SetBooksAsync(
+    public Task SetBooksAsync(
         Guid ownerId,
         int skip,
         int take,

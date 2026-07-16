@@ -58,11 +58,11 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
 
     public async Task<Guid> Handle(CreateBookCommand request, CancellationToken cancellationToken)
     {
-        var ownerId = _user.RequiredId;
-        var contentType = await _typeRepository.GetByIdAsync(request.ContentTypeId, cancellationToken)
-            ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
-        var status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
-            ?? throw new EntityNotFoundException<Status, Guid>(request.StatusId);
+        Guid ownerId = _user.RequiredId;
+        ContentType contentType = await _typeRepository.GetByIdAsync(request.ContentTypeId, cancellationToken)
+                                  ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
+        Status status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
+                        ?? throw new EntityNotFoundException<Status, Guid>(request.StatusId);
         await BookMutationSupport.EnsureBookDoesNotExistAsync(
             _bookRepository,
             ownerId,
@@ -72,12 +72,13 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             request.AlternativeTitles,
             cancellationToken);
 
-        var author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, request.AuthorId, request.AuthorName, cancellationToken);
-        var primaryTitle = request.PrimaryTitle.Trim();
-        var description = BookMutationSupport.TrimToNull(request.Description);
-        var currentChapterLabel = BookMutationSupport.TrimToNull(request.CurrentChapterLabel);
-        var notes = BookMutationSupport.TrimToNull(request.Notes);
-        var rawImportedLine = BookMutationSupport.TrimToNull(request.RawImportedLine);
+        Author? author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, request.AuthorId,
+            request.AuthorName, cancellationToken);
+        string primaryTitle = request.PrimaryTitle.Trim();
+        string? description = BookMutationSupport.TrimToNull(request.Description);
+        string? currentChapterLabel = BookMutationSupport.TrimToNull(request.CurrentChapterLabel);
+        string? notes = BookMutationSupport.TrimToNull(request.Notes);
+        string? rawImportedLine = BookMutationSupport.TrimToNull(request.RawImportedLine);
         var book = new Book
         {
             PrimaryTitle = primaryTitle,
@@ -100,22 +101,24 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             Cover = new BookCover()
         };
 
-        foreach (var title in BookMutationSupport.BuildTitles(primaryTitle, request.AlternativeTitles))
+        foreach (BookTitle title in BookMutationSupport.BuildTitles(primaryTitle, request.AlternativeTitles))
         {
             book.Titles.Add(title);
         }
 
-        foreach (var link in BookMutationSupport.BuildLinks(request.Links))
+        foreach (BookLink link in BookMutationSupport.BuildLinks(request.Links))
         {
             book.Links.Add(link);
         }
 
-        foreach (var genre in await _genreRepository.GetByIdsAsync(request.GenreIds ?? Enumerable.Empty<Guid>(), cancellationToken))
+        foreach (Genre genre in await _genreRepository.GetByIdsAsync(request.GenreIds ?? Enumerable.Empty<Guid>(),
+                     cancellationToken))
         {
             book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
         }
 
-        foreach (var tag in await BookMutationSupport.ResolveTagsAsync(_tagRepository, ownerId, request.Tags ?? Enumerable.Empty<string>(), cancellationToken))
+        foreach (Tag tag in await BookMutationSupport.ResolveTagsAsync(_tagRepository, ownerId,
+                     request.Tags ?? Enumerable.Empty<string>(), cancellationToken))
         {
             book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         }

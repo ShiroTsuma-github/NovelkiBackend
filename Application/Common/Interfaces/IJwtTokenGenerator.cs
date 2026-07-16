@@ -2,5 +2,5 @@
 
 public interface IJwtTokenGenerator
 {
-    TokenResponse? GenerateToken(IUser user);
+    public TokenResponse? GenerateToken(IUser user);
 }

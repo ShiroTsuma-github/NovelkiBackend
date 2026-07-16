@@ -1,7 +1,7 @@
 namespace Application.Common;
 
 using Application.Common.DTOs.Book;
-using Application.Common.Interfaces;
+using Interfaces;
 
 public sealed class BookCsvExportService : IBookCsvExportService
 {
@@ -43,7 +43,7 @@ public sealed class BookCsvExportService : IBookCsvExportService
 
     private static string Escape(object? value)
     {
-        var text = NeutralizeSpreadsheetFormula(value?.ToString() ?? string.Empty);
+        string text = NeutralizeSpreadsheetFormula(value?.ToString() ?? string.Empty);
         if (!text.Contains(',') && !text.Contains('"') && !text.Contains('\n') && !text.Contains('\r'))
         {
             return text;

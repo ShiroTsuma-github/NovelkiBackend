@@ -1,6 +1,6 @@
 namespace Domain.Associations;
 
-using Domain.Entities;
+using Entities;
 
 public class BookGenre
 {

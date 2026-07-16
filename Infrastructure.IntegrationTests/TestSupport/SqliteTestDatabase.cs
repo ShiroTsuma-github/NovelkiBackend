@@ -19,11 +19,11 @@ public sealed class SqliteTestDatabase : IDisposable
         _connection = new SqliteConnection("DataSource=:memory:");
         _connection.Open();
 
-        using var command = _connection.CreateCommand();
+        using SqliteCommand command = _connection.CreateCommand();
         command.CommandText = "PRAGMA foreign_keys=ON;";
         command.ExecuteNonQuery();
 
-        using var context = CreateContext();
+        using ApplicationDbContext context = CreateContext();
         context.Database.EnsureCreated();
         context.Users.Add(new User
         {
@@ -40,7 +40,7 @@ public sealed class SqliteTestDatabase : IDisposable
 
     public ApplicationDbContext CreateContext(params IInterceptor[] interceptors)
     {
-        var builder = new DbContextOptionsBuilder<ApplicationDbContext>()
+        DbContextOptionsBuilder<ApplicationDbContext> builder = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(_connection)
             .EnableSensitiveDataLogging();
 
@@ -49,7 +49,7 @@ public sealed class SqliteTestDatabase : IDisposable
             builder.AddInterceptors(interceptors);
         }
 
-        var options = builder.Options;
+        DbContextOptions<ApplicationDbContext> options = builder.Options;
 
         return new ApplicationDbContext(options, _user);
     }

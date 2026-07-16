@@ -14,34 +14,34 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
 
     public async Task<BookCoverCandidate?> FindAsync(Book book, CancellationToken cancellationToken)
     {
-        foreach (var link in book.Links.OrderByDescending(l => l.IsPrimary))
+        foreach (BookLink link in book.Links.OrderByDescending(l => l.IsPrimary))
         {
-            if (!Uri.TryCreate(link.Url, UriKind.Absolute, out var pageUri) ||
+            if (!Uri.TryCreate(link.Url, UriKind.Absolute, out Uri? pageUri) ||
                 pageUri.Scheme is not ("http" or "https"))
             {
                 continue;
             }
 
-            using var response = await _httpClient.GetAsync(pageUri, cancellationToken);
+            using HttpResponseMessage response = await _httpClient.GetAsync(pageUri, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
             }
 
-            var contentType = response.Content.Headers.ContentType?.MediaType;
+            string? contentType = response.Content.Headers.ContentType?.MediaType;
             if (contentType != null && !contentType.Contains("html", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            var html = await response.Content.ReadAsStringAsync(cancellationToken);
+            string html = await response.Content.ReadAsStringAsync(cancellationToken);
             if (html.Contains("challenge-platform", StringComparison.OrdinalIgnoreCase) ||
                 html.Contains("cf_chl", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            foreach (var imageUrl in ExtractImageUrls(html, pageUri))
+            foreach (string imageUrl in ExtractImageUrls(html, pageUri))
             {
                 return new BookCoverCandidate(BookCoverSource.BookLinkMetadata, imageUrl);
             }
@@ -54,14 +54,14 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
     {
         foreach (Match match in MetaRegex().Matches(html))
         {
-            var key = WebUtility.HtmlDecode(match.Groups["key"].Value).Trim().ToLowerInvariant();
+            string key = WebUtility.HtmlDecode(match.Groups["key"].Value).Trim().ToLowerInvariant();
             if (key is not ("og:image" or "og:image:url" or "twitter:image" or "twitter:image:src"))
             {
                 continue;
             }
 
-            var content = WebUtility.HtmlDecode(match.Groups["content"].Value).Trim();
-            if (TryNormalizeImageUrl(content, pageUri, out var imageUrl))
+            string content = WebUtility.HtmlDecode(match.Groups["content"].Value).Trim();
+            if (TryNormalizeImageUrl(content, pageUri, out string imageUrl))
             {
                 yield return imageUrl;
             }
@@ -69,8 +69,8 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
 
         foreach (Match match in LinkImageRegex().Matches(html))
         {
-            var href = WebUtility.HtmlDecode(match.Groups["href"].Value).Trim();
-            if (TryNormalizeImageUrl(href, pageUri, out var imageUrl))
+            string href = WebUtility.HtmlDecode(match.Groups["href"].Value).Trim();
+            if (TryNormalizeImageUrl(href, pageUri, out string imageUrl))
             {
                 yield return imageUrl;
             }
@@ -89,7 +89,7 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
             return false;
         }
 
-        var uri = Uri.TryCreate(value, UriKind.Absolute, out var absolute)
+        Uri uri = Uri.TryCreate(value, UriKind.Absolute, out Uri? absolute)
             ? absolute
             : new Uri(pageUri, value);
         if (uri.Scheme is not ("http" or "https"))
@@ -101,9 +101,13 @@ public sealed partial class BookLinkMetadataCoverProvider : IBookCoverProvider
         return true;
     }
 
-    [GeneratedRegex("<meta[^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]*|<meta[^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]*", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        "<meta[^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]*|<meta[^>]+content=[\"'](?<content>[^\"']+)[\"'][^>]+(?:property|name)=[\"'](?<key>og:image|og:image:url|twitter:image|twitter:image:src)[\"'][^>]*",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex MetaRegex();
 
-    [GeneratedRegex("<link[^>]+rel=[\"'][^\"']*(?:image_src|preload)[^\"']*[\"'][^>]+href=[\"'](?<href>[^\"']+)[\"'][^>]*", RegexOptions.IgnoreCase | RegexOptions.Compiled)]
+    [GeneratedRegex(
+        "<link[^>]+rel=[\"'][^\"']*(?:image_src|preload)[^\"']*[\"'][^>]+href=[\"'](?<href>[^\"']+)[\"'][^>]*",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled)]
     private static partial Regex LinkImageRegex();
 }

@@ -1,46 +1,45 @@
 namespace Application.Common;
 
 using Application.Common.DTOs.Book;
-using Application.Features.BookFeatures.Commands;
+using Features.BookFeatures.Commands;
 
 public static partial class MappingExtensions
 {
     public static BookDto ToDto(this Book source)
     {
-        return MapBookDto(source, new BookDto
-        {
-            PrimaryTitle = source.PrimaryTitle,
-            ContentType = source.ContentType.Name,
-            Status = source.Status.Name
-        });
+        return MapBookDto(source,
+            new BookDto
+            {
+                PrimaryTitle = source.PrimaryTitle,
+                ContentType = source.ContentType.Name,
+                Status = source.Status.Name
+            });
     }
 
     public static AdminBookDto ToAdminDto(this Book source)
     {
-        return MapBookDto(source, new AdminBookDto
-        {
-            OwnerId = source.OwnerId,
-            PrimaryTitle = source.PrimaryTitle,
-            ContentType = source.ContentType.Name,
-            Status = source.Status.Name
-        });
+        return MapBookDto(source,
+            new AdminBookDto
+            {
+                OwnerId = source.OwnerId,
+                PrimaryTitle = source.PrimaryTitle,
+                ContentType = source.ContentType.Name,
+                Status = source.Status.Name
+            });
     }
 
     public static BookTitle ToPrimaryTitle(this string title)
     {
-        var trimmedTitle = title.Trim();
+        string trimmedTitle = title.Trim();
         return new BookTitle
         {
-            Title = trimmedTitle,
-            NormalizedTitle = NormalizeName(trimmedTitle),
-            IsPrimary = true,
-            Source = "Manual"
+            Title = trimmedTitle, NormalizedTitle = NormalizeName(trimmedTitle), IsPrimary = true, Source = "Manual"
         };
     }
 
     public static BookTitle ToBookTitle(this BookTitleInput input)
     {
-        var trimmedTitle = input.Title.Trim();
+        string trimmedTitle = input.Title.Trim();
         return new BookTitle
         {
             Title = trimmedTitle,

@@ -1,6 +1,6 @@
 namespace Domain.Entities;
 
-using Domain.Associations;
+using Associations;
 
 public class Genre : BaseAuditableEntity
 {

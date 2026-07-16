@@ -26,59 +26,78 @@ public sealed class BookSortBuilder
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        var descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
+        bool descending = string.Equals(sortDirection, "desc", StringComparison.OrdinalIgnoreCase);
         switch (NormalizeSort(sortBy))
         {
             case "title":
                 return descending
-                    ? query.OrderByDescending(book => book.NormalizedPrimaryTitle).ThenByDescending(book => book.PrimaryTitle).ThenByDescending(book => book.Id)
-                    : query.OrderBy(book => book.NormalizedPrimaryTitle).ThenBy(book => book.PrimaryTitle).ThenBy(book => book.Id);
+                    ? query.OrderByDescending(book => book.NormalizedPrimaryTitle)
+                        .ThenByDescending(book => book.PrimaryTitle).ThenByDescending(book => book.Id)
+                    : query.OrderBy(book => book.NormalizedPrimaryTitle).ThenBy(book => book.PrimaryTitle)
+                        .ThenBy(book => book.Id);
             case "author":
                 return descending
-                    ? query.OrderByDescending(book => book.Author != null ? book.Author.PrimaryName : "").ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.Author != null ? book.Author.PrimaryName : "").ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderByDescending(book => book.Author != null ? book.Author.PrimaryName : "")
+                        .ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.Author != null ? book.Author.PrimaryName : "")
+                        .ThenBy(book => book.PrimaryTitle);
             case "status":
                 return ApplyNamedCycleOrder(
                     query,
-                    await _context.Statuses.AsNoTracking().OrderBy(status => status.Id.ToString()).Select(status => status.Name).ToListAsync(cancellationToken),
+                    await _context.Statuses.AsNoTracking().OrderBy(status => status.Id.ToString())
+                        .Select(status => status.Name).ToListAsync(cancellationToken),
                     sortDirection,
                     book => book.Status.Name);
             case "type":
                 return ApplyNamedCycleOrder(
                     query,
-                    await _context.ContentTypes.AsNoTracking().OrderBy(type => type.Id.ToString()).Select(type => type.Name).ToListAsync(cancellationToken),
+                    await _context.ContentTypes.AsNoTracking().OrderBy(type => type.Id.ToString())
+                        .Select(type => type.Name).ToListAsync(cancellationToken),
                     sortDirection,
                     book => book.ContentType.Name);
             case "progress":
                 if (!_supportsILike)
                 {
                     return descending
-                        ? query.OrderBy(book => book.CurrentChapterNumber == null).ThenByDescending(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
-                        : query.OrderBy(book => book.CurrentChapterNumber == null).ThenBy(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
+                        ? query.OrderBy(book => book.CurrentChapterNumber == null)
+                            .ThenByDescending(book => (double?)book.CurrentChapterNumber)
+                            .ThenBy(book => book.PrimaryTitle)
+                        : query.OrderBy(book => book.CurrentChapterNumber == null)
+                            .ThenBy(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
                 }
 
                 return descending
-                    ? query.OrderBy(book => book.CurrentChapterNumber == null).ThenByDescending(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.CurrentChapterNumber == null).ThenBy(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.CurrentChapterNumber == null)
+                        .ThenByDescending(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.CurrentChapterNumber == null).ThenBy(book => book.CurrentChapterNumber)
+                        .ThenBy(book => book.PrimaryTitle);
             case "chapters":
                 if (!_supportsILike)
                 {
                     return descending
-                        ? query.OrderBy(book => book.TotalChapters == null).ThenByDescending(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle)
-                        : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle);
+                        ? query.OrderBy(book => book.TotalChapters == null)
+                            .ThenByDescending(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle)
+                        : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => (double?)book.TotalChapters)
+                            .ThenBy(book => book.PrimaryTitle);
                 }
 
                 return descending
-                    ? query.OrderBy(book => book.TotalChapters == null).ThenByDescending(book => book.TotalChapters).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => book.TotalChapters).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.TotalChapters == null).ThenByDescending(book => book.TotalChapters)
+                        .ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => book.TotalChapters)
+                        .ThenBy(book => book.PrimaryTitle);
             case "rating":
                 return descending
-                    ? query.OrderBy(book => book.Rating == null).ThenByDescending(book => book.Rating).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.Rating == null).ThenBy(book => book.Rating).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.Rating == null).ThenByDescending(book => book.Rating)
+                        .ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.Rating == null).ThenBy(book => book.Rating)
+                        .ThenBy(book => book.PrimaryTitle);
             case "priority":
                 return descending
-                    ? query.OrderBy(book => book.Priority == null).ThenByDescending(book => book.Priority).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.Priority == null).ThenBy(book => book.Priority).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderBy(book => book.Priority == null).ThenByDescending(book => book.Priority)
+                        .ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.Priority == null).ThenBy(book => book.Priority)
+                        .ThenBy(book => book.PrimaryTitle);
             case "owner":
                 return descending
                     ? query.OrderByDescending(book => book.OwnerId).ThenBy(book => book.PrimaryTitle)
@@ -101,7 +120,7 @@ public sealed class BookSortBuilder
         string? sortBy,
         string? sortDirection)
     {
-        var descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        bool descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
         return NormalizeSort(sortBy) == "created"
             ? descending
                 ? books.OrderByDescending(book => book.Created).ThenBy(book => book.PrimaryTitle)
@@ -121,9 +140,9 @@ public sealed class BookSortBuilder
     {
         if (ShouldSortDateOnClient(sortBy))
         {
-            var descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
-            var books = await query.ToListAsync(cancellationToken);
-            var sorted = NormalizeSort(sortBy) == "created"
+            bool descending = !string.Equals(sortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+            List<Book> books = await query.ToListAsync(cancellationToken);
+            IOrderedEnumerable<Book> sorted = NormalizeSort(sortBy) == "created"
                 ? descending
                     ? books.OrderByDescending(book => book.Created).ThenBy(book => book.PrimaryTitle)
                     : books.OrderBy(book => book.Created).ThenBy(book => book.PrimaryTitle)
@@ -145,8 +164,8 @@ public sealed class BookSortBuilder
         string? currentSortDirection,
         CancellationToken cancellationToken)
     {
-        var normalizedSort = NormalizeSort(sortBy);
-        var orderedAvailableNames = normalizedSort switch
+        string normalizedSort = NormalizeSort(sortBy);
+        List<string> orderedAvailableNames = normalizedSort switch
         {
             "status" => await GetOrderedAvailableNamesAsync(
                 query.Select(book => book.Status.Name),
@@ -164,11 +183,12 @@ public sealed class BookSortBuilder
             return null;
         }
 
-        var normalizedCurrent = NormalizeCycleValue(currentSortDirection);
-        var currentIndex = normalizedCurrent == null
+        string? normalizedCurrent = NormalizeCycleValue(currentSortDirection);
+        int currentIndex = normalizedCurrent == null
             ? -1
-            : orderedAvailableNames.FindIndex(name => string.Equals(NormalizeCycleValue(name), normalizedCurrent, StringComparison.Ordinal));
-        var nextIndex = (currentIndex + 1 + orderedAvailableNames.Count) % orderedAvailableNames.Count;
+            : orderedAvailableNames.FindIndex(name =>
+                string.Equals(NormalizeCycleValue(name), normalizedCurrent, StringComparison.Ordinal));
+        int nextIndex = (currentIndex + 1 + orderedAvailableNames.Count) % orderedAvailableNames.Count;
         return orderedAvailableNames[nextIndex];
     }
 
@@ -193,7 +213,7 @@ public sealed class BookSortBuilder
 
     private static bool IsDateSort(string? sortBy)
     {
-        var normalizedSort = NormalizeSort(sortBy);
+        string normalizedSort = NormalizeSort(sortBy);
         return normalizedSort is "created" or "lastmodified";
     }
 
@@ -208,9 +228,9 @@ public sealed class BookSortBuilder
             return query.OrderBy(book => book.PrimaryTitle).ThenBy(book => book.Id);
         }
 
-        var orderedNameArray = orderedNames.ToArray();
-        var normalizedStartName = NormalizeCycleValue(startName);
-        var startIndex = normalizedStartName == null
+        string[] orderedNameArray = orderedNames.ToArray();
+        string? normalizedStartName = NormalizeCycleValue(startName);
+        int startIndex = normalizedStartName == null
             ? -1
             : Array.FindIndex(
                 orderedNameArray,
@@ -220,10 +240,10 @@ public sealed class BookSortBuilder
             startIndex = 0;
         }
 
-        var rotatedNames = orderedNameArray.Skip(startIndex).Concat(orderedNameArray.Take(startIndex)).ToArray();
-        var parameter = keySelector.Parameters[0];
+        string[] rotatedNames = orderedNameArray.Skip(startIndex).Concat(orderedNameArray.Take(startIndex)).ToArray();
+        ParameterExpression parameter = keySelector.Parameters[0];
         Expression body = Expression.Constant(rotatedNames.Length);
-        for (var index = rotatedNames.Length - 1; index >= 0; index--)
+        for (int index = rotatedNames.Length - 1; index >= 0; index--)
         {
             body = Expression.Condition(
                 Expression.Equal(keySelector.Body, Expression.Constant(rotatedNames[index])),

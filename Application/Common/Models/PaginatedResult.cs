@@ -9,12 +9,6 @@ public class PaginatedResult<T>
 
     public static PaginatedResult<T> Create(int skip, int take, int total, IEnumerable<T> data)
     {
-        return new PaginatedResult<T>
-        {
-            Skip = skip,
-            Take = take,
-            Total = total,
-            Data = data.ToList()
-        };
+        return new PaginatedResult<T> { Skip = skip, Take = take, Total = total, Data = data.ToList() };
     }
 }

@@ -1,6 +1,6 @@
 namespace Application.Features.TypeFeatures.Commands;
 
-using Application.Common;
+using Common;
 using Application.Common.DTOs.Type;
 
 public record CreateTypeCommand(string Name, string? Description) : IRequest<TypeDto>;
@@ -16,7 +16,7 @@ public class CreateTypeCommandHandler : IRequestHandler<CreateTypeCommand, TypeD
 
     public async Task<TypeDto> Handle(CreateTypeCommand request, CancellationToken cancellationToken)
     {
-        var type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken);
+        ContentType? type = await _typeRepository.GetByNameAsync(request.Name, cancellationToken);
         if (type != null)
         {
             throw new EntityAlreadyExistsException<ContentType, Guid>(request.Name, type.Id);

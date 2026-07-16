@@ -32,6 +32,7 @@ public record BookImportRowDto
     public string? Notes { get; set; }
     public string? RawImportedLine { get; set; }
     public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
+
     public IReadOnlyDictionary<string, IReadOnlyCollection<string>> FieldErrors { get; set; } =
         new Dictionary<string, IReadOnlyCollection<string>>();
 }
@@ -55,7 +56,10 @@ public record BookImportFinalizeResultDto
 {
     public int ImportedCount { get; set; }
     public int SkippedCount { get; set; }
-    public IReadOnlyCollection<BookImportFinalizedBookDto> ImportedBooks { get; set; } = Array.Empty<BookImportFinalizedBookDto>();
+
+    public IReadOnlyCollection<BookImportFinalizedBookDto> ImportedBooks { get; set; } =
+        Array.Empty<BookImportFinalizedBookDto>();
+
     public IReadOnlyCollection<string> Errors { get; set; } = Array.Empty<string>();
 }
 

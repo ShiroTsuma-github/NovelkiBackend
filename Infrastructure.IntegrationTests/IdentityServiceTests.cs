@@ -14,31 +14,37 @@ using Microsoft.Extensions.Options;
 
 namespace Infrastructure.IntegrationTests;
 
+using Domain.Entities;
+
 public class IdentityServiceTests
 {
     [Fact]
     public async Task RegisterUser_ShouldCreateUserAndRejectDuplicateUsernameAndEmail()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
+        IdentityService service = host.GetRequiredService<IdentityService>();
 
-        var created = await service.RegisterUser(new RegisterDto("new-reader", "new-reader@example.com", "Strong1!"), CancellationToken.None);
+        RegisterResponse created =
+            await service.RegisterUser(new RegisterDto("new-reader", "new-reader@example.com", "Strong1!"),
+                CancellationToken.None);
 
         Assert.NotEqual(Guid.Empty, created.Id);
         Assert.Equal("new-reader", created.Name);
         await Assert.ThrowsAsync<UsernameTakenException>(() =>
-            service.RegisterUser(new RegisterDto("new-reader", "other@example.com", "Strong1!"), CancellationToken.None));
+            service.RegisterUser(new RegisterDto("new-reader", "other@example.com", "Strong1!"),
+                CancellationToken.None));
         await Assert.ThrowsAsync<EmailInUseException>(() =>
-            service.RegisterUser(new RegisterDto("other-reader", "new-reader@example.com", "Strong1!"), CancellationToken.None));
+            service.RegisterUser(new RegisterDto("other-reader", "new-reader@example.com", "Strong1!"),
+                CancellationToken.None));
     }
 
     [Fact]
     public async Task RegisterUser_ShouldSurfaceIdentityErrors()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
+        IdentityService service = host.GetRequiredService<IdentityService>();
 
-        var ex = await Assert.ThrowsAsync<IdentityOperationFailedException>(() =>
+        IdentityOperationFailedException ex = await Assert.ThrowsAsync<IdentityOperationFailedException>(() =>
             service.RegisterUser(new RegisterDto("weak-reader", "weak@example.com", "x"), CancellationToken.None));
 
         Assert.NotEmpty(ex.Errors);
@@ -48,15 +54,17 @@ public class IdentityServiceTests
     public async Task LoginUser_ShouldIssueAccessAndRefreshToken()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("login-reader", "login@example.com", "Strong1!"), CancellationToken.None);
+        IdentityService service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("login-reader", "login@example.com", "Strong1!"),
+            CancellationToken.None);
 
-        var response = await service.LoginUser(new LoginDto("login-reader", null, "Strong1!"), CancellationToken.None);
+        TokenResponse response =
+            await service.LoginUser(new LoginDto("login-reader", null, "Strong1!"), CancellationToken.None);
 
         Assert.False(string.IsNullOrWhiteSpace(response.AccessToken));
         Assert.False(string.IsNullOrWhiteSpace(response.RefreshToken));
         Assert.True(response.RefreshTokenExpiresAt > DateTimeOffset.UtcNow);
-        await using var context = host.CreateContext();
+        await using ApplicationDbContext context = host.CreateContext();
         Assert.Single(context.RefreshTokens.Where(token => token.UserId == response.UserId));
     }
 
@@ -64,8 +72,9 @@ public class IdentityServiceTests
     public async Task LoginUser_ShouldRejectMissingUserAndWrongPassword()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("password-reader", "password@example.com", "Strong1!"), CancellationToken.None);
+        IdentityService service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("password-reader", "password@example.com", "Strong1!"),
+            CancellationToken.None);
 
         await Assert.ThrowsAsync<EntityNotFoundException<User, string>>(() =>
             service.LoginUser(new LoginDto("missing-reader", null, "Strong1!"), CancellationToken.None));
@@ -77,18 +86,20 @@ public class IdentityServiceTests
     public async Task RefreshTokenAsync_ShouldRotateRefreshToken()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("refresh-reader", "refresh@example.com", "Strong1!"), CancellationToken.None);
-        var login = await service.LoginUser(new LoginDto(null, "refresh@example.com", "Strong1!"), CancellationToken.None);
+        IdentityService service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("refresh-reader", "refresh@example.com", "Strong1!"),
+            CancellationToken.None);
+        TokenResponse login = await service.LoginUser(new LoginDto(null, "refresh@example.com", "Strong1!"),
+            CancellationToken.None);
 
-        var refreshed = await service.RefreshTokenAsync(login.RefreshToken, CancellationToken.None);
+        TokenResponse refreshed = await service.RefreshTokenAsync(login.RefreshToken, CancellationToken.None);
 
         Assert.NotEqual(login.RefreshToken, refreshed.RefreshToken);
         Assert.False(string.IsNullOrWhiteSpace(refreshed.AccessToken));
-        await using var context = host.CreateContext();
+        await using ApplicationDbContext context = host.CreateContext();
         var tokens = (await context.RefreshTokens
-            .Where(token => token.UserId == login.UserId)
-            .ToListAsync())
+                .Where(token => token.UserId == login.UserId)
+                .ToListAsync())
             .OrderBy(token => token.Created)
             .ToList();
         Assert.Equal(2, tokens.Count);
@@ -101,12 +112,14 @@ public class IdentityServiceTests
     public async Task RefreshTokenAsync_ShouldRejectMissingInvalidAndExpiredTokens()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("expired-reader", "expired@example.com", "Strong1!"), CancellationToken.None);
-        var login = await service.LoginUser(new LoginDto("expired-reader", null, "Strong1!"), CancellationToken.None);
-        await using (var context = host.CreateContext())
+        IdentityService service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("expired-reader", "expired@example.com", "Strong1!"),
+            CancellationToken.None);
+        TokenResponse login =
+            await service.LoginUser(new LoginDto("expired-reader", null, "Strong1!"), CancellationToken.None);
+        await using (ApplicationDbContext context = host.CreateContext())
         {
-            var stored = await context.RefreshTokens.SingleAsync(token => token.UserId == login.UserId);
+            RefreshToken stored = await context.RefreshTokens.SingleAsync(token => token.UserId == login.UserId);
             stored.ExpiresAt = DateTimeOffset.UtcNow.AddMinutes(-1);
             await context.SaveChangesAsync();
         }
@@ -124,16 +137,18 @@ public class IdentityServiceTests
     public async Task RevokeRefreshTokenAsync_ShouldIgnoreBlankAndRevokeActiveToken()
     {
         using var host = new IdentityTestHost();
-        var service = host.GetRequiredService<IdentityService>();
-        await service.RegisterUser(new RegisterDto("logout-reader", "logout@example.com", "Strong1!"), CancellationToken.None);
-        var login = await service.LoginUser(new LoginDto("logout-reader", null, "Strong1!"), CancellationToken.None);
+        IdentityService service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("logout-reader", "logout@example.com", "Strong1!"),
+            CancellationToken.None);
+        TokenResponse login =
+            await service.LoginUser(new LoginDto("logout-reader", null, "Strong1!"), CancellationToken.None);
 
         await service.RevokeRefreshTokenAsync(null, CancellationToken.None);
         await service.RevokeRefreshTokenAsync(login.RefreshToken, CancellationToken.None);
         await service.RevokeRefreshTokenAsync(login.RefreshToken, CancellationToken.None);
 
-        await using var context = host.CreateContext();
-        var stored = await context.RefreshTokens.SingleAsync(token => token.UserId == login.UserId);
+        await using ApplicationDbContext context = host.CreateContext();
+        RefreshToken stored = await context.RefreshTokens.SingleAsync(token => token.UserId == login.UserId);
         Assert.Equal("Logged out", stored.ReasonRevoked);
         Assert.NotNull(stored.RevokedAt);
     }
@@ -178,7 +193,7 @@ public class IdentityServiceTests
             services.AddScoped<IdentityService>();
 
             _provider = services.BuildServiceProvider();
-            using var scope = _provider.CreateScope();
+            using IServiceScope scope = _provider.CreateScope();
             scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.EnsureCreated();
         }
 

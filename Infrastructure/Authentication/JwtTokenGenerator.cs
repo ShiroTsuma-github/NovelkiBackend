@@ -1,5 +1,4 @@
-﻿
-using Application.Common.Models;
+﻿using Application.Common.Models;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -17,23 +16,24 @@ public class JwtTokenGenerator : IJwtTokenGenerator
     {
         _configuration = jwtSettings.Value;
     }
-    
+
     public TokenResponse? GenerateToken(IUser user)
     {
         if (!user.IsAuthenticated)
         {
             return null;
         }
+
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration.Key));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, user.RequiredId.ToString()),
-            new Claim(ClaimTypes.Name, user.Username!),
-            new Claim(ClaimTypes.Email, user.Email!),
-            new Claim(JwtRegisteredClaimNames.Sub, user.RequiredId.ToString()),
-            new Claim(JwtRegisteredClaimNames.Email, user.Email!)
+            new(ClaimTypes.NameIdentifier, user.RequiredId.ToString()),
+            new(ClaimTypes.Name, user.Username!),
+            new(ClaimTypes.Email, user.Email!),
+            new(JwtRegisteredClaimNames.Sub, user.RequiredId.ToString()),
+            new(JwtRegisteredClaimNames.Email, user.Email!)
         };
 
         if (user.CreatedAt is { } createdAt)
@@ -41,15 +41,15 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             claims.Add(new Claim("created_at", createdAt.ToString("O")));
         }
 
-        foreach (var role in user.Roles)
+        foreach (string role in user.Roles)
         {
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
         var token = new JwtSecurityToken(
-            issuer: _configuration.Issuer,
-            audience: _configuration.Audience,
-            claims: claims,
+            _configuration.Issuer,
+            _configuration.Audience,
+            claims,
             expires: DateTime.UtcNow.AddHours(1),
             signingCredentials: creds);
 

@@ -6,8 +6,8 @@ internal static class BookCoverJson
 {
     public static JsonElement? TryGetProperty(JsonElement element, params string[] path)
     {
-        var current = element;
-        foreach (var part in path)
+        JsonElement current = element;
+        foreach (string part in path)
         {
             if (!current.TryGetProperty(part, out current))
             {
@@ -20,7 +20,7 @@ internal static class BookCoverJson
 
     public static string? TryGetString(JsonElement element, params string[] path)
     {
-        var property = TryGetProperty(element, path);
+        JsonElement? property = TryGetProperty(element, path);
         return property?.ValueKind == JsonValueKind.String ? property.Value.GetString() : null;
     }
 }

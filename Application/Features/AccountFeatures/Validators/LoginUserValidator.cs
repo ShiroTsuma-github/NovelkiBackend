@@ -1,6 +1,6 @@
 ﻿namespace Application.Features.AccountFeatures.Validators;
 
-using Application.Features.AccountFeatures.Commands;
+using Commands;
 
 public class LoginUserCommandValidator : AbstractValidator<LoginUserCommand>
 {
@@ -33,8 +33,8 @@ public class LoginUserCommandValidator : AbstractValidator<LoginUserCommand>
 
     private bool OnlyOneProvided(LoginUserCommand command)
     {
-        var usernameProvided = !string.IsNullOrWhiteSpace(command.Username);
-        var emailProvided = !string.IsNullOrWhiteSpace(command.Email);
+        bool usernameProvided = !string.IsNullOrWhiteSpace(command.Username);
+        bool emailProvided = !string.IsNullOrWhiteSpace(command.Email);
         return usernameProvided ^ emailProvided;
     }
 }

@@ -1,6 +1,6 @@
 namespace Application.Features.StatusFeatures.Validators;
 
-using Application.Features.StatusFeatures.Commands;
+using Commands;
 
 public class UpdateStatusCommandValidator : AbstractValidator<UpdateStatusCommand>
 {

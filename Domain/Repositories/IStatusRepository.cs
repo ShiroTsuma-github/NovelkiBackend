@@ -2,11 +2,11 @@ namespace Domain.Repositories;
 
 public interface IStatusRepository
 {
-    Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
-    Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken);
-    Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken);
-    Task<int> GetCountAsync(CancellationToken cancellationToken);
-    Task AddAsync(Status status, CancellationToken cancellationToken);
-    Task DeleteAsync(Guid id, CancellationToken cancellationToken);
-    Task SaveAsync(CancellationToken cancellationToken);
+    public Task<Status?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    public Task<Status?> GetByNameAsync(string name, CancellationToken cancellationToken);
+    public Task<IEnumerable<Status>> GetAllAsync(int Skip, int Take, CancellationToken cancellationToken);
+    public Task<int> GetCountAsync(CancellationToken cancellationToken);
+    public Task AddAsync(Status status, CancellationToken cancellationToken);
+    public Task DeleteAsync(Guid id, CancellationToken cancellationToken);
+    public Task SaveAsync(CancellationToken cancellationToken);
 }

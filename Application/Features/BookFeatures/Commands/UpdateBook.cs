@@ -24,8 +24,7 @@ public sealed record UpdateBookCommand(
     string? RawImportedLine,
     IEnumerable<BookLinkInput>? Links) : IRequest
 {
-    [JsonIgnore]
-    public bool AdminScope { get; set; }
+    [JsonIgnore] public bool AdminScope { get; set; }
 }
 
 public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
@@ -61,7 +60,7 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
 
     public async Task Handle(UpdateBookCommand request, CancellationToken cancellationToken)
     {
-        var book = request.AdminScope
+        Book? book = request.AdminScope
             ? await _bookRepository.GetForUpdateAsync(request.Id, cancellationToken)
             : await _bookRepository.GetForUpdateAsync(request.Id, _user.RequiredId, cancellationToken);
         if (book == null)
@@ -69,12 +68,12 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
             throw new EntityNotFoundException<Book, Guid>(request.Id);
         }
 
-        var ownerId = book.OwnerId;
+        Guid ownerId = book.OwnerId;
 
-        var contentType = await _typeRepository.GetByIdAsync(request.ContentTypeId, cancellationToken)
-            ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
-        var status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
-            ?? throw new EntityNotFoundException<Status, Guid>(request.StatusId);
+        ContentType contentType = await _typeRepository.GetByIdAsync(request.ContentTypeId, cancellationToken)
+                                  ?? throw new EntityNotFoundException<ContentType, Guid>(request.ContentTypeId);
+        Status status = await _statusRepository.GetByIdAsync(request.StatusId, cancellationToken)
+                        ?? throw new EntityNotFoundException<Status, Guid>(request.StatusId);
         await BookMutationSupport.EnsureBookDoesNotExistAsync(
             _bookRepository,
             ownerId,
@@ -83,15 +82,16 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
             request.PrimaryTitle,
             request.AlternativeTitles,
             cancellationToken);
-        var author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, request.AuthorId, request.AuthorName, cancellationToken);
-        var primaryTitle = request.PrimaryTitle.Trim();
-        var description = BookMutationSupport.TrimToNull(request.Description);
-        var currentChapterLabel = BookMutationSupport.TrimToNull(request.CurrentChapterLabel);
-        var notes = BookMutationSupport.TrimToNull(request.Notes);
-        var rawImportedLine = BookMutationSupport.TrimToNull(request.RawImportedLine);
+        Author? author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, request.AuthorId,
+            request.AuthorName, cancellationToken);
+        string primaryTitle = request.PrimaryTitle.Trim();
+        string? description = BookMutationSupport.TrimToNull(request.Description);
+        string? currentChapterLabel = BookMutationSupport.TrimToNull(request.CurrentChapterLabel);
+        string? notes = BookMutationSupport.TrimToNull(request.Notes);
+        string? rawImportedLine = BookMutationSupport.TrimToNull(request.RawImportedLine);
 
-        var progressChanged = book.CurrentChapterNumber != request.CurrentChapterNumber ||
-                              book.CurrentChapterLabel != currentChapterLabel;
+        bool progressChanged = book.CurrentChapterNumber != request.CurrentChapterNumber ||
+                               book.CurrentChapterLabel != currentChapterLabel;
 
         book.PrimaryTitle = primaryTitle;
         book.NormalizedPrimaryTitle = MappingExtensions.NormalizeName(primaryTitle);
@@ -110,31 +110,37 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
         book.Notes = notes;
         book.RawImportedLine = rawImportedLine;
 
-        var titles = BookMutationSupport.BuildTitles(primaryTitle, request.AlternativeTitles);
-        var links = BookMutationSupport.BuildLinks(request.Links);
+        List<BookTitle> titles = BookMutationSupport.BuildTitles(primaryTitle, request.AlternativeTitles);
+        List<BookLink> links = BookMutationSupport.BuildLinks(request.Links);
 
-        var genreIds = (await _genreRepository.GetByIdsAsync(request.GenreIds ?? Enumerable.Empty<Guid>(), cancellationToken))
+        var genreIds =
+            (await _genreRepository.GetByIdsAsync(request.GenreIds ?? Enumerable.Empty<Guid>(), cancellationToken))
             .Select(g => g.Id)
             .ToList();
-        var tagIds = (await BookMutationSupport.ResolveTagsAsync(_tagRepository, ownerId, request.Tags ?? Enumerable.Empty<string>(), cancellationToken))
+        var tagIds = (await BookMutationSupport.ResolveTagsAsync(_tagRepository, ownerId,
+                request.Tags ?? Enumerable.Empty<string>(), cancellationToken))
             .Select(t => t.Id)
             .ToList();
-        var progressHistory = progressChanged
+        BookProgressHistory? progressHistory = progressChanged
             ? new BookProgressHistory
             {
-                ChapterNumber = request.CurrentChapterNumber,
-                ChapterLabel = currentChapterLabel
+                ChapterNumber = request.CurrentChapterNumber, ChapterLabel = currentChapterLabel
             }
             : null;
 
-        await _bookRepository.ReplaceEditableCollectionsAsync(book.Id, titles, links, genreIds, tagIds, progressHistory, cancellationToken);
+        await _bookRepository.ReplaceEditableCollectionsAsync(book.Id, titles, links, genreIds, tagIds, progressHistory,
+            cancellationToken);
 
         await _bookRepository.SaveAsync(cancellationToken);
         await _cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
     }
 }
 
-public record UpdateBookProgressCommand(Guid Id, decimal? CurrentChapterNumber, string? CurrentChapterLabel, string? Comment) : IRequest;
+public record UpdateBookProgressCommand(
+    Guid Id,
+    decimal? CurrentChapterNumber,
+    string? CurrentChapterLabel,
+    string? Comment) : IRequest;
 
 public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressCommand>
 {
@@ -151,14 +157,15 @@ public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressComma
 
     public async Task Handle(UpdateBookProgressCommand request, CancellationToken cancellationToken)
     {
-        var book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
-            ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
-        if (book.TotalChapters.HasValue && book.TotalChapters > 0 && request.CurrentChapterNumber.HasValue && request.CurrentChapterNumber > book.TotalChapters)
+        Book book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
+                    ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
+        if (book.TotalChapters.HasValue && book.TotalChapters > 0 && request.CurrentChapterNumber.HasValue &&
+            request.CurrentChapterNumber > book.TotalChapters)
         {
             throw new ValidationException("Current chapter cannot be greater than total chapters.");
         }
 
-        var updated = await _repository.UpdateProgressAsync(
+        bool updated = await _repository.UpdateProgressAsync(
             request.Id,
             _user.RequiredId,
             request.CurrentChapterNumber,

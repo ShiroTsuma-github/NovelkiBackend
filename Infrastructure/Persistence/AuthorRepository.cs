@@ -20,7 +20,7 @@ public class AuthorRepository : IAuthorRepository
 
     public async Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
-        var normalizedName = MappingExtensions.NormalizeName(name);
+        string normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Authors
             .Include(a => a.Names)
             .FirstOrDefaultAsync(
@@ -31,10 +31,10 @@ public class AuthorRepository : IAuthorRepository
 
     public async Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
     {
-        var query = _context.Authors.Include(a => a.Names).AsQueryable();
+        IQueryable<Author> query = _context.Authors.Include(a => a.Names).AsQueryable();
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var normalizedSearch = MappingExtensions.NormalizeName(search);
+            string normalizedSearch = MappingExtensions.NormalizeName(search);
             query = query.Where(a =>
                 a.NormalizedPrimaryName.Contains(normalizedSearch) ||
                 a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)));

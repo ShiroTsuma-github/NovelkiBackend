@@ -4,7 +4,7 @@ using Application.Common.DTOs.Book;
 
 public interface IBookExportQueryService
 {
-    Task<PaginatedResult<BookDto>> GetBooksForExportAsync(
+    public Task<PaginatedResult<BookDto>> GetBooksForExportAsync(
         Guid ownerId,
         BookSearchCriteria criteria,
         int skip,
