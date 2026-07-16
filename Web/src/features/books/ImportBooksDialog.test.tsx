@@ -220,6 +220,27 @@ describe('ImportBooksDialog', () => {
     expect(screen.getByLabelText(/^Title/)).toBeInTheDocument()
   })
 
+  it('keeps the import dialog inside the viewport and gives invalid rows the scroll area', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    expect(await screen.findByTestId('import-dialog-panel')).toHaveClass('h-[calc(100vh-0.5rem)]', 'overflow-hidden')
+    expect(screen.getByRole('dialog')).toHaveClass('overflow-hidden')
+    expect(screen.getByTestId('import-invalid-rows-panel')).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden')
+  })
+
   it('marks import row fields with field errors', async () => {
     vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
 
