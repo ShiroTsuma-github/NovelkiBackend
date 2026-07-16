@@ -188,9 +188,36 @@ describe('ImportBooksDialog', () => {
 
     const title = await screen.findByTitle(importSessionWithLongTitle.rows[0].primaryTitle!)
     expect(title).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /collapse/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /revalidate row/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /edit row/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /revalidate row/i })).toBeDisabled()
     expect(screen.getByRole('button', { name: /remove row/i })).toBeInTheDocument()
+  })
+
+  it('mounts import row form controls only after opening a row for editing', async () => {
+    vi.mocked(api.createBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    const { container } = renderWithProviders(
+      <ImportBooksDialog open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const input = container.querySelector('input[type="file"]')
+    expect(input).not.toBeNull()
+
+    fireEvent.change(input!, {
+      target: {
+        files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
+      },
+    })
+
+    expect(await screen.findByRole('button', { name: /edit row/i })).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Title/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /revalidate row/i })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: /edit row/i }))
+
+    expect(screen.getByRole('button', { name: /collapse/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /revalidate row/i })).not.toBeDisabled()
+    expect(screen.getByLabelText(/^Title/)).toBeInTheDocument()
   })
 
   it('marks import row fields with field errors', async () => {
@@ -210,6 +237,7 @@ describe('ImportBooksDialog', () => {
     })
 
     expect(await screen.findAllByText(/Content type is required and must exist\./)).toHaveLength(2)
+    fireEvent.click(screen.getByRole('button', { name: /edit row/i }))
 
     const typeInput = screen.getByLabelText(/^Type/)
     const titleInput = screen.getByLabelText(/^Title/)
@@ -234,6 +262,9 @@ describe('ImportBooksDialog', () => {
         files: [new File(['primaryTitle,contentType,status'], 'books.csv', { type: 'text/csv' })],
       },
     })
+
+    await screen.findByRole('button', { name: /edit row/i })
+    fireEvent.click(screen.getByRole('button', { name: /edit row/i }))
 
     const typeInput = await screen.findByRole('combobox', { name: /^Type/ })
     const statusInput = screen.getByRole('combobox', { name: /^Status/ })
