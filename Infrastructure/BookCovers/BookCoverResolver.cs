@@ -13,11 +13,11 @@ public sealed class BookCoverResolver
 
     public async Task<BookCoverCandidate?> FindAsync(Book book, CancellationToken cancellationToken)
     {
-        foreach (IBookCoverProvider provider in _providers)
+        foreach (var provider in _providers)
         {
             try
             {
-                BookCoverCandidate? candidate = await provider.FindAsync(book, cancellationToken);
+                var candidate = await provider.FindAsync(book, cancellationToken);
                 if (candidate != null)
                 {
                     return candidate;

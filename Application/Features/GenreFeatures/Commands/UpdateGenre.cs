@@ -20,8 +20,8 @@ public class UpdateGenreCommandHandler : IRequestHandler<UpdateGenreCommand, Gen
 
     public async Task<GenreDto> Handle(UpdateGenreCommand request, CancellationToken cancellationToken)
     {
-        Genre genre = await _genreRepository.GetByIdAsync(request.Id, cancellationToken)
-                      ?? throw new EntityNotFoundException<Genre, Guid>(request.Id);
+        var genre = await _genreRepository.GetByIdAsync(request.Id, cancellationToken)
+                    ?? throw new EntityNotFoundException<Genre, Guid>(request.Id);
 
         request.ApplyTo(genre);
         await _genreRepository.SaveAsync(cancellationToken);

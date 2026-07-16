@@ -39,8 +39,8 @@ internal static class DependencyInjection
         {
             options.AddPolicy(FrontendCorsPolicy, policy =>
             {
-                string[] origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ??
-                                   Array.Empty<string>();
+                var origins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ??
+                              Array.Empty<string>();
                 if (origins.Length > 0)
                 {
                     policy.WithOrigins(origins)
@@ -63,16 +63,16 @@ internal static class DependencyInjection
         });
         builder.Services.AddRateLimiter(options =>
         {
-            int accountPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Account:PermitLimit") ?? 10;
-            int accountWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Account:WindowSeconds") ?? 60;
-            int expensivePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:PermitLimit") ?? 20;
-            int expensiveWindowSeconds =
+            var accountPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Account:PermitLimit") ?? 10;
+            var accountWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Account:WindowSeconds") ?? 60;
+            var expensivePermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Expensive:PermitLimit") ?? 20;
+            var expensiveWindowSeconds =
                 builder.Configuration.GetValue<int?>("RateLimiting:Expensive:WindowSeconds") ?? 60;
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
-                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out TimeSpan retryAfter))
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
                 {
                     context.HttpContext.Response.Headers.RetryAfter =
                         Math.Ceiling(retryAfter.TotalSeconds).ToString("0");
@@ -133,7 +133,7 @@ internal static class DependencyInjection
             });
             c.CustomSchemaIds(type =>
             {
-                string name = type.Name;
+                var name = type.Name;
                 if (name.EndsWith("Command"))
                 {
                     return name.Substring(0, name.Length - "Command".Length);

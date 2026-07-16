@@ -19,7 +19,7 @@ public class AccountFeatureTests
         var service = new FakeIdentityService { RefreshResult = expected };
         var handler = new RefreshTokenHandler(service);
 
-        TokenResponse result = await handler.Handle(new RefreshTokenCommand("refresh-token"), CancellationToken.None);
+        var result = await handler.Handle(new RefreshTokenCommand("refresh-token"), CancellationToken.None);
 
         Assert.Same(expected, result);
         Assert.Equal("refresh-token", service.LastRefreshToken);

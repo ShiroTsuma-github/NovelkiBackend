@@ -23,8 +23,8 @@ public class BookFeatureTests
     [Fact]
     public async Task CreateBook_ShouldStorePrimaryAndAlternativeTitles()
     {
-        Fixture fixture = CreateFixture();
-        CreateBookCommand command = ValidCreateCommand(new[] { new BookTitleInput("Everyone Else is a Returnee") });
+        var fixture = CreateFixture();
+        var command = ValidCreateCommand(new[] { new BookTitleInput("Everyone Else is a Returnee") });
 
         await fixture.Handler.Handle(command, CancellationToken.None);
 
@@ -42,8 +42,8 @@ public class BookFeatureTests
     [Fact]
     public async Task CreateBook_ShouldCreateAuthorFromName()
     {
-        Fixture fixture = CreateFixture();
-        CreateBookCommand command = ValidCreateCommand(authorName: "Toika");
+        var fixture = CreateFixture();
+        var command = ValidCreateCommand(authorName: "Toika");
 
         await fixture.Handler.Handle(command, CancellationToken.None);
 
@@ -55,8 +55,8 @@ public class BookFeatureTests
     [Fact]
     public async Task CreateBook_ShouldStoreLinksTagsAndInitialProgressHistory()
     {
-        Fixture fixture = CreateFixture();
-        CreateBookCommand command = ValidCreateCommand(
+        var fixture = CreateFixture();
+        var command = ValidCreateCommand(
             tags: new[] { "favorite", "cultivation" },
             links: new[] { new BookLinkInput("https://novelupdates.com/example", "NU", "NovelUpdates", true, true) },
             currentChapterNumber: 348,
@@ -65,7 +65,7 @@ public class BookFeatureTests
 
         await fixture.Handler.Handle(command, CancellationToken.None);
 
-        Book book = fixture.BookRepository.LastBook!;
+        var book = fixture.BookRepository.LastBook!;
         Assert.Equal(2, book.BookTags.Count);
         Assert.Single(book.Links);
         Assert.Single(book.ProgressHistory);
@@ -77,7 +77,7 @@ public class BookFeatureTests
     [Fact]
     public async Task CreateBook_ShouldThrowWhenTitleAlreadyExists()
     {
-        Fixture fixture = CreateFixture();
+        var fixture = CreateFixture();
         fixture.BookRepository.Seed(new Book
         {
             Id = Guid.NewGuid(),
@@ -87,7 +87,7 @@ public class BookFeatureTests
             ContentTypeId = ContentTypeId,
             StatusId = StatusId
         });
-        CreateBookCommand command = ValidCreateCommand();
+        var command = ValidCreateCommand();
 
         await Assert.ThrowsAsync<EntityAlreadyExistsException<Book, Guid>>(() =>
             fixture.Handler.Handle(command, CancellationToken.None));
@@ -96,7 +96,7 @@ public class BookFeatureTests
     [Fact]
     public async Task UpdateBook_ShouldReplaceEditableDetailsAndAppendProgressHistory()
     {
-        Fixture fixture = CreateFixture();
+        var fixture = CreateFixture();
         var book = new Book
         {
             Id = Guid.NewGuid(),
@@ -156,7 +156,7 @@ public class BookFeatureTests
     [Fact]
     public async Task UpdateBook_ShouldAllowAdminScopeToUpdateBookOwnedByAnotherUser()
     {
-        Fixture fixture = CreateFixture();
+        var fixture = CreateFixture();
         var otherOwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb");
         var book = new Book
         {
@@ -208,7 +208,7 @@ public class BookFeatureTests
     [Fact]
     public async Task UpdateBook_ShouldRejectNonAdminScopeForBookOwnedByAnotherUser()
     {
-        Fixture fixture = CreateFixture();
+        var fixture = CreateFixture();
         var book = new Book
         {
             Id = Guid.NewGuid(),
@@ -255,7 +255,7 @@ public class BookFeatureTests
     [Fact]
     public async Task UpdateProgress_ShouldRejectChapterGreaterThanTotal()
     {
-        Fixture fixture = CreateFixture();
+        var fixture = CreateFixture();
         var book = new Book
         {
             Id = Guid.NewGuid(),
@@ -277,13 +277,13 @@ public class BookFeatureTests
     [Fact]
     public void CreateBookValidator_ShouldRejectInvalidFrontendInput()
     {
-        CreateBookCommand command = ValidCreateCommand(
+        var command = ValidCreateCommand(
             links: new[] { new BookLinkInput("not-a-url") },
             currentChapterNumber: 11);
         command = command with { TotalChapters = 10, Rating = 11, Priority = 0 };
         var validator = new CreateBookCommandValidator();
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterNumber");
@@ -296,9 +296,9 @@ public class BookFeatureTests
     public void CreateBookValidator_ShouldRejectZeroTotalChapters()
     {
         var validator = new CreateBookCommandValidator();
-        CreateBookCommand command = ValidCreateCommand() with { TotalChapters = 0 };
+        var command = ValidCreateCommand() with { TotalChapters = 0 };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors,
@@ -309,9 +309,9 @@ public class BookFeatureTests
     public void CreateBookValidator_ShouldRejectWhitespaceOnlyPrimaryTitle()
     {
         var validator = new CreateBookCommandValidator();
-        CreateBookCommand command = ValidCreateCommand() with { PrimaryTitle = "   " };
+        var command = ValidCreateCommand() with { PrimaryTitle = "   " };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title is required.");
@@ -341,7 +341,7 @@ public class BookFeatureTests
             null,
             null);
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "PrimaryTitle" && e.ErrorMessage == "Title is required.");
@@ -351,7 +351,7 @@ public class BookFeatureTests
     public void CreateBookValidator_ShouldRejectOverlongScalarFields()
     {
         var validator = new CreateBookCommandValidator();
-        CreateBookCommand command = ValidCreateCommand(authorName: new string('a', 301)) with
+        var command = ValidCreateCommand(authorName: new string('a', 301)) with
         {
             PrimaryTitle = new string('t', 501),
             CurrentChapterLabel = new string('c', 101),
@@ -360,7 +360,7 @@ public class BookFeatureTests
             RawImportedLine = new string('r', 4001)
         };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors,
@@ -376,7 +376,7 @@ public class BookFeatureTests
     public void CreateBookValidator_ShouldRejectInvalidAlternativeTitlesTagsAndLinks()
     {
         var validator = new CreateBookCommandValidator();
-        CreateBookCommand command = ValidCreateCommand(
+        var command = ValidCreateCommand(
             [
                 new BookTitleInput(" ", "pl", "Manual"),
                 new BookTitleInput(new string('t', 501), new string('l', 11), new string('s', 51))
@@ -389,7 +389,7 @@ public class BookFeatureTests
                 new BookLinkInput(new string('h', 2001), "label", new string('s', 51))
             ]);
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "AlternativeTitles[0].Title");
@@ -412,7 +412,7 @@ public class BookFeatureTests
         var validator = new UpdateBookProgressCommandValidator();
         var command = new UpdateBookProgressCommand(Guid.NewGuid(), -1, "-1", null);
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == "CurrentChapterNumber");
@@ -428,7 +428,7 @@ public class BookFeatureTests
             new string('x', 101),
             new string('x', 1001));
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors,
@@ -441,7 +441,7 @@ public class BookFeatureTests
     [Fact]
     public async Task UpdateProgress_ShouldIgnoreLegacyZeroTotalChapters()
     {
-        Fixture fixture = CreateFixture();
+        var fixture = CreateFixture();
         var book = new Book
         {
             Id = Guid.NewGuid(),
@@ -489,7 +489,7 @@ public class BookFeatureTests
         };
         var handler = new GetBookSummaryHandler(summaryQueryService, new FakeUser());
 
-        BookSummaryDto result = await handler.Handle(new GetBookSummaryQuery("author:Toika"), CancellationToken.None);
+        var result = await handler.Handle(new GetBookSummaryQuery("author:Toika"), CancellationToken.None);
 
         Assert.Equal(4, result.TotalBooks);
         Assert.Equal(3, result.RatedBooks);
@@ -617,12 +617,12 @@ public class BookFeatureTests
         public Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId,
             CancellationToken cancellationToken)
         {
-            string normalized = MappingExtensions.NormalizeName(name);
-            bool match = LastBook != null &&
-                         LastBook.OwnerId == ownerId &&
-                         LastBook.ContentTypeId == contentTypeId &&
-                         (LastBook.NormalizedPrimaryTitle == normalized ||
-                          LastBook.Titles.Any(t => t.NormalizedTitle == normalized));
+            var normalized = MappingExtensions.NormalizeName(name);
+            var match = LastBook != null &&
+                        LastBook.OwnerId == ownerId &&
+                        LastBook.ContentTypeId == contentTypeId &&
+                        (LastBook.NormalizedPrimaryTitle == normalized ||
+                         LastBook.Titles.Any(t => t.NormalizedTitle == normalized));
             return Task.FromResult(match ? LastBook : null);
         }
 
@@ -646,27 +646,27 @@ public class BookFeatureTests
             }
 
             LastBook.Titles.Clear();
-            foreach (BookTitle title in titles)
+            foreach (var title in titles)
             {
                 title.BookId = bookId;
                 LastBook.Titles.Add(title);
             }
 
             LastBook.Links.Clear();
-            foreach (BookLink link in links)
+            foreach (var link in links)
             {
                 link.BookId = bookId;
                 LastBook.Links.Add(link);
             }
 
             LastBook.BookGenres.Clear();
-            foreach (Guid genreId in genreIds.Distinct())
+            foreach (var genreId in genreIds.Distinct())
             {
                 LastBook.BookGenres.Add(new BookGenre { BookId = bookId, GenreId = genreId });
             }
 
             LastBook.BookTags.Clear();
-            foreach (Guid tagId in tagIds.Distinct())
+            foreach (var tagId in tagIds.Distinct())
             {
                 LastBook.BookTags.Add(new BookTag { BookId = bookId, TagId = tagId });
             }

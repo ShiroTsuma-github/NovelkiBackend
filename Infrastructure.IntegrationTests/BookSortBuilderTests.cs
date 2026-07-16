@@ -19,7 +19,7 @@ public class BookSortBuilderTests
     public void ShouldSortDateOnClient_ShouldOnlyUseClientSortForSqliteDateFields(string? sortBy, bool expected)
     {
         using var database = new SqliteTestDatabase();
-        using ApplicationDbContext context = database.CreateContext();
+        using var context = database.CreateContext();
         var sortBuilder = new BookSortBuilder(context);
 
         Assert.Equal(expected, sortBuilder.ShouldSortDateOnClient(sortBy));
@@ -29,24 +29,24 @@ public class BookSortBuilderTests
     public async Task ApplySortingAsync_ShouldSortByAuthorAndTitle()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Author betaAuthor = TestData.Author("Beta Author");
-        Author alphaAuthor = TestData.Author("Alpha Author");
+        await using var context = database.CreateContext();
+        var betaAuthor = TestData.Author("Beta Author");
+        var alphaAuthor = TestData.Author("Alpha Author");
         context.Authors.AddRange(betaAuthor, alphaAuthor);
-        Book noAuthor = TestData.Book(database.UserId, "No Author");
-        Book alpha = TestData.Book(database.UserId, "Alpha Book", alphaAuthor);
-        Book beta = TestData.Book(database.UserId, "Beta Book", betaAuthor);
+        var noAuthor = TestData.Book(database.UserId, "No Author");
+        var alpha = TestData.Book(database.UserId, "Alpha Book", alphaAuthor);
+        var beta = TestData.Book(database.UserId, "Beta Book", betaAuthor);
         context.Books.AddRange(beta, noAuthor, alpha);
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
         var sortBuilder = new BookSortBuilder(context);
 
-        List<Guid> ascending =
+        var ascending =
             await (await sortBuilder.ApplySortingAsync(context.Books.AsNoTracking(), "author", "asc",
                     CancellationToken.None))
                 .Select(book => book.Id)
                 .ToListAsync();
-        List<Guid> descending =
+        var descending =
             await (await sortBuilder.ApplySortingAsync(context.Books.AsNoTracking(), "author", "desc",
                     CancellationToken.None))
                 .Select(book => book.Id)
@@ -60,10 +60,10 @@ public class BookSortBuilderTests
     public async Task ToSortedPageAsync_ShouldSortDateFieldsOnClientAndApplyPaging()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book first = await TestData.AddBookAsync(context, database.UserId, "First");
-        Book second = await TestData.AddBookAsync(context, database.UserId, "Second");
-        Book third = await TestData.AddBookAsync(context, database.UserId, "Third");
+        await using var context = database.CreateContext();
+        var first = await TestData.AddBookAsync(context, database.UserId, "First");
+        var second = await TestData.AddBookAsync(context, database.UserId, "Second");
+        var third = await TestData.AddBookAsync(context, database.UserId, "Third");
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE Books SET Created = {DateTimeOffset.Parse("2026-01-01T00:00:00+00:00")} WHERE Id = {first.Id}");
         await context.Database.ExecuteSqlInterpolatedAsync(
@@ -84,13 +84,13 @@ public class BookSortBuilderTests
     public async Task GetNextCycleSortDirectionAsync_ShouldReturnNullWhenNoCycleValuesExist()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         var sortBuilder = new BookSortBuilder(context);
 
-        string? nextType =
+        var nextType =
             await sortBuilder.GetNextCycleSortDirectionAsync(context.Books.AsNoTracking(), "type", null,
                 CancellationToken.None);
-        string? nextTitle = await sortBuilder.GetNextCycleSortDirectionAsync(context.Books.AsNoTracking(), "title",
+        var nextTitle = await sortBuilder.GetNextCycleSortDirectionAsync(context.Books.AsNoTracking(), "title",
             null, CancellationToken.None);
 
         Assert.Null(nextType);
@@ -101,9 +101,9 @@ public class BookSortBuilderTests
     public async Task ToSortedPageAsync_ShouldFallbackToLastModifiedForUnknownSort()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book older = await TestData.AddBookAsync(context, database.UserId, "Older");
-        Book newer = await TestData.AddBookAsync(context, database.UserId, "Newer");
+        await using var context = database.CreateContext();
+        var older = await TestData.AddBookAsync(context, database.UserId, "Older");
+        var newer = await TestData.AddBookAsync(context, database.UserId, "Newer");
         await context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE Books SET LastModified = {DateTimeOffset.Parse("2026-01-01T00:00:00+00:00")} WHERE Id = {older.Id}");
         await context.Database.ExecuteSqlInterpolatedAsync(
@@ -123,18 +123,18 @@ public class BookSortBuilderTests
     public async Task ApplySortingAsync_ShouldKeepNullableNumericFieldsLastInBothDirections()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book low = await TestData.AddBookAsync(context, database.UserId, "Low");
+        await using var context = database.CreateContext();
+        var low = await TestData.AddBookAsync(context, database.UserId, "Low");
         low.Rating = 3;
         low.Priority = 1;
         low.CurrentChapterNumber = 10;
         low.TotalChapters = 50;
-        Book high = await TestData.AddBookAsync(context, database.UserId, "High");
+        var high = await TestData.AddBookAsync(context, database.UserId, "High");
         high.Rating = 8;
         high.Priority = 4;
         high.CurrentChapterNumber = 40;
         high.TotalChapters = 200;
-        Book unknown = await TestData.AddBookAsync(context, database.UserId, "Unknown");
+        var unknown = await TestData.AddBookAsync(context, database.UserId, "Unknown");
         unknown.Rating = null;
         unknown.Priority = null;
         unknown.CurrentChapterNumber = null;

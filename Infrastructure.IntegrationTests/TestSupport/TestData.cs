@@ -49,7 +49,7 @@ public static class TestData
     public static async Task<Book> AddBookAsync(ApplicationDbContext context, Guid ownerId, string title,
         Author? author = null)
     {
-        Book book = Book(ownerId, title, author);
+        var book = Book(ownerId, title, author);
         context.Books.Add(book);
         await context.SaveChangesAsync();
         return book;
@@ -57,14 +57,14 @@ public static class TestData
 
     public static async Task<Book> AddBookWithRelationsAsync(ApplicationDbContext context, Guid ownerId)
     {
-        Author author = Author("Toika");
-        Genre genre = Genre("Fantasy");
-        Tag tag = Tag(ownerId, "favorite");
+        var author = Author("Toika");
+        var genre = Genre("Fantasy");
+        var tag = Tag(ownerId, "favorite");
         context.Authors.Add(author);
         context.Genres.Add(genre);
         context.Tags.Add(tag);
 
-        Book book = Book(ownerId, "Everyone Else is a Returnee", author);
+        var book = Book(ownerId, "Everyone Else is a Returnee", author);
         book.Titles.Add(new BookTitle
         {
             Title = "Na Bbaego Da Gwihwanja",

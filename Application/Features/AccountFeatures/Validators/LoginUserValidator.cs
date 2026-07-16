@@ -33,8 +33,8 @@ public class LoginUserCommandValidator : AbstractValidator<LoginUserCommand>
 
     private bool OnlyOneProvided(LoginUserCommand command)
     {
-        bool usernameProvided = !string.IsNullOrWhiteSpace(command.Username);
-        bool emailProvided = !string.IsNullOrWhiteSpace(command.Email);
+        var usernameProvided = !string.IsNullOrWhiteSpace(command.Username);
+        var emailProvided = !string.IsNullOrWhiteSpace(command.Email);
         return usernameProvided ^ emailProvided;
     }
 }

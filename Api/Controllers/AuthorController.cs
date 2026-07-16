@@ -18,7 +18,7 @@ public class AuthorController : ControllerBase
     [Authorize]
     public async Task<IActionResult> Search([FromQuery] SearchAuthorsQuery query)
     {
-        IReadOnlyCollection<AuthorDto> authors = await _mediator.Send(query);
+        var authors = await _mediator.Send(query);
         return Ok(authors);
     }
 }

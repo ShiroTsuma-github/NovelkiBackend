@@ -16,7 +16,7 @@ public class CreateStatusCommandHandler : IRequestHandler<CreateStatusCommand, S
 
     public async Task<StatusDto> Handle(CreateStatusCommand request, CancellationToken cancellationToken)
     {
-        Status? status = await _statusRepository.GetByNameAsync(request.Name, cancellationToken);
+        var status = await _statusRepository.GetByNameAsync(request.Name, cancellationToken);
         if (status != null)
         {
             throw new EntityAlreadyExistsException<Status, Guid>(request.Name, status.Id);

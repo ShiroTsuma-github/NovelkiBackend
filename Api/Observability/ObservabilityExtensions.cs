@@ -21,7 +21,7 @@ public static class ObservabilityExtensions
                 .Enrich.WithProperty("Application", "NovelkiBackend")
                 .Enrich.WithProperty("ServiceName", GetServiceName(context.Configuration));
 
-            string? endpoint = context.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+            var endpoint = context.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
             if (!string.IsNullOrWhiteSpace(endpoint))
             {
                 logger.WriteTo.OpenTelemetry(options =>
@@ -90,7 +90,7 @@ public static class ObservabilityExtensions
 
     private static void AddOtlpTracingExporter(TracerProviderBuilder tracing, IConfiguration configuration)
     {
-        string? endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+        var endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             return;
@@ -101,7 +101,7 @@ public static class ObservabilityExtensions
 
     private static void AddOtlpMetricsExporter(MeterProviderBuilder metrics, IConfiguration configuration)
     {
-        string? endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
+        var endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"];
         if (string.IsNullOrWhiteSpace(endpoint))
         {
             return;
@@ -112,7 +112,7 @@ public static class ObservabilityExtensions
 
     private static string GetDbSystem(IDbCommand command)
     {
-        string provider = command.GetType().Namespace ?? string.Empty;
+        var provider = command.GetType().Namespace ?? string.Empty;
         if (provider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
         {
             return "postgresql";

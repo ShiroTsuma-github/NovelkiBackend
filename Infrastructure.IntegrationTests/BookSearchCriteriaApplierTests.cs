@@ -26,9 +26,9 @@ public sealed class BookSearchCriteriaApplierTests
         get
         {
             var data = new TheoryData<BookSearchNumberField, BookSearchOperator>();
-            foreach (BookSearchNumberField numberField in Enum.GetValues<BookSearchNumberField>())
+            foreach (var numberField in Enum.GetValues<BookSearchNumberField>())
             {
-                foreach (BookSearchOperator op in Enum.GetValues<BookSearchOperator>())
+                foreach (var op in Enum.GetValues<BookSearchOperator>())
                 {
                     data.Add(numberField, op);
                 }
@@ -43,11 +43,11 @@ public sealed class BookSearchCriteriaApplierTests
         get
         {
             var data = new TheoryData<BookSearchDateField, BookSearchOperator, bool>();
-            foreach (bool postgres in new[] { false, true })
+            foreach (var postgres in new[] { false, true })
             {
-                foreach (BookSearchDateField dateField in Enum.GetValues<BookSearchDateField>())
+                foreach (var dateField in Enum.GetValues<BookSearchDateField>())
                 {
-                    foreach (BookSearchOperator op in Enum.GetValues<BookSearchOperator>())
+                    foreach (var op in Enum.GetValues<BookSearchOperator>())
                     {
                         data.Add(dateField, op, postgres);
                     }
@@ -72,10 +72,10 @@ public sealed class BookSearchCriteriaApplierTests
     [InlineData(true)]
     public void GeneralTextSearch_ShouldGenerateQueryForBothProviders(bool postgres)
     {
-        using ApplicationDbContext context = CreateQueryContext(postgres);
-        BookSearchCriteria criteria = Criteria(["  needle*with%_\\  "]);
+        using var context = CreateQueryContext(postgres);
+        var criteria = Criteria(["  needle*with%_\\  "]);
 
-        string sql = Apply(context, criteria).ToQueryString();
+        var sql = Apply(context, criteria).ToQueryString();
 
         Assert.Contains(postgres ? "ILIKE" : "LIKE", sql, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(postgres ? "BookTitles" : "NormalizedTitle", sql, StringComparison.Ordinal);
@@ -87,9 +87,9 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task GeneralTextSearch_ShouldMatchEverySupportedTextSource()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book primaryTitle = TestData.Book(database.UserId, "Primary Needle");
-        Book alternateTitle = TestData.Book(database.UserId, "Alternate Book");
+        await using var context = database.CreateContext();
+        var primaryTitle = TestData.Book(database.UserId, "Primary Needle");
+        var alternateTitle = TestData.Book(database.UserId, "Alternate Book");
         alternateTitle.Titles.Add(new BookTitle
         {
             Title = "Alternate Needle",
@@ -97,8 +97,8 @@ public sealed class BookSearchCriteriaApplierTests
             IsPrimary = false,
             Source = "Test"
         });
-        Book primaryAuthor = TestData.Book(database.UserId, "Primary Author Book", TestData.Author("Author Needle"));
-        Author aliasAuthor = TestData.Author("Alias Author");
+        var primaryAuthor = TestData.Book(database.UserId, "Primary Author Book", TestData.Author("Author Needle"));
+        var aliasAuthor = TestData.Author("Alias Author");
         aliasAuthor.Names.Add(new AuthorName
         {
             Name = "Alias Needle",
@@ -106,8 +106,8 @@ public sealed class BookSearchCriteriaApplierTests
             IsPrimary = false,
             Source = "Test"
         });
-        Book authorAlias = TestData.Book(database.UserId, "Alias Author Book", aliasAuthor);
-        Book noMatch = TestData.Book(database.UserId, "Unrelated Book", TestData.Author("Unrelated Author"));
+        var authorAlias = TestData.Book(database.UserId, "Alias Author Book", aliasAuthor);
+        var noMatch = TestData.Book(database.UserId, "Unrelated Book", TestData.Author("Unrelated Author"));
         context.Books.AddRange(primaryTitle, alternateTitle, primaryAuthor, authorAlias, noMatch);
         await context.SaveChangesAsync();
 
@@ -118,7 +118,7 @@ public sealed class BookSearchCriteriaApplierTests
 
         async Task AssertMatchesOnlyAsync(string term, Guid expectedId)
         {
-            Guid[] ids = await Apply(context, Criteria([term]))
+            var ids = await Apply(context, Criteria([term]))
                 .Select(book => book.Id)
                 .ToArrayAsync();
             Assert.Equal([expectedId], ids);
@@ -129,10 +129,10 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task GeneralTextSearch_ShouldTreatPercentAndUnderscoreAsLiteralsAndAsteriskAsWildcard()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book literal = TestData.Book(database.UserId, @"Literal 100%_Path\End");
-        Book wildcard = TestData.Book(database.UserId, "Wildcard Prefix Middle Suffix");
-        Book percentOnly = TestData.Book(database.UserId, @"Literal 100AXPath\End");
+        await using var context = database.CreateContext();
+        var literal = TestData.Book(database.UserId, @"Literal 100%_Path\End");
+        var wildcard = TestData.Book(database.UserId, "Wildcard Prefix Middle Suffix");
+        var percentOnly = TestData.Book(database.UserId, @"Literal 100AXPath\End");
         context.Books.AddRange(literal, wildcard, percentOnly);
         await context.SaveChangesAsync();
 
@@ -144,14 +144,14 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task MultipleGeneralTerms_ShouldUseAnd()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book both = TestData.Book(database.UserId, "Alpha Beta");
-        Book alphaOnly = TestData.Book(database.UserId, "Alpha");
-        Book betaOnly = TestData.Book(database.UserId, "Beta");
+        await using var context = database.CreateContext();
+        var both = TestData.Book(database.UserId, "Alpha Beta");
+        var alphaOnly = TestData.Book(database.UserId, "Alpha");
+        var betaOnly = TestData.Book(database.UserId, "Beta");
         context.Books.AddRange(both, alphaOnly, betaOnly);
         await context.SaveChangesAsync();
 
-        Guid[] ids = await Apply(context, Criteria(["Alpha", "Beta"]))
+        var ids = await Apply(context, Criteria(["Alpha", "Beta"]))
             .Select(book => book.Id)
             .ToArrayAsync();
 
@@ -162,9 +162,9 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task TitleFilter_ShouldMatchPrimaryAndAlternativeTitlesAndRejectOtherFields()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book primary = TestData.Book(database.UserId, "Title Needle Primary");
-        Book alternative = TestData.Book(database.UserId, "Alternative Title Book");
+        await using var context = database.CreateContext();
+        var primary = TestData.Book(database.UserId, "Title Needle Primary");
+        var alternative = TestData.Book(database.UserId, "Alternative Title Book");
         alternative.Titles.Add(new BookTitle
         {
             Title = "Title Needle Alternative",
@@ -172,11 +172,11 @@ public sealed class BookSearchCriteriaApplierTests
             IsPrimary = false,
             Source = "Test"
         });
-        Book authorOnly = TestData.Book(database.UserId, "Author Only Book", TestData.Author("Title Needle Author"));
+        var authorOnly = TestData.Book(database.UserId, "Author Only Book", TestData.Author("Title Needle Author"));
         context.Books.AddRange(primary, alternative, authorOnly);
         await context.SaveChangesAsync();
 
-        Guid[] ids = await SearchFieldAsync(context, BookSearchField.Title, "Title Needle*");
+        var ids = await SearchFieldAsync(context, BookSearchField.Title, "Title Needle*");
 
         Assert.Equal(new[] { alternative.Id, primary.Id }.Order(), ids.Order());
     }
@@ -185,9 +185,9 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task AuthorFilter_ShouldMatchPrimaryAndAliasNamesAndRejectTitles()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book primary = TestData.Book(database.UserId, "Primary Author Book", TestData.Author("Author Needle Primary"));
-        Author aliasAuthor = TestData.Author("Unrelated Primary Author");
+        await using var context = database.CreateContext();
+        var primary = TestData.Book(database.UserId, "Primary Author Book", TestData.Author("Author Needle Primary"));
+        var aliasAuthor = TestData.Author("Unrelated Primary Author");
         aliasAuthor.Names.Add(new AuthorName
         {
             Name = "Author Needle Alias",
@@ -195,12 +195,12 @@ public sealed class BookSearchCriteriaApplierTests
             IsPrimary = false,
             Source = "Test"
         });
-        Book alias = TestData.Book(database.UserId, "Alias Author Book", aliasAuthor);
-        Book titleOnly = TestData.Book(database.UserId, "Author Needle Title");
+        var alias = TestData.Book(database.UserId, "Alias Author Book", aliasAuthor);
+        var titleOnly = TestData.Book(database.UserId, "Author Needle Title");
         context.Books.AddRange(primary, alias, titleOnly);
         await context.SaveChangesAsync();
 
-        Guid[] ids = await SearchFieldAsync(context, BookSearchField.Author, "Author Needle*");
+        var ids = await SearchFieldAsync(context, BookSearchField.Author, "Author Needle*");
 
         Assert.Equal(new[] { alias.Id, primary.Id }.Order(), ids.Order());
     }
@@ -209,13 +209,13 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task TagAndGenreFilters_ShouldNotBeInterchanged()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book tagged = TestData.Book(database.UserId, "Tagged");
+        await using var context = database.CreateContext();
+        var tagged = TestData.Book(database.UserId, "Tagged");
         tagged.BookTags.Add(new Domain.Associations.BookTag
         {
             Book = tagged, Tag = TestData.Tag(database.UserId, "Relation Needle")
         });
-        Book genreBook = TestData.Book(database.UserId, "Genre");
+        var genreBook = TestData.Book(database.UserId, "Genre");
         genreBook.BookGenres.Add(new Domain.Associations.BookGenre
         {
             Book = genreBook, Genre = TestData.Genre("Relation Needle")
@@ -231,12 +231,12 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task StatusAndTypeFilters_ShouldNotBeInterchanged()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book statusMatch = TestData.Book(database.UserId, "Status Match");
+        await using var context = database.CreateContext();
+        var statusMatch = TestData.Book(database.UserId, "Status Match");
         statusMatch.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
-        Book typeMatch = TestData.Book(database.UserId, "Type Match");
+        var typeMatch = TestData.Book(database.UserId, "Type Match");
         typeMatch.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
-        Book defaultBook = TestData.Book(database.UserId, "Default");
+        var defaultBook = TestData.Book(database.UserId, "Default");
         context.Books.AddRange(statusMatch, typeMatch, defaultBook);
         await context.SaveChangesAsync();
 
@@ -248,14 +248,14 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task FieldFilterMultipleValues_ShouldUseOrWithinOneFilter()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book first = TestData.Book(database.UserId, "First Choice");
-        Book second = TestData.Book(database.UserId, "Second Choice");
-        Book rejected = TestData.Book(database.UserId, "Rejected");
+        await using var context = database.CreateContext();
+        var first = TestData.Book(database.UserId, "First Choice");
+        var second = TestData.Book(database.UserId, "Second Choice");
+        var rejected = TestData.Book(database.UserId, "Rejected");
         context.Books.AddRange(first, second, rejected);
         await context.SaveChangesAsync();
 
-        Guid[] ids = await Apply(
+        var ids = await Apply(
                 context,
                 Criteria(fields:
                 [
@@ -271,14 +271,14 @@ public sealed class BookSearchCriteriaApplierTests
     [MemberData(nameof(FieldCases))]
     public void FieldFilters_ShouldGeneratePostgresQueryForEveryField(BookSearchField field)
     {
-        using ApplicationDbContext context = CreateQueryContext(true);
-        BookSearchCriteria criteria = Criteria(fields: [new BookSearchFieldFilter(field, ["first", "second*"])]);
+        using var context = CreateQueryContext(true);
+        var criteria = Criteria(fields: [new BookSearchFieldFilter(field, ["first", "second*"])]);
 
-        string sql = Apply(context, criteria).ToQueryString();
+        var sql = Apply(context, criteria).ToQueryString();
 
         Assert.Contains("ILIKE", sql, StringComparison.Ordinal);
         Assert.Contains(" OR ", sql, StringComparison.OrdinalIgnoreCase);
-        foreach (string fragment in ExpectedPostgresFieldFragments(field))
+        foreach (var fragment in ExpectedPostgresFieldFragments(field))
         {
             Assert.Contains(fragment, sql, StringComparison.Ordinal);
         }
@@ -289,14 +289,14 @@ public sealed class BookSearchCriteriaApplierTests
     [InlineData(true)]
     public void EmptyAndUnknownFieldFilters_ShouldLeaveQueryUnchanged(bool postgres)
     {
-        using ApplicationDbContext context = CreateQueryContext(postgres);
-        BookSearchCriteria criteria = Criteria(fields:
+        using var context = CreateQueryContext(postgres);
+        var criteria = Criteria(fields:
         [
             new BookSearchFieldFilter(BookSearchField.Title, Array.Empty<string>()),
             new BookSearchFieldFilter((BookSearchField)int.MaxValue, ["ignored"])
         ]);
 
-        string sql = Apply(context, criteria).ToQueryString();
+        var sql = Apply(context, criteria).ToQueryString();
 
         Assert.DoesNotContain("WHERE", sql, StringComparison.OrdinalIgnoreCase);
     }
@@ -308,19 +308,19 @@ public sealed class BookSearchCriteriaApplierTests
         BookSearchOperator op)
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book low = TestData.Book(database.UserId, "Low");
-        Book equal = TestData.Book(database.UserId, "Equal");
-        Book high = TestData.Book(database.UserId, "High");
-        Book missing = TestData.Book(database.UserId, "Missing");
+        await using var context = database.CreateContext();
+        var low = TestData.Book(database.UserId, "Low");
+        var equal = TestData.Book(database.UserId, "Equal");
+        var high = TestData.Book(database.UserId, "High");
+        var missing = TestData.Book(database.UserId, "Missing");
         SetNumber(low, field, 4);
         SetNumber(equal, field, 5);
         SetNumber(high, field, 6);
         context.Books.AddRange(low, equal, high, missing);
         await context.SaveChangesAsync();
-        BookSearchCriteria criteria = Criteria(numbers: [new BookSearchNumberFilter(field, op, 5)]);
+        var criteria = Criteria(numbers: [new BookSearchNumberFilter(field, op, 5)]);
 
-        string[] titles = await Apply(context, criteria)
+        var titles = await Apply(context, criteria)
             .OrderBy(book => book.PrimaryTitle)
             .Select(book => book.PrimaryTitle)
             .ToArrayAsync();
@@ -334,10 +334,10 @@ public sealed class BookSearchCriteriaApplierTests
         BookSearchNumberField field,
         BookSearchOperator op)
     {
-        using ApplicationDbContext context = CreateQueryContext(true);
-        BookSearchCriteria criteria = Criteria(numbers: [new BookSearchNumberFilter(field, op, 5)]);
+        using var context = CreateQueryContext(true);
+        var criteria = Criteria(numbers: [new BookSearchNumberFilter(field, op, 5)]);
 
-        string sql = Apply(context, criteria).ToQueryString();
+        var sql = Apply(context, criteria).ToQueryString();
 
         Assert.Contains(ExpectedComparisonOperator(op), sql, StringComparison.Ordinal);
         Assert.Contains(ExpectedNumberColumn(field), sql, StringComparison.Ordinal);
@@ -347,8 +347,8 @@ public sealed class BookSearchCriteriaApplierTests
     public void UnknownNumberFilter_ShouldLeaveQueryUnchanged()
     {
         using var database = new SqliteTestDatabase();
-        using ApplicationDbContext context = database.CreateContext();
-        BookSearchCriteria criteria = Criteria(numbers:
+        using var context = database.CreateContext();
+        var criteria = Criteria(numbers:
         [
             new BookSearchNumberFilter((BookSearchNumberField)int.MaxValue, BookSearchOperator.Equal, 5)
         ]);
@@ -363,13 +363,13 @@ public sealed class BookSearchCriteriaApplierTests
         BookSearchOperator op,
         bool postgres)
     {
-        using ApplicationDbContext context = CreateQueryContext(postgres);
-        BookSearchCriteria criteria = Criteria(dates: [new BookSearchDateFilter(field, op, new DateOnly(2026, 7, 15))]);
+        using var context = CreateQueryContext(postgres);
+        var criteria = Criteria(dates: [new BookSearchDateFilter(field, op, new DateOnly(2026, 7, 15))]);
 
-        string sql = Apply(context, criteria).ToQueryString();
+        var sql = Apply(context, criteria).ToQueryString();
 
         Assert.Contains("WHERE", sql, StringComparison.OrdinalIgnoreCase);
-        string column = field == BookSearchDateField.Created ? "Created" : "LastModified";
+        var column = field == BookSearchDateField.Created ? "Created" : "LastModified";
         Assert.Contains(column, sql, StringComparison.Ordinal);
         AssertDateOperatorShape(sql, op);
     }
@@ -396,8 +396,8 @@ public sealed class BookSearchCriteriaApplierTests
     public void UnknownDateFilter_ShouldLeaveQueryUnchanged()
     {
         using var database = new SqliteTestDatabase();
-        using ApplicationDbContext context = database.CreateContext();
-        BookSearchCriteria criteria = Criteria(dates:
+        using var context = database.CreateContext();
+        var criteria = Criteria(dates:
         [
             new BookSearchDateFilter((BookSearchDateField)int.MaxValue, BookSearchOperator.Equal,
                 new DateOnly(2026, 7, 15))
@@ -410,22 +410,22 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task MissingFilters_ShouldSelectOnlyBooksMissingTheRequestedMetadata()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book complete = AddBookWithMetadata(context, database.UserId, "Complete");
+        await using var context = database.CreateContext();
+        var complete = AddBookWithMetadata(context, database.UserId, "Complete");
         var expected = new Dictionary<BookSearchMissingField, Guid>();
 
-        foreach (BookSearchMissingField field in Enum.GetValues<BookSearchMissingField>())
+        foreach (var field in Enum.GetValues<BookSearchMissingField>())
         {
-            Book book = AddBookWithMetadata(context, database.UserId, $"Missing {field}", field);
+            var book = AddBookWithMetadata(context, database.UserId, $"Missing {field}", field);
             expected[field] = book.Id;
         }
 
         await context.SaveChangesAsync();
         var applier = new BookSearchCriteriaApplier(context);
 
-        foreach ((BookSearchMissingField field, Guid expectedId) in expected)
+        foreach (var (field, expectedId) in expected)
         {
-            Guid[] ids = await applier.Apply(
+            var ids = await applier.Apply(
                     context.Books.AsNoTracking(),
                     Criteria(missing: [new BookSearchMissingFilter(field)]))
                 .Select(book => book.Id)
@@ -440,8 +440,8 @@ public sealed class BookSearchCriteriaApplierTests
     public void UnknownMissingFilter_ShouldLeaveQueryUnchanged()
     {
         using var database = new SqliteTestDatabase();
-        using ApplicationDbContext context = database.CreateContext();
-        BookSearchCriteria criteria = Criteria(missing:
+        using var context = database.CreateContext();
+        var criteria = Criteria(missing:
         [
             new BookSearchMissingFilter((BookSearchMissingField)int.MaxValue)
         ]);
@@ -453,16 +453,16 @@ public sealed class BookSearchCriteriaApplierTests
     public async Task MultipleCriteriaGroups_ShouldBeCombinedWithAnd()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book match = AddBookWithMetadata(context, database.UserId, "Needle Match");
+        await using var context = database.CreateContext();
+        var match = AddBookWithMetadata(context, database.UserId, "Needle Match");
         match.Rating = 8;
-        Book wrongRating = AddBookWithMetadata(context, database.UserId, "Needle Wrong Rating");
+        var wrongRating = AddBookWithMetadata(context, database.UserId, "Needle Wrong Rating");
         wrongRating.Rating = 4;
-        Book wrongTitle = AddBookWithMetadata(context, database.UserId, "Other Match");
+        var wrongTitle = AddBookWithMetadata(context, database.UserId, "Other Match");
         wrongTitle.Rating = 8;
         await context.SaveChangesAsync();
 
-        BookSearchCriteria criteria = Criteria(
+        var criteria = Criteria(
             ["Needle"],
             numbers:
             [
@@ -474,7 +474,7 @@ public sealed class BookSearchCriteriaApplierTests
         wrongTitle.Priority = null;
         await context.SaveChangesAsync();
 
-        Guid[] ids = await Apply(context, criteria).Select(book => book.Id).ToArrayAsync();
+        var ids = await Apply(context, criteria).Select(book => book.Id).ToArrayAsync();
 
         Assert.Equal([match.Id], ids);
     }
@@ -610,10 +610,10 @@ public sealed class BookSearchCriteriaApplierTests
         IReadOnlyCollection<string> expectedTitles)
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book low = TestData.Book(database.UserId, "Low");
-        Book equal = TestData.Book(database.UserId, "Equal");
-        Book high = TestData.Book(database.UserId, "High");
+        await using var context = database.CreateContext();
+        var low = TestData.Book(database.UserId, "Low");
+        var equal = TestData.Book(database.UserId, "Equal");
+        var high = TestData.Book(database.UserId, "High");
         context.Books.AddRange(low, equal, high);
         await context.SaveChangesAsync();
 
@@ -626,7 +626,7 @@ public sealed class BookSearchCriteriaApplierTests
             unrelatedDate);
         context.ChangeTracker.Clear();
 
-        string[] titles = await Apply(
+        var titles = await Apply(
                 context,
                 Criteria(dates:
                 [
@@ -645,8 +645,8 @@ public sealed class BookSearchCriteriaApplierTests
         DateTimeOffset targetDate,
         DateTimeOffset unrelatedDate)
     {
-        DateTimeOffset created = field == BookSearchDateField.Created ? targetDate : unrelatedDate;
-        DateTimeOffset lastModified = field == BookSearchDateField.LastModified ? targetDate : unrelatedDate;
+        var created = field == BookSearchDateField.Created ? targetDate : unrelatedDate;
+        var lastModified = field == BookSearchDateField.LastModified ? targetDate : unrelatedDate;
         return context.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE Books SET Created = {created}, LastModified = {lastModified} WHERE Id = {bookId}");
     }
@@ -682,8 +682,8 @@ public sealed class BookSearchCriteriaApplierTests
 
     private static int CountOccurrences(string value, string search)
     {
-        int count = 0;
-        int index = 0;
+        var count = 0;
+        var index = 0;
         while ((index = value.IndexOf(search, index, StringComparison.OrdinalIgnoreCase)) >= 0)
         {
             count++;
@@ -699,8 +699,8 @@ public sealed class BookSearchCriteriaApplierTests
         string title,
         BookSearchMissingField? missing = null)
     {
-        Author? author = missing == BookSearchMissingField.Author ? null : TestData.Author($"{title} Author");
-        Book book = TestData.Book(ownerId, title, author);
+        var author = missing == BookSearchMissingField.Author ? null : TestData.Author($"{title} Author");
+        var book = TestData.Book(ownerId, title, author);
         book.Rating = missing == BookSearchMissingField.Rating ? null : 8;
         book.Priority = missing == BookSearchMissingField.Priority ? null : 2;
         book.CurrentChapterNumber = missing == BookSearchMissingField.CurrentChapter ? null : 50;

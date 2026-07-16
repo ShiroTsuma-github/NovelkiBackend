@@ -28,7 +28,7 @@ public class BookCoverRepository : IBookCoverRepository
 
     public async Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken)
     {
-        DateTimeOffset retryBefore = DateTimeOffset.UtcNow.AddMinutes(-15);
+        var retryBefore = DateTimeOffset.UtcNow.AddMinutes(-15);
         return await _context.BookCovers
             .Include(c => c.Book)
             .ThenInclude(b => b.Titles)

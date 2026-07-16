@@ -14,9 +14,9 @@ public class JwtTokenGeneratorTests
     [Fact]
     public void GenerateToken_ShouldReturnNullForUnauthenticatedUser()
     {
-        JwtTokenGenerator generator = CreateGenerator();
+        var generator = CreateGenerator();
 
-        TokenResponse? token = generator.GenerateToken(new FakeUser(false));
+        var token = generator.GenerateToken(new FakeUser(false));
 
         Assert.Null(token);
     }
@@ -24,13 +24,13 @@ public class JwtTokenGeneratorTests
     [Fact]
     public void GenerateToken_ShouldIncludeUserClaimsAndRoles()
     {
-        JwtTokenGenerator generator = CreateGenerator();
+        var generator = CreateGenerator();
 
-        TokenResponse? token = generator.GenerateToken(new FakeUser(true));
+        var token = generator.GenerateToken(new FakeUser(true));
 
         Assert.NotNull(token);
         Assert.Equal(UserId, token.UserId);
-        JwtSecurityToken? jwt = new JwtSecurityTokenHandler().ReadJwtToken(token.AccessToken);
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token.AccessToken);
         Assert.Contains(jwt.Claims,
             claim => claim.Type == ClaimTypes.NameIdentifier && claim.Value == UserId.ToString());
         Assert.Contains(jwt.Claims, claim => claim.Type == ClaimTypes.Name && claim.Value == "reader");

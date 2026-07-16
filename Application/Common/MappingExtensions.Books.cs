@@ -30,7 +30,7 @@ public static partial class MappingExtensions
 
     public static BookTitle ToPrimaryTitle(this string title)
     {
-        string trimmedTitle = title.Trim();
+        var trimmedTitle = title.Trim();
         return new BookTitle
         {
             Title = trimmedTitle, NormalizedTitle = NormalizeName(trimmedTitle), IsPrimary = true, Source = "Manual"
@@ -39,7 +39,7 @@ public static partial class MappingExtensions
 
     public static BookTitle ToBookTitle(this BookTitleInput input)
     {
-        string trimmedTitle = input.Title.Trim();
+        var trimmedTitle = input.Title.Trim();
         return new BookTitle
         {
             Title = trimmedTitle,

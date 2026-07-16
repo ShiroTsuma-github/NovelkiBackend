@@ -35,10 +35,10 @@ public class SecurityBaselineEndpointTests
     public async Task ProtectedBookEndpoint_ShouldReturnUnauthorizedWithoutToken()
     {
         await using var factory = new SecurityApiFactory();
-        using HttpClient client =
+        using var client =
             factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/book");
+        var response = await client.GetAsync("/api/v1/book");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
@@ -47,9 +47,9 @@ public class SecurityBaselineEndpointTests
     public async Task AdminEndpoint_ShouldReturnForbiddenForNonAdminUser()
     {
         await using var factory = new SecurityApiFactory();
-        using HttpClient client = factory.CreateAuthenticatedClient(UserAId);
+        using var client = factory.CreateAuthenticatedClient(UserAId);
 
-        HttpResponseMessage response = await client.GetAsync("/api/v1/admin/books");
+        var response = await client.GetAsync("/api/v1/admin/books");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -58,11 +58,11 @@ public class SecurityBaselineEndpointTests
     public async Task UserBookEndpoints_ShouldNotAllowCrossUserReadOrDelete()
     {
         await using var factory = new SecurityApiFactory();
-        Guid otherUserBookId = await factory.SeedBookAsync(UserBId, "Other User Book");
-        using HttpClient client = factory.CreateAuthenticatedClient(UserAId);
+        var otherUserBookId = await factory.SeedBookAsync(UserBId, "Other User Book");
+        using var client = factory.CreateAuthenticatedClient(UserAId);
 
-        HttpResponseMessage readResponse = await client.GetAsync($"/api/v1/book/{otherUserBookId}");
-        HttpResponseMessage deleteResponse = await client.DeleteAsync($"/api/v1/book/{otherUserBookId}");
+        var readResponse = await client.GetAsync($"/api/v1/book/{otherUserBookId}");
+        var deleteResponse = await client.DeleteAsync($"/api/v1/book/{otherUserBookId}");
 
         Assert.Equal(HttpStatusCode.NotFound, readResponse.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, deleteResponse.StatusCode);
@@ -73,9 +73,9 @@ public class SecurityBaselineEndpointTests
     public async Task DestructiveAdminPurge_ShouldRequireAdminRole()
     {
         await using var factory = new SecurityApiFactory();
-        using HttpClient client = factory.CreateAuthenticatedClient(UserAId);
+        using var client = factory.CreateAuthenticatedClient(UserAId);
 
-        HttpResponseMessage response = await client.DeleteAsync($"/api/v1/admin/books/owner/{UserBId}");
+        var response = await client.DeleteAsync($"/api/v1/admin/books/owner/{UserBId}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -84,11 +84,11 @@ public class SecurityBaselineEndpointTests
     public async Task ApiResponses_ShouldIncludeBaselineSecurityHeaders()
     {
         await using var factory = new SecurityApiFactory();
-        using HttpClient client =
+        using var client =
             factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        HttpResponseMessage response = await client.GetAsync("/health/live");
-        string body = await response.Content.ReadAsStringAsync();
+        var response = await client.GetAsync("/health/live");
+        var body = await response.Content.ReadAsStringAsync();
 
         Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected 200, got {(int)response.StatusCode}: {body}");
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
@@ -103,13 +103,13 @@ public class SecurityBaselineEndpointTests
     public async Task Cors_ShouldNotAllowArbitraryOrigins_WhenNoOriginAllowlistIsConfiguredOutsideDevelopment()
     {
         await using var factory = new SecurityApiFactory();
-        using HttpClient client =
+        using var client =
             factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         using var request = new HttpRequestMessage(HttpMethod.Get, "/health/live");
         request.Headers.Add("Origin", "https://evil.example");
 
-        HttpResponseMessage response = await client.SendAsync(request);
-        string body = await response.Content.ReadAsStringAsync();
+        var response = await client.SendAsync(request);
+        var body = await response.Content.ReadAsStringAsync();
 
         Assert.True(response.StatusCode == HttpStatusCode.OK, $"Expected 200, got {(int)response.StatusCode}: {body}");
         Assert.False(response.Headers.Contains("Access-Control-Allow-Origin"));
@@ -119,11 +119,11 @@ public class SecurityBaselineEndpointTests
     public async Task AccountLogin_ShouldRateLimitRepeatedRequestsByRemoteIp()
     {
         await using var factory = new SecurityApiFactory();
-        using HttpClient client =
+        using var client =
             factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
 
-        HttpResponseMessage firstResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
-        HttpResponseMessage secondResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
+        var firstResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
+        var secondResponse = await client.PostAsJsonAsync("/api/v1/account/login", new { });
 
         Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
@@ -134,11 +134,11 @@ public class SecurityBaselineEndpointTests
     {
         await using var factory = new SecurityApiFactory();
         await factory.EnsureCreatedAsync();
-        using HttpClient client = factory.CreateAuthenticatedClient(UserAId);
+        using var client = factory.CreateAuthenticatedClient(UserAId);
 
-        HttpResponseMessage firstResponse =
+        var firstResponse =
             await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
-        HttpResponseMessage secondResponse =
+        var secondResponse =
             await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
 
         Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
@@ -150,11 +150,11 @@ public class SecurityBaselineEndpointTests
     {
         await using var factory = new SecurityApiFactory();
         await factory.EnsureCreatedAsync();
-        using HttpClient client = factory.CreateAuthenticatedClient(UserAId, "Admin");
+        using var client = factory.CreateAuthenticatedClient(UserAId, "Admin");
 
-        HttpResponseMessage firstResponse =
+        var firstResponse =
             await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
-        HttpResponseMessage secondResponse =
+        var secondResponse =
             await client.PostAsync("/api/v1/book/import/sessions", new MultipartFormDataContent());
 
         Assert.Equal(HttpStatusCode.BadRequest, firstResponse.StatusCode);
@@ -223,7 +223,7 @@ public class SecurityBaselineEndpointTests
 
         public HttpClient CreateAuthenticatedClient(Guid userId, params string[] roles)
         {
-            HttpClient client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+            var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
             client.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.ToString());
@@ -238,9 +238,9 @@ public class SecurityBaselineEndpointTests
         public async Task<Guid> SeedBookAsync(Guid ownerId, string title)
         {
             await EnsureCreatedAsync();
-            await using AsyncServiceScope scope = Services.CreateAsyncScope();
-            ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            Book book = TestData.Book(ownerId, title);
+            await using var scope = Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var book = TestData.Book(ownerId, title);
             context.Books.Add(book);
             await context.SaveChangesAsync();
             return book.Id;
@@ -248,18 +248,18 @@ public class SecurityBaselineEndpointTests
 
         public async Task<bool> BookExistsAsync(Guid bookId)
         {
-            await using AsyncServiceScope scope = Services.CreateAsyncScope();
-            ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await using var scope = Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             return await context.Books.AnyAsync(book => book.Id == bookId);
         }
 
         public async Task EnsureCreatedAsync()
         {
-            await using AsyncServiceScope scope = Services.CreateAsyncScope();
-            ApplicationDbContext context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            await using var scope = Services.CreateAsyncScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             await context.Database.EnsureCreatedAsync();
 
-            foreach (Guid userId in new[] { UserAId, UserBId })
+            foreach (var userId in new[] { UserAId, UserBId })
             {
                 if (!await context.Users.AnyAsync(user => user.Id == userId))
                 {
@@ -312,13 +312,13 @@ public class SecurityBaselineEndpointTests
 
         protected override Task<AuthenticateResult> HandleAuthenticateAsync()
         {
-            if (!Request.Headers.TryGetValue("Authorization", out StringValues authorization) ||
+            if (!Request.Headers.TryGetValue("Authorization", out var authorization) ||
                 !authorization.ToString().StartsWith(AuthenticationScheme, StringComparison.OrdinalIgnoreCase))
             {
                 return Task.FromResult(AuthenticateResult.NoResult());
             }
 
-            if (!Guid.TryParse(Request.Headers[UserIdHeader].FirstOrDefault(), out Guid userId))
+            if (!Guid.TryParse(Request.Headers[UserIdHeader].FirstOrDefault(), out var userId))
             {
                 return Task.FromResult(AuthenticateResult.Fail("Missing test user id."));
             }
@@ -329,7 +329,7 @@ public class SecurityBaselineEndpointTests
                 new(ClaimTypes.Name, $"reader-{userId:N}"),
                 new(ClaimTypes.Email, $"{userId:N}@example.com")
             };
-            IEnumerable<string> roles = Request.Headers[RolesHeader]
+            var roles = Request.Headers[RolesHeader]
                 .SelectMany(value =>
                     value?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries) ??
                     Array.Empty<string>());

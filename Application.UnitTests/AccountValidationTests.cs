@@ -13,7 +13,7 @@ public class AccountValidationTests
         var validator = new LoginUserCommandValidator();
         var command = new LoginUserCommand { Password = "Password1!" };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("Either Username or Email"));
@@ -25,7 +25,7 @@ public class AccountValidationTests
         var validator = new LoginUserCommandValidator();
         var command = new LoginUserCommand { Username = "reader", Password = "Password1!" };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.True(result.IsValid);
     }
@@ -36,7 +36,7 @@ public class AccountValidationTests
         var validator = new LoginUserCommandValidator();
         var command = new LoginUserCommand { Email = "reader@example.com", Password = "Password1!" };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.True(result.IsValid);
     }
@@ -48,7 +48,7 @@ public class AccountValidationTests
         var command =
             new LoginUserCommand { Username = "reader", Email = "reader@example.com", Password = "Password1!" };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.ErrorMessage.Contains("Either Username or Email"));
@@ -63,7 +63,7 @@ public class AccountValidationTests
             Username = "reader", Email = "reader@example.com", Password = "Password1!"
         };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.True(result.IsValid);
     }
@@ -81,7 +81,7 @@ public class AccountValidationTests
             Username = username, Email = "reader@example.com", Password = "Password1!"
         };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(RegisterUserCommand.Username));
@@ -101,7 +101,7 @@ public class AccountValidationTests
             Username = username, Email = "reader@example.com", Password = "Password1!"
         };
 
-        ValidationResult? result = validator.Validate(command);
+        var result = validator.Validate(command);
 
         Assert.True(result.IsValid);
     }

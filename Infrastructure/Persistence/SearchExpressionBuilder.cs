@@ -23,7 +23,7 @@ internal sealed class TextSearchExpressionFactory(bool useILike)
         Expression<Func<TEntity, string>> normalizedValueSelector,
         string search)
     {
-        Expression<Func<TEntity, string>> selector = SelectSelector(valueSelector, normalizedValueSelector);
+        var selector = SelectSelector(valueSelector, normalizedValueSelector);
         return Expression.Lambda<Func<TEntity, bool>>(
             BuildLikeCall(selector.Body, search),
             selector.Parameters);
@@ -35,11 +35,11 @@ internal sealed class TextSearchExpressionFactory(bool useILike)
         Expression<Func<TElement, string>> normalizedValueSelector,
         string search)
     {
-        Expression<Func<TElement, string>> selector = SelectSelector(valueSelector, normalizedValueSelector);
+        var selector = SelectSelector(valueSelector, normalizedValueSelector);
         var elementPredicate = Expression.Lambda<Func<TElement, bool>>(
             BuildLikeCall(selector.Body, search),
             selector.Parameters);
-        MethodCallExpression anyCall = Expression.Call(
+        var anyCall = Expression.Call(
             typeof(Enumerable),
             nameof(Enumerable.Any),
             [typeof(TElement)],
@@ -58,7 +58,7 @@ internal sealed class TextSearchExpressionFactory(bool useILike)
 
     private MethodCallExpression BuildLikeCall(Expression value, string search)
     {
-        string patternInput = useILike ? search : MappingExtensions.NormalizeName(search);
+        var patternInput = useILike ? search : MappingExtensions.NormalizeName(search);
         return Expression.Call(
             useILike ? _iLikeMethod : _likeMethod,
             Expression.Property(null, typeof(EF), nameof(EF.Functions)),
@@ -69,8 +69,8 @@ internal sealed class TextSearchExpressionFactory(bool useILike)
 
     private static string ToLikePattern(string value)
     {
-        string trimmed = value.Trim();
-        string pattern = EscapeLike(trimmed).Replace("*", "%", StringComparison.Ordinal);
+        var trimmed = value.Trim();
+        var pattern = EscapeLike(trimmed).Replace("*", "%", StringComparison.Ordinal);
         return trimmed.Contains('*') ? pattern : $"%{pattern}%";
     }
 
@@ -124,7 +124,7 @@ internal sealed class DateSearchExpressionFactory(bool useNativeComparison)
         BookSearchOperator op,
         DateOnly value)
     {
-        (DateTimeOffset start, DateTimeOffset nextDay) = ToUtcDateBounds(value);
+        var (start, nextDay) = ToUtcDateBounds(value);
         if (useNativeComparison)
         {
             return MatchBounds(
@@ -235,7 +235,7 @@ internal static class PredicateExpression
         BookSearchOperator op,
         string value)
     {
-        MethodCallExpression comparisonResult = Expression.Call(
+        var comparisonResult = Expression.Call(
             typeof(string),
             nameof(string.Compare),
             Type.EmptyTypes,
@@ -252,7 +252,7 @@ internal static class PredicateExpression
         Func<Expression<Func<T, bool>>, Expression<Func<T, bool>>, Expression<Func<T, bool>>> combine)
     {
         Expression<Func<T, bool>>? result = null;
-        foreach (Expression<Func<T, bool>> predicate in predicates)
+        foreach (var predicate in predicates)
         {
             result = result == null ? predicate : combine(result, predicate);
         }
@@ -265,9 +265,9 @@ internal static class PredicateExpression
         Expression<Func<T, bool>> right,
         Func<Expression, Expression, BinaryExpression> merge)
     {
-        ParameterExpression parameter = Expression.Parameter(typeof(T), left.Parameters[0].Name);
-        Expression leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
-        Expression rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
+        var parameter = Expression.Parameter(typeof(T), left.Parameters[0].Name);
+        var leftBody = ReplaceParameter(left.Body, left.Parameters[0], parameter);
+        var rightBody = ReplaceParameter(right.Body, right.Parameters[0], parameter);
         return Expression.Lambda<Func<T, bool>>(merge(leftBody, rightBody), parameter);
     }
 

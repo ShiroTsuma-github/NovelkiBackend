@@ -32,15 +32,15 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
     public async Task<BookAnalyticsDto> Handle(GetBookAnalyticsQuery request, CancellationToken cancellationToken)
     {
-        string bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "week" : request.Bucket.Trim().ToLowerInvariant();
+        var bucket = string.IsNullOrWhiteSpace(request.Bucket) ? "week" : request.Bucket.Trim().ToLowerInvariant();
         if (!SupportedBuckets.Contains(bucket))
         {
             throw ValidationError(nameof(request.Bucket), "Bucket must be one of: day, week, month.");
         }
 
-        DateOnly todayExclusive = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
-        DateOnly to = request.To ?? todayExclusive;
-        DateOnly from = request.From ?? to.AddDays(-DefaultRangeDays);
+        var todayExclusive = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(1);
+        var to = request.To ?? todayExclusive;
+        var from = request.From ?? to.AddDays(-DefaultRangeDays);
         if (_user.CreatedAt is { } userCreatedAt)
         {
             var accountStart = DateOnly.FromDateTime(userCreatedAt.UtcDateTime);
@@ -57,8 +57,8 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
         bucket = ResolveEffectiveBucket(bucket, from, to);
         var scope = new BookAnalyticsScopeSnapshot(request.Query, from, to, bucket);
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(request.Query);
-        BookAnalyticsSnapshot snapshot =
+        var criteria = BookSearchQueryParser.Parse(request.Query);
+        var snapshot =
             await _queryService.GetAnalyticsAsync(_user.RequiredId, criteria, scope, cancellationToken);
 
         return snapshot.ToDto();
@@ -71,7 +71,7 @@ public sealed class GetBookAnalyticsHandler : IRequestHandler<GetBookAnalyticsQu
 
     private static string ResolveEffectiveBucket(string requestedBucket, DateOnly from, DateOnly to)
     {
-        int rangeDays = to.DayNumber - from.DayNumber;
+        var rangeDays = to.DayNumber - from.DayNumber;
         if (rangeDays > MaxWeeklyBucketRangeDays)
         {
             return "month";

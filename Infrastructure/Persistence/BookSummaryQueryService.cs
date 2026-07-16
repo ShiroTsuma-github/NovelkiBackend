@@ -19,27 +19,27 @@ public sealed class BookSummaryQueryService : IBookSummaryQueryService
     public async Task<BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria,
         CancellationToken cancellationToken)
     {
-        IQueryable<Book> query =
+        var query =
             ApplyCriteria(_context.Books.AsNoTracking().Where(book => book.OwnerId == ownerId), criteria);
 
-        int totalBooks = await query.CountAsync(cancellationToken);
-        int ratedBooks = await query.CountAsync(book => book.Rating != null, cancellationToken);
-        double? averageRating = ratedBooks == 0
+        var totalBooks = await query.CountAsync(cancellationToken);
+        var ratedBooks = await query.CountAsync(book => book.Rating != null, cancellationToken);
+        var averageRating = ratedBooks == 0
             ? null
             : await query
                 .Where(book => book.Rating != null)
                 .Select(book => (double?)book.Rating)
                 .AverageAsync(cancellationToken);
-        decimal currentChapters = await query
+        var currentChapters = await query
             .Where(book => book.CurrentChapterNumber != null)
             .Select(book => book.CurrentChapterNumber ?? 0)
             .SumAsync(cancellationToken);
-        int booksWithKnownCurrentChapter =
+        var booksWithKnownCurrentChapter =
             await query.CountAsync(book => book.CurrentChapterNumber != null, cancellationToken);
-        IReadOnlyList<BookStatusCountSnapshot> statusCounts = await GetStatusCountsAsync(query, cancellationToken);
-        IReadOnlyList<BookTypeSummarySnapshot> typeCounts = await GetTypeCountsAsync(query, cancellationToken);
-        IReadOnlyList<BookGenreCountSnapshot> genreCounts = await GetGenreCountsAsync(query, cancellationToken);
-        IReadOnlyList<BookRatingCountSnapshot> ratingCounts = await GetRatingCountsAsync(query, cancellationToken);
+        var statusCounts = await GetStatusCountsAsync(query, cancellationToken);
+        var typeCounts = await GetTypeCountsAsync(query, cancellationToken);
+        var genreCounts = await GetGenreCountsAsync(query, cancellationToken);
+        var ratingCounts = await GetRatingCountsAsync(query, cancellationToken);
 
         return new BookSummarySnapshot(
             totalBooks,

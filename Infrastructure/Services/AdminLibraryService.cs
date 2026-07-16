@@ -23,14 +23,14 @@ public sealed class AdminLibraryService : IAdminLibraryService
     public async Task<AdminLibraryPurgeResult> DeleteAllBooksForOwnerAsync(Guid ownerId,
         CancellationToken cancellationToken)
     {
-        await using IDbContextTransaction
+        await using var
             transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
         var books = await _context.Books
             .Where(book => book.OwnerId == ownerId)
             .Select(book => new { book.Id, book.AuthorId })
             .ToListAsync(cancellationToken);
-        List<string?> storagePaths = await _context.BookCovers
+        var storagePaths = await _context.BookCovers
             .Where(cover => cover.Book.OwnerId == ownerId && cover.StoragePath != null)
             .Select(cover => cover.StoragePath)
             .ToListAsync(cancellationToken);
@@ -41,17 +41,17 @@ public sealed class AdminLibraryService : IAdminLibraryService
             return new AdminLibraryPurgeResult(0, 0, 0);
         }
 
-        Guid[] authorIds = books.Where(book => book.AuthorId.HasValue).Select(book => book.AuthorId!.Value).Distinct()
+        var authorIds = books.Where(book => book.AuthorId.HasValue).Select(book => book.AuthorId!.Value).Distinct()
             .ToArray();
-        int deletedBooks = await _context.Books
+        var deletedBooks = await _context.Books
             .Where(book => book.OwnerId == ownerId)
             .ExecuteDeleteAsync(cancellationToken);
 
-        int deletedTags = await _context.Tags
+        var deletedTags = await _context.Tags
             .Where(tag => tag.OwnerId == ownerId && !tag.BookTags.Any())
             .ExecuteDeleteAsync(cancellationToken);
 
-        int deletedAuthors = authorIds.Length == 0
+        var deletedAuthors = authorIds.Length == 0
             ? 0
             : await _context.Authors
                 .Where(author => authorIds.Contains(author.Id) && !author.Books.Any())
@@ -59,7 +59,7 @@ public sealed class AdminLibraryService : IAdminLibraryService
 
         await transaction.CommitAsync(cancellationToken);
 
-        foreach (string? storagePath in storagePaths)
+        foreach (var storagePath in storagePaths)
         {
             await _storage.DeleteIfExistsAsync(storagePath, cancellationToken);
         }

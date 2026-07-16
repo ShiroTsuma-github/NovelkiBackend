@@ -13,7 +13,7 @@ public class TagRepository : ITagRepository
 
     public async Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
     {
-        string normalizedName = MappingExtensions.NormalizeName(name);
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Tags.FirstOrDefaultAsync(
             t => t.OwnerId == ownerId && t.NormalizedName == normalizedName,
             cancellationToken);
@@ -31,10 +31,10 @@ public class TagRepository : ITagRepository
     public async Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
         CancellationToken cancellationToken)
     {
-        IQueryable<Tag> query = _context.Tags.Where(t => t.OwnerId == ownerId);
+        var query = _context.Tags.Where(t => t.OwnerId == ownerId);
         if (!string.IsNullOrWhiteSpace(search))
         {
-            string normalizedSearch = MappingExtensions.NormalizeName(search);
+            var normalizedSearch = MappingExtensions.NormalizeName(search);
             query = query.Where(t => t.NormalizedName.Contains(normalizedSearch));
         }
 

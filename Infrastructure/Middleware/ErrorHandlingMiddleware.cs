@@ -32,9 +32,9 @@ public class ErrorHandlingMiddleware
     private async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         context.Response.ContentType = "application/json";
-        HttpStatusCode statusCode = HttpStatusCode.InternalServerError;
-        string title = "An unexpected error occurred.";
-        string detail = "Please try again later.";
+        var statusCode = HttpStatusCode.InternalServerError;
+        var title = "An unexpected error occurred.";
+        var detail = "Please try again later.";
         object? errors = null;
 
         switch (exception)
@@ -186,7 +186,7 @@ public class ErrorHandlingMiddleware
             errors
         };
 
-        string json = JsonSerializer.Serialize(errorResponse);
+        var json = JsonSerializer.Serialize(errorResponse);
         await context.Response.WriteAsync(json);
     }
 }

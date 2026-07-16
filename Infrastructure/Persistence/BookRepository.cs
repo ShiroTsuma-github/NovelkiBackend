@@ -41,7 +41,7 @@ public class BookRepository : IBookRepository
     public async Task<Book?> GetByNameAsync(string name, Guid ownerId, Guid contentTypeId,
         CancellationToken cancellationToken)
     {
-        string normalizedName = MappingExtensions.NormalizeName(name);
+        var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Books
             .AsNoTracking()
             .FirstOrDefaultAsync(
@@ -60,7 +60,7 @@ public class BookRepository : IBookRepository
 
     public async Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
     {
-        Book? book =
+        var book =
             await _context.Books.FirstOrDefaultAsync(book => book.Id == id && book.OwnerId == ownerId,
                 cancellationToken);
         if (book != null)
@@ -93,16 +93,16 @@ public class BookRepository : IBookRepository
         string? comment,
         CancellationToken cancellationToken)
     {
-        Book? book = await _context.Books
+        var book = await _context.Books
             .FirstOrDefaultAsync(book => book.Id == id && book.OwnerId == ownerId, cancellationToken);
         if (book == null)
         {
             return false;
         }
 
-        bool progressChanged = book.CurrentChapterNumber != currentChapterNumber ||
-                               book.CurrentChapterLabel != currentChapterLabel;
-        bool hasComment = !string.IsNullOrWhiteSpace(comment);
+        var progressChanged = book.CurrentChapterNumber != currentChapterNumber ||
+                              book.CurrentChapterLabel != currentChapterLabel;
+        var hasComment = !string.IsNullOrWhiteSpace(comment);
         if (book.TotalChapters.HasValue && book.TotalChapters > 0 && currentChapterNumber.HasValue &&
             currentChapterNumber > book.TotalChapters)
         {
@@ -179,25 +179,25 @@ public class BookRepository : IBookRepository
 
     private void DetachTrackedEditableCollections(Guid bookId)
     {
-        foreach (EntityEntry<BookTitle> entry in _context.ChangeTracker.Entries<BookTitle>()
+        foreach (var entry in _context.ChangeTracker.Entries<BookTitle>()
                      .Where(entry => entry.Entity.BookId == bookId).ToList())
         {
             entry.State = EntityState.Detached;
         }
 
-        foreach (EntityEntry<BookLink> entry in _context.ChangeTracker.Entries<BookLink>()
+        foreach (var entry in _context.ChangeTracker.Entries<BookLink>()
                      .Where(entry => entry.Entity.BookId == bookId).ToList())
         {
             entry.State = EntityState.Detached;
         }
 
-        foreach (EntityEntry<BookGenre> entry in _context.ChangeTracker.Entries<BookGenre>()
+        foreach (var entry in _context.ChangeTracker.Entries<BookGenre>()
                      .Where(entry => entry.Entity.BookId == bookId).ToList())
         {
             entry.State = EntityState.Detached;
         }
 
-        foreach (EntityEntry<BookTag> entry in _context.ChangeTracker.Entries<BookTag>()
+        foreach (var entry in _context.ChangeTracker.Entries<BookTag>()
                      .Where(entry => entry.Entity.BookId == bookId).ToList())
         {
             entry.State = EntityState.Detached;

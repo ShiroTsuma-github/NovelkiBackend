@@ -43,7 +43,7 @@ public sealed class BookCsvExportService : IBookCsvExportService
 
     private static string Escape(object? value)
     {
-        string text = NeutralizeSpreadsheetFormula(value?.ToString() ?? string.Empty);
+        var text = NeutralizeSpreadsheetFormula(value?.ToString() ?? string.Empty);
         if (!text.Contains(',') && !text.Contains('"') && !text.Contains('\n') && !text.Contains('\r'))
         {
             return text;

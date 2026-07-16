@@ -67,9 +67,17 @@ dotnet_style_require_accessibility_modifiers = always:warning
 csharp_preferred_modifier_order = public, private, protected, internal, static, extern, new, virtual, abstract, sealed, override, readonly, unsafe, volatile, async:suggestion
 
 # Użycie słowa kluczowego 'var'
-csharp_style_var_for_built_in_types = false:suggestion
-csharp_style_var_when_type_is_apparent = true:suggestion
-csharp_style_var_elsewhere = false:suggestion
+csharp_style_var_for_built_in_types = true:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = true:warning
+dotnet_diagnostic.IDE0007.severity = warning
+dotnet_diagnostic.IDE0008.severity = none
+resharper_csharp_use_roslyn_logic_for_evident_types = true
+
+# Preferuj primary constructors, gdy konwersja jest bezpieczna
+csharp_style_prefer_primary_constructors = true:warning
+dotnet_diagnostic.IDE0290.severity = warning
+resharper_convert_to_primary_constructor_highlighting = warning
 
 # Wyrażenia (Expression-level preferences)
 dotnet_style_object_initializer = true:suggestion
@@ -133,23 +141,22 @@ dotnet_naming_rule.non_field_members_should_be_pascal_case.style = pascal_case
 dotnet_naming_symbols.non_field_members.applicable_kinds = property, event, method
 dotnet_naming_symbols.non_field_members.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
 
-# Prywatne i wewnętrzne pola - _camelCase
-dotnet_naming_rule.private_or_internal_field_should_be_begins_with__.severity = warning
-dotnet_naming_rule.private_or_internal_field_should_be_begins_with__.symbols = private_or_internal_field
-dotnet_naming_rule.private_or_internal_field_should_be_begins_with__.style = begins_with__
-dotnet_naming_symbols.private_or_internal_field.applicable_kinds = field
-dotnet_naming_symbols.private_or_internal_field.applicable_accessibilities = internal, private, private_protected
-dotnet_naming_style.begins_with__.required_prefix = _
-dotnet_naming_style.begins_with__.required_suffix =
-dotnet_naming_style.begins_with__.word_separator =
-dotnet_naming_style.begins_with__.capitalization = camel_case
+# Prywatne pola - _camelCase
+dotnet_naming_rule.private_fields_should_be_underscore_camel_case.severity = warning
+dotnet_naming_rule.private_fields_should_be_underscore_camel_case.symbols = private_fields
+dotnet_naming_rule.private_fields_should_be_underscore_camel_case.style = underscore_camel_case
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+dotnet_naming_style.underscore_camel_case.required_suffix =
+dotnet_naming_style.underscore_camel_case.word_separator =
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
 
 # Zmienne lokalne i parametry metod - camelCase
 dotnet_naming_rule.locals_and_parameters_should_be_camel_case.severity = warning
 dotnet_naming_rule.locals_and_parameters_should_be_camel_case.symbols = locals_and_parameters
 dotnet_naming_rule.locals_and_parameters_should_be_camel_case.style = camel_case
 dotnet_naming_symbols.locals_and_parameters.applicable_kinds = parameter, local
-dotnet_naming_symbols.locals_and_parameters.applicable_accessibilities = local
 dotnet_naming_style.camel_case.required_prefix =
 dotnet_naming_style.camel_case.required_suffix =
 dotnet_naming_style.camel_case.word_separator =

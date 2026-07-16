@@ -33,9 +33,9 @@ public sealed class BookListProjectionQuery
             return clientSortedPage.Select(BookListProjectionMapper.MapListProjection).ToList();
         }
 
-        IQueryable<BookListProjection> pageQuery =
+        var pageQuery =
             await BuildProjectedPageQueryAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
-        List<BookListProjection> page = await pageQuery.ToListAsync(cancellationToken);
+        var page = await pageQuery.ToListAsync(cancellationToken);
 
         return page.Select(BookListProjectionMapper.MapListProjection).ToList();
     }
@@ -55,17 +55,17 @@ public sealed class BookListProjectionQuery
                 .Skip(skip)
                 .Take(take)
                 .ToList();
-            Dictionary<Guid, BookOwnerProjection> clientSortedOwners =
+            var clientSortedOwners =
                 await GetOwnersAsync(sortedPage.Select(book => book.OwnerId), cancellationToken);
 
             return sortedPage.Select(book => BookListProjectionMapper.MapAdminListProjection(book, clientSortedOwners))
                 .ToList();
         }
 
-        IQueryable<BookListProjection> pageQuery =
+        var pageQuery =
             await BuildProjectedPageQueryAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
-        List<BookListProjection> page = await pageQuery.ToListAsync(cancellationToken);
-        Dictionary<Guid, BookOwnerProjection> owners =
+        var page = await pageQuery.ToListAsync(cancellationToken);
+        var owners =
             await GetOwnersAsync(page.Select(book => book.OwnerId), cancellationToken);
 
         return page.Select(book => BookListProjectionMapper.MapAdminListProjection(book, owners)).ToList();
@@ -74,7 +74,7 @@ public sealed class BookListProjectionQuery
     private async Task<Dictionary<Guid, BookOwnerProjection>> GetOwnersAsync(IEnumerable<Guid> ownerIds,
         CancellationToken cancellationToken)
     {
-        Guid[] distinctOwnerIds = ownerIds.Distinct().ToArray();
+        var distinctOwnerIds = ownerIds.Distinct().ToArray();
         return await _context.Users
             .AsNoTracking()
             .Where(user => distinctOwnerIds.Contains(user.Id))
@@ -90,7 +90,7 @@ public sealed class BookListProjectionQuery
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        IQueryable<Book> sortedPage =
+        var sortedPage =
             (await _sortBuilder.ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
             .Skip(skip)
             .Take(take);

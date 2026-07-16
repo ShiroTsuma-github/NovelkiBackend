@@ -40,11 +40,11 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
             throw new ValidationException("Cover file is empty.");
         }
 
-        Book book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
-                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        BookCoverStoredFiles stored = await _storage.SaveAsync(book.OwnerId, book.Id, request.Content, request.FileName,
+        var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var stored = await _storage.SaveAsync(book.OwnerId, book.Id, request.Content, request.FileName,
             request.ContentType, cancellationToken);
-        BookCoverChange change =
+        var change =
             BookCoverMutationSupport.ApplyStoredCover(book, stored, BookCoverSource.ManualUpload, null);
 
         await BookCoverMutationSupport.SaveAsync(change, _bookRepository, _coverRepository, cancellationToken);
@@ -83,17 +83,17 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
 
     public async Task<BookCoverDto> Handle(SetBookCoverFromUrlCommand request, CancellationToken cancellationToken)
     {
-        if (!Uri.TryCreate(request.ImageUrl, UriKind.Absolute, out Uri? imageUri) ||
+        if (!Uri.TryCreate(request.ImageUrl, UriKind.Absolute, out var imageUri) ||
             imageUri.Scheme is not ("http" or "https"))
         {
             throw new ValidationException("Image URL must be an absolute HTTP or HTTPS URL.");
         }
 
-        Book book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
-                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        BookCoverStoredFiles stored =
+        var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var stored =
             await _remoteImageService.SaveFromUrlAsync(book.OwnerId, book.Id, request.ImageUrl, cancellationToken);
-        BookCoverChange change =
+        var change =
             BookCoverMutationSupport.ApplyStoredCover(book, stored, BookCoverSource.ManualUrl, request.ImageUrl);
         BookCoverLinkHelper.EnsureCoverSourceLink(book, request.ImageUrl, change.Cover.Source);
 
@@ -135,9 +135,9 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
 
     public async Task<BookCoverDto> Handle(RefreshBookCoverCommand request, CancellationToken cancellationToken)
     {
-        Book book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
-                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        BookCoverChange change = BookCoverMutationSupport.ApplyPendingRefresh(book);
+        var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var change = BookCoverMutationSupport.ApplyPendingRefresh(book);
 
         await BookCoverMutationSupport.SaveAsync(change, _bookRepository, _coverRepository, cancellationToken);
         await _storage.DeleteIfExistsAsync(change.PreviousStoragePath, cancellationToken);
@@ -174,17 +174,17 @@ public class DeleteBookCoverHandler : IRequestHandler<DeleteBookCoverCommand>
 
     public async Task Handle(DeleteBookCoverCommand request, CancellationToken cancellationToken)
     {
-        Book book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
-                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
-        BookCover? cover = book.Cover;
+        var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+                   ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var cover = book.Cover;
         if (cover == null)
         {
             return;
         }
 
-        string? storagePath = cover.StoragePath;
-        string? thumbnailStoragePath = cover.ThumbnailStoragePath;
-        BookLink? coverSourceLink = book.Links.FirstOrDefault(link =>
+        var storagePath = cover.StoragePath;
+        var thumbnailStoragePath = cover.ThumbnailStoragePath;
+        var coverSourceLink = book.Links.FirstOrDefault(link =>
             string.Equals(link.SourceType, "Cover", StringComparison.OrdinalIgnoreCase) &&
             string.Equals(link.Url, cover.OriginalImageUrl, StringComparison.OrdinalIgnoreCase));
         if (coverSourceLink != null)
@@ -220,14 +220,14 @@ public class GetBookCoverFileHandler : IRequestHandler<GetBookCoverFileQuery, Bo
 
     public async Task<BookCoverFileResult> Handle(GetBookCoverFileQuery request, CancellationToken cancellationToken)
     {
-        BookCover cover = await _coverRepository.GetByBookIdAsync(request.BookId, _user.RequiredId, cancellationToken)
-                          ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var cover = await _coverRepository.GetByBookIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
         if (cover.StoragePath == null || cover.MimeType == null)
         {
             throw new EntityNotFoundException<BookCover, Guid>(request.BookId);
         }
 
-        Stream stream = await _storage.OpenReadAsync(cover.StoragePath, cancellationToken);
+        var stream = await _storage.OpenReadAsync(cover.StoragePath, cancellationToken);
         return new BookCoverFileResult(stream, cover.MimeType,
             $"{request.BookId}{Path.GetExtension(cover.StoragePath)}");
     }
@@ -249,14 +249,14 @@ public class GetBookCoverThumbnailFileHandler : IRequestHandler<GetBookCoverThum
     public async Task<BookCoverFileResult> Handle(GetBookCoverThumbnailFileQuery request,
         CancellationToken cancellationToken)
     {
-        BookCover cover = await _coverRepository.GetByBookIdAsync(request.BookId, _user.RequiredId, cancellationToken)
-                          ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
+        var cover = await _coverRepository.GetByBookIdAsync(request.BookId, _user.RequiredId, cancellationToken)
+                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
         if (cover.ThumbnailStoragePath == null || cover.ThumbnailMimeType == null)
         {
             throw new EntityNotFoundException<BookCover, Guid>(request.BookId);
         }
 
-        Stream stream = await _storage.OpenReadAsync(cover.ThumbnailStoragePath, cancellationToken);
+        var stream = await _storage.OpenReadAsync(cover.ThumbnailStoragePath, cancellationToken);
         return new BookCoverFileResult(stream, cover.ThumbnailMimeType,
             $"{request.BookId}.thumb{Path.GetExtension(cover.ThumbnailStoragePath)}");
     }

@@ -27,27 +27,27 @@ public sealed class AniListBookCoverProvider : IBookCoverProvider
 
     public async Task<BookCoverCandidate?> FindAsync(Book book, CancellationToken cancellationToken)
     {
-        foreach (string title in BookCoverProviderHelpers.EnumerateTitles(book))
+        foreach (var title in BookCoverProviderHelpers.EnumerateTitles(book))
         {
             var payload = new { query = Query, variables = new { search = title } };
-            using HttpResponseMessage response = await _httpClient.PostAsJsonAsync("", payload, cancellationToken);
+            using var response = await _httpClient.PostAsJsonAsync("", payload, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 continue;
             }
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            using JsonDocument document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-            JsonElement? media = BookCoverJson.TryGetProperty(document.RootElement, "data", "Page", "media");
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            var media = BookCoverJson.TryGetProperty(document.RootElement, "data", "Page", "media");
             if (media == null || media.Value.ValueKind != JsonValueKind.Array)
             {
                 continue;
             }
 
-            foreach (JsonElement item in media.Value.EnumerateArray())
+            foreach (var item in media.Value.EnumerateArray())
             {
-                string? imageUrl = BookCoverJson.TryGetString(item, "coverImage", "extraLarge")
-                                   ?? BookCoverJson.TryGetString(item, "coverImage", "large");
+                var imageUrl = BookCoverJson.TryGetString(item, "coverImage", "extraLarge")
+                               ?? BookCoverJson.TryGetString(item, "coverImage", "large");
                 if (!string.IsNullOrWhiteSpace(imageUrl))
                 {
                     return new BookCoverCandidate(BookCoverSource.AniList, imageUrl);

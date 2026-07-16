@@ -23,7 +23,7 @@ public class AutocompleteFeatureTests
         await repository.AddAsync(author, CancellationToken.None);
         var handler = new SearchAuthorsQueryHandler(repository);
 
-        IReadOnlyCollection<AuthorDto> result =
+        var result =
             await handler.Handle(new SearchAuthorsQuery("耳", 10), CancellationToken.None);
 
         Assert.Single(result);
@@ -40,7 +40,7 @@ public class AutocompleteFeatureTests
             CancellationToken.None);
         var handler = new SearchTagsQueryHandler(repository, new FakeUser());
 
-        IReadOnlyCollection<TagDto> result =
+        var result =
             await handler.Handle(new SearchTagsQuery("fav", 10), CancellationToken.None);
 
         Assert.Single(result);
@@ -81,7 +81,7 @@ public class AutocompleteFeatureTests
 
         public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
         {
-            string normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
+            var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Author>>(_authors
                 .Where(a => a.NormalizedPrimaryName.Contains(normalizedSearch) ||
                             a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)))
@@ -122,7 +122,7 @@ public class AutocompleteFeatureTests
         public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
             CancellationToken cancellationToken)
         {
-            string normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
+            var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Tag>>(_tags
                 .Where(t => t.OwnerId == ownerId && t.NormalizedName.Contains(normalizedSearch))
                 .Take(take)

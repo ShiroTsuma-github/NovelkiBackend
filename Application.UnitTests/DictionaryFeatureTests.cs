@@ -20,7 +20,7 @@ public class DictionaryFeatureTests
     public async Task StatusHandlers_ShouldCoverCrudQueriesAndDetails()
     {
         var repository = new FakeStatusRepository();
-        StatusDto created = await new CreateStatusCommandHandler(repository)
+        var created = await new CreateStatusCommandHandler(repository)
             .Handle(new CreateStatusCommand("Paused", "Waiting"), CancellationToken.None);
 
         Assert.Equal("Paused", created.Name);
@@ -28,18 +28,18 @@ public class DictionaryFeatureTests
             new CreateStatusCommandHandler(repository).Handle(new CreateStatusCommand("paused", null),
                 CancellationToken.None));
 
-        PaginatedResult<StatusDto> all =
+        var all =
             await new GetAllStatusesQueryHandler(repository).Handle(new GetAllStatusesQuery(0, 10),
                 CancellationToken.None);
-        StatusDto byId =
+        var byId =
             await new GetStatusQueryHandler(repository).Handle(new GetStatusQuery(created.Id), CancellationToken.None);
-        StatusDto byName =
+        var byName =
             await new GetStatusByNameQueryHandler(repository).Handle(new GetStatusByNameQuery("Paused"),
                 CancellationToken.None);
-        StatusDetailsDto details =
+        var details =
             await new GetStatusDetailsQueryHandler(repository).Handle(new GetStatusDetailsQuery(created.Id),
                 CancellationToken.None);
-        StatusDetailsDto detailsByName =
+        var detailsByName =
             await new GetStatusDetailsByNameQueryHandler(repository).Handle(new GetStatusDetailsByNameQuery("Paused"),
                 CancellationToken.None);
 
@@ -49,7 +49,7 @@ public class DictionaryFeatureTests
         Assert.Equal(created.Id, details.Id);
         Assert.Equal(created.Id, detailsByName.Id);
 
-        StatusDto updated = await new UpdateStatusCommandHandler(repository)
+        var updated = await new UpdateStatusCommandHandler(repository)
             .Handle(new UpdateStatusCommand { Id = created.Id, Name = "On Hold", Description = "Later" },
                 CancellationToken.None);
         Assert.Equal("On Hold", updated.Name);
@@ -63,7 +63,7 @@ public class DictionaryFeatureTests
     public async Task TypeHandlers_ShouldCoverCrudQueriesAndDetails()
     {
         var repository = new FakeTypeRepository();
-        TypeDto created = await new CreateTypeCommandHandler(repository)
+        var created = await new CreateTypeCommandHandler(repository)
             .Handle(new CreateTypeCommand("Audio", "Narrated"), CancellationToken.None);
 
         Assert.Equal("Audio", created.Name);
@@ -71,17 +71,17 @@ public class DictionaryFeatureTests
             new CreateTypeCommandHandler(repository).Handle(new CreateTypeCommand("audio", null),
                 CancellationToken.None));
 
-        PaginatedResult<TypeDto> all =
+        var all =
             await new GetAllTypesQueryHandler(repository).Handle(new GetAllTypesQuery(0, 10), CancellationToken.None);
-        TypeDto byId =
+        var byId =
             await new GetTypeQueryHandler(repository).Handle(new GetTypeQuery(created.Id), CancellationToken.None);
-        TypeDto byName =
+        var byName =
             await new GetTypeByNameQueryHandler(repository).Handle(new GetTypeByNameQuery("Audio"),
                 CancellationToken.None);
-        TypeDetailsDto details =
+        var details =
             await new GetTypeDetailsQueryHandler(repository).Handle(new GetTypeDetailsQuery(created.Id),
                 CancellationToken.None);
-        TypeDetailsDto detailsByName =
+        var detailsByName =
             await new GetTypeDetailsByNameQueryHandler(repository).Handle(new GetTypeDetailsByNameQuery("Audio"),
                 CancellationToken.None);
 
@@ -91,7 +91,7 @@ public class DictionaryFeatureTests
         Assert.Equal(created.Id, details.Id);
         Assert.Equal(created.Id, detailsByName.Id);
 
-        TypeDto updated = await new UpdateTypeCommandHandler(repository)
+        var updated = await new UpdateTypeCommandHandler(repository)
             .Handle(new UpdateTypeCommand { Id = created.Id, Name = "Audiobook", Description = "Spoken" },
                 CancellationToken.None);
         Assert.Equal("Audiobook", updated.Name);

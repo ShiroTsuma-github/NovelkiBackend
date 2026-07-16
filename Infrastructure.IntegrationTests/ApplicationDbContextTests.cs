@@ -12,7 +12,7 @@ public class ApplicationDbContextTests
     public async Task EnsureCreated_ShouldSeedSystemDictionaries()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
 
         Assert.True(await context.ContentTypes.AnyAsync(t => t.Slug == "novel"));
         Assert.True(await context.Statuses.AnyAsync(s => s.Slug == "reading"));
@@ -22,8 +22,8 @@ public class ApplicationDbContextTests
     public async Task SaveChanges_ShouldPopulateAuditFields()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Genre genre = TestData.Genre("Fantasy");
+        await using var context = database.CreateContext();
+        var genre = TestData.Genre("Fantasy");
 
         context.Genres.Add(genre);
         await context.SaveChangesAsync();
@@ -38,7 +38,7 @@ public class ApplicationDbContextTests
     public async Task AuthorNormalizedPrimaryName_ShouldBeUnique()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         context.Authors.Add(TestData.Author("Toika"));
         context.Authors.Add(TestData.Author("Toika"));
 
@@ -49,7 +49,7 @@ public class ApplicationDbContextTests
     public async Task TagNormalizedName_ShouldBeUniquePerOwner()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         context.Tags.Add(TestData.Tag(database.UserId, "favorite"));
         context.Tags.Add(TestData.Tag(database.UserId, "favorite"));
 
@@ -60,7 +60,7 @@ public class ApplicationDbContextTests
     public async Task SameTagName_ShouldBeAllowedForDifferentOwners()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
+        await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         context.Users.Add(new Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
         context.Tags.Add(TestData.Tag(database.UserId, "favorite"));
@@ -75,8 +75,8 @@ public class ApplicationDbContextTests
     public async Task DeletingBook_ShouldCascadeToTitlesLinksAndProgress()
     {
         using var database = new SqliteTestDatabase();
-        await using ApplicationDbContext context = database.CreateContext();
-        Book book = await TestData.AddBookWithRelationsAsync(context, database.UserId);
+        await using var context = database.CreateContext();
+        var book = await TestData.AddBookWithRelationsAsync(context, database.UserId);
 
         context.Books.Remove(book);
         await context.SaveChangesAsync();
@@ -92,15 +92,15 @@ public class ApplicationDbContextTests
     {
         using var database = new SqliteTestDatabase();
         Guid authorId;
-        await using (ApplicationDbContext arrangeContext = database.CreateContext())
+        await using (var arrangeContext = database.CreateContext())
         {
-            Author existingAuthor = TestData.Author("Toika");
+            var existingAuthor = TestData.Author("Toika");
             await TestData.AddBookAsync(arrangeContext, database.UserId, "Novel", existingAuthor);
             authorId = existingAuthor.Id;
         }
 
-        await using ApplicationDbContext context = database.CreateContext();
-        Author author = await context.Authors.SingleAsync(a => a.Id == authorId);
+        await using var context = database.CreateContext();
+        var author = await context.Authors.SingleAsync(a => a.Id == authorId);
         context.Authors.Remove(author);
 
         await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync());

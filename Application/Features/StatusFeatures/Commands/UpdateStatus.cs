@@ -20,8 +20,8 @@ public class UpdateStatusCommandHandler : IRequestHandler<UpdateStatusCommand, S
 
     public async Task<StatusDto> Handle(UpdateStatusCommand request, CancellationToken cancellationToken)
     {
-        Status status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken)
-                        ?? throw new EntityNotFoundException<Status, Guid>(request.Id);
+        var status = await _statusRepository.GetByIdAsync(request.Id, cancellationToken)
+                     ?? throw new EntityNotFoundException<Status, Guid>(request.Id);
 
         request.ApplyTo(status);
 

@@ -6,7 +6,7 @@ internal static class BookCoverProviderHelpers
     {
         yield return book.PrimaryTitle;
 
-        foreach (string title in book.Titles.Where(t => !t.IsPrimary).Select(t => t.Title))
+        foreach (var title in book.Titles.Where(t => !t.IsPrimary).Select(t => t.Title))
         {
             yield return title;
         }

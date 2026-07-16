@@ -20,8 +20,8 @@ public sealed class GetBookSummaryHandler : IRequestHandler<GetBookSummaryQuery,
 
     public async Task<BookSummaryDto> Handle(GetBookSummaryQuery request, CancellationToken cancellationToken)
     {
-        BookSearchCriteria criteria = BookSearchQueryParser.Parse(request.Query);
-        BookSummarySnapshot summary =
+        var criteria = BookSearchQueryParser.Parse(request.Query);
+        var summary =
             await _queryService.GetSummaryAsync(_user.RequiredId, criteria, cancellationToken);
 
         return summary.ToDto();

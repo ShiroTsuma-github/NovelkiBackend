@@ -20,10 +20,10 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
     public async Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
         string? contentType, CancellationToken cancellationToken)
     {
-        ProcessedBookCoverContent processed =
+        var processed =
             await BookCoverImageProcessor.ProcessAsync(content, contentType, _options.MaxBytes, cancellationToken);
-        string storagePath = $"{ownerId:N}/{bookId:N}.jpg";
-        string thumbnailStoragePath = $"{ownerId:N}/{bookId:N}.thumb.jpg";
+        var storagePath = $"{ownerId:N}/{bookId:N}.jpg";
+        var thumbnailStoragePath = $"{ownerId:N}/{bookId:N}.thumb.jpg";
 
         await UploadAsync(storagePath, processed.Original.Bytes, processed.Original.MimeType, cancellationToken);
         await UploadAsync(thumbnailStoragePath, processed.Thumbnail.Bytes, processed.Thumbnail.MimeType,
@@ -48,7 +48,7 @@ public sealed class S3BookCoverStorage : IBookCoverStorage
     {
         try
         {
-            GetObjectResponse? response = await _s3.GetObjectAsync(_bucket, storagePath, cancellationToken);
+            var response = await _s3.GetObjectAsync(_bucket, storagePath, cancellationToken);
             return response.ResponseStream;
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound ||

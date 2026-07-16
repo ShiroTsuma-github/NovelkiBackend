@@ -6,7 +6,7 @@ public static class SecurityHeadersMiddlewareExtensions
     {
         return app.Use(async (context, next) =>
         {
-            IHeaderDictionary headers = context.Response.Headers;
+            var headers = context.Response.Headers;
             headers.TryAdd("X-Content-Type-Options", "nosniff");
             headers.TryAdd("X-Frame-Options", "DENY");
             headers.TryAdd("Referrer-Policy", "no-referrer");

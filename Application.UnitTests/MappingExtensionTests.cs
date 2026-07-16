@@ -12,7 +12,7 @@ public class MappingExtensionTests
     [Fact]
     public void NormalizeName_ShouldTrimCollapseWhitespaceAndUppercase()
     {
-        string result = MappingExtensions.NormalizeName("  Er\t \n Gen   ");
+        var result = MappingExtensions.NormalizeName("  Er\t \n Gen   ");
 
         Assert.Equal("ER GEN", result);
     }
@@ -20,7 +20,7 @@ public class MappingExtensionTests
     [Fact]
     public void CollapseWhitespace_ShouldPreserveDisplayCasing()
     {
-        string result = MappingExtensions.CollapseWhitespace("  Lord   of\tMysteries  ");
+        var result = MappingExtensions.CollapseWhitespace("  Lord   of\tMysteries  ");
 
         Assert.Equal("Lord of Mysteries", result);
     }
@@ -77,7 +77,7 @@ public class MappingExtensionTests
             LastAttemptAt = coverVersion
         };
 
-        BookDto dto = book.ToDto();
+        var dto = book.ToDto();
 
         Assert.Equal("Everyone Else is a Returnee", dto.PrimaryTitle);
         Assert.Equal("Portal fantasy with returnee progression.", dto.Description);
@@ -90,7 +90,7 @@ public class MappingExtensionTests
         Assert.Contains("Fantasy", dto.Genres);
         Assert.Contains("favorite", dto.Tags);
         Assert.Single(dto.Links);
-        BookProgressHistoryDto progressEntry = Assert.Single(dto.ProgressHistory);
+        var progressEntry = Assert.Single(dto.ProgressHistory);
         Assert.Equal("Progress note", progressEntry.Comment);
         Assert.NotNull(dto.Cover);
         Assert.Equal("Found", dto.Cover.Status);
@@ -107,7 +107,7 @@ public class MappingExtensionTests
         var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
         author.Names.Add(new AuthorName { Name = "Ergen", NormalizedName = "ERGEN", IsPrimary = false });
 
-        AuthorDto dto = author.ToDto();
+        var dto = author.ToDto();
 
         Assert.Equal("Er Gen", dto.PrimaryName);
         Assert.Contains("Ergen", dto.OtherNames);

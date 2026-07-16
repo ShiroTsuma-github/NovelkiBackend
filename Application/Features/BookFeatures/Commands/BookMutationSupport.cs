@@ -14,9 +14,9 @@ internal static class BookMutationSupport
         IEnumerable<BookTitleInput>? alternativeTitles,
         CancellationToken cancellationToken)
     {
-        foreach (string title in EnumerateTitles(primaryTitle, alternativeTitles))
+        foreach (var title in EnumerateTitles(primaryTitle, alternativeTitles))
         {
-            Book? existing = await bookRepository.GetByNameAsync(title, ownerId, contentTypeId, cancellationToken);
+            var existing = await bookRepository.GetByNameAsync(title, ownerId, contentTypeId, cancellationToken);
             if (existing != null && existing.Id != currentBookId)
             {
                 throw new EntityAlreadyExistsException<Book, Guid>(title, existing.Id);
@@ -41,8 +41,8 @@ internal static class BookMutationSupport
             return null;
         }
 
-        string normalizedAuthorName = authorName.Trim();
-        Author? existing = await authorRepository.GetByNameAsync(normalizedAuthorName, cancellationToken);
+        var normalizedAuthorName = authorName.Trim();
+        var existing = await authorRepository.GetByNameAsync(normalizedAuthorName, cancellationToken);
         if (existing != null)
         {
             return existing;
@@ -77,9 +77,9 @@ internal static class BookMutationSupport
             .ToList();
         var existingTags = (await tagRepository.GetByNamesAsync(ownerId, names, cancellationToken)).ToList();
         var existingNormalized = existingTags.Select(tag => tag.NormalizedName).ToHashSet();
-        foreach (string name in names)
+        foreach (var name in names)
         {
-            string normalized = MappingExtensions.NormalizeName(name);
+            var normalized = MappingExtensions.NormalizeName(name);
             if (existingNormalized.Contains(normalized))
             {
                 continue;
@@ -119,7 +119,7 @@ internal static class BookMutationSupport
     {
         yield return primaryTitle;
 
-        foreach (BookTitleInput title in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
+        foreach (var title in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
         {
             if (!string.IsNullOrWhiteSpace(title.Title))
             {

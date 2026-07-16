@@ -28,7 +28,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new())
     {
-        foreach (EntityEntry<BaseAuditableEntity> entry in ChangeTracker.Entries<BaseAuditableEntity>())
+        foreach (var entry in ChangeTracker.Entries<BaseAuditableEntity>())
         {
             switch (entry.State)
             {
