@@ -11,6 +11,17 @@ vi.mock('@/features/auth/AuthProvider', () => ({
 }))
 
 describe('AppShell', () => {
+  it('exposes stable shell landmarks for page refactors', () => {
+    renderAt('/books')
+
+    expect(screen.getByRole('banner')).toBeInTheDocument()
+    expect(screen.getByRole('navigation')).toBeInTheDocument()
+    expect(screen.getByRole('main')).toBeInTheDocument()
+    expect(screen.getByText('Novelki')).toBeInTheDocument()
+    expect(screen.getByText('Reading library')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument()
+  })
+
   it('keeps only the matching top-level nav item active on the add-book route', () => {
     renderAt('/books/new')
 

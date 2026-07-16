@@ -1,75 +1,37 @@
-import { expect, type Locator, type Page, test } from '@playwright/test'
-
-const books = [
-  {
-    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-    created: '2026-01-01T10:00:00Z',
-    lastModified: '2026-02-01T10:00:00Z',
-    primaryTitle: 'Lord of Mysteries',
-    description: 'A long fantasy mystery.',
-    alternativeTitles: ['LOTM'],
-    authorId: 'author-1',
-    author: 'Cuttlefish',
-    contentType: 'Novel',
-    status: 'Reading',
-    currentChapterNumber: 348,
-    currentChapterLabel: '348',
-    totalChapters: 1432,
-    rating: 9,
-    priority: 1,
-    notes: 'Private note',
-    progressHistory: [],
-    genres: ['Fantasy'],
-    tags: ['favorite', 'mystery'],
-    links: [],
-  },
-  {
-    id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
-    created: '2026-01-02T10:00:00Z',
-    lastModified: '2026-02-02T10:00:00Z',
-    primaryTitle: 'A Very Long Book Title That Should Stay Inside Its Card Container Without Pushing Actions Away',
-    alternativeTitles: [],
-    author: 'Toika',
-    contentType: 'Novel',
-    status: 'Completed',
-    currentChapterNumber: 120,
-    totalChapters: 120,
-    rating: null,
-    priority: 2,
-    progressHistory: [],
-    genres: ['Slice of Life'],
-    tags: ['completed'],
-    links: [],
-  },
-]
-
-const dictionaries = {
-  type: [
-    { id: '10000000-0000-0000-0000-000000000001', name: 'Novel' },
-    { id: '10000000-0000-0000-0000-000000000002', name: 'Manga' },
-  ],
-  status: [
-    { id: '20000000-0000-0000-0000-000000000001', name: 'Reading' },
-    { id: '20000000-0000-0000-0000-000000000002', name: 'Completed' },
-  ],
-  genre: [
-    { id: '30000000-0000-0000-0000-000000000001', name: 'Fantasy' },
-    { id: '30000000-0000-0000-0000-000000000002', name: 'Slice of Life' },
-  ],
-}
+import { expect, test } from '@playwright/test'
+import { installLayoutApiMocks, seedAuthenticatedSession } from './fixtures/api.js'
+import {
+  backgroundColor,
+  expectCenteredInViewport,
+  expectElementBottomVisible,
+  expectFitsViewportWidth,
+  expectInViewport,
+  expectMinHeight,
+  expectNoHorizontalOverflow,
+  expectNoVerticalDocumentOverflow,
+  requiredBox,
+} from './helpers/layout.js'
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    window.localStorage.setItem('novelki.session', JSON.stringify({
-      accessToken: 'header.eyJyb2xlIjoiVXNlciJ9.signature',
-      refreshToken: 'refresh-token',
-      tokenType: 'Bearer',
-      expiresAt: '2099-01-01T00:00:00Z',
-      refreshTokenExpiresAt: '2099-02-01T00:00:00Z',
-      userId: '11111111-1111-1111-1111-111111111111',
-    }))
-  })
-  await mockApi(page)
+  await seedAuthenticatedSession(page)
+  await installLayoutApiMocks(page)
+})
+
+test('app shell keeps stable page landmarks and primary structure', async ({ page }) => {
+  await page.goto('/books')
+
+  await expect(page.locator('header')).toBeVisible()
+  await expect(page.locator('main')).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Books' })).toBeVisible()
+  await expect(page.getByRole('button', { name: /log out/i })).toBeVisible()
+  await expect(page.locator('main')).toHaveCount(1)
+
+  if (page.viewportSize()!.width >= 768) {
+    await expect(page.getByRole('navigation')).toBeVisible()
+    await expect(page.getByRole('link', { name: /books/i })).toHaveAttribute('aria-current', 'page')
+  }
+
+  await expectNoHorizontalOverflow(page)
 })
 
 test('books table layout has no horizontal overflow and keeps controls in viewport', async ({ page }) => {
@@ -125,6 +87,21 @@ test('cards layout constrains long titles and shows active toggle styles', async
   await expectNoHorizontalOverflow(page)
 })
 
+test('analytics layout exposes chart structure without page overflow', async ({ page }) => {
+  await page.goto('/analytics')
+  await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible()
+  await expect(page.getByText('Status by type')).toBeVisible()
+
+  await expectNoHorizontalOverflow(page)
+  await expectFitsViewportWidth(page.locator('main'))
+  await expectFitsViewportWidth(page.getByTestId('analytics-left-column'))
+  await expectFitsViewportWidth(page.getByTestId('analytics-right-column'))
+
+  const statusByTypeCard = page.getByText('Status by type').locator('xpath=ancestor::section[1]')
+  await expectMinHeight(statusByTypeCard, 220)
+  await expectInViewport(page.getByRole('button', { name: /date range/i }))
+})
+
 test('progress dialog exposes error state through DOM and stays centered', async ({ page }) => {
   await page.goto('/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
   await page.getByRole('button', { name: /progress/i }).click()
@@ -177,11 +154,7 @@ test('csv import invalid rows panel keeps usable height in the browser layout', 
 
   if (viewport!.width >= 1024) {
     await page.getByRole('button', { name: /edit row/i }).first().click()
-    const updatedPanelBox = await requiredBox(invalidRowsPanel)
-    const notesBox = await requiredBox(page.getByLabel('Notes'))
-
-    expect(notesBox.y).toBeGreaterThanOrEqual(updatedPanelBox.y)
-    expect(notesBox.y + notesBox.height).toBeLessThanOrEqual(updatedPanelBox.y + updatedPanelBox.height)
+    await expectElementBottomVisible(invalidRowsPanel, page.getByLabel('Notes'))
 
     await page.getByRole('button', { name: /collapse/i }).click()
     await page.locator('.import-rows-scroll').evaluate((element) => {
@@ -198,136 +171,6 @@ test('csv import invalid rows panel keeps usable height in the browser layout', 
         && bottomRowNotesBox.y + bottomRowNotesBox.height <= bottomRowPanelBox.y + bottomRowPanelBox.height
     }).toBe(true)
 
-    const bottomRowPanelBox = await requiredBox(invalidRowsPanel)
-    const bottomRowNotesBox = await requiredBox(page.getByLabel('Notes'))
-    expect(bottomRowNotesBox.y).toBeGreaterThanOrEqual(bottomRowPanelBox.y)
-    expect(bottomRowNotesBox.y + bottomRowNotesBox.height).toBeLessThanOrEqual(bottomRowPanelBox.y + bottomRowPanelBox.height)
+    await expectElementBottomVisible(invalidRowsPanel, page.getByLabel('Notes'))
   }
 })
-
-async function mockApi(page: Page) {
-  await page.route('**/api/v1/**', async (route) => {
-    const url = new URL(route.request().url())
-    const path = url.pathname.replace('/api/v1/', '')
-
-    if (path === 'book/import/sessions') {
-      await route.fulfill({ json: invalidImportSession })
-      return
-    }
-
-    if (path === 'book') {
-      await route.fulfill({ json: { skip: 0, take: 20, total: books.length, data: books } })
-      return
-    }
-
-    if (path.startsWith('book/')) {
-      await route.fulfill({ json: books[0] })
-      return
-    }
-
-    if (path in dictionaries) {
-      await route.fulfill({
-        json: {
-          skip: 0,
-          take: 100,
-          total: dictionaries[path as keyof typeof dictionaries].length,
-          data: dictionaries[path as keyof typeof dictionaries],
-        },
-      })
-      return
-    }
-
-    await route.fulfill({ status: 204 })
-  })
-}
-
-const invalidImportSession = {
-  sessionId: 'layout-session',
-  fileName: 'invalid-books.csv',
-  totalRows: 80,
-  validRows: 0,
-  invalidRows: 80,
-  canFinalize: false,
-  availableContentTypes: ['Novel', 'Manga'],
-  availableStatuses: ['Reading', 'Completed'],
-  rows: Array.from({ length: 80 }, (_unused, index) => ({
-    rowId: `layout-row-${index + 1}`,
-    lineNumber: index + 2,
-    isValid: false,
-    primaryTitle: `Broken imported title ${index + 1}`,
-    authorName: null,
-    contentType: 'Wrong',
-    status: 'Reading',
-    tags: null,
-    totalChapters: null,
-    currentChapterNumber: null,
-    currentChapterLabel: null,
-    rating: null,
-    priority: null,
-    description: null,
-    notes: null,
-    rawImportedLine: null,
-    errors: ['Content type is required and must exist.'],
-    fieldErrors: {
-      contentType: ['Content type is required and must exist.'],
-    },
-  })),
-}
-
-async function expectNoHorizontalOverflow(page: Page) {
-  const hasOverflow = await page.evaluate(() => {
-    const root = document.documentElement
-    const body = document.body
-    return root.scrollWidth > root.clientWidth + 1 || body.scrollWidth > body.clientWidth + 1
-  })
-  expect(hasOverflow).toBe(false)
-}
-
-async function expectNoVerticalDocumentOverflow(page: Page) {
-  const hasOverflow = await page.evaluate(() => {
-    const root = document.documentElement
-    const body = document.body
-    return root.scrollHeight > root.clientHeight + 1 || body.scrollHeight > body.clientHeight + 1
-  })
-  expect(hasOverflow).toBe(false)
-}
-
-async function backgroundColor(locator: Locator) {
-  return locator.evaluate((element) => getComputedStyle(element).backgroundColor)
-}
-
-async function expectInViewport(locator: Locator) {
-  const box = await requiredBox(locator)
-  const viewport = locator.page().viewportSize()
-  expect(viewport).not.toBeNull()
-  expect(box.x).toBeGreaterThanOrEqual(0)
-  expect(box.y).toBeGreaterThanOrEqual(0)
-  expect(box.x + box.width).toBeLessThanOrEqual(viewport!.width + 8)
-  expect(box.y).toBeLessThanOrEqual(viewport!.height + 1)
-}
-
-async function expectFitsViewportWidth(locator: Locator) {
-  const box = await requiredBox(locator)
-  const viewport = locator.page().viewportSize()
-  expect(viewport).not.toBeNull()
-  expect(box.x).toBeGreaterThanOrEqual(0)
-  expect(box.x + box.width).toBeLessThanOrEqual(viewport!.width + 8)
-}
-
-async function expectCenteredInViewport(locator: Locator) {
-  const box = await requiredBox(locator)
-  const viewport = locator.page().viewportSize()
-  expect(viewport).not.toBeNull()
-  const viewportCenterX = viewport!.width / 2
-  const viewportCenterY = viewport!.height / 2
-  const boxCenterX = box.x + box.width / 2
-  const boxCenterY = box.y + box.height / 2
-  expect(Math.abs(boxCenterX - viewportCenterX)).toBeLessThan(32)
-  expect(Math.abs(boxCenterY - viewportCenterY)).toBeLessThan(32)
-}
-
-async function requiredBox(locator: Locator) {
-  const box = await locator.boundingBox()
-  expect(box).not.toBeNull()
-  return box!
-}
