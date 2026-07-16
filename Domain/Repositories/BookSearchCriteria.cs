@@ -71,6 +71,7 @@ public enum BookSearchMissingField
     Author,
     Genre,
     Tag,
+    CurrentChapter,
     TotalChapters,
     Cover,
     Link

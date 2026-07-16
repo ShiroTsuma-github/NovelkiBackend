@@ -48,13 +48,17 @@ public static class BookSearchQueryParser
         ["author"] = BookSearchMissingField.Author,
         ["genre"] = BookSearchMissingField.Genre,
         ["tag"] = BookSearchMissingField.Tag,
+        ["current"] = BookSearchMissingField.CurrentChapter,
+        ["currentChapter"] = BookSearchMissingField.CurrentChapter,
+        ["progress"] = BookSearchMissingField.CurrentChapter,
         ["total"] = BookSearchMissingField.TotalChapters,
         ["chapter"] = BookSearchMissingField.TotalChapters,
         ["chapters"] = BookSearchMissingField.TotalChapters,
         ["total-chapters"] = BookSearchMissingField.TotalChapters,
         ["totalChapters"] = BookSearchMissingField.TotalChapters,
         ["cover"] = BookSearchMissingField.Cover,
-        ["link"] = BookSearchMissingField.Link
+        ["link"] = BookSearchMissingField.Link,
+        ["links"] = BookSearchMissingField.Link
     };
 
     private static readonly string[] DateFormats =

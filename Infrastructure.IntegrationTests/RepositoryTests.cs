@@ -237,27 +237,41 @@ public class RepositoryTests
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("77777777-7777-7777-7777-777777777777");
         context.Users.Add(new Infrastructure.Identity.User { Id = otherOwnerId, UserName = "other-missing", NormalizedUserName = "OTHER-MISSING" });
-        var complete = await TestData.AddBookWithRelationsAsync(context, database.UserId);
-        complete.Rating = 8;
-        complete.Priority = 2;
-        complete.TotalChapters = 100;
-        var missing = TestData.Book(database.UserId, "Missing Fields");
+
+        var complete = AddBookWithMetadata("Complete");
+        var missingRating = AddBookWithMetadata("Missing Rating", missing: BookSearchMissingField.Rating);
+        var missingPriority = AddBookWithMetadata("Missing Priority", missing: BookSearchMissingField.Priority);
+        var missingAuthor = AddBookWithMetadata("Missing Author", missing: BookSearchMissingField.Author);
+        var missingGenre = AddBookWithMetadata("Missing Genre", missing: BookSearchMissingField.Genre);
+        var missingTag = AddBookWithMetadata("Missing Tag", missing: BookSearchMissingField.Tag);
+        var missingCurrent = AddBookWithMetadata("Missing Current Chapter", missing: BookSearchMissingField.CurrentChapter);
+        var missingTotal = AddBookWithMetadata("Missing Total Chapters", missing: BookSearchMissingField.TotalChapters);
+        var missingCover = AddBookWithMetadata("Missing Cover", missing: BookSearchMissingField.Cover);
+        var missingLink = AddBookWithMetadata("Missing Link", missing: BookSearchMissingField.Link);
+        var missingGenreAndTag = AddBookWithMetadata(
+            "Missing Genre And Tag",
+            missing: BookSearchMissingField.Genre,
+            secondMissing: BookSearchMissingField.Tag);
         var otherOwnerMissing = TestData.Book(otherOwnerId, "Other Owner Missing Fields");
-        context.Books.AddRange(missing, otherOwnerMissing);
+        context.Books.Add(otherOwnerMissing);
         await context.SaveChangesAsync();
         var queryService = CreateReadQueryService(context);
 
-        foreach (var query in new[]
+        foreach (var (query, expectedIds) in new[]
         {
-            "rating:none",
-            "priority:NONE",
-            "author:'none'",
-            "genre:none",
-            "tag:none",
-            "total:none",
-            "cover:none",
-            "link:none",
-            "genre:none tag:none"
+            ("rating:none", new[] { missingRating.Id }),
+            ("priority:NONE", new[] { missingPriority.Id }),
+            ("author:'none'", new[] { missingAuthor.Id }),
+            ("genre:none", new[] { missingGenre.Id, missingGenreAndTag.Id }),
+            ("tag:none", new[] { missingTag.Id, missingGenreAndTag.Id }),
+            ("current:none", new[] { missingCurrent.Id }),
+            ("currentChapter:none", new[] { missingCurrent.Id }),
+            ("progress:none", new[] { missingCurrent.Id }),
+            ("total:none", new[] { missingTotal.Id }),
+            ("cover:none", new[] { missingCover.Id }),
+            ("link:none", new[] { missingLink.Id }),
+            ("links:none", new[] { missingLink.Id }),
+            ("genre:none tag:none", new[] { missingGenreAndTag.Id })
         })
         {
             var books = (await queryService.GetBooksAsync(
@@ -269,10 +283,47 @@ public class RepositoryTests
                 "asc",
                 CancellationToken.None)).ToList();
 
-            var book = Assert.Single(books);
-            Assert.Equal(missing.Id, book.Id);
+            Assert.Equal(expectedIds.Order(), books.Select(book => book.Id).Order());
             Assert.DoesNotContain(books, item => item.Id == complete.Id);
             Assert.DoesNotContain(books, item => item.Id == otherOwnerMissing.Id);
+        }
+
+        Book AddBookWithMetadata(
+            string title,
+            BookSearchMissingField? missing = null,
+            BookSearchMissingField? secondMissing = null)
+        {
+            bool IsMissing(BookSearchMissingField field) => missing == field || secondMissing == field;
+
+            var author = IsMissing(BookSearchMissingField.Author) ? null : TestData.Author($"{title} Author");
+            var book = TestData.Book(database.UserId, title, author);
+            book.Rating = IsMissing(BookSearchMissingField.Rating) ? null : 8;
+            book.Priority = IsMissing(BookSearchMissingField.Priority) ? null : 2;
+            book.CurrentChapterNumber = IsMissing(BookSearchMissingField.CurrentChapter) ? null : 50;
+            book.TotalChapters = IsMissing(BookSearchMissingField.TotalChapters) ? null : 100;
+
+            if (!IsMissing(BookSearchMissingField.Genre))
+            {
+                book.BookGenres.Add(new BookGenre { Book = book, Genre = TestData.Genre($"{title} Genre") });
+            }
+
+            if (!IsMissing(BookSearchMissingField.Tag))
+            {
+                book.BookTags.Add(new BookTag { Book = book, Tag = TestData.Tag(database.UserId, $"{title} Tag") });
+            }
+
+            if (!IsMissing(BookSearchMissingField.Cover))
+            {
+                book.Cover = new BookCover { Status = BookCoverStatus.Pending };
+            }
+
+            if (!IsMissing(BookSearchMissingField.Link))
+            {
+                book.Links.Add(new BookLink { Url = $"https://example.com/{book.Id}", SourceType = "Test" });
+            }
+
+            context.Books.Add(book);
+            return book;
         }
     }
 
@@ -1204,7 +1255,7 @@ public class RepositoryTests
 
         Assert.Equal(snapshot.Samples.Where(sample => sample.Rating != null).Min(sample => sample.Rating), ratingAsc[0].Rating);
         Assert.Equal(snapshot.Samples.Where(sample => sample.Rating != null).Max(sample => sample.Rating), ratingDesc[0].Rating);
-        Assert.Null(priorityAsc[0].Priority);
+        Assert.Equal(snapshot.Samples.Where(sample => sample.Priority != null).Min(sample => sample.Priority), priorityAsc[0].Priority);
         Assert.Equal(snapshot.Samples.Max(sample => sample.CurrentChapterNumber), progressDesc[0].CurrentChapterNumber);
         Assert.Equal(oldest.Id, createdAsc[0].Id);
         Assert.Equal(otherOwnerId, ownerDesc[0].OwnerId);

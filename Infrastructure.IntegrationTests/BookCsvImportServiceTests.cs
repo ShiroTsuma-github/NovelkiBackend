@@ -212,7 +212,11 @@ primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumb
         var analytics = await new BookAnalyticsQueryService(context, new BookSearchCriteriaApplier(context)).GetAnalyticsAsync(
             database.UserId,
             BookSearchQueryParser.Parse("title:\"The Novel\""),
-            new Domain.Models.BookAnalyticsScopeSnapshot("title:\"The Novel\"", new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), "week"),
+            new Domain.Models.BookAnalyticsScopeSnapshot(
+                "title:\"The Novel\"",
+                DateOnly.FromDateTime(savedBook.Created.UtcDateTime),
+                DateOnly.FromDateTime(savedBook.Created.UtcDateTime).AddDays(1),
+                "week"),
             CancellationToken.None);
 
         var authorCompleteness = Assert.Single(analytics.Quality.FieldCompleteness, item => item.Field == "author");

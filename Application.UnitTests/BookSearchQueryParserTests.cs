@@ -97,9 +97,13 @@ public class BookSearchQueryParserTests
     [InlineData("author:'none'", BookSearchMissingField.Author)]
     [InlineData("genre:none", BookSearchMissingField.Genre)]
     [InlineData("tag:none", BookSearchMissingField.Tag)]
+    [InlineData("current:none", BookSearchMissingField.CurrentChapter)]
+    [InlineData("currentChapter:none", BookSearchMissingField.CurrentChapter)]
+    [InlineData("progress:none", BookSearchMissingField.CurrentChapter)]
     [InlineData("total:none", BookSearchMissingField.TotalChapters)]
     [InlineData("cover:none", BookSearchMissingField.Cover)]
     [InlineData("link:none", BookSearchMissingField.Link)]
+    [InlineData("links:none", BookSearchMissingField.Link)]
     public void Parse_ShouldReadMissingValueFilters(string query, BookSearchMissingField expectedField)
     {
         var criteria = BookSearchQueryParser.Parse(query);

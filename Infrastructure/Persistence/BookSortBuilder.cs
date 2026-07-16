@@ -50,10 +50,24 @@ public sealed class BookSortBuilder
                     sortDirection,
                     book => book.ContentType.Name);
             case "progress":
+                if (!_supportsILike)
+                {
+                    return descending
+                        ? query.OrderBy(book => book.CurrentChapterNumber == null).ThenByDescending(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
+                        : query.OrderBy(book => book.CurrentChapterNumber == null).ThenBy(book => (double?)book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
+                }
+
                 return descending
                     ? query.OrderBy(book => book.CurrentChapterNumber == null).ThenByDescending(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle)
                     : query.OrderBy(book => book.CurrentChapterNumber == null).ThenBy(book => book.CurrentChapterNumber).ThenBy(book => book.PrimaryTitle);
             case "chapters":
+                if (!_supportsILike)
+                {
+                    return descending
+                        ? query.OrderBy(book => book.TotalChapters == null).ThenByDescending(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle)
+                        : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => (double?)book.TotalChapters).ThenBy(book => book.PrimaryTitle);
+                }
+
                 return descending
                     ? query.OrderBy(book => book.TotalChapters == null).ThenByDescending(book => book.TotalChapters).ThenBy(book => book.PrimaryTitle)
                     : query.OrderBy(book => book.TotalChapters == null).ThenBy(book => book.TotalChapters).ThenBy(book => book.PrimaryTitle);
