@@ -104,6 +104,10 @@ public static class DependencyInjection
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
         builder.Services.AddScoped<IGlobalTagService, GlobalTagService>();
         builder.Services.AddScoped<IPublicBookService, PublicBookService>();
+        builder.Services.AddScoped<IStorageCleanupQueue, StorageCleanupQueue>();
+        builder.Services.AddScoped<StorageCleanupQueueProcessor>();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddHostedService<StorageCleanupBackgroundService>();
         builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
 
         builder.Services.AddOptions<BookCoverOptions>()

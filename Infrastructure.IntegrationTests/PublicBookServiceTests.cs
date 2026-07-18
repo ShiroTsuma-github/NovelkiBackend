@@ -1,6 +1,7 @@
 namespace Infrastructure.IntegrationTests;
 
 using Application.Common.Interfaces;
+using BookCovers;
 using Domain.Associations;
 using Domain.Entities;
 using Identity;
@@ -173,7 +174,8 @@ public sealed class PublicBookServiceTests
         IBookCoverStorage storage,
         IBookListCacheInvalidator cache)
     {
-        return new PublicBookService(context, user, storage, new AuthorLifecycleService(context, cache), cache);
+        return new PublicBookService(context, user, storage, new AuthorLifecycleService(context, cache), cache,
+            new StorageCleanupQueue(context, TimeProvider.System));
     }
 
     private sealed record TestUser(Guid UserId) : IUser
