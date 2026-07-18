@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
-import type { BookCoverDto, BookMutationRequest } from '@/api/types'
+import type { AuthorDto, BookCoverDto, BookMutationRequest } from '@/api/types'
 import { buttonVariants, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
@@ -28,6 +28,12 @@ type SaveResult = {
   coverError?: string | null
 }
 
+type SelectedAuthorDisplay = {
+  id: string
+  primaryName: string
+  matchedAlias?: string
+}
+
 type CoverInfoItem = {
   text: string
   truncate?: boolean
@@ -46,6 +52,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const queryClient = useQueryClient()
   const initializedBookIdRef = useRef<string | null>(null)
   const [authorSuggestionsOpen, setAuthorSuggestionsOpen] = useState(false)
+  const [selectedAuthorDisplay, setSelectedAuthorDisplay] = useState<SelectedAuthorDisplay | null>(null)
   const [coverDialogOpen, setCoverDialogOpen] = useState(false)
   const [coverDialogView, setCoverDialogView] = useState<'choice' | 'url'>('choice')
   const [coverUrlInput, setCoverUrlInput] = useState('')
@@ -68,6 +75,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   })
 
   const authorName = form.watch('authorName') ?? ''
+  const authorInputValue = selectedAuthorDisplay
+    ? formatAuthorDisplay(selectedAuthorDisplay.primaryName, selectedAuthorDisplay.matchedAlias)
+    : authorName
   const primaryTitle = form.watch('primaryTitle') ?? ''
   const currentChapterNumber = form.watch('currentChapterNumber') ?? ''
   const totalChapters = form.watch('totalChapters') ?? ''
@@ -86,6 +96,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
 
   useEffect(() => {
     initializedBookIdRef.current = null
+    setSelectedAuthorDisplay(null)
     setExistingCoverChange({ kind: 'keep' })
   }, [id, mode])
 
@@ -110,6 +121,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
         statusId: matchingStatus?.id ?? '',
         genreIds: matchingGenres,
       })
+      setSelectedAuthorDisplay(bookQuery.data.authorId && bookQuery.data.author
+        ? { id: bookQuery.data.authorId, primaryName: bookQuery.data.author }
+        : null)
       initializedBookIdRef.current = bookQuery.data.id
     }
   }, [bookQuery.data, form, genresQuery.data, mode, statusesQuery.data, typesQuery.data])
@@ -137,7 +151,11 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
     })
 
     return exactAuthor
-      ? { ...values, authorId: exactAuthor.id, authorName: exactAuthor.primaryName }
+      ? (() => {
+          const matchedAlias = findMatchingAlias(exactAuthor, name)
+          setSelectedAuthorDisplay({ id: exactAuthor.id, primaryName: exactAuthor.primaryName, matchedAlias })
+          return { ...values, authorId: exactAuthor.id, authorName: exactAuthor.primaryName }
+        })()
       : values
   }
 
@@ -175,9 +193,11 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
     })
   }
 
-  function selectAuthor(author: { id: string; primaryName: string }) {
+  function selectAuthor(author: AuthorDto) {
+    const matchedAlias = findMatchingAlias(author, authorName)
     form.setValue('authorId', author.id, { shouldDirty: true, shouldValidate: true })
     form.setValue('authorName', author.primaryName, { shouldDirty: true, shouldValidate: true })
+    setSelectedAuthorDisplay({ id: author.id, primaryName: author.primaryName, matchedAlias })
     setAuthorSuggestionsOpen(false)
   }
 
@@ -370,11 +390,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                     autoComplete="off"
                     className={`${inputClass} w-full`}
                     name="authorName"
-                    value={authorName}
+                    value={authorInputValue}
                     onBlur={() => window.setTimeout(() => setAuthorSuggestionsOpen(false), 120)}
                     onChange={(event) => {
                       form.setValue('authorName', event.target.value, { shouldDirty: true, shouldValidate: true })
                       form.setValue('authorId', '', { shouldDirty: true, shouldValidate: true })
+                      setSelectedAuthorDisplay(null)
                       setAuthorSuggestionsOpen(true)
                     }}
                     onFocus={() => setAuthorSuggestionsOpen(true)}
@@ -384,7 +405,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                       {authorSuggestionsQuery.isLoading ? (
                         <div className="px-3 py-2 text-sm text-slate-400">Searching authors...</div>
                       ) : null}
-                      {authorSuggestionsQuery.data?.map((author) => (
+                      {authorSuggestionsQuery.data?.map((author) => {
+                        const matchedAlias = findMatchingAlias(author, authorName)
+                        return (
                         <button
                           className="grid w-full gap-0.5 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
                           key={author.id}
@@ -392,12 +415,18 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                           onMouseDown={(event) => event.preventDefault()}
                           onClick={() => selectAuthor(author)}
                         >
-                          <span className="font-medium">{author.primaryName}</span>
+                          <span className="flex items-center justify-between gap-2 font-medium">
+                            <span>{formatAuthorDisplay(author.primaryName, matchedAlias)}</span>
+                            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              {author.isPublic ? 'Public' : 'Private'}
+                            </span>
+                          </span>
                           {author.otherNames.length ? (
                             <span className="text-xs text-slate-400">{author.otherNames.slice(0, 3).join(', ')}</span>
                           ) : null}
                         </button>
-                      ))}
+                        )
+                      })}
                       {!authorSuggestionsQuery.isLoading && authorSuggestionsQuery.data?.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-slate-400">No author found. A new one will be created.</div>
                       ) : null}
@@ -1031,6 +1060,20 @@ function splitComma(value: string) {
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function findMatchingAlias(author: AuthorDto, input: string) {
+  const normalizedInput = normalizeAuthorName(input)
+  if (!normalizedInput || normalizeAuthorName(author.primaryName) === normalizedInput) {
+    return undefined
+  }
+
+  return author.otherNames.find((name) => normalizeAuthorName(name) === normalizedInput)
+    ?? author.otherNames.find((name) => normalizeAuthorName(name).includes(normalizedInput))
+}
+
+function formatAuthorDisplay(primaryName: string, matchedAlias?: string) {
+  return matchedAlias ? `${primaryName} (${matchedAlias})` : primaryName
 }
 
 function DescriptionHelp({ value }: { value?: string | null }) {

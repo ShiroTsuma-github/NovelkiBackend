@@ -122,6 +122,8 @@ export const api = {
     apiRequest<AuthorDto>('/author', { method: 'POST', body: request }),
   updateAuthor: (id: string, request: UpdateAuthorRequest) =>
     apiRequest<AuthorDto>(`/author/${id}`, { method: 'PUT', body: request }),
+  updateAuthorVisibility: (id: string, isPublic: boolean) =>
+    apiRequest<AuthorDto>(`/author/${id}/visibility`, { method: 'PUT', body: { isPublic } }),
   deleteAuthor: (id: string) =>
     apiRequest<void>(`/author/${id}`, { method: 'DELETE' }),
   searchTags: (search: string, take = 10) =>

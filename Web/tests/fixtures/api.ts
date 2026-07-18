@@ -64,8 +64,8 @@ const managedTags = [
 ]
 
 const managedAuthors = [
-  { id: '50000000-0000-0000-0000-000000000001', primaryName: 'Cuttlefish', otherNames: ['Cuttlefish That Loves Diving'] },
-  { id: '50000000-0000-0000-0000-000000000002', primaryName: 'Toika', otherNames: [] },
+  { id: '50000000-0000-0000-0000-000000000001', primaryName: 'Cuttlefish', otherNames: ['Cuttlefish That Loves Diving'], isPublic: true },
+  { id: '50000000-0000-0000-0000-000000000002', primaryName: 'Toika', otherNames: [], isPublic: false },
 ]
 
 export const invalidImportSession = {

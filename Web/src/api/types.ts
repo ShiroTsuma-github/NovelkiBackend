@@ -450,6 +450,7 @@ export type AuthorDto = {
   id: string
   primaryName: string
   otherNames: string[]
+  isPublic: boolean
 }
 
 export type TagDto = {
@@ -493,4 +494,8 @@ export type UpdateTagRequest = {
 
 export type UpdateAuthorRequest = {
   otherNames: string[]
+}
+
+export type UpdateAuthorVisibilityRequest = {
+  isPublic: boolean
 }

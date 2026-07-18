@@ -152,6 +152,7 @@ function AuthorList({ authors, onEdit }: { authors: AuthorDto[]; onEdit: (author
             <strong>{author.primaryName}</strong>
             <small>{author.otherNames.length > 0 ? author.otherNames.join(' · ') : 'No alternative names'}</small>
           </span>
+          <Badge tone={author.isPublic ? 'accent' : 'neutral'}>{author.isPublic ? 'Public' : 'Private'}</Badge>
           <Badge tone={author.otherNames.length > 0 ? 'accent' : 'neutral'}>{author.otherNames.length} aliases</Badge>
         </ManageRow>
       ))}
@@ -271,6 +272,25 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
     }
   }
 
+  async function handleVisibilityChange() {
+    if (item?.kind !== 'author' || !item.value) {
+      return
+    }
+
+    const isPublic = !item.value.isPublic
+    setSaving(true)
+    try {
+      await api.updateAuthorVisibility(item.value.id, isPublic)
+      toast.success(`Author “${item.value.primaryName}” is now ${isPublic ? 'public' : 'private'}.`)
+      await queryClient.invalidateQueries({ queryKey: ['manage-metadata', 'authors'] })
+      onClose()
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div aria-labelledby={titleId} aria-modal="true" className="manage-dialog" role="dialog" onMouseDown={onClose}>
       <DialogPanel className="manage-dialog__panel" onMouseDown={(event) => event.stopPropagation()}>
@@ -326,9 +346,34 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
                 value={value}
                 onChange={(event) => setValue(event.target.value)}
               />
-              <small>One name per line. The primary name stays unchanged.</small>
+              <small>One name per line. The primary name stays unchanged.{isCreate ? ' New authors start private.' : ''}</small>
             </label>
           )}
+
+          {item.kind === 'author' && item.value ? (
+            <div className="rounded-xl border border-[var(--qs-line)] bg-[var(--qs-surface-muted)] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="max-w-md">
+                  <strong className="text-sm text-[var(--qs-text)]">
+                    {item.value.isPublic ? 'Public author' : 'Private author'}
+                  </strong>
+                  <p className="mt-1 text-xs leading-5 text-[var(--qs-muted)]">
+                    {item.value.isPublic
+                      ? 'Other readers can use this identity. Making it private creates private copies for libraries already using it.'
+                      : 'Only you can find this identity. Publishing makes its primary and alternative names available to everyone.'}
+                  </p>
+                </div>
+                <button
+                  className={buttonVariants.secondary}
+                  disabled={saving}
+                  type="button"
+                  onClick={handleVisibilityChange}
+                >
+                  {item.value.isPublic ? 'Make private' : 'Make public'}
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="manage-dialog__actions">
             {!isCreate ? <button
@@ -344,7 +389,9 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
             <button className={buttonVariants.secondary} disabled={saving} type="button" onClick={onClose}>Cancel</button>
             <button className={buttonVariants.primary} disabled={saving || (isCreate && !nameValue.trim())} type="submit">{saving ? 'Saving…' : isCreate ? `Create ${item.kind}` : 'Save changes'}</button>
           </div>
-          {confirmDelete ? <p className="manage-delete-note">This cannot be undone. Items still used by books cannot be deleted.</p> : null}
+          {confirmDelete ? <p className="manage-delete-note">{item.kind === 'author' && item.value?.isPublic
+            ? 'Your own books must stop using this author first. Other readers keep private copies.'
+            : 'This cannot be undone. Items still used by books cannot be deleted.'}</p> : null}
         </form>
       </DialogPanel>
     </div>

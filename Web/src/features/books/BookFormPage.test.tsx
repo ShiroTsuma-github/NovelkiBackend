@@ -174,4 +174,30 @@ describe('BookFormPage', () => {
     expect(reading.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByTestId('book-form-rail')).toContainElement(screen.getByRole('button', { name: 'Save' }))
   })
+
+  it('shows the matched alias but submits the primary author identity', async () => {
+    const user = userEvent.setup()
+    vi.mocked(api.searchAuthors).mockResolvedValue([{
+      id: 'author-1',
+      primaryName: 'Er Gen',
+      otherNames: ['Ergen'],
+      isPublic: true,
+    }])
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.type(screen.getByLabelText('Primary title'), 'Renegade Immortal')
+    await user.type(screen.getByLabelText('Author'), 'Ergen')
+    await user.click(await screen.findByRole('button', { name: /Er Gen \(Ergen\).*Public/i }))
+
+    expect(screen.getByLabelText('Author')).toHaveValue('Er Gen (Ergen)')
+    await user.type(screen.getByLabelText('Current chapter'), '1')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.createBook).toHaveBeenCalled())
+    expect(vi.mocked(api.createBook).mock.calls[0][0]).toMatchObject({
+      authorId: 'author-1',
+      authorName: 'Er Gen',
+    })
+  })
 })
