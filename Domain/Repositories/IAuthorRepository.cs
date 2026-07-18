@@ -12,6 +12,7 @@ public interface IAuthorRepository
         CancellationToken cancellationToken);
 
     public Task AddAsync(Author author, CancellationToken cancellationToken);
+    public void AddName(Author author, AuthorName name);
     public Task DeleteAsync(Author author, CancellationToken cancellationToken);
     public Task SaveAsync(CancellationToken cancellationToken);
 }

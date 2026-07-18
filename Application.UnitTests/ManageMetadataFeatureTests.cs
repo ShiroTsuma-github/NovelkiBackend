@@ -264,6 +264,11 @@ public class ManageMetadataFeatureTests
             return Task.CompletedTask;
         }
 
+        public void AddName(Author author, AuthorName name)
+        {
+            author.Names.Add(name);
+        }
+
         public Task DeleteAsync(Author author, CancellationToken cancellationToken)
         {
             Deleted = true;

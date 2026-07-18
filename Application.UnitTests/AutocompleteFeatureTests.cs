@@ -69,6 +69,11 @@ public class AutocompleteFeatureTests
             return Task.CompletedTask;
         }
 
+        public void AddName(Author author, AuthorName name)
+        {
+            author.Names.Add(name);
+        }
+
         public Task DeleteAsync(Author author, CancellationToken cancellationToken)
         {
             _authors.Remove(author);
