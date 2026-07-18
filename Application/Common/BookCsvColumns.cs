@@ -3,6 +3,7 @@ namespace Application.Common;
 public static class BookCsvColumns
 {
     public const string PrimaryTitle = "primaryTitle";
+    public const string AlternativeTitles = "alternativeTitles";
     public const string Author = "author";
     public const string AuthorName = "authorName";
     public const string ContentType = "contentType";
@@ -17,4 +18,6 @@ public static class BookCsvColumns
     public const string Description = "description";
     public const string Notes = "notes";
     public const string RawImportedLine = "rawImportedLine";
+    public const string Links = "links";
+    public const string ProgressHistory = "progressHistory";
 }

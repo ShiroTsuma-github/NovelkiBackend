@@ -1,18 +1,18 @@
+namespace Application.UnitTests;
+
 using System.Text;
 using Api.Controllers;
-using Application.Common.DTOs.Book;
-using Application.Common.Interfaces;
-using Application.Common.Models;
-using Application.Features.BookFeatures.Commands;
-using Application.Features.BookFeatures.Queries.GetBook;
+using Common.DTOs.Book;
+using Common.Interfaces;
+using Common.Models;
+using Features.BookFeatures.Commands;
+using Features.BookFeatures.Queries.GetBook;
 using MediatR;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-
-namespace Application.UnitTests;
 
 public class BookControllerTests
 {
@@ -175,6 +175,7 @@ public class BookControllerTests
             Rows = [new BookImportRowDto { RowId = rowId, LineNumber = 2, IsValid = true, PrimaryTitle = "Book" }]
         };
         var request = new UpdateBookImportRowRequest("Book", null, "Novel", "Reading", null, null, null, null, null,
+            null,
             null, null, null, null);
         var importService = new Mock<IBookCsvImportService>();
         importService.Setup(service => service.GetSessionAsync(sessionId, CancellationToken.None))

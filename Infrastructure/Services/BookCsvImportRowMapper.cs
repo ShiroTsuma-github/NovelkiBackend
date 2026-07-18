@@ -1,6 +1,7 @@
 namespace Infrastructure.Services;
 
 using System.Globalization;
+using System.Text.Json;
 using Application.Common.DTOs.Book;
 
 internal static class BookCsvImportRowMapper
@@ -12,9 +13,11 @@ internal static class BookCsvImportRowMapper
             RowId = Guid.NewGuid(),
             LineNumber = lineNumber,
             PrimaryTitle = CleanName(values, BookCsvColumns.PrimaryTitle),
+            AlternativeTitles = Clean(values, BookCsvColumns.AlternativeTitles),
             AuthorName = CleanName(values, BookCsvColumns.AuthorName),
             ContentType = CleanName(values, BookCsvColumns.ContentType),
             Status = CleanName(values, BookCsvColumns.Status),
+            Genres = NormalizeTags(Clean(values, BookCsvColumns.Genres)),
             Tags = NormalizeTags(Clean(values, BookCsvColumns.Tags)),
             TotalChapters = Clean(values, BookCsvColumns.TotalChapters),
             CurrentChapterNumber = Clean(values, BookCsvColumns.CurrentChapterNumber),
@@ -23,7 +26,9 @@ internal static class BookCsvImportRowMapper
             Priority = Clean(values, BookCsvColumns.Priority),
             Description = Clean(values, BookCsvColumns.Description),
             Notes = NormalizeNotes(Clean(values, BookCsvColumns.Notes)),
-            RawImportedLine = Clean(values, BookCsvColumns.RawImportedLine)
+            RawImportedLine = Clean(values, BookCsvColumns.RawImportedLine),
+            Links = Clean(values, BookCsvColumns.Links),
+            ProgressHistory = Clean(values, BookCsvColumns.ProgressHistory)
         };
     }
 
@@ -33,6 +38,7 @@ internal static class BookCsvImportRowMapper
         row.AuthorName = request.AuthorName;
         row.ContentType = request.ContentType;
         row.Status = request.Status;
+        row.Genres = request.Genres;
         row.Tags = request.Tags;
         row.TotalChapters = request.TotalChapters;
         row.CurrentChapterNumber = request.CurrentChapterNumber;
@@ -48,9 +54,11 @@ internal static class BookCsvImportRowMapper
     public static void NormalizeRow(ImportRow row)
     {
         row.PrimaryTitle = NormalizeNameToNull(row.PrimaryTitle);
+        row.AlternativeTitles = TrimToNull(row.AlternativeTitles);
         row.AuthorName = NormalizeNameToNull(row.AuthorName);
         row.ContentType = NormalizeNameToNull(row.ContentType);
         row.Status = NormalizeNameToNull(row.Status);
+        row.Genres = NormalizeTags(row.Genres);
         row.Tags = NormalizeTags(row.Tags);
         row.TotalChapters = TrimToNull(row.TotalChapters);
         row.CurrentChapterNumber = TrimToNull(row.CurrentChapterNumber);
@@ -60,6 +68,8 @@ internal static class BookCsvImportRowMapper
         row.Description = TrimToNull(row.Description);
         row.Notes = NormalizeNotes(row.Notes);
         row.RawImportedLine = TrimToNull(row.RawImportedLine);
+        row.Links = TrimToNull(row.Links);
+        row.ProgressHistory = TrimToNull(row.ProgressHistory);
     }
 
     public static IEnumerable<string> SplitTags(string? value)
@@ -138,6 +148,32 @@ internal static class BookCsvImportRowMapper
         }
 
         errors.Add(message);
+    }
+
+    public static IReadOnlyCollection<T> DeserializeCollection<T>(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? []
+            : JsonSerializer.Deserialize<List<T>>(value,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
+    }
+
+    public static bool IsJsonArray(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return true;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            return document.RootElement.ValueKind == JsonValueKind.Array;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static string? Clean(IReadOnlyDictionary<string, string> row, string key)
