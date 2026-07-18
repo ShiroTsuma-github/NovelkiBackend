@@ -1,8 +1,6 @@
 namespace Infrastructure.BookCovers;
 
-using System.Collections.Concurrent;
 using System.Text.Json;
-using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -191,6 +189,7 @@ public sealed class BookCoverProcessor
             {
                 CoverLinkHelper.TouchBook(cover.Book);
             }
+
             await _coverRepository.SaveAsync(cancellationToken);
             if (shouldInvalidateCache)
             {

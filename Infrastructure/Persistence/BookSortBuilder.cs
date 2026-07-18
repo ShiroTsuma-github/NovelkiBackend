@@ -1,9 +1,5 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
-using Domain.Entities;
-using System.Linq.Expressions;
-
 public sealed class BookSortBuilder
 {
     private readonly ApplicationDbContext _context;

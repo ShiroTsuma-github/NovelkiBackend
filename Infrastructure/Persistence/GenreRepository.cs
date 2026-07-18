@@ -1,7 +1,5 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
-
 public class GenreRepository : IGenreRepository
 {
     private readonly ApplicationDbContext _context;
@@ -48,6 +46,7 @@ public class GenreRepository : IGenreRepository
             {
                 throw new EntityInUseException<Genre>(genre.Name);
             }
+
             _context.Genres.Remove(genre);
             await _context.SaveChangesAsync(cancellationToken);
         }

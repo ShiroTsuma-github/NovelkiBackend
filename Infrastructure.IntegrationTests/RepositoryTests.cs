@@ -1,21 +1,22 @@
-using Application.Common;
-using Domain.Associations;
-using Domain.Entities;
-using Domain.Repositories;
-using Infrastructure.Contexts;
-using Infrastructure.IntegrationTests.TestSupport;
-using Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics;
-using System.Data.Common;
-using System.Text.Json;
-using Xunit.Abstractions;
-
 namespace Infrastructure.IntegrationTests;
 
-using Application.Common.DTOs.Book;
-using Application.Common.Models;
+using System.Data.Common;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
+using Application.Common;
+using Contexts;
+using Domain.Associations;
+using Domain.Entities;
 using Domain.Models;
+using Domain.Repositories;
+using FluentValidation;
+using Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Persistence;
+using TestSupport;
+using Xunit.Abstractions;
 
 public class RepositoryTests
 {
@@ -96,7 +97,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("33333333-3333-3333-3333-333333333333");
-        context.Users.Add(new Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
+        context.Users.Add(new User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
         var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
         await TestData.AddBookAsync(context, otherOwnerId, "Other");
         var repository = new BookRepository(context);
@@ -144,7 +145,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("66666666-6666-6666-6666-666666666666");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "other-progress", NormalizedUserName = "OTHER-PROGRESS"
         });
@@ -164,7 +165,7 @@ public class RepositoryTests
         Assert.Equal(20, await repository.GetTotalChaptersAsync(book.Id, database.UserId, CancellationToken.None));
         Assert.False(await repository.UpdateProgressAsync(Guid.NewGuid(), database.UserId, 1, "1", null,
             CancellationToken.None));
-        await Assert.ThrowsAsync<FluentValidation.ValidationException>(() =>
+        await Assert.ThrowsAsync<ValidationException>(() =>
             repository.UpdateProgressAsync(book.Id, database.UserId, 21, "21", null, CancellationToken.None));
 
         Assert.True(await repository.UpdateProgressAsync(book.Id, database.UserId, 10, "10", null,
@@ -264,7 +265,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("77777777-7777-7777-7777-777777777777");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "other-missing", NormalizedUserName = "OTHER-MISSING"
         });
@@ -363,11 +364,7 @@ public class RepositoryTests
 
             if (!IsMissing(BookSearchMissingField.Cover))
             {
-                book.Cover = new BookCover
-                {
-                    Status = BookCoverStatus.Found,
-                    StoragePath = $"{book.Id:N}/cover.jpg"
-                };
+                book.Cover = new BookCover { Status = BookCoverStatus.Found, StoragePath = $"{book.Id:N}/cover.jpg" };
             }
 
             if (!IsMissing(BookSearchMissingField.Link))
@@ -444,7 +441,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("99999999-9999-9999-9999-999999999999");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "analytics-other", NormalizedUserName = "ANALYTICS-OTHER"
         });
@@ -484,7 +481,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("88888888-8888-8888-8888-888888888888");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "composition-other", NormalizedUserName = "COMPOSITION-OTHER"
         });
@@ -548,7 +545,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("12121212-1212-1212-1212-121212121212");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "ratings-other", NormalizedUserName = "RATINGS-OTHER"
         });
@@ -618,7 +615,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("13131313-1313-1313-1313-131313131313");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "volumes-other", NormalizedUserName = "VOLUMES-OTHER"
         });
@@ -711,7 +708,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("14141414-1414-1414-1414-141414141414");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "activity-other", NormalizedUserName = "ACTIVITY-OTHER"
         });
@@ -846,10 +843,8 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("15151515-1515-1515-1515-151515151515");
-        context.Users.Add(new Identity.User
-        {
-            Id = otherOwnerId, UserName = "growth-other", NormalizedUserName = "GROWTH-OTHER"
-        });
+        context.Users.Add(
+            new User { Id = otherOwnerId, UserName = "growth-other", NormalizedUserName = "GROWTH-OTHER" });
 
         var opening = TestData.Book(database.UserId, "Growth Scope Opening");
         var yearEdge = TestData.Book(database.UserId, "Growth Scope Year Edge");
@@ -924,7 +919,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("16161616-1616-1616-1616-161616161616");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "quality-other", NormalizedUserName = "QUALITY-OTHER"
         });
@@ -1092,7 +1087,7 @@ public class RepositoryTests
                 "week"),
             CancellationToken.None);
         var elapsed = DateTimeOffset.UtcNow - started;
-        var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result.ToDto()));
+        var payloadBytes = Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result.ToDto()));
         var artifact = WriteAnalyticsPerformanceArtifact(
             "bounded",
             result,
@@ -1145,7 +1140,7 @@ public class RepositoryTests
                 "week"),
             CancellationToken.None);
         var elapsed = DateTimeOffset.UtcNow - started;
-        var payloadBytes = System.Text.Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result.ToDto()));
+        var payloadBytes = Encoding.UTF8.GetByteCount(JsonSerializer.Serialize(result.ToDto()));
         var progressHistoryCount = await context.BookProgressHistory.CountAsync();
         var artifact = WriteAnalyticsPerformanceArtifact(
             "large",
@@ -1375,10 +1370,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("77777777-7777-7777-7777-777777777777");
-        context.Users.Add(new Identity.User
-        {
-            Id = otherOwnerId, UserName = "other-sort", NormalizedUserName = "OTHER-SORT"
-        });
+        context.Users.Add(new User { Id = otherOwnerId, UserName = "other-sort", NormalizedUserName = "OTHER-SORT" });
         var snapshot = await BookCsvDatasetSeeder.SeedAsync(context, database.UserId);
         var other = await TestData.AddBookAsync(context, otherOwnerId, "Other");
         var oldest = snapshot.Samples[^1];
@@ -1531,7 +1523,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
-        context.Users.Add(new Identity.User
+        context.Users.Add(new User
         {
             Id = otherOwnerId, UserName = "other-admin-search", NormalizedUserName = "OTHER-ADMIN-SEARCH"
         });
@@ -1754,7 +1746,7 @@ public class RepositoryTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var otherOwnerId = Guid.Parse("44444444-4444-4444-4444-444444444444");
-        context.Users.Add(new Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
+        context.Users.Add(new User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
         context.Tags.Add(TestData.Tag(database.UserId, "favorite"));
         context.Tags.Add(TestData.Tag(otherOwnerId, "favorite"));
         await context.SaveChangesAsync();
@@ -1855,7 +1847,7 @@ public class RepositoryTests
                             ? baseline
                             : new DateTimeOffset(2026, 7, historyIndex % 28 + 1, 12, 0, 0, TimeSpan.Zero),
                         ChapterNumber = historyIndex,
-                        ChapterLabel = historyIndex.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                        ChapterLabel = historyIndex.ToString(CultureInfo.InvariantCulture)
                     });
                 }
 

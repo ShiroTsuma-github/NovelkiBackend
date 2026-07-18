@@ -1,8 +1,5 @@
 namespace Infrastructure.Services;
 
-using Application.Common;
-using Application.Common.Interfaces;
-
 public sealed class GlobalTagService(
     ApplicationDbContext context,
     IBookListCacheInvalidator cacheInvalidator) : IGlobalTagService
@@ -91,11 +88,12 @@ public sealed class GlobalTagService(
             return [];
         }
 
-        var privateBookIds = privateTags.SelectMany(tag => tag.BookTags).Select(link => link.BookId).Distinct().ToArray();
+        var privateBookIds = privateTags.SelectMany(tag => tag.BookTags).Select(link => link.BookId).Distinct()
+            .ToArray();
         var affectedOwners = await context.Books.Where(book => privateBookIds.Contains(book.Id))
             .Select(book => book.OwnerId).ToHashSetAsync(cancellationToken);
 
-        var globallyLinkedBookIds = await context.Set<Domain.Associations.BookTag>()
+        var globallyLinkedBookIds = await context.Set<BookTag>()
             .Where(link => link.TagId == globalTag.Id)
             .Select(link => link.BookId)
             .ToHashSetAsync(cancellationToken);
@@ -106,7 +104,7 @@ public sealed class GlobalTagService(
                 context.Remove(link);
                 if (globallyLinkedBookIds.Add(link.BookId))
                 {
-                    context.Add(new Domain.Associations.BookTag { BookId = link.BookId, TagId = globalTag.Id });
+                    context.Add(new BookTag { BookId = link.BookId, TagId = globalTag.Id });
                 }
             }
         }
@@ -116,11 +114,13 @@ public sealed class GlobalTagService(
         return affectedOwners;
     }
 
-    private Task<HashSet<Guid>> GetLinkedOwnerIdsAsync(Guid tagId, CancellationToken cancellationToken) =>
-        context.Set<Domain.Associations.BookTag>()
+    private Task<HashSet<Guid>> GetLinkedOwnerIdsAsync(Guid tagId, CancellationToken cancellationToken)
+    {
+        return context.Set<BookTag>()
             .Where(link => link.TagId == tagId)
             .Select(link => link.Book.OwnerId)
             .ToHashSetAsync(cancellationToken);
+    }
 
     private async Task InvalidateOwnersAsync(IEnumerable<Guid> ownerIds, CancellationToken cancellationToken)
     {
@@ -130,5 +130,8 @@ public sealed class GlobalTagService(
         }
     }
 
-    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static string? TrimToNull(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 }

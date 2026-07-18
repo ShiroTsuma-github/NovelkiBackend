@@ -1,8 +1,5 @@
 ﻿namespace Infrastructure.Persistence;
 
-using Application.Common;
-using Domain.Entities;
-
 public class StatusRepository : IStatusRepository
 {
     private readonly ApplicationDbContext _context;
@@ -27,6 +24,7 @@ public class StatusRepository : IStatusRepository
             {
                 throw new EntityInUseException<Status>(status.Name);
             }
+
             _context.Statuses.Remove(status);
             await _context.SaveChangesAsync(cancellationToken);
         }

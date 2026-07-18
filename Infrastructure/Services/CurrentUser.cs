@@ -1,9 +1,8 @@
 namespace Infrastructure.Services;
 
-using Application.Common.Interfaces;
-using Infrastructure.Authentication;
-using Microsoft.AspNetCore.Http;
 using System.Security.Claims;
+using Authentication;
+using Microsoft.AspNetCore.Http;
 
 public class CurrentUser : IUser
 {

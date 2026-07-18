@@ -1,13 +1,12 @@
 namespace Api.Controllers;
 
-using System.Diagnostics;
+using Application.Features.AccountFeatures;
 using Application.Features.BookFeatures.Commands;
 using Application.Features.BookFeatures.Queries.GetBook;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.StatusFeatures.Commands;
-using Application.Features.TypeFeatures.Commands;
 using Application.Features.TagFeatures.Commands;
-using Application.Features.AccountFeatures;
+using Application.Features.TypeFeatures.Commands;
 using Observability;
 
 [ApiController]

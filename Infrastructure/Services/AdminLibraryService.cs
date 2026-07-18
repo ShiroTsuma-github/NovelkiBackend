@@ -1,14 +1,10 @@
 namespace Infrastructure.Services;
 
-using Application.Common.Interfaces;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
-
 public sealed class AdminLibraryService : IAdminLibraryService
 {
+    private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly ApplicationDbContext _context;
     private readonly IBookCoverStorage _storage;
-    private readonly IBookListCacheInvalidator _cacheInvalidator;
 
     public AdminLibraryService(
         ApplicationDbContext context,

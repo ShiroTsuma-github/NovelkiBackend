@@ -1,13 +1,14 @@
+namespace Infrastructure.IntegrationTests;
+
 using Application.Common;
 using Application.Common.Interfaces;
+using Contexts;
+using Domain.Associations;
 using Domain.Entities;
 using Domain.Repositories;
-using Infrastructure.Contexts;
-using Infrastructure.IntegrationTests.TestSupport;
-using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-
-namespace Infrastructure.IntegrationTests;
+using Persistence;
+using TestSupport;
 
 public sealed class BookSearchCriteriaApplierTests
 {
@@ -211,15 +212,9 @@ public sealed class BookSearchCriteriaApplierTests
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var tagged = TestData.Book(database.UserId, "Tagged");
-        tagged.BookTags.Add(new Domain.Associations.BookTag
-        {
-            Book = tagged, Tag = TestData.Tag(database.UserId, "Relation Needle")
-        });
+        tagged.BookTags.Add(new BookTag { Book = tagged, Tag = TestData.Tag(database.UserId, "Relation Needle") });
         var genreBook = TestData.Book(database.UserId, "Genre");
-        genreBook.BookGenres.Add(new Domain.Associations.BookGenre
-        {
-            Book = genreBook, Genre = TestData.Genre("Relation Needle")
-        });
+        genreBook.BookGenres.Add(new BookGenre { Book = genreBook, Genre = TestData.Genre("Relation Needle") });
         context.Books.AddRange(tagged, genreBook);
         await context.SaveChangesAsync();
 
@@ -470,14 +465,7 @@ public sealed class BookSearchCriteriaApplierTests
             .ToArrayAsync();
 
         Assert.Equal(
-            new[]
-            {
-                failed.Id,
-                foundWithoutStorage.Id,
-                missingCover.Id,
-                notFound.Id,
-                pending.Id
-            }.Order(),
+            new[] { failed.Id, foundWithoutStorage.Id, missingCover.Id, notFound.Id, pending.Id }.Order(),
             ids.Order());
         Assert.DoesNotContain(usableFound.Id, ids);
         Assert.DoesNotContain(usableUploaded.Id, ids);
@@ -528,10 +516,7 @@ public sealed class BookSearchCriteriaApplierTests
             BookSearchMissingField.AlternateTitle);
         whitespace.Titles.Add(new BookTitle
         {
-            Title = "   ",
-            NormalizedTitle = string.Empty,
-            IsPrimary = false,
-            Source = "Test"
+            Title = "   ", NormalizedTitle = string.Empty, IsPrimary = false, Source = "Test"
         });
         await context.SaveChangesAsync();
 
@@ -818,18 +803,12 @@ public sealed class BookSearchCriteriaApplierTests
 
         if (missing != BookSearchMissingField.Genre)
         {
-            book.BookGenres.Add(new Domain.Associations.BookGenre
-            {
-                Book = book, Genre = TestData.Genre($"{title} Genre")
-            });
+            book.BookGenres.Add(new BookGenre { Book = book, Genre = TestData.Genre($"{title} Genre") });
         }
 
         if (missing != BookSearchMissingField.Tag)
         {
-            book.BookTags.Add(new Domain.Associations.BookTag
-            {
-                Book = book, Tag = TestData.Tag(ownerId, $"{title} Tag")
-            });
+            book.BookTags.Add(new BookTag { Book = book, Tag = TestData.Tag(ownerId, $"{title} Tag") });
         }
 
         if (missing != BookSearchMissingField.AlternateTitle)
@@ -845,11 +824,7 @@ public sealed class BookSearchCriteriaApplierTests
 
         if (missing != BookSearchMissingField.Cover)
         {
-            book.Cover = new BookCover
-            {
-                Status = BookCoverStatus.Found,
-                StoragePath = $"{book.Id:N}/cover.jpg"
-            };
+            book.Cover = new BookCover { Status = BookCoverStatus.Found, StoragePath = $"{book.Id:N}/cover.jpg" };
         }
 
         if (missing != BookSearchMissingField.Link)
