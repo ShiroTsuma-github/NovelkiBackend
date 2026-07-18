@@ -3,6 +3,7 @@ using Application.Features.BookFeatures.Commands;
 using Domain.Entities;
 using Domain.Exceptions;
 using Domain.Repositories;
+using Moq;
 
 namespace Application.UnitTests;
 
@@ -21,7 +22,12 @@ public class DeleteBookTests
             NormalizedPrimaryTitle = "NOVEL",
             ContentTypeId = Guid.NewGuid(),
             StatusId = Guid.NewGuid(),
-            Cover = new BookCover { StoragePath = "owner/book.jpg", MimeType = "image/jpeg" }
+            Cover = new BookCover
+            {
+                StoragePath = "owner/book.jpg",
+                ThumbnailStoragePath = "owner/book.thumb.jpg",
+                MimeType = "image/jpeg"
+            }
         };
         var repository = new FakeBookRepository(book);
         var storage = new FakeBookCoverStorage();
@@ -31,7 +37,7 @@ public class DeleteBookTests
         await handler.Handle(new DeleteBookCommand(book.Id), CancellationToken.None);
 
         Assert.Equal(book.Id, repository.DeletedBookId);
-        Assert.Equal("owner/book.jpg", storage.DeletedPath);
+        Assert.Equal(["owner/book.jpg", "owner/book.thumb.jpg"], storage.DeletedPaths);
         Assert.Equal(OwnerId, cache.InvalidatedOwnerId);
     }
 
@@ -48,6 +54,70 @@ public class DeleteBookTests
             handler.Handle(new DeleteBookCommand(Guid.NewGuid()), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task DeleteBook_ShouldUnlistBeforeDeletingBook()
+    {
+        var book = CreateBook();
+        var calls = new List<string>();
+        var repository = new FakeBookRepository(book, calls);
+        var publicBooks = new Mock<IPublicBookService>();
+        publicBooks.Setup(service => service.UnlistBySourceBookAsync(book.Id, It.IsAny<CancellationToken>()))
+            .Callback(() => calls.Add("unlist"))
+            .Returns(Task.CompletedTask);
+        var handler = new DeleteBookHandler(repository, new FakeBookCoverStorage(),
+            new FakeBookListCacheInvalidator(), new FakeUser(), publicBooks.Object);
+
+        await handler.Handle(new DeleteBookCommand(book.Id), CancellationToken.None);
+
+        Assert.Equal(["unlist", "delete"], calls);
+    }
+
+    [Fact]
+    public async Task DeleteBook_ShouldStopWhenUnlistFails()
+    {
+        var book = CreateBook();
+        var repository = new FakeBookRepository(book);
+        var publicBooks = new Mock<IPublicBookService>();
+        publicBooks.Setup(service => service.UnlistBySourceBookAsync(book.Id, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("unlist failed"));
+        var storage = new FakeBookCoverStorage();
+        var handler = new DeleteBookHandler(repository, storage, new FakeBookListCacheInvalidator(),
+            new FakeUser(), publicBooks.Object);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            handler.Handle(new DeleteBookCommand(book.Id), CancellationToken.None));
+
+        Assert.Null(repository.DeletedBookId);
+        Assert.Empty(storage.DeletedPaths);
+    }
+
+    [Fact]
+    public async Task DeleteBook_ShouldContinueWhenBookHasNoPublicSnapshot()
+    {
+        var book = CreateBook();
+        var repository = new FakeBookRepository(book);
+        var publicBooks = new Mock<IPublicBookService>();
+        publicBooks.Setup(service => service.UnlistBySourceBookAsync(book.Id, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        var handler = new DeleteBookHandler(repository, new FakeBookCoverStorage(),
+            new FakeBookListCacheInvalidator(), new FakeUser(), publicBooks.Object);
+
+        await handler.Handle(new DeleteBookCommand(book.Id), CancellationToken.None);
+
+        Assert.Equal(book.Id, repository.DeletedBookId);
+        publicBooks.VerifyAll();
+    }
+
+    private static Book CreateBook() => new()
+    {
+        Id = Guid.NewGuid(),
+        OwnerId = OwnerId,
+        PrimaryTitle = "Novel",
+        NormalizedPrimaryTitle = "NOVEL",
+        ContentTypeId = Guid.NewGuid(),
+        StatusId = Guid.NewGuid()
+    };
+
     private sealed class FakeUser : IUser
     {
         public Guid? Id => OwnerId;
@@ -63,9 +133,12 @@ public class DeleteBookTests
     {
         private readonly Book? _book;
 
-        public FakeBookRepository(Book? book)
+        private readonly List<string>? _calls;
+
+        public FakeBookRepository(Book? book, List<string>? calls = null)
         {
             _book = book;
+            _calls = calls;
         }
 
         public Guid? DeletedBookId { get; private set; }
@@ -77,6 +150,7 @@ public class DeleteBookTests
 
         public Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
         {
+            _calls?.Add("delete");
             DeletedBookId = _book?.OwnerId == ownerId ? id : null;
             return Task.CompletedTask;
         }
@@ -105,7 +179,7 @@ public class DeleteBookTests
 
     private sealed class FakeBookCoverStorage : IBookCoverStorage
     {
-        public string? DeletedPath { get; private set; }
+        public List<string> DeletedPaths { get; } = [];
 
         public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
             string? contentType, CancellationToken cancellationToken)
@@ -120,7 +194,10 @@ public class DeleteBookTests
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
         {
-            DeletedPath = storagePath;
+            if (storagePath is not null)
+            {
+                DeletedPaths.Add(storagePath);
+            }
             return Task.CompletedTask;
         }
     }

@@ -39,6 +39,10 @@ public class ErrorHandlingMiddlewareTests
         { new EntityNotFoundException<ContentType, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<Book, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<BookCover, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
+        {
+            new EntityNotFoundException<PublicBookSnapshot, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound,
+            "Not Found"
+        },
         { new EntityNotFoundException<Tag, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<Author, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityInUseException<Tag>("favorite"), StatusCodes.Status409Conflict, "Conflict" },

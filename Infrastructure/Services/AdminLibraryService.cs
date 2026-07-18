@@ -33,10 +33,12 @@ public sealed class AdminLibraryService : IAdminLibraryService
             .Where(book => book.OwnerId == ownerId)
             .Select(book => new { book.Id, book.AuthorId })
             .ToListAsync(cancellationToken);
-        var storagePaths = await _context.BookCovers
-            .Where(cover => cover.Book.OwnerId == ownerId && cover.StoragePath != null)
-            .Select(cover => cover.StoragePath)
+        var covers = await _context.BookCovers
+            .Where(cover => cover.Book.OwnerId == ownerId)
+            .Select(cover => new { cover.StoragePath, cover.ThumbnailStoragePath })
             .ToListAsync(cancellationToken);
+        var storagePaths = covers.SelectMany(cover => new[] { cover.StoragePath, cover.ThumbnailStoragePath })
+            .Where(path => !string.IsNullOrWhiteSpace(path)).Cast<string>().Distinct().ToList();
 
         if (books.Count == 0)
         {

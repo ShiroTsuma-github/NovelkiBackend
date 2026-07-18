@@ -29,12 +29,14 @@ public class DeleteBookHandler : IRequestHandler<DeleteBookCommand>
         var book = await _repository.GetByIdAsync(request.Id, _user.RequiredId, cancellationToken)
                    ?? throw new EntityNotFoundException<Book, Guid>(request.Id);
         var storagePath = book.Cover?.StoragePath;
+        var thumbnailStoragePath = book.Cover?.ThumbnailStoragePath;
         if (_publicBooks is not null)
         {
             await _publicBooks.UnlistBySourceBookAsync(book.Id, cancellationToken);
         }
         await _repository.DeleteAsync(request.Id, _user.RequiredId, cancellationToken);
         await _storage.DeleteIfExistsAsync(storagePath, cancellationToken);
+        await _storage.DeleteIfExistsAsync(thumbnailStoragePath, cancellationToken);
         await _cacheInvalidator.InvalidateBooksAsync(_user.RequiredId, cancellationToken);
     }
 }
