@@ -2,6 +2,8 @@ import { apiBlobRequest, apiFormRequest, apiRequest, toQueryString } from './htt
 import type {
   AuthorDto,
   AdminLibraryPurgeResult,
+  AdminUserDto,
+  AdminAccountDeleteResult,
   AdminBookDto,
   AdminBookListItemDto,
   BookDto,
@@ -166,4 +168,8 @@ export const api = {
   deleteAdminGlobalTag: (id: string) => apiRequest<void>(`/admin/tags/${id}`, { method: 'DELETE' }),
   deleteAdminBooksByOwner: (ownerId: string) =>
     apiRequest<AdminLibraryPurgeResult>(`/admin/books/owner/${ownerId}`, { method: 'DELETE' }),
+  getAdminUsers: (params: { skip?: number; take?: number; search?: string }) =>
+    apiRequest<PaginatedResult<AdminUserDto>>(`/admin/users${toQueryString(params)}`),
+  deleteAdminUser: (userId: string) =>
+    apiRequest<AdminAccountDeleteResult>(`/admin/users/${userId}`, { method: 'DELETE' }),
 }

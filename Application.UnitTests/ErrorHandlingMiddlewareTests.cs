@@ -20,6 +20,8 @@ public class ErrorHandlingMiddlewareTests
             new EntityNotFoundException<User, string>("missing"), StatusCodes.Status404NotFound, "Authentication Failed"
         },
         { new WrongPasswordException(), StatusCodes.Status401Unauthorized, "Authentication Failed" },
+        { new EntityNotFoundException<Infrastructure.Identity.User, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
+        { new CannotDeleteCurrentAccountException(), StatusCodes.Status409Conflict, "Conflict" },
         {
             new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()), StatusCodes.Status409Conflict,
             "Conflict"

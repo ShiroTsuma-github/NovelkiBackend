@@ -1,14 +1,12 @@
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { Edit } from 'lucide-react'
-import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { AdminBookListItemDto } from '@/api/types'
-import { HttpError } from '@/api/http'
-import { buttonVariants, PageHeader, Surface } from '@/components/app/DesignSystem'
-import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { PageHeader, Surface } from '@/components/app/DesignSystem'
+import { secondaryButtonClass } from '@/components/app/FormField'
 import { AdminMetadataManager } from './AdminMetadataManager'
+import { AdminAccountsManager } from './AdminAccountsManager'
 import { BookDataTable } from '@/features/books/BookDataTable'
 import {
   ColumnSettingsPopup,
@@ -58,8 +56,6 @@ const adminBookColumns: ColumnDefinition<AdminBookListItemDto>[] = [
 export function AdminPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(adminColumnsStorageKey, adminBookColumns)
-  const [ownerIdToPurge, setOwnerIdToPurge] = useState('')
-  const queryClient = useQueryClient()
   const {
     pageSize,
     query,
@@ -89,21 +85,6 @@ export function AdminPage() {
     total,
   })
   const scrollShortcuts = useBookListScrollShortcuts()
-  const purgeMutation = useMutation({
-    mutationFn: (ownerId: string) => api.deleteAdminBooksByOwner(ownerId),
-    onSuccess: async (result) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['adminBooks'] }),
-        queryClient.invalidateQueries({ queryKey: ['books'] }),
-      ])
-      toast.success(`Deleted ${result.deletedBooks} books, ${result.deletedAuthors} authors, ${result.deletedTags} tags.`)
-      setOwnerIdToPurge('')
-    },
-    onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : error.message)
-    },
-  })
-
   function setSort(nextSortBy: string) {
     setSortParams(nextSortBy, getNextSortDirection(nextSortBy, sortBy, sortDirection))
   }
@@ -117,34 +98,7 @@ export function AdminPage() {
       />
 
       <AdminMetadataManager />
-
-      <Surface className="grid gap-4 p-5" tone="danger">
-        <h2 className="ui-panel-title text-inherit">Purge user library</h2>
-        <p className="text-sm text-inherit opacity-80">Deletes all books for the given owner id, then removes orphaned authors and that user&apos;s orphaned tags.</p>
-        <div className="flex flex-wrap gap-2">
-          <input
-            className={`${inputClass} min-w-80`}
-            placeholder="OwnerId"
-            value={ownerIdToPurge}
-            onChange={(event) => setOwnerIdToPurge(event.target.value)}
-          />
-          <button
-            className={buttonVariants.destructive}
-            disabled={purgeMutation.isPending || !ownerIdToPurge.trim()}
-            type="button"
-            onClick={() => {
-              const ownerId = ownerIdToPurge.trim()
-              if (!window.confirm(`Delete all books for owner ${ownerId}? This also removes orphaned authors and tags.`)) {
-                return
-              }
-
-              purgeMutation.mutate(ownerId)
-            }}
-          >
-            {purgeMutation.isPending ? 'Purging...' : 'Delete all by owner id'}
-          </button>
-        </div>
-      </Surface>
+      <AdminAccountsManager />
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
