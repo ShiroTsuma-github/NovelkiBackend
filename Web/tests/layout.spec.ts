@@ -59,7 +59,7 @@ test('mobile navigation and primary actions keep touch targets', async ({ page }
   await expectMinHeight(page.getByRole('navigation', { name: /primary/i }).getByRole('link', { name: /books/i }), 44)
   await expectMinHeight(page.getByRole('button', { name: /log out/i }), 44)
   await expectMinHeight(page.getByRole('button', { name: /summary/i }), 44)
-  await expectMinHeight(page.getByRole('button', { name: /import csv/i }), 44)
+  await expectMinHeight(page.getByRole('button', { name: /^import$/i }), 44)
   await expectMinHeight(page.getByRole('link', { name: /add book/i }), 44)
 })
 
@@ -266,6 +266,25 @@ test('analytics layout exposes chart structure without page overflow', async ({ 
   await expect(rangeMiddle.locator('.analytics-calendar-day-button')).toHaveCSS('color', 'rgb(238, 242, 247)')
 })
 
+test('manage metadata workspace and editor fit desktop and mobile viewports', async ({ page }) => {
+  await page.goto('/manage')
+  await expect(page.getByRole('heading', { name: 'Manage' })).toBeVisible()
+  await expect(page.getByText('favorite', { exact: true })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await expectFitsViewportWidth(page.locator('.manage-workspace'))
+
+  await page.getByText('favorite', { exact: true }).dblclick()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible()
+  await expectInViewport(dialog.locator('.manage-dialog__panel'))
+  await expect(page.getByLabel('Description')).toBeVisible()
+  await page.getByRole('button', { name: /close dialog/i }).click()
+
+  await page.getByRole('tab', { name: 'Authors' }).click()
+  await expect(page.getByText('Cuttlefish', { exact: true })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+})
+
 test('progress dialog exposes error state through DOM and stays centered', async ({ page }) => {
   await page.goto('/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
   await page.getByRole('button', { name: /progress/i }).click()
@@ -333,7 +352,8 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
 
 test('csv import invalid rows panel keeps usable height in the browser layout', async ({ page }) => {
   await page.goto('/books')
-  await page.getByRole('button', { name: /import csv/i }).click()
+  await page.getByRole('button', { name: /^import$/i }).click()
+  await page.getByRole('menuitem', { name: /^csv/i }).click()
   await page.locator('input[type="file"]').setInputFiles({
     name: 'invalid-books.csv',
     mimeType: 'text/csv',

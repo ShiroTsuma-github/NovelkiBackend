@@ -1,14 +1,11 @@
-using Application.Common;
-using Application.Common.Interfaces;
-using Application.Features.AuthorFeatures.Queries;
-using Application.Features.TagFeatures.Queries;
-using Domain.Entities;
-using Domain.Repositories;
-
 namespace Application.UnitTests;
 
-using Common.DTOs.Author;
-using Common.DTOs.Tag;
+using Common;
+using Common.Interfaces;
+using Domain.Entities;
+using Domain.Repositories;
+using Features.AuthorFeatures.Queries;
+using Features.TagFeatures.Queries;
 
 public class AutocompleteFeatureTests
 {
@@ -21,7 +18,7 @@ public class AutocompleteFeatureTests
         var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
         author.Names.Add(new AuthorName { Name = "耳根", NormalizedName = "耳根", IsPrimary = false });
         await repository.AddAsync(author, CancellationToken.None);
-        var handler = new SearchAuthorsQueryHandler(repository);
+        var handler = new SearchAuthorsQueryHandler(repository, new FakeUser());
 
         var result =
             await handler.Handle(new SearchAuthorsQuery("耳", 10), CancellationToken.None);
@@ -68,6 +65,12 @@ public class AutocompleteFeatureTests
             return Task.CompletedTask;
         }
 
+        public Task DeleteAsync(Author author, CancellationToken cancellationToken)
+        {
+            _authors.Remove(author);
+            return Task.CompletedTask;
+        }
+
         public Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
         {
             return Task.FromResult(_authors.FirstOrDefault(a => a.Id == id));
@@ -89,6 +92,15 @@ public class AutocompleteFeatureTests
                 .ToList());
         }
 
+        public Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Author>>(_authors
+                .Where(author => author.CreatedBy == createdBy)
+                .Take(take)
+                .ToList());
+        }
+
         public Task SaveAsync(CancellationToken cancellationToken)
         {
             return Task.CompletedTask;
@@ -103,6 +115,17 @@ public class AutocompleteFeatureTests
         {
             _tags.Add(tag);
             return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Tag tag, CancellationToken cancellationToken)
+        {
+            _tags.Remove(tag);
+            return Task.CompletedTask;
+        }
+
+        public Task<Tag?> GetByIdAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_tags.FirstOrDefault(t => t.OwnerId == ownerId && t.Id == id));
         }
 
         public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,

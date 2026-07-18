@@ -1,7 +1,5 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
-
 public class TagRepository : ITagRepository
 {
     private readonly ApplicationDbContext _context;
@@ -9,6 +7,13 @@ public class TagRepository : ITagRepository
     public TagRepository(ApplicationDbContext context)
     {
         _context = context;
+    }
+
+    public async Task<Tag?> GetByIdAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+    {
+        return await _context.Tags
+            .Include(t => t.BookTags)
+            .FirstOrDefaultAsync(t => t.OwnerId == ownerId && t.Id == id, cancellationToken);
     }
 
     public async Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
@@ -44,6 +49,12 @@ public class TagRepository : ITagRepository
     public async Task AddAsync(Tag tag, CancellationToken cancellationToken)
     {
         _context.Tags.Add(tag);
+        await _context.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteAsync(Tag tag, CancellationToken cancellationToken)
+    {
+        _context.Tags.Remove(tag);
         await _context.SaveChangesAsync(cancellationToken);
     }
 

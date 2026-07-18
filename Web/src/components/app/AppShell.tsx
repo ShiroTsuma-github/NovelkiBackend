@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, LogOut, Plus, Search, Shield } from 'lucide-react'
+import { BarChart3, BookOpen, LogOut, Plus, Search, Settings2, Shield } from 'lucide-react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { buttonVariants } from '@/components/app/DesignSystem'
@@ -47,6 +47,10 @@ export function AppShell() {
             <NavLink className={navLinkClass} to="/books/new">
               <Plus className="h-4 w-4" />
               Add
+            </NavLink>
+            <NavLink className={navLinkClass} to="/manage">
+              <Settings2 className="h-4 w-4" />
+              Manage
             </NavLink>
             {isAdmin ? (
               <NavLink className={navLinkClass} to="/admin">

@@ -1,11 +1,11 @@
 namespace Application.Common;
 
-using Application.Common.DTOs.Author;
-using Application.Common.DTOs.Book;
-using Application.Common.DTOs.Genre;
-using Application.Common.DTOs.Status;
-using Application.Common.DTOs.Tag;
-using Application.Common.DTOs.Type;
+using DTOs.Author;
+using DTOs.Book;
+using DTOs.Genre;
+using DTOs.Status;
+using DTOs.Tag;
+using DTOs.Type;
 using Features.GenreFeatures.Commands;
 using Features.StatusFeatures.Commands;
 using Features.TypeFeatures.Commands;
@@ -26,7 +26,7 @@ public static partial class MappingExtensions
         {
             Id = source.Id,
             PrimaryName = source.PrimaryName,
-            OtherNames = source.Names.Where(n => !n.IsPrimary).Select(n => n.Name).ToList()
+            OtherNames = source.Names.Where(n => !n.IsPrimary).OrderBy(n => n.Name).Select(n => n.Name).ToList()
         };
     }
 

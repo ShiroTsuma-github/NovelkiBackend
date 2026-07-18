@@ -458,3 +458,11 @@ export type TagDto = {
   description?: string | null
   color?: string | null
 }
+
+export type UpdateTagRequest = {
+  description?: string | null
+}
+
+export type UpdateAuthorRequest = {
+  otherNames: string[]
+}

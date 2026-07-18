@@ -22,6 +22,8 @@ import type {
   TagDto,
   TokenResponse,
   UpdateProgressRequest,
+  UpdateAuthorRequest,
+  UpdateTagRequest,
 } from './types'
 
 export const api = {
@@ -108,12 +110,20 @@ export const api = {
     apiRequest<void>(`/book/${id}/cover`, { method: 'DELETE' }),
   deleteBook: (id: string) =>
     apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
-  searchAuthors: (search: string, take = 10) =>
+  searchAuthors: (search: string, take = 10, mineOnly = false) =>
     apiRequest<AuthorDto[]>(
-      `/author${toQueryString({ search, take })}`,
+      `/author${toQueryString({ search, take, mineOnly: mineOnly || undefined })}`,
     ),
+  updateAuthor: (id: string, request: UpdateAuthorRequest) =>
+    apiRequest<AuthorDto>(`/author/${id}`, { method: 'PUT', body: request }),
+  deleteAuthor: (id: string) =>
+    apiRequest<void>(`/author/${id}`, { method: 'DELETE' }),
   searchTags: (search: string, take = 10) =>
     apiRequest<TagDto[]>(`/tag${toQueryString({ search, take })}`),
+  updateTag: (id: string, request: UpdateTagRequest) =>
+    apiRequest<TagDto>(`/tag/${id}`, { method: 'PUT', body: request }),
+  deleteTag: (id: string) =>
+    apiRequest<void>(`/tag/${id}`, { method: 'DELETE' }),
   getTypes: () =>
     apiRequest<PaginatedResult<DictionaryDto>>(
       `/type${toQueryString({ skip: 0, take: 100 })}`,

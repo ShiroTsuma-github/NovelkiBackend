@@ -58,6 +58,16 @@ const dictionaries = {
   ],
 }
 
+const managedTags = [
+  { id: '40000000-0000-0000-0000-000000000001', name: 'favorite', description: 'Worth rereading', color: null },
+  { id: '40000000-0000-0000-0000-000000000002', name: 'mystery', description: null, color: null },
+]
+
+const managedAuthors = [
+  { id: '50000000-0000-0000-0000-000000000001', primaryName: 'Cuttlefish', otherNames: ['Cuttlefish That Loves Diving'] },
+  { id: '50000000-0000-0000-0000-000000000002', primaryName: 'Toika', otherNames: [] },
+]
+
 export const invalidImportSession = {
   sessionId: 'layout-session',
   fileName: 'invalid-books.csv',
@@ -213,6 +223,16 @@ export async function installLayoutApiMocks(page: Page) {
 
     if (path === 'book') {
       await route.fulfill({ json: { skip: 0, take: 20, total: layoutBooks.length, data: layoutBooks } })
+      return
+    }
+
+    if (path === 'tag') {
+      await route.fulfill({ json: managedTags })
+      return
+    }
+
+    if (path === 'author') {
+      await route.fulfill({ json: managedAuthors })
       return
     }
 

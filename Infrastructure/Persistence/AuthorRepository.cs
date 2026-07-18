@@ -1,13 +1,12 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
-
 public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
 {
     public async Task<Author?> GetByIdAsync(Guid id, CancellationToken cancellationToken)
     {
         return await context.Authors
             .Include(a => a.Names)
+            .Include(a => a.Books)
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
     }
 
@@ -24,20 +23,19 @@ public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
 
     public async Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
     {
-        var query = context.Authors.Include(a => a.Names).AsQueryable();
-        if (string.IsNullOrWhiteSpace(search))
-        {
-            return await query.OrderBy(a => a.PrimaryName).Take(take).ToListAsync(cancellationToken);
-        }
+        return await SearchQuery(context.Authors.Include(a => a.Names), search)
+            .OrderBy(a => a.PrimaryName)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+    }
 
-
-        var normalizedSearch = MappingExtensions.NormalizeName(search);
-        query = query.Where(a =>
-            a.NormalizedPrimaryName.Contains(normalizedSearch) ||
-            a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)));
-
-
-        return await query.OrderBy(a => a.PrimaryName).Take(take).ToListAsync(cancellationToken);
+    public async Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+        CancellationToken cancellationToken)
+    {
+        return await SearchQuery(context.Authors.Include(a => a.Names).Where(a => a.CreatedBy == createdBy), search)
+            .OrderBy(a => a.PrimaryName)
+            .Take(take)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task AddAsync(Author author, CancellationToken cancellationToken)
@@ -46,8 +44,27 @@ public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task DeleteAsync(Author author, CancellationToken cancellationToken)
+    {
+        context.Authors.Remove(author);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SaveAsync(CancellationToken cancellationToken)
     {
         await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static IQueryable<Author> SearchQuery(IQueryable<Author> query, string? search)
+    {
+        if (string.IsNullOrWhiteSpace(search))
+        {
+            return query;
+        }
+
+        var normalizedSearch = MappingExtensions.NormalizeName(search);
+        return query.Where(a =>
+            a.NormalizedPrimaryName.Contains(normalizedSearch) ||
+            a.Names.Any(n => n.NormalizedName.Contains(normalizedSearch)));
     }
 }

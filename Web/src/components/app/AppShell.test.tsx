@@ -44,6 +44,13 @@ describe('AppShell', () => {
     expect(screen.getByRole('link', { name: /analytics/i })).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: /books/i })).not.toHaveAttribute('aria-current')
   })
+
+  it('exposes and activates the manage workspace', () => {
+    renderAt('/manage')
+
+    expect(screen.getByRole('link', { name: /manage/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /books/i })).not.toHaveAttribute('aria-current')
+  })
 })
 
 function renderAt(route: string) {
@@ -54,6 +61,7 @@ function renderAt(route: string) {
           <Route element={<div>Page</div>} path="/books" />
           <Route element={<div>Page</div>} path="/analytics" />
           <Route element={<div>Page</div>} path="/books/new" />
+          <Route element={<div>Page</div>} path="/manage" />
         </Route>
       </Routes>
     </MemoryRouter>,

@@ -1,6 +1,6 @@
 namespace Api.Controllers;
 
-using Application.Common.DTOs.Tag;
+using Application.Features.TagFeatures.Commands;
 using Application.Features.TagFeatures.Queries;
 
 [ApiController]
@@ -20,5 +20,21 @@ public class TagController : ControllerBase
     {
         var tags = await _mediator.Send(query);
         return Ok(tags);
+    }
+
+    [HttpPut(ApiRouteTemplates.Id)]
+    [Authorize]
+    public async Task<IActionResult> Update(Guid id, UpdateTagCommand command)
+    {
+        command.Id = id;
+        return Ok(await _mediator.Send(command));
+    }
+
+    [HttpDelete(ApiRouteTemplates.Id)]
+    [Authorize]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        await _mediator.Send(new DeleteTagCommand(id));
+        return NoContent();
     }
 }
