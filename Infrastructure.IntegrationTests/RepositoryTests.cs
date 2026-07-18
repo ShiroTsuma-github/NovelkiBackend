@@ -171,6 +171,14 @@ public class RepositoryTests
             CancellationToken.None));
         Assert.True(await repository.UpdateProgressAsync(book.Id, database.UserId, 10, "10", "note",
             CancellationToken.None));
+        var history = await context.BookProgressHistory
+            .Where(history => history.BookId == book.Id)
+            .ToListAsync();
+        var entry = Assert.Single(history);
+        Assert.Equal("note", entry.Comment);
+
+        Assert.True(await repository.UpdateProgressAsync(book.Id, database.UserId, 9, "9", "older chapter",
+            CancellationToken.None));
         Assert.Equal(2, await context.BookProgressHistory.CountAsync(history => history.BookId == book.Id));
         await repository.DeleteAsync(Guid.NewGuid(), database.UserId, CancellationToken.None);
         await repository.DeleteAsync(book.Id, database.UserId, CancellationToken.None);

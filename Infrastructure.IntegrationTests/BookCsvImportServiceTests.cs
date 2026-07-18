@@ -36,6 +36,27 @@ public class BookCsvImportServiceTests
     }
 
     [Fact]
+    public async Task CreateSessionAsync_ShouldAcceptSemicolonDelimitedCsv()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+
+        using var stream = CreateCsv("""
+                                     primaryTitle;contentType;status
+                                     Semicolon Book;Manhua;Reading
+                                     """);
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+
+        var row = Assert.Single(session.Rows);
+        Assert.True(row.IsValid);
+        Assert.Equal("Semicolon Book", row.PrimaryTitle);
+        Assert.Equal("Manhua", row.ContentType);
+        Assert.Equal("Reading", row.Status);
+    }
+
+    [Fact]
     public async Task CreateSessionAsync_ShouldNormalizeFieldsAndFlagInvalidRows()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());

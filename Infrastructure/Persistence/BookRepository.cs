@@ -109,7 +109,7 @@ public class BookRepository : IBookRepository
         book.CurrentChapterNumber = currentChapterNumber;
         book.CurrentChapterLabel = currentChapterLabel;
 
-        if (progressChanged || hasComment)
+        if (progressChanged)
         {
             _context.BookProgressHistory.Add(new BookProgressHistory
             {
@@ -118,6 +118,32 @@ public class BookRepository : IBookRepository
                 ChapterLabel = currentChapterLabel,
                 Comment = comment
             });
+        }
+        else if (hasComment)
+        {
+            var progressHistory = await _context.BookProgressHistory
+                .Where(history => history.BookId == book.Id)
+                .ToListAsync(cancellationToken);
+            var latestHistory = progressHistory
+                .OrderByDescending(history => history.ChangedAt)
+                .ThenByDescending(history => history.Id)
+                .FirstOrDefault();
+
+            if (latestHistory is not null && latestHistory.ChapterNumber == currentChapterNumber &&
+                latestHistory.ChapterLabel == currentChapterLabel)
+            {
+                latestHistory.Comment = comment;
+            }
+            else
+            {
+                _context.BookProgressHistory.Add(new BookProgressHistory
+                {
+                    BookId = book.Id,
+                    ChapterNumber = currentChapterNumber,
+                    ChapterLabel = currentChapterLabel,
+                    Comment = comment
+                });
+            }
         }
 
         await SaveAsync(cancellationToken);

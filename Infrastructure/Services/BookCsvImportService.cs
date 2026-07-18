@@ -62,11 +62,12 @@ public sealed class BookCsvImportService : IBookCsvImportService
     {
         var ownerId = _user.RequiredId;
         using var reader = new StreamReader(csvStream, leaveOpen: true);
-        using var parser = new TextFieldParser(reader)
+        var csv = await reader.ReadToEndAsync(cancellationToken);
+        using var parser = new TextFieldParser(new StringReader(csv))
         {
             TextFieldType = FieldType.Delimited, HasFieldsEnclosedInQuotes = true, TrimWhiteSpace = false
         };
-        parser.SetDelimiters(",");
+        parser.SetDelimiters(DetectDelimiter(csv));
 
         if (parser.EndOfData)
         {
@@ -456,5 +457,48 @@ public sealed class BookCsvImportService : IBookCsvImportService
     private static int NormalizeLineNumber(int? lineNumber)
     {
         return lineNumber.HasValue && lineNumber.Value > 0 ? lineNumber.Value : 1;
+    }
+
+    private static string DetectDelimiter(string csv)
+    {
+        using var reader = new StringReader(csv);
+        string? header;
+        do
+        {
+            header = reader.ReadLine();
+        } while (header != null && string.IsNullOrWhiteSpace(header));
+
+        if (string.IsNullOrEmpty(header))
+        {
+            return ",";
+        }
+
+        return CountUnquotedDelimiters(header, ';') > CountUnquotedDelimiters(header, ',') ? ";" : ",";
+    }
+
+    private static int CountUnquotedDelimiters(string value, char delimiter)
+    {
+        var count = 0;
+        var insideQuotes = false;
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (value[index] == '"')
+            {
+                if (insideQuotes && index + 1 < value.Length && value[index + 1] == '"')
+                {
+                    index++;
+                }
+                else
+                {
+                    insideQuotes = !insideQuotes;
+                }
+            }
+            else if (!insideQuotes && value[index] == delimiter)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 }
