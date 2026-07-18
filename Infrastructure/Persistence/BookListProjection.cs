@@ -13,6 +13,7 @@ internal sealed class BookListProjection
     public required List<string> AlternativeTitles { get; init; }
     public int AlternativeTitlesCount { get; init; }
     public string? Author { get; init; }
+    public required List<string> AuthorOtherNames { get; init; }
     public required string ContentType { get; init; }
     public required string Status { get; init; }
     public decimal? CurrentChapterNumber { get; init; }
@@ -22,8 +23,10 @@ internal sealed class BookListProjection
     public int? Priority { get; init; }
     public string? Notes { get; init; }
     public required List<string> Genres { get; init; }
+    public required List<string?> GenreDescriptions { get; init; }
     public int GenresCount { get; init; }
     public required List<string> Tags { get; init; }
+    public required List<string?> TagDescriptions { get; init; }
     public int TagsCount { get; init; }
     public int LinksCount { get; init; }
     public BookCoverStatus? CoverStatus { get; init; }
@@ -112,6 +115,7 @@ internal static class BookListProjectionMapper
         destination.AlternativeTitles = projection.AlternativeTitles;
         destination.AlternativeTitlesCount = projection.AlternativeTitlesCount;
         destination.Author = projection.Author;
+        destination.AuthorOtherNames = projection.AuthorOtherNames;
         destination.ContentType = projection.ContentType;
         destination.Status = projection.Status;
         destination.CurrentChapterNumber = projection.CurrentChapterNumber;
@@ -121,8 +125,14 @@ internal static class BookListProjectionMapper
         destination.Priority = projection.Priority;
         destination.Notes = projection.Notes;
         destination.Genres = projection.Genres;
+        destination.GenreDescriptions = projection.Genres
+            .Zip(projection.GenreDescriptions)
+            .ToDictionary(item => item.First, item => item.Second);
         destination.GenresCount = projection.GenresCount;
         destination.Tags = projection.Tags;
+        destination.TagDescriptions = projection.Tags
+            .Zip(projection.TagDescriptions)
+            .ToDictionary(item => item.First, item => item.Second);
         destination.TagsCount = projection.TagsCount;
         destination.LinksCount = projection.LinksCount;
         destination.Cover = MapCoverProjection(projection);
