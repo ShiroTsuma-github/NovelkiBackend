@@ -12,6 +12,7 @@ import { BookDetailsPage } from '@/features/books/BookDetailsPage'
 import { BookFormPage } from '@/features/books/BookFormPage'
 import { BooksPage } from '@/features/books/BooksPage'
 import { ManagePage } from '@/features/manage/ManagePage'
+import { DiscoverPage } from '@/features/discover/DiscoverPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -34,6 +35,7 @@ export function App() {
               <Route path="/books" element={<BooksPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="/manage" element={<ManagePage />} />
+              <Route path="/discover" element={<DiscoverPage />} />
               <Route path="/books/new" element={<BookFormPage mode="create" />} />
               <Route path="/books/:id" element={<BookDetailsPage />} />
               <Route path="/books/:id/edit" element={<BookFormPage mode="edit" />} />

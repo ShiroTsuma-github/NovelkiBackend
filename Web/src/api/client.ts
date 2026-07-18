@@ -28,6 +28,8 @@ import type {
   UpdateTagRequest,
   CreateAuthorRequest,
   CreateTagRequest,
+  CopyPublicBookResult,
+  PublicBookSnapshotDto,
 } from './types'
 
 export const api = {
@@ -114,6 +116,16 @@ export const api = {
     apiRequest<void>(`/book/${id}/cover`, { method: 'DELETE' }),
   deleteBook: (id: string) =>
     apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
+  searchPublicBooks: (params: { search?: string; skip?: number; take?: number; mineOnly?: boolean }) =>
+    apiRequest<PaginatedResult<PublicBookSnapshotDto>>(`/public-book${toQueryString(params)}`),
+  publishBook: (bookId: string) =>
+    apiRequest<PublicBookSnapshotDto>(`/public-book/source/${bookId}`, { method: 'POST' }),
+  refreshPublishedBook: (snapshotId: string) =>
+    apiRequest<PublicBookSnapshotDto>(`/public-book/${snapshotId}/refresh`, { method: 'PUT' }),
+  unlistPublishedBook: (snapshotId: string) =>
+    apiRequest<void>(`/public-book/${snapshotId}`, { method: 'DELETE' }),
+  copyPublicBook: (snapshotId: string) =>
+    apiRequest<CopyPublicBookResult>(`/public-book/${snapshotId}/copy`, { method: 'POST' }),
   searchAuthors: (search: string, take = 10, mineOnly = false) =>
     apiRequest<AuthorDto[]>(
       `/author${toQueryString({ search, take, mineOnly: mineOnly || undefined })}`,

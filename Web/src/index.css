@@ -752,6 +752,153 @@ select.ui-control {
   gap: 1rem;
 }
 
+.discover-page {
+  display: grid;
+  gap: 1rem;
+}
+
+.discover-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+}
+
+.discover-search {
+  flex: 1;
+  margin-top: 0;
+}
+
+.discover-toolbar__meta {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 0.5rem;
+  color: var(--qs-muted);
+  font-size: 0.75rem;
+}
+
+.discover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 25rem), 1fr));
+  gap: 1rem;
+}
+
+.discover-card {
+  display: grid;
+  min-height: 21rem;
+  grid-template-columns: 9.5rem minmax(0, 1fr);
+  overflow: hidden;
+  transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.discover-card:hover {
+  border-color: var(--qs-border-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--qs-shadow-raised);
+}
+
+.discover-card__cover {
+  border-right: 1px solid var(--qs-border);
+  background: var(--qs-surface-muted);
+}
+
+.discover-card__cover .book-cover-artwork {
+  height: 100%;
+  min-height: 21rem;
+}
+
+.discover-card__body {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.discover-card__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.discover-card__title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--qs-text);
+  font-size: 1rem;
+  font-weight: 720;
+  letter-spacing: -0.015em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discover-card__author {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  margin-top: 0.25rem;
+  color: var(--qs-muted);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.discover-card__description {
+  display: -webkit-box;
+  overflow: hidden;
+  margin: 0;
+  color: var(--qs-muted);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.discover-card__metadata {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.discover-card__metadata > span {
+  color: var(--qs-subtle);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.discover-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--qs-border);
+}
+
+.discover-card__footer > span {
+  color: var(--qs-subtle);
+  font-size: 0.68rem;
+}
+
+.discover-state {
+  display: grid;
+  min-height: 18rem;
+  place-content: center;
+  gap: 0.5rem;
+  color: var(--qs-muted);
+  text-align: center;
+}
+
+.discover-state strong {
+  color: var(--qs-text);
+}
+
 .manage-workspace {
   display: grid;
   min-height: 34rem;
@@ -909,6 +1056,12 @@ select.ui-control {
   white-space: nowrap;
 }
 
+.manage-book-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
 .manage-state {
   display: grid;
   min-height: 15rem;
@@ -1008,6 +1161,28 @@ select.ui-control {
 }
 
 @media (max-width: 640px) {
+  .discover-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .discover-toolbar__meta {
+    padding: 0 0.25rem;
+  }
+
+  .discover-card {
+    grid-template-columns: 7rem minmax(0, 1fr);
+  }
+
+  .discover-card__cover .book-cover-artwork {
+    min-height: 19rem;
+  }
+
+  .discover-card__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .manage-workspace {
     grid-template-columns: 1fr;
   }
@@ -1033,6 +1208,17 @@ select.ui-control {
 
   .manage-item .ui-badge {
     display: none;
+  }
+
+  .manage-book-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manage-book-actions .ui-button,
+  .manage-item > .ui-button {
+    padding-right: 0.65rem;
+    padding-left: 0.65rem;
   }
 
   .manage-dialog__actions > button {

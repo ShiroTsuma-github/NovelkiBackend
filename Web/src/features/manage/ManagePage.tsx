@@ -1,14 +1,15 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Tags, Trash2, Users, X } from 'lucide-react'
+import { BookOpen, EyeOff, Globe2, Plus, RefreshCw, Search, Tags, Trash2, Users, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
-import type { AuthorDto, TagDto } from '@/api/types'
+import type { AuthorDto, BookListItemDto, PublicBookSnapshotDto, TagDto } from '@/api/types'
 import { Badge, buttonVariants, controlClass, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
+import { buildBookQuery, emptyFilters } from '@/features/books/queryBuilder'
 import { cn } from '@/lib/utils'
 
-type ManageSection = 'tags' | 'authors'
+type ManageSection = 'tags' | 'authors' | 'books'
 type ManagedItem = { kind: 'tag'; value: TagDto | null } | { kind: 'author'; value: AuthorDto | null }
 
 export function ManagePage() {
@@ -16,6 +17,8 @@ export function ManagePage() {
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selected, setSelected] = useState<ManagedItem | null>(null)
+  const [bookActionId, setBookActionId] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 180)
@@ -27,6 +30,23 @@ export function ManagePage() {
     queryFn: () => section === 'tags'
       ? api.searchTags(debouncedSearch, 50)
       : api.searchAuthors(debouncedSearch, 50, true),
+    enabled: section !== 'books',
+  })
+
+  const libraryBooks = useQuery({
+    queryKey: ['manage-books', debouncedSearch],
+    queryFn: () => api.getBooks({
+      skip: 0,
+      take: 50,
+      query: buildBookQuery({ ...emptyFilters, text: debouncedSearch }) || undefined,
+    }),
+    enabled: section === 'books',
+  })
+
+  const publishedBooks = useQuery({
+    queryKey: ['public-books', 'mine'],
+    queryFn: () => api.searchPublicBooks({ skip: 0, take: 50, mineOnly: true }),
+    enabled: section === 'books',
   })
 
   function changeSection(next: ManageSection) {
@@ -35,18 +55,34 @@ export function ManagePage() {
     setDebouncedSearch('')
   }
 
-  const itemCount = results.data?.length ?? 0
+  const itemCount = section === 'books' ? libraryBooks.data?.total ?? 0 : results.data?.length ?? 0
+
+  async function runBookAction(bookId: string, action: () => Promise<unknown>, success: string) {
+    setBookActionId(bookId)
+    try {
+      await action()
+      toast.success(success)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['public-books'] }),
+        queryClient.invalidateQueries({ queryKey: ['manage-metadata'] }),
+      ])
+    } catch (error) {
+      toast.error(getErrorMessage(error))
+    } finally {
+      setBookActionId(null)
+    }
+  }
 
   return (
     <div className="manage-page">
       <PageHeader
-        description="Keep saved tags and author identities tidy, even after their books are gone."
-        eyebrow="Library metadata"
+        description="Keep saved metadata tidy and control which private books have a public snapshot."
+        eyebrow="Library controls"
         title="Manage"
       />
 
       <Surface className="manage-workspace">
-        <div className="manage-rail" role="tablist" aria-label="Metadata type">
+        <div className="manage-rail" role="tablist" aria-label="Manage section">
           <button
             aria-selected={section === 'tags'}
             className={cn('manage-tab', section === 'tags' && 'manage-tab--active')}
@@ -67,24 +103,34 @@ export function ManagePage() {
             <Users className="h-4 w-4" />
             <span>Authors</span>
           </button>
+          <button
+            aria-selected={section === 'books'}
+            className={cn('manage-tab', section === 'books' && 'manage-tab--active')}
+            role="tab"
+            type="button"
+            onClick={() => changeSection('books')}
+          >
+            <BookOpen className="h-4 w-4" />
+            <span>Books</span>
+          </button>
         </div>
 
         <section className="manage-content" role="tabpanel">
           <div className="manage-toolbar">
             <div>
-              <div className="ui-eyebrow">{section === 'tags' ? 'Personal taxonomy' : 'Shared identities'}</div>
-              <h2 className="manage-title">{section === 'tags' ? 'Saved tags' : 'Known authors'}</h2>
+              <div className="ui-eyebrow">{section === 'tags' ? 'Personal taxonomy' : section === 'authors' ? 'Shared identities' : 'Community listings'}</div>
+              <h2 className="manage-title">{section === 'tags' ? 'Saved tags' : section === 'authors' ? 'Known authors' : 'Your books'}</h2>
             </div>
             <div className="flex items-center gap-2">
               <Badge tone="neutral">{itemCount} shown</Badge>
-              <button
+              {section !== 'books' ? <button
                 className={buttonVariants.primary}
                 type="button"
                 onClick={() => setSelected({ kind: section === 'tags' ? 'tag' : 'author', value: null } as ManagedItem)}
               >
                 <Plus className="h-4 w-4" />
                 Add {section === 'tags' ? 'tag' : 'author'}
-              </button>
+              </button> : null}
             </div>
           </div>
 
@@ -93,17 +139,31 @@ export function ManagePage() {
             <span className="sr-only">Search {section}</span>
             <input
               autoComplete="off"
-              placeholder={section === 'tags' ? 'Search tags…' : 'Search authors or aliases…'}
+              placeholder={section === 'tags' ? 'Search tags…' : section === 'authors' ? 'Search authors or aliases…' : 'Search your books…'}
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            {results.isFetching ? <span className="manage-search__status">Searching…</span> : null}
+            {(section === 'books' ? libraryBooks.isFetching : results.isFetching) ? <span className="manage-search__status">Searching…</span> : null}
           </label>
 
-          <p className="manage-hint">Double-click a row to edit it, or use the Edit button.</p>
+          <p className="manage-hint">{section === 'books'
+            ? 'Listing creates a public snapshot. Refresh it after editing your private copy; existing imports never change.'
+            : 'Double-click a row to edit it, or use the Edit button.'}</p>
 
-          {results.isError ? (
+          {section === 'books' ? (
+            <ManagedBooks
+              actionId={bookActionId}
+              books={libraryBooks.data?.data ?? []}
+              error={libraryBooks.isError || publishedBooks.isError}
+              loading={libraryBooks.isPending || publishedBooks.isPending}
+              published={publishedBooks.data?.data ?? []}
+              search={search}
+              onPublish={(book) => runBookAction(book.id, () => api.publishBook(book.id), `“${book.primaryTitle}” is now listed.`)}
+              onRefresh={(snapshot) => runBookAction(snapshot.sourceBookId, () => api.refreshPublishedBook(snapshot.id), `“${snapshot.primaryTitle}” snapshot refreshed.`)}
+              onUnlist={(snapshot) => runBookAction(snapshot.sourceBookId, () => api.unlistPublishedBook(snapshot.id), `“${snapshot.primaryTitle}” was unlisted.`)}
+            />
+          ) : results.isError ? (
             <div className="manage-state manage-state--error">Could not load {section}. Try again.</div>
           ) : results.isPending ? (
             <div className="manage-state">Loading {section}…</div>
@@ -121,6 +181,84 @@ export function ManagePage() {
       </Surface>
 
       <ManageDialog item={selected} onClose={() => setSelected(null)} />
+    </div>
+  )
+}
+
+function ManagedBooks({ books, published, actionId, loading, error, search, onPublish, onRefresh, onUnlist }: {
+  books: BookListItemDto[]
+  published: PublicBookSnapshotDto[]
+  actionId: string | null
+  loading: boolean
+  error: boolean
+  search: string
+  onPublish: (book: BookListItemDto) => void
+  onRefresh: (snapshot: PublicBookSnapshotDto) => void
+  onUnlist: (snapshot: PublicBookSnapshotDto) => void
+}) {
+  if (error) return <div className="manage-state manage-state--error">Could not load your book listings. Try again.</div>
+  if (loading) return <div className="manage-state">Loading your books…</div>
+  if (books.length === 0) {
+    return (
+      <div className="manage-state">
+        <span>No books found.</span>
+        <small>{search.trim() ? 'Try a broader search.' : 'Add a book to your library before creating a public listing.'}</small>
+      </div>
+    )
+  }
+
+  const snapshotByBookId = new Map(published.map((snapshot) => [snapshot.sourceBookId, snapshot]))
+  return (
+    <div className="manage-list" aria-label="Books">
+      {books.map((book) => {
+        const snapshot = snapshotByBookId.get(book.id)
+        const busy = actionId === book.id
+        return (
+          <div className="manage-item" key={book.id}>
+            <span className="manage-item__icon"><BookOpen className="h-4 w-4" /></span>
+            <span className="manage-item__body">
+              <strong>{book.primaryTitle}</strong>
+              <small>{book.author || 'Unknown author'} · {book.contentType}{snapshot ? ` · Snapshot ${new Date(snapshot.snapshotAt).toLocaleDateString()}` : ''}</small>
+            </span>
+            <Badge tone={snapshot ? 'success' : 'neutral'}>{snapshot ? 'Listed' : 'Private'}</Badge>
+            {snapshot ? (
+              <span className="manage-book-actions">
+                <button
+                  aria-label={`Refresh listing ${book.primaryTitle}`}
+                  className={buttonVariants.secondary}
+                  disabled={busy}
+                  type="button"
+                  onClick={() => onRefresh(snapshot)}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </button>
+                <button
+                  aria-label={`Unlist ${book.primaryTitle}`}
+                  className={buttonVariants.ghost}
+                  disabled={busy}
+                  type="button"
+                  onClick={() => onUnlist(snapshot)}
+                >
+                  <EyeOff className="h-4 w-4" />
+                  Unlist
+                </button>
+              </span>
+            ) : (
+              <button
+                aria-label={`List ${book.primaryTitle}`}
+                className={buttonVariants.primary}
+                disabled={busy}
+                type="button"
+                onClick={() => onPublish(book)}
+              >
+                <Globe2 className="h-4 w-4" />
+                {busy ? 'Listing…' : 'List publicly'}
+              </button>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
