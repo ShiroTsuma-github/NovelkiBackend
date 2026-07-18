@@ -6,6 +6,9 @@ public sealed class BookCoverOptions
 
     public string StorageRoot { get; set; } = "storage/covers";
     public long MaxBytes { get; set; } = 10 * 1024 * 1024;
+    public int MaxWidth { get; set; } = 12_000;
+    public int MaxHeight { get; set; } = 12_000;
+    public long MaxPixels { get; set; } = 40_000_000;
     public string UserAgent { get; set; } = DefaultUserAgent;
     public BookCoverS3Options? S3 { get; set; }
 }

@@ -68,10 +68,17 @@ export const api = {
     formData.set('file', file)
     return apiFormRequest<BookImportSessionDto>('/book/import/sessions', formData, { method: 'POST' })
   },
+  createFullBookImportSession: (file: File) => {
+    const formData = new FormData()
+    formData.set('file', file)
+    return apiFormRequest<BookImportSessionDto>('/book/import/full/sessions', formData, { method: 'POST' })
+  },
   downloadBookImportTemplate: () =>
     apiBlobRequest('/book/import/template'),
   downloadBooksExport: (params: { query?: string; sortBy?: string; sortDirection?: string }) =>
     apiBlobRequest(`/book/export${toQueryString(params)}`),
+  downloadBooksFullExport: (params: { query?: string; sortBy?: string; sortDirection?: string }) =>
+    apiBlobRequest(`/book/export/full${toQueryString(params)}`),
   getBookImportSession: (sessionId: string) =>
     apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}`),
   updateBookImportRow: (sessionId: string, rowId: string, request: BookImportRowUpdateRequest) =>

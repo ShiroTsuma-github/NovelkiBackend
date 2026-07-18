@@ -1,30 +1,29 @@
+namespace Infrastructure.IntegrationTests;
+
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using Application.Common.Interfaces;
-using Domain.Entities;
-using Infrastructure.Contexts;
-using Infrastructure.Identity;
-using Infrastructure.IntegrationTests.TestSupport;
+using Contexts;
+using Identity;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
-namespace Infrastructure.IntegrationTests;
-
-using Microsoft.Extensions.Primitives;
+using TestSupport;
 
 public class SecurityBaselineEndpointTests
 {
@@ -161,6 +160,70 @@ public class SecurityBaselineEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
     }
 
+    [Fact]
+    public async Task FullImportEndpoint_ShouldRateLimitNonAdminUsers()
+    {
+        await using var factory = new SecurityApiFactory();
+        await factory.EnsureCreatedAsync();
+        using var client = factory.CreateAuthenticatedClient(UserAId);
+
+        var firstResponse =
+            await client.PostAsync("/api/v1/book/import/full/sessions", new MultipartFormDataContent());
+        var secondResponse =
+            await client.PostAsync("/api/v1/book/import/full/sessions", new MultipartFormDataContent());
+
+        Assert.Equal(HttpStatusCode.BadRequest, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+        using var error = JsonDocument.Parse(await secondResponse.Content.ReadAsStringAsync());
+        Assert.Equal("Too Many Requests", error.RootElement.GetProperty("title").GetString());
+        Assert.Contains("Try again in", error.RootElement.GetProperty("detail").GetString());
+        Assert.True(secondResponse.Headers.Contains("Retry-After"));
+    }
+
+    [Fact]
+    public async Task FullImportEndpoint_ShouldNotRateLimitAdminUsers()
+    {
+        await using var factory = new SecurityApiFactory();
+        await factory.EnsureCreatedAsync();
+        using var client = factory.CreateAuthenticatedClient(UserAId, "Admin");
+
+        var firstResponse =
+            await client.PostAsync("/api/v1/book/import/full/sessions", new MultipartFormDataContent());
+        var secondResponse =
+            await client.PostAsync("/api/v1/book/import/full/sessions", new MultipartFormDataContent());
+
+        Assert.Equal(HttpStatusCode.BadRequest, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task FullExportEndpoint_ShouldRateLimitNonAdminUsers()
+    {
+        await using var factory = new SecurityApiFactory();
+        await factory.EnsureCreatedAsync();
+        using var client = factory.CreateAuthenticatedClient(UserAId);
+
+        var firstResponse = await client.GetAsync("/api/v1/book/export/full");
+        var secondResponse = await client.GetAsync("/api/v1/book/export/full");
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task FullExportEndpoint_ShouldNotRateLimitAdminUsers()
+    {
+        await using var factory = new SecurityApiFactory();
+        await factory.EnsureCreatedAsync();
+        using var client = factory.CreateAuthenticatedClient(UserAId, "Admin");
+
+        var firstResponse = await client.GetAsync("/api/v1/book/export/full");
+        var secondResponse = await client.GetAsync("/api/v1/book/export/full");
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, secondResponse.StatusCode);
+    }
+
     private sealed class SecurityApiFactory : WebApplicationFactory<Program>
     {
         private readonly SqliteConnection _connection = new("DataSource=:memory:");
@@ -225,7 +288,7 @@ public class SecurityBaselineEndpointTests
         {
             var client = CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
             client.DefaultRequestHeaders.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
+                new AuthenticationHeaderValue(TestAuthHandler.AuthenticationScheme);
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserIdHeader, userId.ToString());
             if (roles.Length > 0)
             {

@@ -1,20 +1,18 @@
-using Application.Common.DTOs.Book;
-using Application.Common.Interfaces;
-using Application.Features.BookFeatures.Commands;
+namespace Application.UnitTests;
+
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text;
+using Common.Interfaces;
 using Domain.Entities;
+using Domain.Exceptions;
 using Domain.Repositories;
+using Features.BookFeatures.Commands;
+using FluentValidation;
 using Infrastructure.BookCovers;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Text;
-
-namespace Application.UnitTests;
-
-using Common.Models;
-using FluentValidation;
 
 public class BookCoverTests
 {
@@ -727,9 +725,9 @@ public class BookCoverTests
         var originalHandler = new GetBookCoverFileHandler(coverRepository, storage, new FakeUser());
         var thumbnailHandler = new GetBookCoverThumbnailFileHandler(coverRepository, storage, new FakeUser());
 
-        await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<BookCover, Guid>>(() =>
+        await Assert.ThrowsAsync<EntityNotFoundException<BookCover, Guid>>(() =>
             originalHandler.Handle(new GetBookCoverFileQuery(BookId), CancellationToken.None));
-        await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<BookCover, Guid>>(() =>
+        await Assert.ThrowsAsync<EntityNotFoundException<BookCover, Guid>>(() =>
             thumbnailHandler.Handle(new GetBookCoverThumbnailFileQuery(BookId), CancellationToken.None));
     }
 
@@ -765,6 +763,34 @@ public class BookCoverTests
     }
 
     [Fact]
+    public async Task LocalBookCoverStorage_ShouldRejectImagesAbovePixelLimitBeforeDecoding()
+    {
+        var storageRoot = CreateTempStorageRoot();
+        try
+        {
+            var storage = new LocalBookCoverStorage(Options.Create(new BookCoverOptions
+            {
+                StorageRoot = storageRoot,
+                MaxBytes = 1024 * 1024,
+                MaxWidth = 100,
+                MaxHeight = 100,
+                MaxPixels = 4
+            }));
+            await using var content = new MemoryStream(CreateTestPngBytes());
+
+            var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+                storage.SaveAsync(OwnerId, BookId, content, "cover.png", "image/png", CancellationToken.None));
+
+            Assert.Contains("dimensions exceed", exception.Message, StringComparison.OrdinalIgnoreCase);
+            Assert.Empty(Directory.EnumerateFiles(storageRoot, "*", SearchOption.AllDirectories));
+        }
+        finally
+        {
+            DeleteTempStorageRoot(storageRoot);
+        }
+    }
+
+    [Fact]
     public async Task LocalBookCoverStorage_ShouldRejectMissingAndEscapingPaths()
     {
         var storageRoot = CreateTempStorageRoot();
@@ -774,7 +800,7 @@ public class BookCoverTests
                 new LocalBookCoverStorage(
                     Options.Create(new BookCoverOptions { StorageRoot = storageRoot, MaxBytes = 1024 * 1024 }));
 
-            await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<BookCover, Guid>>(() =>
+            await Assert.ThrowsAsync<EntityNotFoundException<BookCover, Guid>>(() =>
                 storage.OpenReadAsync("missing.jpg", CancellationToken.None));
             await Assert.ThrowsAsync<InvalidOperationException>(() =>
                 storage.OpenReadAsync("..\\..\\escape.jpg", CancellationToken.None));
@@ -895,7 +921,6 @@ public class BookCoverTests
         private readonly byte[] _content;
         private readonly string _contentType;
         private readonly HttpStatusCode _statusCode;
-        public int RequestCount { get; private set; }
 
         public FakeHttpMessageHandler(string html)
             : this(Encoding.UTF8.GetBytes(html), "text/html")
@@ -913,6 +938,8 @@ public class BookCoverTests
             _contentType = contentType;
             _statusCode = statusCode;
         }
+
+        public int RequestCount { get; private set; }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
@@ -975,12 +1002,13 @@ public class BookCoverTests
     private sealed class FakeBookRepository : IBookRepository
     {
         private readonly Book _book;
-        public bool Saved { get; private set; }
 
         public FakeBookRepository(Book book)
         {
             _book = book;
         }
+
+        public bool Saved { get; private set; }
 
         public Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
         {

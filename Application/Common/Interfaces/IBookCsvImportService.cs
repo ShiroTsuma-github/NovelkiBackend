@@ -1,12 +1,15 @@
 namespace Application.Common.Interfaces;
 
-using Application.Common.DTOs.Book;
+using DTOs.Book;
 
 public interface IBookCsvImportService
 {
     public string CreateTemplate();
 
     public Task<BookImportSessionDto> CreateSessionAsync(Stream csvStream, string fileName,
+        CancellationToken cancellationToken);
+
+    public Task<BookImportSessionDto> CreateFullSessionAsync(Stream archiveStream, string fileName,
         CancellationToken cancellationToken);
 
     public Task<BookImportSessionDto> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken);

@@ -2,6 +2,7 @@ namespace Infrastructure.BookCovers;
 
 using FluentValidation;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -21,11 +22,12 @@ internal static class BookCoverImageProcessor
     public static async Task<ProcessedBookCoverContent> ProcessAsync(
         Stream content,
         string? contentType,
-        long maxBytes,
+        BookCoverOptions options,
         CancellationToken cancellationToken)
     {
         var input =
-            await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, maxBytes, cancellationToken);
+            await BookCoverStorageValidation.ReadAndValidateAsync(content, contentType, options.MaxBytes,
+                cancellationToken);
         var format = Image.DetectFormat(input.Bytes);
         if (format == null || !AllowedFormats.Contains(format.Name))
         {
@@ -34,7 +36,18 @@ internal static class BookCoverImageProcessor
 
         try
         {
-            using var source = Image.Load<Rgba32>(input.Bytes);
+            var decoderOptions = new DecoderOptions { MaxFrames = 1, SkipMetadata = true };
+            var imageInfo = Image.Identify(decoderOptions, input.Bytes)
+                            ?? throw new ValidationException("Cover file must be a valid image.");
+            if (imageInfo.Width <= 0 || imageInfo.Height <= 0 ||
+                imageInfo.Width > options.MaxWidth || imageInfo.Height > options.MaxHeight ||
+                (long)imageInfo.Width * imageInfo.Height > options.MaxPixels)
+            {
+                throw new ValidationException(
+                    $"Cover dimensions exceed the allowed limit of {options.MaxWidth}x{options.MaxHeight} and {options.MaxPixels} pixels.");
+            }
+
+            using var source = Image.Load<Rgba32>(decoderOptions, input.Bytes);
             var original =
                 await EncodeVariantAsync(source, source.Width, FullJpegQuality, cancellationToken);
             var thumbnailWidth = Math.Min(ThumbnailTargetWidth, source.Width);

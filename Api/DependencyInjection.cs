@@ -4,7 +4,6 @@ using System.IO.Compression;
 using System.Net.Mime;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi;
@@ -14,6 +13,7 @@ internal static class DependencyInjection
     public const string FrontendCorsPolicy = "Frontend";
     public const string AccountAuthRateLimitPolicy = "account-auth";
     public const string ExpensiveUserActionRateLimitPolicy = "expensive-user-action";
+    public const string FullBackupRateLimitPolicy = "full-backup";
 
     private const string CorsAllowedOriginsKey = "Cors:AllowedOrigins";
     private const string AccountPermitLimitKey = "RateLimiting:Account:PermitLimit";
@@ -83,14 +83,37 @@ internal static class DependencyInjection
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
             {
+                TimeSpan? retryAfterValue = null;
                 if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
                 {
+                    retryAfterValue = retryAfter;
                     context.HttpContext.Response.Headers.RetryAfter =
                         Math.Ceiling(retryAfter.TotalSeconds).ToString("0");
                 }
 
+                var detail = retryAfterValue.HasValue
+                    ? $"Too many requests. Try again in {FormatRetryAfter(retryAfterValue.Value)}."
+                    : "Too many requests. Please retry later.";
+                var logger = context.HttpContext.RequestServices
+                    .GetRequiredService<ILoggerFactory>()
+                    .CreateLogger("RateLimiting");
+                logger.LogWarning(
+                    "Rate limit exceeded for {Method} {Path}. Detail={Detail} TraceId={TraceId}",
+                    context.HttpContext.Request.Method,
+                    context.HttpContext.Request.Path,
+                    detail,
+                    context.HttpContext.TraceIdentifier);
+
                 await context.HttpContext.Response.WriteAsJsonAsync(
-                    new { error = "Too many requests. Please retry later." }, cancellationToken);
+                    new
+                    {
+                        type = "RateLimitExceeded",
+                        title = "Too Many Requests",
+                        status = StatusCodes.Status429TooManyRequests,
+                        detail,
+                        instance = context.HttpContext.Request.Path.Value,
+                        errors = (object?)null
+                    }, cancellationToken);
             };
 
             options.AddPolicy(AccountAuthRateLimitPolicy, httpContext =>
@@ -119,6 +142,21 @@ internal static class DependencyInjection
                         Window = TimeSpan.FromSeconds(expensiveWindowSeconds),
                         QueueLimit = 0,
                         AutoReplenishment = true
+                    });
+            });
+
+            options.AddPolicy(FullBackupRateLimitPolicy, httpContext =>
+            {
+                if (httpContext.User.IsInRole(AuthorizationRoles.Admin))
+                {
+                    return RateLimitPartition.GetNoLimiter(AdminRateLimitPartition);
+                }
+
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"{GetAuthenticatedUserPartitionKey(httpContext)}:{httpContext.Request.Path.Value?.ToLowerInvariant()}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 1, Window = TimeSpan.FromMinutes(30), QueueLimit = 0, AutoReplenishment = true
                     });
             });
         });
@@ -174,5 +212,17 @@ internal static class DependencyInjection
     private static string GetAuthenticatedUserPartitionKey(HttpContext httpContext)
     {
         return httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier) ?? GetRemoteIpPartitionKey(httpContext);
+    }
+
+    private static string FormatRetryAfter(TimeSpan retryAfter)
+    {
+        if (retryAfter.TotalMinutes >= 1)
+        {
+            var minutes = (int)Math.Ceiling(retryAfter.TotalMinutes);
+            return $"{minutes} minute{(minutes == 1 ? string.Empty : "s")}";
+        }
+
+        var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+        return $"{seconds} second{(seconds == 1 ? string.Empty : "s")}";
     }
 }

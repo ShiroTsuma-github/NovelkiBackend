@@ -66,7 +66,7 @@ export async function apiBlobRequest(
 
   if (!response.ok) {
     const text = await response.text()
-    const data = text ? JSON.parse(text) : undefined
+    const data = parseResponseData(text)
     throw new HttpError(normalizeApiError(data, response.status, path))
   }
 
@@ -108,7 +108,7 @@ async function requestWithBody<T>(
   }
 
   const text = await response.text()
-  const data = text ? JSON.parse(text) : undefined
+  const data = parseResponseData(text)
 
   if (!response.ok) {
     throw new HttpError(normalizeApiError(data, response.status, path))
@@ -126,9 +126,33 @@ function normalizeApiError(data: unknown, status: number, path: string): ApiErro
     type: 'HttpError',
     title: 'Request failed',
     status,
-    detail: `Request failed with status ${status}.`,
+    detail: getDefaultErrorDetail(status),
     instance: path,
   }
+}
+
+function parseResponseData(text: string): unknown {
+  if (!text) {
+    return undefined
+  }
+
+  try {
+    return JSON.parse(text)
+  } catch {
+    return undefined
+  }
+}
+
+function getDefaultErrorDetail(status: number) {
+  if (status === 413) {
+    return 'The selected file is too large.'
+  }
+
+  if (status === 429) {
+    return 'Too many requests. Please try again later.'
+  }
+
+  return `Request failed with status ${status}.`
 }
 
 function isApiError(value: unknown): value is ApiError {

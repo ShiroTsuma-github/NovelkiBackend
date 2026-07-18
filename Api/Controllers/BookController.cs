@@ -1,11 +1,14 @@
 ﻿namespace Api.Controllers;
 
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Features.BookFeatures.Commands;
 using Application.Features.BookFeatures.Queries.GetBook;
+using Domain.Repositories;
 using Microsoft.AspNetCore.RateLimiting;
 using Observability;
 
@@ -15,6 +18,8 @@ public partial class BookController : ControllerBase
 {
     private const string MultipartFormData = "multipart/form-data";
     private const string CsvContentType = "text/csv; charset=utf-8";
+    private readonly IBookCoverRepository _bookCoverRepository;
+    private readonly IBookCoverStorage _bookCoverStorage;
     private readonly IBookCsvExportService _bookCsvExportService;
     private readonly IBookCsvImportService _bookCsvImportService;
     private readonly ILogger<BookController> _logger;
@@ -25,11 +30,15 @@ public partial class BookController : ControllerBase
         IMediator mediator,
         IBookCsvImportService bookCsvImportService,
         IBookCsvExportService bookCsvExportService,
+        IBookCoverRepository bookCoverRepository,
+        IBookCoverStorage bookCoverStorage,
         ILogger<BookController> logger)
     {
         _mediator = mediator;
         _bookCsvImportService = bookCsvImportService;
         _bookCsvExportService = bookCsvExportService;
+        _bookCoverRepository = bookCoverRepository;
+        _bookCoverStorage = bookCoverStorage;
         _logger = logger;
     }
 
@@ -145,6 +154,47 @@ public partial class BookController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("import/full/sessions")]
+    [Authorize]
+    [Consumes(MultipartFormData)]
+    [RequestSizeLimit(300L * 1024 * 1024)]
+    [RequestFormLimits(
+        MultipartBodyLengthLimit = 300L * 1024 * 1024,
+        MultipartBoundaryLengthLimit = 128,
+        MultipartHeadersCountLimit = 8,
+        MultipartHeadersLengthLimit = 4096,
+        KeyLengthLimit = 128,
+        ValueCountLimit = 8,
+        ValueLengthLimit = 1024)]
+    [EnableRateLimiting(DependencyInjection.FullBackupRateLimitPolicy)]
+    public async Task<IActionResult> CreateFullImportSession(IFormFile? file, CancellationToken cancellationToken)
+    {
+        if (file == null)
+        {
+            return BadRequest(new { error = "Full backup ZIP file is required." });
+        }
+
+        if (Request.HasFormContentType && Request.Form.Files.Count != 1)
+        {
+            return BadRequest(new { error = "Exactly one full backup ZIP file is required." });
+        }
+
+        if (file.Length == 0)
+        {
+            return BadRequest(new { error = "Full backup ZIP file is empty." });
+        }
+
+        if (!string.Equals(Path.GetExtension(file.FileName), ".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { error = "Full backup must be a .zip file." });
+        }
+
+        await using var stream = file.OpenReadStream();
+        var result = await _bookCsvImportService.CreateFullSessionAsync(stream, file.FileName, cancellationToken);
+        _logger.LogInformation("Book full import session created. SessionId={SessionId}", result.SessionId);
+        return Ok(result);
+    }
+
     [HttpGet("import/template")]
     [Authorize]
     public IActionResult DownloadImportTemplate()
@@ -168,6 +218,65 @@ public partial class BookController : ControllerBase
         var csv = _bookCsvExportService.Build(allBooks.Data);
         var bytes = Encoding.UTF8.GetBytes(csv);
         return File(bytes, CsvContentType, "books-export.csv");
+    }
+
+    [HttpGet("export/full")]
+    [Authorize]
+    [EnableRateLimiting(DependencyInjection.FullBackupRateLimitPolicy)]
+    public async Task<IActionResult> ExportFullBooks([FromQuery] string? query, [FromQuery] string? sortBy,
+        [FromQuery] string? sortDirection, CancellationToken cancellationToken)
+    {
+        var firstPage =
+            await _mediator.Send(new GetAllBooksForExportQuery(0, 1, query, sortBy, sortDirection), cancellationToken);
+        var allBooks = firstPage.Total > 0
+            ? await _mediator.Send(new GetAllBooksForExportQuery(0, firstPage.Total, query, sortBy, sortDirection),
+                cancellationToken)
+            : firstPage;
+
+        await using var archiveStream = new MemoryStream();
+        using (var archive = new ZipArchive(archiveStream, ZipArchiveMode.Create, true))
+        {
+            var csvEntry = archive.CreateEntry("books.csv", CompressionLevel.NoCompression);
+            await using (var csvStream = csvEntry.Open())
+            await using (var writer = new StreamWriter(csvStream, Encoding.UTF8, leaveOpen: false))
+            {
+                await writer.WriteAsync(_bookCsvExportService.Build(allBooks.Data));
+            }
+
+            var manifest = new BookFullBackupManifest();
+            for (var index = 0; index < allBooks.Data.Count; index++)
+            {
+                var book = allBooks.Data[index];
+                var cover = await _bookCoverRepository.GetByBookIdAsync(book.Id, cancellationToken);
+                string? originalCoverPath = null;
+                string? thumbnailCoverPath = null;
+                if (cover != null)
+                {
+                    var coverDirectory = $"covers/{index + 1:D6}";
+                    originalCoverPath = await AddCoverFileAsync(
+                        archive, book.Id, $"{coverDirectory}/original", cover.StoragePath, cancellationToken);
+                    thumbnailCoverPath = await AddCoverFileAsync(
+                        archive, book.Id, $"{coverDirectory}/thumbnail", cover.ThumbnailStoragePath,
+                        cancellationToken);
+                }
+
+                manifest.Books.Add(new BookFullBackupManifestItem
+                {
+                    PrimaryTitle = book.PrimaryTitle,
+                    ContentType = book.ContentType,
+                    OriginalCoverPath = originalCoverPath,
+                    OriginalCoverMimeType = originalCoverPath == null ? null : cover?.MimeType,
+                    ThumbnailCoverPath = thumbnailCoverPath,
+                    ThumbnailCoverMimeType = thumbnailCoverPath == null ? null : cover?.ThumbnailMimeType
+                });
+            }
+
+            var manifestEntry = archive.CreateEntry("manifest.json", CompressionLevel.NoCompression);
+            await using var manifestStream = manifestEntry.Open();
+            await JsonSerializer.SerializeAsync(manifestStream, manifest, cancellationToken: cancellationToken);
+        }
+
+        return File(archiveStream.ToArray(), "application/zip", "books-full-export.zip");
     }
 
     [HttpGet(ApiRouteTemplates.ImportSession)]
@@ -326,6 +435,32 @@ public sealed record SetBookCoverFromUrlRequest(string ImageUrl);
 
 partial class BookController
 {
+    private async Task<string?> AddCoverFileAsync(ZipArchive archive, Guid bookId, string entryPath,
+        string? storagePath,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var extension = Path.GetExtension(storagePath);
+            var fullEntryPath = entryPath + extension;
+            var entry = archive.CreateEntry(fullEntryPath, CompressionLevel.NoCompression);
+            await using var source = await _bookCoverStorage.OpenReadAsync(storagePath, cancellationToken);
+            await using var destination = entry.Open();
+            await source.CopyToAsync(destination, cancellationToken);
+            return fullEntryPath;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Skipping unavailable cover during full export. BookId={BookId}", bookId);
+            return null;
+        }
+    }
+
     private void ApplyCoverCacheHeaders()
     {
         Response.Headers.CacheControl = "private, max-age=2592000, immutable";

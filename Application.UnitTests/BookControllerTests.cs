@@ -1,10 +1,14 @@
 namespace Application.UnitTests;
 
+using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using Api.Controllers;
 using Common.DTOs.Book;
 using Common.Interfaces;
 using Common.Models;
+using Domain.Entities;
+using Domain.Repositories;
 using Features.BookFeatures.Commands;
 using Features.BookFeatures.Queries.GetBook;
 using MediatR;
@@ -127,6 +131,39 @@ public class BookControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
+    }
+
+    [Fact]
+    public async Task CreateFullImportSession_ShouldReturnServiceResult()
+    {
+        var expected = new BookImportSessionDto
+        {
+            SessionId = Guid.NewGuid(), FileName = "backup.csv", Rows = Array.Empty<BookImportRowDto>()
+        };
+        var importService = new Mock<IBookCsvImportService>();
+        importService
+            .Setup(service => service.CreateFullSessionAsync(It.IsAny<Stream>(), "backup.zip",
+                CancellationToken.None))
+            .ReturnsAsync(expected);
+        var controller = CreateController(importService: importService.Object);
+        var file = CreateFormFile("zip-content", "backup.zip", "application/zip");
+
+        var result = await controller.CreateFullImportSession(file, CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        Assert.Same(expected, ok.Value);
+    }
+
+    [Fact]
+    public async Task CreateFullImportSession_ShouldRejectNonZipFile()
+    {
+        var controller = CreateController();
+        var file = CreateFormFile("csv-content", "books.csv");
+
+        var result = await controller.CreateFullImportSession(file, CancellationToken.None);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        Assert.Equal("Full backup must be a .zip file.", ReadError(badRequest.Value));
     }
 
     [Fact]
@@ -370,7 +407,13 @@ public class BookControllerTests
         exportService
             .Setup(service => service.Build(fullPage.Data))
             .Returns("exported,csv\n");
-        var controller = new BookController(mediator.Object, importService.Object, exportService.Object, logger.Object);
+        var controller = new BookController(
+            mediator.Object,
+            importService.Object,
+            exportService.Object,
+            Mock.Of<IBookCoverRepository>(),
+            Mock.Of<IBookCoverStorage>(),
+            logger.Object);
 
         var result = await controller.ExportBooks("author:Toika", "title", "asc");
 
@@ -404,6 +447,53 @@ public class BookControllerTests
         Assert.Equal("headers\n", Encoding.UTF8.GetString(Assert.IsType<FileContentResult>(result).FileContents));
         mediator.Verify(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ExportFullBooks_ShouldIncludeCsvAndIdFreeManifest()
+    {
+        var mediator = new Mock<IMediator>();
+        var exportService = new Mock<IBookCsvExportService>();
+        var page = new PaginatedResult<BookDto> { Skip = 0, Take = 1, Total = 1, Data = [Book("Backup Book")] };
+        var coverRepository = new Mock<IBookCoverRepository>();
+        var coverStorage = new Mock<IBookCoverStorage>();
+        mediator.Setup(mock => mock.Send(It.IsAny<GetAllBooksForExportQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(page);
+        exportService.Setup(service => service.Build(page.Data)).Returns("primaryTitle\nBackup Book\n");
+        coverRepository
+            .Setup(repository => repository.GetByBookIdAsync(page.Data[0].Id, CancellationToken.None))
+            .ReturnsAsync(new BookCover
+            {
+                BookId = page.Data[0].Id,
+                StoragePath = "original.jpg",
+                ThumbnailStoragePath = "thumbnail.webp",
+                MimeType = "image/jpeg",
+                ThumbnailMimeType = "image/webp"
+            });
+        coverStorage.Setup(storage => storage.OpenReadAsync("original.jpg", CancellationToken.None))
+            .ReturnsAsync(new MemoryStream([1, 2, 3]));
+        coverStorage.Setup(storage => storage.OpenReadAsync("thumbnail.webp", CancellationToken.None))
+            .ReturnsAsync(new MemoryStream([4, 5]));
+        var controller = CreateController(mediator.Object, exportService: exportService.Object,
+            coverRepository: coverRepository.Object, coverStorage: coverStorage.Object);
+
+        var result = await controller.ExportFullBooks(null, null, null, CancellationToken.None);
+
+        var file = Assert.IsType<FileContentResult>(result);
+        using var archiveStream = new MemoryStream(file.FileContents);
+        using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read);
+        Assert.NotNull(archive.GetEntry("books.csv"));
+        var manifestEntry = archive.GetEntry("manifest.json");
+        Assert.NotNull(manifestEntry);
+        using var manifest = JsonDocument.Parse(manifestEntry!.Open());
+        var item = Assert.Single(manifest.RootElement.GetProperty("Books").EnumerateArray());
+        Assert.Equal("Backup Book", item.GetProperty("PrimaryTitle").GetString());
+        Assert.Equal("Novel", item.GetProperty("ContentType").GetString());
+        Assert.False(item.TryGetProperty("Id", out _));
+        Assert.Equal("covers/000001/original.jpg", item.GetProperty("OriginalCoverPath").GetString());
+        Assert.Equal("covers/000001/thumbnail.webp", item.GetProperty("ThumbnailCoverPath").GetString());
+        Assert.NotNull(archive.GetEntry("covers/000001/original.jpg"));
+        Assert.NotNull(archive.GetEntry("covers/000001/thumbnail.webp"));
     }
 
     [Fact]
@@ -505,12 +595,16 @@ public class BookControllerTests
     private static BookController CreateController(
         IMediator? mediator = null,
         IBookCsvImportService? importService = null,
-        IBookCsvExportService? exportService = null)
+        IBookCsvExportService? exportService = null,
+        IBookCoverRepository? coverRepository = null,
+        IBookCoverStorage? coverStorage = null)
     {
         return new BookController(
             mediator ?? Mock.Of<IMediator>(),
             importService ?? Mock.Of<IBookCsvImportService>(),
             exportService ?? Mock.Of<IBookCsvExportService>(),
+            coverRepository ?? Mock.Of<IBookCoverRepository>(),
+            coverStorage ?? Mock.Of<IBookCoverStorage>(),
             NullLogger<BookController>.Instance)
         {
             ControllerContext = new ControllerContext { HttpContext = new DefaultHttpContext() }

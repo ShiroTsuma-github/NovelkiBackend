@@ -2,6 +2,10 @@ namespace Infrastructure.Services;
 
 internal readonly record struct BookImportKey(string NormalizedTitle, Guid ContentTypeId);
 
+internal readonly record struct BookFullBackupKey(string NormalizedTitle, string NormalizedContentType);
+
+internal sealed record BookFullBackupCover(string StagedPath, string FileName, string? MimeType, long SizeBytes);
+
 internal sealed class ImportSession
 {
     public Guid SessionId { get; init; }
@@ -10,6 +14,14 @@ internal sealed class ImportSession
     public IReadOnlyCollection<string> AvailableContentTypes { get; set; } = Array.Empty<string>();
     public IReadOnlyCollection<string> AvailableStatuses { get; set; } = Array.Empty<string>();
     public List<ImportRow> Rows { get; } = [];
+    public Dictionary<Guid, BookFullBackupCover> CoversByRowId { get; } = [];
+    public bool IsFullImport { get; set; }
+    public string? TempDirectory { get; set; }
+    public long StagedBytes { get; set; }
+    public long ReservedStagedBytes { get; set; }
+    public DateTimeOffset CreatedAt { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset LastAccessAt { get; set; } = DateTimeOffset.UtcNow;
+    public SemaphoreSlim OperationLock { get; } = new(1, 1);
 }
 
 internal sealed class ImportRow

@@ -1,21 +1,23 @@
+namespace Application.UnitTests;
+
 using System.Text.Json;
 using Domain.Entities;
 using Domain.Exceptions;
+using FluentValidation;
 using FluentValidation.Results;
+using Infrastructure.Identity;
 using Infrastructure.Middleware;
+using Infrastructure.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
-
-namespace Application.UnitTests;
 
 public class ErrorHandlingMiddlewareTests
 {
     public static TheoryData<Exception, int, string> MappedExceptions => new()
     {
         {
-            new EntityNotFoundException<Infrastructure.Identity.User, string>("missing"), StatusCodes.Status404NotFound,
-            "Authentication Failed"
+            new EntityNotFoundException<User, string>("missing"), StatusCodes.Status404NotFound, "Authentication Failed"
         },
         { new WrongPasswordException(), StatusCodes.Status401Unauthorized, "Authentication Failed" },
         {
@@ -35,6 +37,18 @@ public class ErrorHandlingMiddlewareTests
         { new EntityNotFoundException<ContentType, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<Book, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityNotFoundException<BookCover, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
+        {
+            new FullImportCapacityExceededException("Full import capacity reached."),
+            StatusCodes.Status429TooManyRequests, "Full Import Capacity Reached"
+        },
+        {
+            new ImportCapacityExceededException("Import capacity reached."), StatusCodes.Status429TooManyRequests,
+            "Import Capacity Reached"
+        },
+        {
+            new BookImportProcessingTimeoutException("Full import timed out."), StatusCodes.Status408RequestTimeout,
+            "Full Import Timed Out"
+        },
         { new InvalidOperationException("boom"), StatusCodes.Status500InternalServerError, "Internal Server Error" }
     };
 
@@ -112,7 +126,7 @@ public class ErrorHandlingMiddlewareTests
     [Fact]
     public async Task InvokeAsync_ShouldReturnGroupedValidationErrors()
     {
-        var exception = new FluentValidation.ValidationException([
+        var exception = new ValidationException([
             new ValidationFailure("Title", "Title is required."),
             new ValidationFailure("Title", "Title is too long."),
             new ValidationFailure("Rating", "Rating must be valid.")
@@ -128,6 +142,41 @@ public class ErrorHandlingMiddlewareTests
         Assert.Equal("Title: Title is required.", document.RootElement.GetProperty("detail").GetString());
         Assert.Equal(2, errors.GetProperty("Title").GetArrayLength());
         Assert.Single(errors.GetProperty("Rating").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldReturnAndLogMessageOnlyValidationError()
+    {
+        var logger = new Mock<ILogger<ErrorHandlingMiddleware>>();
+        var context = new DefaultHttpContext();
+        context.Request.Method = HttpMethods.Post;
+        context.Request.Path = "/api/v1/book/import/full/sessions";
+        context.Response.Body = new MemoryStream();
+        var middleware = new ErrorHandlingMiddleware(
+            _ => throw new ValidationException("Full backup is missing manifest.json."),
+            logger.Object);
+
+        await middleware.InvokeAsync(context);
+
+        context.Response.Body.Position = 0;
+        using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var errors = document.RootElement.GetProperty("errors");
+
+        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
+        Assert.Equal("Full backup is missing manifest.json.",
+            document.RootElement.GetProperty("detail").GetString());
+        Assert.Contains("Full backup is missing manifest.json.",
+            errors.GetProperty("General").EnumerateArray().Select(item => item.GetString()));
+        logger.Verify(
+            candidate => candidate.Log(
+                LogLevel.Warning,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((state, _) =>
+                    state.ToString()!.Contains("Full backup is missing manifest.json.") &&
+                    state.ToString()!.Contains("/api/v1/book/import/full/sessions")),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     [Fact]
