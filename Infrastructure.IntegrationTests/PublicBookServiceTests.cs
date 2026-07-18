@@ -126,6 +126,47 @@ public sealed class PublicBookServiceTests
         Assert.False(await context.BookShareTagPromotions.AnyAsync());
     }
 
+    [Fact]
+    public async Task DeleteAccount_ShouldUnlistSnapshotsAndKeepPrivateCopiesForOtherLibraries()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var targetId = Guid.Parse("88888888-8888-8888-8888-888888888888");
+        var otherId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+        context.Users.AddRange(
+            new User { Id = targetId, UserName = "target", NormalizedUserName = "TARGET" },
+            new User { Id = otherId, UserName = "copy-owner", NormalizedUserName = "COPY-OWNER" });
+        var author = TestData.Author("Snapshot Owner", targetId, false);
+        var tag = TestData.Tag(targetId, "Shared by snapshot");
+        var sourceBook = TestData.Book(targetId, "Account deletion snapshot", author);
+        sourceBook.BookTags.Add(new BookTag { Book = sourceBook, Tag = tag });
+        context.AddRange(author, tag, sourceBook);
+        await context.SaveChangesAsync();
+
+        var cache = new NoopCache();
+        var storage = new NoopStorage();
+        var targetPublicBooks = CreateService(context, new TestUser(targetId), storage, cache);
+        var snapshot = await targetPublicBooks.PublishAsync(sourceBook.Id, CancellationToken.None);
+        var otherPublicBooks = CreateService(context, new TestUser(otherId), storage, cache);
+        var copiedBookId = (await otherPublicBooks.CopyAsync(snapshot.Id, CancellationToken.None)).BookId;
+
+        var adminPublicBooks = CreateService(context, new TestUser(database.UserId), storage, cache);
+        var accountService = new AdminAccountService(
+            context,
+            new AdminLibraryService(context, storage, cache, adminPublicBooks),
+            new AuthorLifecycleService(context, cache));
+        await accountService.DeleteAsync(targetId, database.UserId, CancellationToken.None);
+        context.ChangeTracker.Clear();
+
+        Assert.False(await context.Users.AnyAsync(item => item.Id == targetId));
+        Assert.False(await context.PublicBookSnapshots.AnyAsync());
+        Assert.True(await context.Books.AnyAsync(item => item.Id == copiedBookId && item.OwnerId == otherId));
+        Assert.True(await context.Authors.AnyAsync(item => item.OwnerId == otherId && !item.IsPublic));
+        Assert.True(await context.Tags.AnyAsync(item => item.OwnerId == otherId && !item.IsGlobal));
+        Assert.False(await context.Authors.AnyAsync(item => item.OwnerId == targetId));
+        Assert.False(await context.Tags.AnyAsync(item => item.OwnerId == targetId));
+    }
+
     private static PublicBookService CreateService(
         Contexts.ApplicationDbContext context,
         IUser user,
