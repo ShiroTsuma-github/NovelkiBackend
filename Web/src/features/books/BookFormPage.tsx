@@ -201,6 +201,19 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
     setAuthorSuggestionsOpen(false)
   }
 
+  function handleAuthorBlur() {
+    const normalizedName = normalizeAuthorName(authorName)
+    const exactAuthor = authorSuggestionsQuery.data?.find((author) =>
+      normalizeAuthorName(author.primaryName) === normalizedName ||
+      author.otherNames.some((otherName) => normalizeAuthorName(otherName) === normalizedName))
+    if (exactAuthor) {
+      selectAuthor(exactAuthor)
+      return
+    }
+
+    window.setTimeout(() => setAuthorSuggestionsOpen(false), 120)
+  }
+
   function setSelectedGenreIds(value: string[]) {
     form.setValue('genreIds', value, { shouldDirty: true, shouldValidate: true })
   }
@@ -391,7 +404,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                     className={`${inputClass} w-full`}
                     name="authorName"
                     value={authorInputValue}
-                    onBlur={() => window.setTimeout(() => setAuthorSuggestionsOpen(false), 120)}
+                    onBlur={handleAuthorBlur}
                     onChange={(event) => {
                       form.setValue('authorName', event.target.value, { shouldDirty: true, shouldValidate: true })
                       form.setValue('authorId', '', { shouldDirty: true, shouldValidate: true })
