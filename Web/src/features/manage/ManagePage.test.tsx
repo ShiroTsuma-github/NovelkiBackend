@@ -14,6 +14,7 @@ vi.mock('@/api/client', () => ({
     updateTag: vi.fn(),
     deleteTag: vi.fn(),
     updateAuthor: vi.fn(),
+    updateAuthorVisibility: vi.fn(),
     deleteAuthor: vi.fn(),
   },
 }))
@@ -37,6 +38,7 @@ const author = {
   id: '22222222-2222-2222-2222-222222222222',
   primaryName: 'Er Gen',
   otherNames: ['耳根'],
+  isPublic: false,
 }
 
 describe('ManagePage', () => {
@@ -48,6 +50,7 @@ describe('ManagePage', () => {
     vi.mocked(api.updateTag).mockReset().mockResolvedValue(tag)
     vi.mocked(api.deleteTag).mockReset().mockResolvedValue(undefined)
     vi.mocked(api.updateAuthor).mockReset().mockResolvedValue(author)
+    vi.mocked(api.updateAuthorVisibility).mockReset().mockResolvedValue(author)
     vi.mocked(api.deleteAuthor).mockReset().mockResolvedValue(undefined)
   })
 
@@ -130,5 +133,17 @@ describe('ManagePage', () => {
     expect(await screen.findByText('Global')).toBeInTheDocument()
     expect(screen.getByText('Managed by admin')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit tag official' })).not.toBeInTheDocument()
+  })
+
+  it('publishes a private author from the editor', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Authors' }))
+    expect(await screen.findByText('Private')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Edit author Er Gen' }))
+    await user.click(screen.getByRole('button', { name: 'Make public' }))
+
+    await waitFor(() => expect(api.updateAuthorVisibility).toHaveBeenCalledWith(author.id, true))
   })
 })
