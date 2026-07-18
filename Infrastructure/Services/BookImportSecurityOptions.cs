@@ -12,6 +12,9 @@ public sealed class BookImportSecurityOptions
     public long MaxCoverBytes { get; set; } = 10 * 1024 * 1024;
     public long MaxUncompressedArchiveBytes { get; set; } = 256 * 1024 * 1024;
     public double MaxCompressionRatio { get; set; } = 100;
+    public double SuspiciousCompressionRatio { get; set; } = 500;
+    public long SuspiciousCompressionMinimumBytes { get; set; } = 8 * 1024 * 1024;
+    public TimeSpan SuspiciousAccountBlockDuration { get; set; } = TimeSpan.FromHours(24);
     public int MaxConcurrentFullImportOperations { get; set; } = 2;
     public int MaxActiveSessionsGlobal { get; set; } = 50;
     public int MaxActiveSessionsPerUser { get; set; } = 5;
@@ -44,4 +47,26 @@ public sealed class BookImportProcessingTimeoutException : Exception
     public BookImportProcessingTimeoutException(string message) : base(message)
     {
     }
+}
+
+public sealed class AccountTemporarilyBlockedException : Exception
+{
+    public AccountTemporarilyBlockedException(DateTimeOffset blockedUntilUtc)
+        : base(
+            $"This account is blocked until {blockedUntilUtc.UtcDateTime:yyyy-MM-dd HH:mm:ss} UTC because suspicious activity was detected.")
+    {
+        BlockedUntilUtc = blockedUntilUtc;
+    }
+
+    public DateTimeOffset BlockedUntilUtc { get; }
+}
+
+internal sealed class SuspiciousBookImportException : Exception
+{
+    public SuspiciousBookImportException(string reasonCode, string safeMessage) : base(safeMessage)
+    {
+        ReasonCode = reasonCode;
+    }
+
+    public string ReasonCode { get; }
 }

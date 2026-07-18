@@ -1,20 +1,17 @@
-using Application.Common;
+namespace Infrastructure.IntegrationTests;
+
 using Application.Common.DTOs.User;
 using Application.Common.Interfaces;
-using Application.Common.Models;
-using Infrastructure.Authentication;
-using Infrastructure.Contexts;
-using Infrastructure.Identity;
+using Authentication;
+using Contexts;
 using Domain.Exceptions;
+using Identity;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
-
-namespace Infrastructure.IntegrationTests;
-
-using Domain.Entities;
+using Services;
 
 public class IdentityServiceTests
 {
@@ -109,6 +106,28 @@ public class IdentityServiceTests
     }
 
     [Fact]
+    public async Task BlockedAccount_ShouldNotLoginOrRefreshTokens()
+    {
+        using var host = new IdentityTestHost();
+        var service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("blocked-reader", "blocked@example.com", "Strong1!"),
+            CancellationToken.None);
+        var login = await service.LoginUser(new LoginDto("blocked-reader", null, "Strong1!"),
+            CancellationToken.None);
+        var guard = host.GetRequiredService<AccountAbuseGuard>();
+        await guard.BlockAsync(new TestUser(login.UserId), "test-suspicious-import", CancellationToken.None);
+
+        await Assert.ThrowsAsync<AccountTemporarilyBlockedException>(() =>
+            service.LoginUser(new LoginDto("blocked-reader", null, "Strong1!"), CancellationToken.None));
+        await Assert.ThrowsAsync<AccountTemporarilyBlockedException>(() =>
+            service.RefreshTokenAsync(login.RefreshToken, CancellationToken.None));
+
+        await using var context = host.CreateContext();
+        var storedToken = await context.RefreshTokens.SingleAsync(token => token.UserId == login.UserId);
+        Assert.True(storedToken.IsActive);
+    }
+
+    [Fact]
     public async Task RefreshTokenAsync_ShouldRejectMissingInvalidAndExpiredTokens()
     {
         using var host = new IdentityTestHost();
@@ -168,6 +187,10 @@ public class IdentityServiceTests
             services.AddHttpContextAccessor();
             services.AddAuthentication();
             services.AddSingleton<IUser>(new TestUser());
+            services.AddDistributedMemoryCache();
+            services.AddSingleton(
+                Options.Create(new BookImportSecurityOptions()));
+            services.AddSingleton<AccountAbuseGuard>();
             services.AddDbContext<ApplicationDbContext>(options => options.UseSqlite(_connection));
             services
                 .AddIdentityCore<User>(options =>
@@ -197,6 +220,12 @@ public class IdentityServiceTests
             scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.EnsureCreated();
         }
 
+        public void Dispose()
+        {
+            _provider.Dispose();
+            _connection.Dispose();
+        }
+
         public T GetRequiredService<T>() where T : notnull
         {
             return _provider.CreateScope().ServiceProvider.GetRequiredService<T>();
@@ -206,17 +235,16 @@ public class IdentityServiceTests
         {
             return _provider.CreateScope().ServiceProvider.GetRequiredService<ApplicationDbContext>();
         }
-
-        public void Dispose()
-        {
-            _provider.Dispose();
-            _connection.Dispose();
-        }
     }
 
     private sealed class TestUser : IUser
     {
-        public Guid? Id => Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        public TestUser(Guid? id = null)
+        {
+            Id = id ?? Guid.Parse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        }
+
+        public Guid? Id { get; }
         public Guid RequiredId => Id!.Value;
         public string? Email => "tests@example.com";
         public string? Username => "tests";

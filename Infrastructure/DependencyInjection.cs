@@ -78,6 +78,10 @@ public static class DependencyInjection
                                  options.MaxCoverBytes > 0 &&
                                  options.MaxUncompressedArchiveBytes > 0 &&
                                  options.MaxCompressionRatio >= 1 &&
+                                 options.SuspiciousCompressionRatio > options.MaxCompressionRatio &&
+                                 options.SuspiciousCompressionMinimumBytes > 0 &&
+                                 options.SuspiciousCompressionMinimumBytes <= options.MaxUncompressedArchiveBytes &&
+                                 options.SuspiciousAccountBlockDuration > TimeSpan.Zero &&
                                  options.MaxConcurrentFullImportOperations > 0 &&
                                  options.MaxActiveSessionsGlobal > 0 &&
                                  options.MaxActiveSessionsPerUser > 0 &&
@@ -95,6 +99,7 @@ public static class DependencyInjection
             .ValidateOnStart();
         builder.Services.AddSingleton<BookImportSessionStore>();
         builder.Services.AddSingleton<BookImportConcurrencyGate>();
+        builder.Services.AddSingleton<AccountAbuseGuard>();
         builder.Services.AddHostedService<BookImportSessionCleanupService>();
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 

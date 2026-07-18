@@ -49,6 +49,10 @@ public class ErrorHandlingMiddlewareTests
             new BookImportProcessingTimeoutException("Full import timed out."), StatusCodes.Status408RequestTimeout,
             "Full Import Timed Out"
         },
+        {
+            new AccountTemporarilyBlockedException(DateTimeOffset.UtcNow.AddHours(24)),
+            StatusCodes.Status429TooManyRequests, "Account Temporarily Blocked"
+        },
         { new InvalidOperationException("boom"), StatusCodes.Status500InternalServerError, "Internal Server Error" }
     };
 
@@ -177,6 +181,17 @@ public class ErrorHandlingMiddlewareTests
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task InvokeAsync_ShouldReturnRemainingBlockInRetryAfterHeader()
+    {
+        var context = await InvokeWithException(
+            new AccountTemporarilyBlockedException(DateTimeOffset.UtcNow.AddHours(24)));
+
+        Assert.Equal(StatusCodes.Status429TooManyRequests, context.Response.StatusCode);
+        Assert.True(long.TryParse(context.Response.Headers.RetryAfter, out var retryAfter));
+        Assert.InRange(retryAfter, 23 * 60 * 60, 24 * 60 * 60);
     }
 
     [Fact]
