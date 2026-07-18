@@ -24,7 +24,7 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('./BookCoverSection', () => ({
-  BookCoverArtwork: ({ title }: { title: string }) => <div>{title} cover</div>,
+  BookCoverArtwork: ({ title, hint }: { title: string; hint?: string }) => <div>{title} cover{hint}</div>,
   CoverLightbox: () => null,
   useResolvedCoverImage: () => null,
 }))
@@ -142,5 +142,27 @@ describe('BookDetailsPage', () => {
     expect(screen.getByRole('heading', { name: /delete book/i })).toHaveClass('text-slate-950')
     expect(within(dialog).getByText('Lord of Mysteries')).toHaveClass('text-slate-950')
     expect(panel).toHaveClass('ui-dialog-panel')
+  })
+
+  it('replaces a technical cover download error with a helpful generic message', async () => {
+    vi.mocked(api.getGenres).mockResolvedValue({ skip: 0, take: 100, total: genres.length, data: genres })
+    vi.mocked(api.getBook).mockResolvedValue({
+      ...books[0],
+      cover: {
+        id: 'cover-1',
+        status: 'Failed',
+        failureReason: 'Response status code does not indicate success: 301 (Moved Permanently).',
+      },
+    })
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    expect(await screen.findByText(/A cover was found, but the image could not be downloaded/)).toBeInTheDocument()
+    expect(screen.queryByText(/301 \(Moved Permanently\)/)).not.toBeInTheDocument()
   })
 })

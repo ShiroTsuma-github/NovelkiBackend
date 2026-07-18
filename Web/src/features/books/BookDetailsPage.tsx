@@ -537,7 +537,16 @@ function getDisplayCoverFailure(failureReason?: string | null) {
     return 'No valid cover response was found from the configured providers.'
   }
 
+  if (isCoverDownloadFailure(failureReason)) {
+    return 'A cover was found, but the image could not be downloaded. Try searching again or upload a cover manually.'
+  }
+
   return failureReason
+}
+
+function isCoverDownloadFailure(failureReason: string) {
+  return failureReason.includes('Response status code does not indicate success')
+    || /HTTP\s+3\d\d/i.test(failureReason)
 }
 
 function isProviderResponseFailure(failureReason?: string | null) {
