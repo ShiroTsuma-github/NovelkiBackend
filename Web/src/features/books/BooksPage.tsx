@@ -34,6 +34,7 @@ import {
   useBookListUrlState,
 } from './BookListShared'
 import { ImportBooksDialog } from './ImportBooksDialog'
+import { DescribedMetadataPills, MetadataSummary } from './MetadataBadges'
 
 export { formatProgress } from './bookProgress'
 export {
@@ -59,7 +60,7 @@ const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
 
 const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-72', render: (book) => <TitleCell book={book} /> },
-  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-44', render: (book) => <span className="block truncate">{book.author ?? '-'}</span> },
+  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-44', render: (book) => <AuthorCell book={book} /> },
   { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-32', render: (book) => book.status },
   { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-24', render: (book) => book.contentType },
   { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', widthClass: 'w-32', render: formatProgress },
@@ -68,8 +69,8 @@ const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', widthClass: 'w-20', render: (book) => book.priority ?? '-' },
   { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', widthClass: 'w-40', render: (book) => formatDate(book.created) },
   { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-40', render: (book) => formatDate(book.lastModified || book.created) },
-  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-40', render: (book) => <Pills values={book.genres} /> },
-  { id: 'tags', label: 'Tags', defaultVisible: true, widthClass: 'w-40', render: (book) => <Pills values={book.tags} /> },
+  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-40', render: (book) => <DescribedMetadataPills descriptions={book.genreDescriptions} values={book.genres} /> },
+  { id: 'tags', label: 'Tags', defaultVisible: true, widthClass: 'w-40', render: (book) => <DescribedMetadataPills descriptions={book.tagDescriptions} values={book.tags} /> },
   { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.linksCount },
   { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-56', render: (book) => truncate(book.notes) },
   { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-56', render: (book) => truncate(book.description) },
@@ -901,45 +902,27 @@ function getCardProgressRowHeight(cardsPerRow: number) {
   return '1.25rem'
 }
 
-function Pills({ values }: { values: string[] }) {
-  if (!values.length) {
-    return '-'
-  }
-
-  const visibleValues = values.slice(0, 3)
-  const hiddenCount = values.length - visibleValues.length
+function TitleCell({ book }: { book: BookListItemDto }) {
+  const alternativeCount = book.alternativeTitlesCount ?? book.alternativeTitles.length
 
   return (
-    <div className="flex flex-wrap gap-1">
-      {visibleValues.map((value) => (
-        <span className="book-table-badge rounded px-2 py-1 text-xs" key={value}>{value}</span>
-      ))}
-      {hiddenCount > 0 ? (
-        <span className="book-table-badge rounded px-2 py-1 text-xs font-medium">+{hiddenCount} more</span>
-      ) : null}
-    </div>
+    <MetadataSummary
+      alternatives={book.alternativeTitles}
+      countNoun="alternative title"
+      primary={book.primaryTitle}
+      primaryClassName="block min-w-0 truncate font-medium text-slate-950"
+      totalCount={alternativeCount}
+    />
   )
 }
 
-function TitleCell({ book }: { book: BookListItemDto }) {
-  const alternativeCount = book.alternativeTitlesCount ?? book.alternativeTitles.length
-  const alternativeTitle = book.alternativeTitles.length
-    ? `Alternative titles: ${book.alternativeTitles.join(', ')}`
-    : `${alternativeCount} alternative titles`
-
+function AuthorCell({ book }: { book: BookListItemDto }) {
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <span className="block min-w-0 truncate font-medium text-slate-950">{book.primaryTitle}</span>
-      {alternativeCount > 0 ? (
-        <span
-          aria-label={`${alternativeCount} alternative titles`}
-          className="book-table-badge shrink-0 rounded px-2 py-1 text-xs font-medium"
-          title={alternativeTitle}
-        >
-          +{alternativeCount}
-        </span>
-      ) : null}
-    </div>
+    <MetadataSummary
+      alternatives={book.authorOtherNames ?? []}
+      countNoun="alternative name"
+      primary={book.author ?? '-'}
+    />
   )
 }
 

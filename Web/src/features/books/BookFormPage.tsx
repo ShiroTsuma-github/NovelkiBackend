@@ -780,7 +780,7 @@ function TagChipSelect({
   const normalizedSelected = selected.map((tag) => tag.toLocaleLowerCase())
   const suggestions = (tagSuggestionsQuery.data ?? [])
     .filter((tag) => !normalizedSelected.includes(tag.name.toLocaleLowerCase()))
-    .map((tag) => ({ key: tag.name, label: tag.name }))
+    .map((tag) => ({ key: tag.name, label: tag.name, description: tag.description }))
 
   function addTag(value: string) {
     const tag = value.trim()
