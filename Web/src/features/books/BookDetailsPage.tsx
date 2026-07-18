@@ -10,6 +10,7 @@ import { Badge, buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
+import { DescribedMetadataPills } from './MetadataBadges'
 import { ProgressDialog } from './ProgressDialog'
 
 export function BookDetailsPage() {
@@ -27,7 +28,6 @@ export function BookDetailsPage() {
     enabled: Boolean(id),
   })
   const previewImageUrl = useResolvedCoverImage(bookQuery.data?.cover)
-  const genresQuery = useQuery({ queryKey: ['genres'], queryFn: api.getGenres, staleTime: 300_000 })
   const deleteMutation = useMutation({
     mutationFn: () => api.deleteBook(id!),
     onSuccess: async () => {
@@ -88,11 +88,6 @@ export function BookDetailsPage() {
     return <Surface className="p-6 text-slate-500" tone="muted">Book not found.</Surface>
   }
 
-  const genreDescriptions = new Map(
-    (genresQuery.data?.data ?? [])
-      .filter((genre) => book.genres.includes(genre.name) && genre.description)
-      .map((genre) => [genre.name, genre.description ?? '']),
-  )
   const shouldOfferRefresh = book.cover?.source !== 'ManualUpload' && book.cover?.source !== 'ManualUrl'
   const refreshLabel = book.cover?.imageUrl ? 'Search again' : 'Search cover'
   const displayCoverStatus = getDisplayCoverStatus(book.cover?.status, book.cover?.failureReason)
@@ -197,11 +192,23 @@ export function BookDetailsPage() {
                       <div className="grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2">
                         <div className="grid gap-2">
                           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Genres</div>
-                          <GenrePills descriptions={genreDescriptions} values={book.genres} />
+                          <DescribedMetadataPills
+                            descriptions={book.genreDescriptions}
+                            empty={<p className="text-sm text-slate-500">No genres.</p>}
+                            maxVisible={book.genres.length}
+                            values={book.genres}
+                            variant="detail"
+                          />
                         </div>
                         <div className="grid gap-2">
                           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tags</div>
-                          <Pills values={book.tags} empty="No tags." />
+                          <DescribedMetadataPills
+                            descriptions={book.tagDescriptions}
+                            empty={<p className="text-sm text-slate-500">No tags.</p>}
+                            maxVisible={book.tags.length}
+                            values={book.tags}
+                            variant="detail"
+                          />
                         </div>
                       </div>
                     </Surface>
@@ -480,43 +487,6 @@ function DeleteBookDialog({
           </button>
         </div>
       </DialogPanel>
-    </div>
-  )
-}
-
-function Pills({ values, empty }: { values: string[]; empty: string }) {
-  if (!values.length) {
-    return <p className="text-sm text-slate-500">{empty}</p>
-  }
-  return (
-    <div className="flex flex-wrap gap-2">
-      {values.map((value) => (
-        <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700" key={value}>{value}</span>
-      ))}
-    </div>
-  )
-}
-
-function GenrePills({ values, descriptions }: { values: string[]; descriptions: Map<string, string> }) {
-  if (!values.length) {
-    return <p className="text-sm text-slate-500">No genres.</p>
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {values.map((value) => {
-        const description = descriptions.get(value)
-        return (
-          <span className="group relative" key={value}>
-            <span className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{value}</span>
-            {description ? (
-              <span className="ui-chart-tooltip pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 text-xs font-normal leading-5 group-hover:block">
-                {description}
-              </span>
-            ) : null}
-          </span>
-        )
-      })}
     </div>
   )
 }
