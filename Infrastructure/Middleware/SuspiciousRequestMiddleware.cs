@@ -2,10 +2,8 @@ namespace Infrastructure.Middleware;
 
 using System.Buffers;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Application.Common.Interfaces;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
@@ -14,6 +12,7 @@ using Services;
 public sealed class SuspiciousRequestMiddleware
 {
     private const int MaxInspectedBodyBytes = 256 * 1024;
+
     private const RegexOptions SafeRegexOptions =
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.NonBacktracking |
         RegexOptions.Singleline;
@@ -231,15 +230,15 @@ public sealed class SuspiciousRequestMiddleware
             var normalized = NormalizeRepeatedly(value).Replace('\\', '/');
             var segments = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
             var traversalSegments = segments.Count(segment => segment == "..");
-            if (traversalSegments >= 2 || traversalSegments == 1 && TargetsSensitivePath(segments))
+            if (traversalSegments >= 2 || (traversalSegments == 1 && TargetsSensitivePath(segments)))
             {
                 return "url-path-traversal";
             }
 
             if (normalized.StartsWith("/etc/", StringComparison.OrdinalIgnoreCase) ||
                 normalized.StartsWith("/proc/", StringComparison.OrdinalIgnoreCase) ||
-                normalized.Length >= 3 && char.IsAsciiLetter(normalized[0]) && normalized[1] == ':' &&
-                normalized[2] == '/')
+                (normalized.Length >= 3 && char.IsAsciiLetter(normalized[0]) && normalized[1] == ':' &&
+                 normalized[2] == '/'))
             {
                 return "url-path-traversal";
             }

@@ -1,9 +1,10 @@
 namespace Infrastructure.IntegrationTests;
 
+using Application.Common.Interfaces;
 using Domain.Associations;
-using Infrastructure.IntegrationTests.TestSupport;
-using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
+using Services;
+using TestSupport;
 
 public sealed class GlobalTagServiceTests
 {
@@ -45,8 +46,11 @@ public sealed class GlobalTagServiceTests
         Assert.False(await context.Set<BookTag>().AnyAsync(link => link.TagId == global.Id));
     }
 
-    private sealed class NoopCache : Application.Common.Interfaces.IBookListCacheInvalidator
+    private sealed class NoopCache : IBookListCacheInvalidator
     {
-        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

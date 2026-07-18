@@ -1,8 +1,6 @@
 namespace Application.Features.BookFeatures.Commands;
 
-using Application.Common.DTOs.Book;
-using Domain.Associations;
-using FluentValidation;
+using Common.DTOs.Book;
 
 public sealed record UpdateBookCommand(
     Guid Id,
@@ -29,13 +27,13 @@ public sealed record UpdateBookCommand(
 
 public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
 {
-    private readonly IBookRepository _bookRepository;
     private readonly IAuthorRepository _authorRepository;
-    private readonly ITypeRepository _typeRepository;
-    private readonly IStatusRepository _statusRepository;
-    private readonly IGenreRepository _genreRepository;
-    private readonly ITagRepository _tagRepository;
+    private readonly IBookRepository _bookRepository;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
+    private readonly IGenreRepository _genreRepository;
+    private readonly IStatusRepository _statusRepository;
+    private readonly ITagRepository _tagRepository;
+    private readonly ITypeRepository _typeRepository;
     private readonly IUser _user;
 
     public UpdateBookHandler(
@@ -144,8 +142,8 @@ public record UpdateBookProgressCommand(
 
 public class UpdateBookProgressHandler : IRequestHandler<UpdateBookProgressCommand>
 {
-    private readonly IBookRepository _repository;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
+    private readonly IBookRepository _repository;
     private readonly IUser _user;
 
     public UpdateBookProgressHandler(IBookRepository repository, IBookListCacheInvalidator cacheInvalidator, IUser user)

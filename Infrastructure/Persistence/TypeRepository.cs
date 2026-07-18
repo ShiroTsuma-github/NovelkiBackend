@@ -1,7 +1,5 @@
 namespace Infrastructure.Persistence;
 
-using Application.Common;
-
 public class TypeRepository : ITypeRepository
 {
     private readonly ApplicationDbContext _context;
@@ -26,6 +24,7 @@ public class TypeRepository : ITypeRepository
             {
                 throw new EntityInUseException<ContentType>(type.Name);
             }
+
             _context.ContentTypes.Remove(type);
             await _context.SaveChangesAsync(cancellationToken);
         }

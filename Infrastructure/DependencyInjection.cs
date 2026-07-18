@@ -1,6 +1,5 @@
 ﻿namespace Infrastructure;
 
-using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
 using Authentication;

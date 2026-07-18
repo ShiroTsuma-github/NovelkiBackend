@@ -1,6 +1,5 @@
 namespace Infrastructure.Persistence;
 
-using System.Globalization;
 using Domain.Models;
 
 public sealed class BookAnalyticsQueryService(ApplicationDbContext context, BookSearchCriteriaApplier criteriaApplier)

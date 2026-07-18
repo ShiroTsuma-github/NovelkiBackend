@@ -1,9 +1,7 @@
 namespace Infrastructure.Services;
 
 using Application.Common.DTOs.Admin;
-using Application.Common.Interfaces;
 using Application.Common.Models;
-using Infrastructure.Identity;
 
 public sealed class AdminAccountService(
     ApplicationDbContext context,
@@ -52,6 +50,7 @@ public sealed class AdminAccountService(
         {
             throw new EntityNotFoundException<User, Guid>(userId);
         }
+
         var purge = await libraryService.DeleteAllBooksForOwnerAsync(userId, cancellationToken);
         context.ChangeTracker.Clear();
 
@@ -60,7 +59,8 @@ public sealed class AdminAccountService(
             .ExecuteDeleteAsync(cancellationToken);
         await context.Authors
             .Where(author => author.CreatedBy == userId)
-            .ExecuteUpdateAsync(update => update.SetProperty(author => author.CreatedBy, (Guid?)null), cancellationToken);
+            .ExecuteUpdateAsync(update => update.SetProperty(author => author.CreatedBy, (Guid?)null),
+                cancellationToken);
         await context.Tags
             .Where(tag => tag.IsGlobal && tag.CreatedBy == userId)
             .ExecuteUpdateAsync(update => update.SetProperty(tag => tag.CreatedBy, (Guid?)null), cancellationToken);

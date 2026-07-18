@@ -1,7 +1,5 @@
 namespace Infrastructure.Services;
 
-using System.Collections.Concurrent;
-using System.Globalization;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

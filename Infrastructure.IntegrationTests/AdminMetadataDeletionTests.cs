@@ -3,8 +3,8 @@ namespace Infrastructure.IntegrationTests;
 using Domain.Associations;
 using Domain.Entities;
 using Domain.Exceptions;
-using Infrastructure.IntegrationTests.TestSupport;
-using Infrastructure.Persistence;
+using Persistence;
+using TestSupport;
 
 public sealed class AdminMetadataDeletionTests
 {

@@ -28,15 +28,11 @@ public sealed class CreateAuthorCommandHandler(IAuthorRepository authorRepositor
 
         var author = new Author
         {
-            PrimaryName = primaryName,
-            NormalizedPrimaryName = MappingExtensions.NormalizeName(primaryName)
+            PrimaryName = primaryName, NormalizedPrimaryName = MappingExtensions.NormalizeName(primaryName)
         };
         author.Names.Add(new AuthorName
         {
-            Name = primaryName,
-            NormalizedName = author.NormalizedPrimaryName,
-            IsPrimary = true,
-            Source = "Manual"
+            Name = primaryName, NormalizedName = author.NormalizedPrimaryName, IsPrimary = true, Source = "Manual"
         });
         foreach (var name in names.Where(name => MappingExtensions.NormalizeName(name) != author.NormalizedPrimaryName))
         {

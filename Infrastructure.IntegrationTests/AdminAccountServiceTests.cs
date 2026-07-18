@@ -2,12 +2,11 @@ namespace Infrastructure.IntegrationTests;
 
 using Application.Common.Interfaces;
 using Domain.Associations;
-using Domain.Entities;
 using Domain.Exceptions;
-using Infrastructure.Identity;
-using Infrastructure.IntegrationTests.TestSupport;
-using Infrastructure.Services;
+using Identity;
 using Microsoft.EntityFrameworkCore;
+using Services;
+using TestSupport;
 
 public sealed class AdminAccountServiceTests
 {
@@ -61,15 +60,28 @@ public sealed class AdminAccountServiceTests
 
     private sealed class NoopCache : IBookListCacheInvalidator
     {
-        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class NoopStorage : IBookCoverStorage
     {
         public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
-            string? contentType, CancellationToken cancellationToken) => throw new NotSupportedException();
-        public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) =>
+            string? contentType, CancellationToken cancellationToken)
+        {
             throw new NotSupportedException();
-        public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken) => Task.CompletedTask;
+        }
+
+        public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException();
+        }
+
+        public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
+        {
+            return Task.CompletedTask;
+        }
     }
 }

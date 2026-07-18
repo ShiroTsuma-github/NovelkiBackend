@@ -35,7 +35,8 @@ public class AutocompleteFeatureTests
             CancellationToken.None);
         await repository.AddAsync(new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" },
             CancellationToken.None);
-        await repository.AddAsync(new Tag { IsGlobal = true, Name = "official favorite", NormalizedName = "OFFICIAL FAVORITE" },
+        await repository.AddAsync(
+            new Tag { IsGlobal = true, Name = "official favorite", NormalizedName = "OFFICIAL FAVORITE" },
             CancellationToken.None);
         var handler = new SearchTagsQueryHandler(repository, new FakeUser());
 
@@ -136,7 +137,8 @@ public class AutocompleteFeatureTests
         {
             var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToList();
             return Task.FromResult<IEnumerable<Tag>>(_tags
-                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && normalizedNames.Contains(t.NormalizedName)).ToList());
+                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && normalizedNames.Contains(t.NormalizedName))
+                .ToList());
         }
 
         public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
