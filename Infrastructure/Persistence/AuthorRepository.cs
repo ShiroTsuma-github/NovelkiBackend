@@ -59,6 +59,12 @@ public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    public void AddName(Author author, AuthorName name)
+    {
+        author.Names.Add(name);
+        context.AuthorNames.Add(name);
+    }
+
     public async Task DeleteAsync(Author author, CancellationToken cancellationToken)
     {
         context.Authors.Remove(author);
