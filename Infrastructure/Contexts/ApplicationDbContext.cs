@@ -25,6 +25,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<Status> Statuses { get; set; }
     public DbSet<ContentType> ContentTypes { get; set; }
     public DbSet<Tag> Tags { get; set; }
+    public DbSet<PublicBookSnapshot> PublicBookSnapshots { get; set; }
+    public DbSet<BookShareAuthorPromotion> BookShareAuthorPromotions { get; set; }
+    public DbSet<BookShareTagPromotion> BookShareTagPromotions { get; set; }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new())
     {
@@ -57,6 +60,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         ConfigureStatus(modelBuilder);
         ConfigureContentType(modelBuilder);
         ConfigureTag(modelBuilder);
+        ConfigurePublicBooks(modelBuilder);
         ConfigureIdentity(modelBuilder);
         SeedSystemDictionaries(modelBuilder);
     }
@@ -260,6 +264,42 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
                 .HasForeignKey(t => t.OwnerId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired(false);
+        });
+    }
+
+    private static void ConfigurePublicBooks(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<PublicBookSnapshot>(entity =>
+        {
+            entity.HasIndex(snapshot => snapshot.SourceBookId).IsUnique();
+            entity.HasIndex(snapshot => snapshot.NormalizedPrimaryTitle);
+            entity.HasIndex(snapshot => new { snapshot.OwnerId, snapshot.SnapshotAt });
+            entity.Property(snapshot => snapshot.PrimaryTitle).HasMaxLength(500);
+            entity.Property(snapshot => snapshot.NormalizedPrimaryTitle).HasMaxLength(500);
+            entity.Property(snapshot => snapshot.AuthorName).HasMaxLength(300);
+            entity.Property(snapshot => snapshot.ContentType).HasMaxLength(100);
+            entity.Property(snapshot => snapshot.CoverStoragePath).HasMaxLength(500);
+            entity.Property(snapshot => snapshot.CoverThumbnailStoragePath).HasMaxLength(500);
+            entity.Property(snapshot => snapshot.CoverMimeType).HasMaxLength(100);
+            entity.HasOne(snapshot => snapshot.SourceBook).WithOne()
+                .HasForeignKey<PublicBookSnapshot>(snapshot => snapshot.SourceBookId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<User>().WithMany().HasForeignKey(snapshot => snapshot.OwnerId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<BookShareAuthorPromotion>(entity =>
+        {
+            entity.HasKey(promotion => promotion.AuthorId);
+            entity.HasOne(promotion => promotion.Author).WithOne()
+                .HasForeignKey<BookShareAuthorPromotion>(promotion => promotion.AuthorId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<BookShareTagPromotion>(entity =>
+        {
+            entity.HasKey(promotion => promotion.TagId);
+            entity.HasOne(promotion => promotion.Tag).WithOne()
+                .HasForeignKey<BookShareTagPromotion>(promotion => promotion.TagId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

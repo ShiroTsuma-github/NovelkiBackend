@@ -1,0 +1,359 @@
+namespace Infrastructure.Services;
+
+using System.Text.Json;
+using Application.Common.DTOs.Book;
+using Application.Common.Models;
+using Domain.Associations;
+
+public sealed class PublicBookService(
+    ApplicationDbContext context,
+    IUser user,
+    IBookCoverStorage storage,
+    IAuthorLifecycleService authorLifecycle,
+    IBookListCacheInvalidator cacheInvalidator) : IPublicBookService
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    public async Task<PaginatedResult<PublicBookSnapshotDto>> SearchAsync(string? search, int skip, int take,
+        bool mineOnly, CancellationToken cancellationToken)
+    {
+        take = Math.Clamp(take, 1, 50);
+        skip = Math.Max(0, skip);
+        var query = context.PublicBookSnapshots.AsNoTracking();
+        if (mineOnly) query = query.Where(snapshot => snapshot.OwnerId == user.RequiredId);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalized = MappingExtensions.NormalizeName(search);
+            query = query.Where(snapshot => snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
+                                            (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)));
+        }
+        var total = await query.CountAsync(cancellationToken);
+        var snapshots = await query.OrderByDescending(snapshot => snapshot.SnapshotAt).ThenBy(snapshot => snapshot.PrimaryTitle)
+            .Skip(skip).Take(take).ToListAsync(cancellationToken);
+        return PaginatedResult<PublicBookSnapshotDto>.Create(skip, take, total, snapshots.Select(ToDto));
+    }
+
+    public async Task<PublicBookSnapshotDto> PublishAsync(Guid bookId, CancellationToken cancellationToken)
+    {
+        var existing = await context.PublicBookSnapshots.FirstOrDefaultAsync(snapshot => snapshot.SourceBookId == bookId,
+            cancellationToken);
+        if (existing is not null) return await RefreshAsync(existing.Id, cancellationToken);
+
+        var book = await LoadOwnedBookAsync(bookId, user.RequiredId, cancellationToken);
+        var snapshot = new PublicBookSnapshot
+        {
+            Id = Guid.NewGuid(), SourceBookId = book.Id, OwnerId = book.OwnerId,
+            PrimaryTitle = book.PrimaryTitle, NormalizedPrimaryTitle = book.NormalizedPrimaryTitle,
+            AlternativeTitlesJson = "[]", AuthorOtherNamesJson = "[]", ContentType = book.ContentType.Name,
+            GenresJson = "[]", TagsJson = "[]", PublicTagIdsJson = "[]", SnapshotAt = DateTimeOffset.UtcNow
+        };
+        await ApplySnapshotAsync(snapshot, book, cancellationToken);
+        context.PublicBookSnapshots.Add(snapshot);
+        await context.SaveChangesAsync(cancellationToken);
+        await CopyCoverToSnapshotAsync(snapshot, book.Cover, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        return ToDto(snapshot);
+    }
+
+    public async Task<PublicBookSnapshotDto> RefreshAsync(Guid snapshotId, CancellationToken cancellationToken)
+    {
+        var snapshot = await GetOwnedSnapshotAsync(snapshotId, cancellationToken);
+        var oldAuthorId = snapshot.PublicAuthorId;
+        var oldTagIds = Deserialize<Guid[]>(snapshot.PublicTagIdsJson);
+        var book = await LoadOwnedBookAsync(snapshot.SourceBookId, user.RequiredId, cancellationToken);
+        await ApplySnapshotAsync(snapshot, book, cancellationToken);
+        await CopyCoverToSnapshotAsync(snapshot, book.Cover, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+        await CleanupPromotionsAsync(oldAuthorId, oldTagIds, snapshot.OwnerId, cancellationToken);
+        return ToDto(snapshot);
+    }
+
+    public async Task UnlistAsync(Guid snapshotId, CancellationToken cancellationToken)
+    {
+        var snapshot = await GetOwnedSnapshotAsync(snapshotId, cancellationToken);
+        await RemoveSnapshotAsync(snapshot, cancellationToken);
+    }
+
+    public async Task UnlistBySourceBookAsync(Guid bookId, CancellationToken cancellationToken)
+    {
+        var snapshot = await context.PublicBookSnapshots.FirstOrDefaultAsync(
+            item => item.SourceBookId == bookId && item.OwnerId == user.RequiredId, cancellationToken);
+        if (snapshot is not null) await RemoveSnapshotAsync(snapshot, cancellationToken);
+    }
+
+    public async Task UnlistAllForOwnerAsync(Guid ownerId, CancellationToken cancellationToken)
+    {
+        var snapshots = await context.PublicBookSnapshots.Where(snapshot => snapshot.OwnerId == ownerId)
+            .ToListAsync(cancellationToken);
+        foreach (var snapshot in snapshots) await RemoveSnapshotAsync(snapshot, cancellationToken);
+    }
+
+    public async Task<CopyPublicBookResult> CopyAsync(Guid snapshotId, CancellationToken cancellationToken)
+    {
+        var snapshot = await context.PublicBookSnapshots.AsNoTracking()
+                           .FirstOrDefaultAsync(item => item.Id == snapshotId, cancellationToken)
+                       ?? throw new EntityNotFoundException<PublicBookSnapshot, Guid>(snapshotId);
+        var type = await context.ContentTypes.FirstOrDefaultAsync(item => item.Name == snapshot.ContentType,
+                       cancellationToken)
+                   ?? throw new ValidationException($"Content type '{snapshot.ContentType}' is no longer available.");
+        if (await context.Books.AnyAsync(book => book.OwnerId == user.RequiredId &&
+                                                book.NormalizedPrimaryTitle == snapshot.NormalizedPrimaryTitle &&
+                                                book.ContentTypeId == type.Id, cancellationToken))
+            throw new ValidationException("This book already exists in your library.");
+
+        var status = await context.Statuses.FirstAsync(item => item.Slug == "plan-to-read", cancellationToken);
+        var book = new Book
+        {
+            Id = Guid.NewGuid(), OwnerId = user.RequiredId, PrimaryTitle = snapshot.PrimaryTitle,
+            NormalizedPrimaryTitle = snapshot.NormalizedPrimaryTitle, Description = snapshot.Description,
+            ContentTypeId = type.Id, ContentType = type, StatusId = status.Id, Status = status,
+            CurrentChapterNumber = 0
+        };
+        book.Titles.Add(snapshot.PrimaryTitle.ToPrimaryTitle());
+        foreach (var title in Deserialize<string[]>(snapshot.AlternativeTitlesJson).Distinct(StringComparer.OrdinalIgnoreCase))
+            book.Titles.Add(new BookTitle { Title = title, NormalizedTitle = MappingExtensions.NormalizeName(title), IsPrimary = false, Source = "Public snapshot" });
+        await AttachAuthorAsync(book, snapshot, cancellationToken);
+        await AttachGenresAsync(book, Deserialize<PublicBookMetadataDto[]>(snapshot.GenresJson), cancellationToken);
+        await AttachTagsAsync(book, Deserialize<PublicBookMetadataDto[]>(snapshot.TagsJson), cancellationToken);
+        context.Books.Add(book);
+        await context.SaveChangesAsync(cancellationToken);
+
+        if (!string.IsNullOrWhiteSpace(snapshot.CoverStoragePath))
+        {
+            await using var coverStream = await storage.OpenReadAsync(snapshot.CoverStoragePath, cancellationToken);
+            var stored = await storage.SaveAsync(book.OwnerId, book.Id, coverStream, "cover.jpg", snapshot.CoverMimeType,
+                cancellationToken);
+            context.BookCovers.Add(new BookCover
+            {
+                BookId = book.Id, Book = book, Status = BookCoverStatus.Uploaded, Source = BookCoverSource.ManualUpload,
+                StoragePath = stored.Original.StoragePath, ThumbnailStoragePath = stored.Thumbnail.StoragePath,
+                MimeType = stored.Original.MimeType, ThumbnailMimeType = stored.Thumbnail.MimeType,
+                SizeBytes = stored.Original.SizeBytes, ThumbnailSizeBytes = stored.Thumbnail.SizeBytes,
+                Width = stored.Original.Width, Height = stored.Original.Height,
+                ThumbnailWidth = stored.Thumbnail.Width, ThumbnailHeight = stored.Thumbnail.Height
+            });
+            await context.SaveChangesAsync(cancellationToken);
+        }
+        await cacheInvalidator.InvalidateBooksAsync(user.RequiredId, cancellationToken);
+        return new CopyPublicBookResult(book.Id);
+    }
+
+    public async Task<(Stream Content, string MimeType)> OpenCoverAsync(Guid snapshotId,
+        CancellationToken cancellationToken)
+    {
+        var snapshot = await context.PublicBookSnapshots.AsNoTracking().FirstOrDefaultAsync(item => item.Id == snapshotId,
+                           cancellationToken)
+                       ?? throw new EntityNotFoundException<PublicBookSnapshot, Guid>(snapshotId);
+        if (string.IsNullOrWhiteSpace(snapshot.CoverStoragePath))
+            throw new EntityNotFoundException<PublicBookSnapshot, Guid>(snapshotId);
+        return (await storage.OpenReadAsync(snapshot.CoverStoragePath, cancellationToken),
+            snapshot.CoverMimeType ?? "image/jpeg");
+    }
+
+    private async Task ApplySnapshotAsync(PublicBookSnapshot snapshot, Book book, CancellationToken cancellationToken)
+    {
+        snapshot.PrimaryTitle = book.PrimaryTitle;
+        snapshot.NormalizedPrimaryTitle = book.NormalizedPrimaryTitle;
+        snapshot.Description = book.Description;
+        snapshot.AlternativeTitlesJson = Serialize(book.Titles.Where(title => !title.IsPrimary).Select(title => title.Title));
+        snapshot.AuthorName = book.Author?.PrimaryName;
+        snapshot.AuthorOtherNamesJson = Serialize(book.Author?.Names.Where(name => !name.IsPrimary).Select(name => name.Name) ?? []);
+        snapshot.PublicAuthorId = await PublishAuthorAsync(book.Author, cancellationToken);
+        snapshot.ContentType = book.ContentType.Name;
+        snapshot.GenresJson = Serialize(book.BookGenres.Select(link => new PublicBookMetadataDto(link.Genre.Name, link.Genre.Description)));
+        var tags = book.BookTags.Select(link => link.Tag).ToList();
+        snapshot.TagsJson = Serialize(tags.Select(tag => new PublicBookMetadataDto(tag.Name, tag.Description)));
+        snapshot.PublicTagIdsJson = Serialize(await PublishTagsAsync(tags, cancellationToken));
+        snapshot.SnapshotAt = DateTimeOffset.UtcNow;
+    }
+
+    private async Task<Guid?> PublishAuthorAsync(Author? author, CancellationToken cancellationToken)
+    {
+        if (author is null) return null;
+        if (author.IsPublic) return author.Id;
+        var names = author.Names.Select(name => name.NormalizedName).Append(author.NormalizedPrimaryName).Distinct().ToArray();
+        var existing = await context.Authors.Include(item => item.Names).FirstOrDefaultAsync(item => item.IsPublic &&
+            (names.Contains(item.NormalizedPrimaryName) || item.Names.Any(name => names.Contains(name.NormalizedName))), cancellationToken);
+        if (existing is not null) return existing.Id;
+        author.IsPublic = true;
+        context.BookShareAuthorPromotions.Add(new BookShareAuthorPromotion { AuthorId = author.Id, Author = author });
+        return author.Id;
+    }
+
+    private async Task<Guid[]> PublishTagsAsync(IEnumerable<Tag> tags, CancellationToken cancellationToken)
+    {
+        var ids = new List<Guid>();
+        foreach (var tag in tags)
+        {
+            if (tag.IsGlobal) { ids.Add(tag.Id); continue; }
+            var existing = await context.Tags.FirstOrDefaultAsync(item => item.IsGlobal && item.NormalizedName == tag.NormalizedName, cancellationToken);
+            if (existing is not null) { ids.Add(existing.Id); continue; }
+            tag.IsGlobal = true;
+            context.BookShareTagPromotions.Add(new BookShareTagPromotion { TagId = tag.Id, Tag = tag });
+            ids.Add(tag.Id);
+        }
+        return ids.ToArray();
+    }
+
+    private async Task RemoveSnapshotAsync(PublicBookSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        var authorId = snapshot.PublicAuthorId;
+        var tagIds = Deserialize<Guid[]>(snapshot.PublicTagIdsJson);
+        context.PublicBookSnapshots.Remove(snapshot);
+        await context.SaveChangesAsync(cancellationToken);
+        await storage.DeleteIfExistsAsync(snapshot.CoverStoragePath, cancellationToken);
+        await storage.DeleteIfExistsAsync(snapshot.CoverThumbnailStoragePath, cancellationToken);
+        await CleanupPromotionsAsync(authorId, tagIds, snapshot.OwnerId, cancellationToken);
+    }
+
+    private async Task CleanupPromotionsAsync(Guid? authorId, IEnumerable<Guid> tagIds, Guid promotionOwnerId,
+        CancellationToken cancellationToken)
+    {
+        var snapshots = await context.PublicBookSnapshots.AsNoTracking().Select(item => new { item.PublicAuthorId, item.PublicTagIdsJson })
+            .ToListAsync(cancellationToken);
+        if (authorId.HasValue && snapshots.All(item => item.PublicAuthorId != authorId))
+        {
+            var marker = await context.BookShareAuthorPromotions.FindAsync([authorId.Value], cancellationToken);
+            if (marker is not null)
+            {
+                context.BookShareAuthorPromotions.Remove(marker);
+                await context.SaveChangesAsync(cancellationToken);
+                await authorLifecycle.SetVisibilityAsync(authorId.Value, promotionOwnerId, false, false,
+                    cancellationToken);
+                var unusedAuthor = await context.Authors.FirstOrDefaultAsync(item => item.Id == authorId.Value,
+                    cancellationToken);
+                if (unusedAuthor is not null && !await context.Books.AnyAsync(book => book.AuthorId == authorId.Value,
+                        cancellationToken))
+                {
+                    context.Authors.Remove(unusedAuthor);
+                    await context.SaveChangesAsync(cancellationToken);
+                }
+            }
+        }
+        var usedTagIds = snapshots.SelectMany(item => Deserialize<Guid[]>(item.PublicTagIdsJson)).ToHashSet();
+        foreach (var tagId in tagIds.Distinct().Where(id => !usedTagIds.Contains(id)))
+            await LocalizeAutoTagAsync(tagId, cancellationToken);
+    }
+
+    private async Task LocalizeAutoTagAsync(Guid tagId, CancellationToken cancellationToken)
+    {
+        var marker = await context.BookShareTagPromotions.FindAsync([tagId], cancellationToken);
+        if (marker is null) return;
+        var tag = await context.Tags.Include(item => item.BookTags).ThenInclude(link => link.Book)
+            .FirstAsync(item => item.Id == tagId, cancellationToken);
+        var ownerToKeep = tag.OwnerId;
+        foreach (var group in tag.BookTags.Where(link => link.Book.OwnerId != ownerToKeep).GroupBy(link => link.Book.OwnerId).ToList())
+        {
+            var local = await context.Tags.FirstOrDefaultAsync(item => !item.IsGlobal && item.OwnerId == group.Key &&
+                item.NormalizedName == tag.NormalizedName, cancellationToken);
+            if (local is null)
+            {
+                local = new Tag
+                {
+                    OwnerId = group.Key, IsGlobal = false, Name = tag.Name,
+                    NormalizedName = tag.NormalizedName, Description = tag.Description, Color = tag.Color
+                };
+                context.Tags.Add(local);
+            }
+            await context.SaveChangesAsync(cancellationToken);
+            foreach (var link in group)
+            {
+                context.Remove(link);
+                context.Add(new BookTag { BookId = link.BookId, TagId = local.Id });
+            }
+            await cacheInvalidator.InvalidateBooksAsync(group.Key, cancellationToken);
+        }
+        context.BookShareTagPromotions.Remove(marker);
+        if (tag.BookTags.Any(link => link.Book.OwnerId == ownerToKeep)) tag.IsGlobal = false;
+        else context.Tags.Remove(tag);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task CopyCoverToSnapshotAsync(PublicBookSnapshot snapshot, BookCover? cover,
+        CancellationToken cancellationToken)
+    {
+        if (cover?.StoragePath is null)
+        {
+            await storage.DeleteIfExistsAsync(snapshot.CoverStoragePath, cancellationToken);
+            await storage.DeleteIfExistsAsync(snapshot.CoverThumbnailStoragePath, cancellationToken);
+            snapshot.CoverStoragePath = null;
+            snapshot.CoverThumbnailStoragePath = null;
+            snapshot.CoverMimeType = null;
+            return;
+        }
+        await using var source = await storage.OpenReadAsync(cover.StoragePath, cancellationToken);
+        var stored = await storage.SaveAsync(snapshot.OwnerId, snapshot.Id, source, "snapshot-cover.jpg", cover.MimeType,
+            cancellationToken);
+        snapshot.CoverStoragePath = stored.Original.StoragePath;
+        snapshot.CoverThumbnailStoragePath = stored.Thumbnail.StoragePath;
+        snapshot.CoverMimeType = stored.Original.MimeType;
+    }
+
+    private async Task AttachAuthorAsync(Book book, PublicBookSnapshot snapshot, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(snapshot.AuthorName)) return;
+        var normalized = MappingExtensions.NormalizeName(snapshot.AuthorName);
+        var author = await context.Authors.Include(item => item.Names)
+            .Where(item => item.IsPublic || item.OwnerId == user.RequiredId).OrderBy(item => item.IsPublic)
+            .FirstOrDefaultAsync(item => item.NormalizedPrimaryName == normalized || item.Names.Any(name => name.NormalizedName == normalized), cancellationToken);
+        if (author is null)
+        {
+            author = new Author { OwnerId = user.RequiredId, IsPublic = false, PrimaryName = snapshot.AuthorName, NormalizedPrimaryName = normalized };
+            author.Names.Add(new AuthorName { Name = snapshot.AuthorName, NormalizedName = normalized, IsPrimary = true, Source = "Public snapshot" });
+            foreach (var alias in Deserialize<string[]>(snapshot.AuthorOtherNamesJson))
+                author.Names.Add(new AuthorName { Name = alias, NormalizedName = MappingExtensions.NormalizeName(alias), IsPrimary = false, Source = "Public snapshot" });
+            context.Authors.Add(author);
+        }
+        book.Author = author;
+    }
+
+    private async Task AttachGenresAsync(Book book, IEnumerable<PublicBookMetadataDto> genres,
+        CancellationToken cancellationToken)
+    {
+        var names = genres.Select(item => MappingExtensions.NormalizeName(item.Name)).ToArray();
+        var entities = await context.Genres.Where(item => names.Contains(item.NormalizedName)).ToListAsync(cancellationToken);
+        foreach (var genre in entities) book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+    }
+
+    private async Task AttachTagsAsync(Book book, IEnumerable<PublicBookMetadataDto> tags,
+        CancellationToken cancellationToken)
+    {
+        foreach (var item in tags)
+        {
+            var normalized = MappingExtensions.NormalizeName(item.Name);
+            var tag = await context.Tags.Where(entity => entity.IsGlobal || entity.OwnerId == user.RequiredId)
+                .OrderBy(entity => entity.IsGlobal).FirstOrDefaultAsync(entity => entity.NormalizedName == normalized, cancellationToken);
+            if (tag is null)
+            {
+                tag = new Tag { OwnerId = user.RequiredId, Name = item.Name, NormalizedName = normalized, Description = item.Description, IsGlobal = false };
+                context.Tags.Add(tag);
+            }
+            book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+        }
+    }
+
+    private async Task<Book> LoadOwnedBookAsync(Guid bookId, Guid ownerId, CancellationToken cancellationToken) =>
+        await context.Books.Include(book => book.Author).ThenInclude(author => author!.Names).Include(book => book.ContentType)
+            .Include(book => book.Titles).Include(book => book.BookGenres).ThenInclude(link => link.Genre)
+            .Include(book => book.BookTags).ThenInclude(link => link.Tag).Include(book => book.Cover)
+            .FirstOrDefaultAsync(book => book.Id == bookId && book.OwnerId == ownerId, cancellationToken)
+        ?? throw new EntityNotFoundException<Book, Guid>(bookId);
+
+    private async Task<PublicBookSnapshot> GetOwnedSnapshotAsync(Guid id, CancellationToken cancellationToken) =>
+        await context.PublicBookSnapshots.FirstOrDefaultAsync(item => item.Id == id && item.OwnerId == user.RequiredId,
+            cancellationToken) ?? throw new EntityNotFoundException<PublicBookSnapshot, Guid>(id);
+
+    private PublicBookSnapshotDto ToDto(PublicBookSnapshot snapshot) => new()
+    {
+        Id = snapshot.Id, SourceBookId = snapshot.SourceBookId, PrimaryTitle = snapshot.PrimaryTitle,
+        Description = snapshot.Description, AlternativeTitles = Deserialize<string[]>(snapshot.AlternativeTitlesJson),
+        Author = snapshot.AuthorName, AuthorOtherNames = Deserialize<string[]>(snapshot.AuthorOtherNamesJson),
+        ContentType = snapshot.ContentType, Genres = Deserialize<PublicBookMetadataDto[]>(snapshot.GenresJson),
+        Tags = Deserialize<PublicBookMetadataDto[]>(snapshot.TagsJson), SnapshotAt = snapshot.SnapshotAt,
+        CoverUrl = snapshot.CoverStoragePath is null ? null : ApiRoutes.PublicBookCover(snapshot.Id, snapshot.SnapshotAt.ToUnixTimeMilliseconds()),
+        IsOwner = snapshot.OwnerId == user.RequiredId
+    };
+
+    private static string Serialize<T>(IEnumerable<T> values) => JsonSerializer.Serialize(values, JsonOptions);
+    private static T Deserialize<T>(string json) => JsonSerializer.Deserialize<T>(json, JsonOptions)!;
+}

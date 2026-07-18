@@ -5,20 +5,27 @@ public sealed class AdminLibraryService : IAdminLibraryService
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly ApplicationDbContext _context;
     private readonly IBookCoverStorage _storage;
+    private readonly IPublicBookService? _publicBooks;
 
     public AdminLibraryService(
         ApplicationDbContext context,
         IBookCoverStorage storage,
-        IBookListCacheInvalidator cacheInvalidator)
+        IBookListCacheInvalidator cacheInvalidator,
+        IPublicBookService? publicBooks = null)
     {
         _context = context;
         _storage = storage;
+        _publicBooks = publicBooks;
         _cacheInvalidator = cacheInvalidator;
     }
 
     public async Task<AdminLibraryPurgeResult> DeleteAllBooksForOwnerAsync(Guid ownerId,
         CancellationToken cancellationToken)
     {
+        if (_publicBooks is not null)
+        {
+            await _publicBooks.UnlistAllForOwnerAsync(ownerId, cancellationToken);
+        }
         await using var
             transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
 
