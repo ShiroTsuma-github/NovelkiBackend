@@ -39,6 +39,7 @@ public record BookListItemDto
     public IReadOnlyCollection<string> AlternativeTitles { get; set; } = Array.Empty<string>();
     public int AlternativeTitlesCount { get; set; }
     public string? Author { get; set; }
+    public IReadOnlyCollection<string> AuthorOtherNames { get; set; } = Array.Empty<string>();
     public required string ContentType { get; set; }
     public required string Status { get; set; }
     public decimal? CurrentChapterNumber { get; set; }
@@ -49,8 +50,12 @@ public record BookListItemDto
     public string? Notes { get; set; }
     public BookCoverDto? Cover { get; set; }
     public IReadOnlyCollection<string> Genres { get; set; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, string?> GenreDescriptions { get; set; } =
+        new Dictionary<string, string?>();
     public int GenresCount { get; set; }
     public IReadOnlyCollection<string> Tags { get; set; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, string?> TagDescriptions { get; set; } =
+        new Dictionary<string, string?>();
     public int TagsCount { get; set; }
     public int LinksCount { get; set; }
 }

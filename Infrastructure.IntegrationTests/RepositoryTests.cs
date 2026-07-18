@@ -117,6 +117,38 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldProjectDescriptionsAndAuthorAliasesForListMetadata()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var author = TestData.Author("Primary Author", database.UserId, false);
+        author.Names.Add(new AuthorName
+        {
+            Name = "Alternative Author",
+            NormalizedName = MappingExtensions.NormalizeName("Alternative Author"),
+            IsPrimary = false,
+            Source = "Test"
+        });
+        var genre = TestData.Genre("Projection Genre");
+        genre.Description = "Genre description";
+        var tag = TestData.Tag(database.UserId, "projection-tag");
+        tag.Description = "Tag description";
+        var book = TestData.Book(database.UserId, "Metadata projection", author);
+        book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+        book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+        context.Books.Add(book);
+        await context.SaveChangesAsync();
+        var queryService = CreateReadQueryService(context);
+
+        var result = (await queryService.GetBooksAsync(database.UserId, BookSearchCriteria.Empty, 0, 10, null, null,
+            CancellationToken.None)).Single();
+
+        Assert.Equal(["Alternative Author"], result.AuthorOtherNames);
+        Assert.Equal("Genre description", result.GenreDescriptions["Projection Genre"]);
+        Assert.Equal("Tag description", result.TagDescriptions["projection-tag"]);
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldIncludeBookDetails()
     {
         using var database = new SqliteTestDatabase();
