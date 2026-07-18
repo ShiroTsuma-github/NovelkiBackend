@@ -475,8 +475,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             .ToDictionaryAsync(t => MappingExtensions.NormalizeName(t.Name), t => t, cancellationToken);
         var statusMap = await _context.Statuses.AsNoTracking()
             .ToDictionaryAsync(s => MappingExtensions.NormalizeName(s.Name), s => s, cancellationToken);
-        var authorMap = await _context.Authors.Include(a => a.Names)
-            .ToDictionaryAsync(a => a.NormalizedPrimaryName, cancellationToken);
+        var authorMap = await BuildAuthorMapAsync(ownerId, cancellationToken);
         var genreMap = await _context.Genres
             .ToDictionaryAsync(genre => genre.NormalizedName, cancellationToken);
         var tagMap = await _context.Tags.Where(t => t.OwnerId == ownerId)
@@ -506,7 +505,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 continue;
             }
 
-            var author = ResolveAuthor(row.AuthorName, authorMap);
+            var author = ResolveAuthor(ownerId, row.AuthorName, authorMap);
             var book = new Book
             {
                 PrimaryTitle = row.PrimaryTitle!,
@@ -839,7 +838,29 @@ public sealed class BookCsvImportService : IBookCsvImportService
         }
     }
 
-    private Author? ResolveAuthor(string? authorName, Dictionary<string, Author> authorMap)
+    private async Task<Dictionary<string, Author>> BuildAuthorMapAsync(Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var authors = await _context.Authors
+            .Include(author => author.Names)
+            .Where(author => author.IsPublic || author.OwnerId == ownerId)
+            .OrderBy(author => author.IsPublic)
+            .ThenBy(author => author.PrimaryName)
+            .ToListAsync(cancellationToken);
+        var map = new Dictionary<string, Author>(StringComparer.Ordinal);
+        foreach (var author in authors)
+        {
+            map.TryAdd(author.NormalizedPrimaryName, author);
+            foreach (var name in author.Names)
+            {
+                map.TryAdd(name.NormalizedName, author);
+            }
+        }
+
+        return map;
+    }
+
+    private Author? ResolveAuthor(Guid ownerId, string? authorName, Dictionary<string, Author> authorMap)
     {
         if (string.IsNullOrWhiteSpace(authorName))
         {
@@ -852,7 +873,13 @@ public sealed class BookCsvImportService : IBookCsvImportService
             return author;
         }
 
-        author = new Author { PrimaryName = authorName, NormalizedPrimaryName = normalized };
+        author = new Author
+        {
+            OwnerId = ownerId,
+            IsPublic = false,
+            PrimaryName = authorName,
+            NormalizedPrimaryName = normalized
+        };
         author.Names.Add(new AuthorName
         {
             Name = authorName, NormalizedName = normalized, IsPrimary = true, Source = "CSV import"
