@@ -1,18 +1,17 @@
-using Application.Common;
-using Application.Common.DTOs.Book;
-using Application.Common.Interfaces;
-using Application.Features.BookFeatures.Commands;
-using Application.Features.BookFeatures.Queries.GetBook;
-using Application.Features.BookFeatures.Validators;
+namespace Application.UnitTests;
+
+using Common;
+using Common.DTOs.Book;
+using Common.Interfaces;
 using Domain.Associations;
 using Domain.Entities;
 using Domain.Exceptions;
+using Domain.Models;
 using Domain.Repositories;
+using Features.BookFeatures.Commands;
+using Features.BookFeatures.Queries.GetBook;
+using Features.BookFeatures.Validators;
 using FluentValidation;
-
-namespace Application.UnitTests;
-
-using FluentValidation.Results;
 
 public class BookFeatureTests
 {
@@ -466,25 +465,25 @@ public class BookFeatureTests
     {
         var summaryQueryService = new FakeBookSummaryQueryService
         {
-            Summary = new Domain.Models.BookSummarySnapshot(
+            Summary = new BookSummarySnapshot(
                 4,
                 3,
                 8.333333333,
                 900,
                 3,
                 [
-                    new Domain.Models.BookStatusCountSnapshot("Reading", 2),
-                    new Domain.Models.BookStatusCountSnapshot("Completed", 2)
+                    new BookStatusCountSnapshot("Reading", 2),
+                    new BookStatusCountSnapshot("Completed", 2)
                 ],
                 [
-                    new Domain.Models.BookTypeSummarySnapshot("Novel", 3, 900)
+                    new BookTypeSummarySnapshot("Novel", 3, 900)
                 ],
                 [
-                    new Domain.Models.BookGenreCountSnapshot("Fantasy", 2)
+                    new BookGenreCountSnapshot("Fantasy", 2)
                 ],
                 [
-                    new Domain.Models.BookRatingCountSnapshot(8, 1),
-                    new Domain.Models.BookRatingCountSnapshot(9, 2)
+                    new BookRatingCountSnapshot(8, 1),
+                    new BookRatingCountSnapshot(9, 2)
                 ])
         };
         var handler = new GetBookSummaryHandler(summaryQueryService, new FakeUser());
@@ -577,11 +576,6 @@ public class BookFeatureTests
     {
         public Book? LastBook { get; private set; }
         public bool Saved { get; private set; }
-
-        public void Seed(Book book)
-        {
-            LastBook = book;
-        }
 
         public Task AddAsync(Book book, CancellationToken cancellationToken)
         {
@@ -716,6 +710,11 @@ public class BookFeatureTests
             Saved = true;
             return Task.CompletedTask;
         }
+
+        public void Seed(Book book)
+        {
+            LastBook = book;
+        }
     }
 
     private sealed class FakeBookCoverQueue : IBookCoverQueue
@@ -739,9 +738,9 @@ public class BookFeatureTests
 
     private sealed class FakeBookSummaryQueryService : IBookSummaryQueryService
     {
-        public Domain.Models.BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
+        public BookSummarySnapshot Summary { get; set; } = new(0, 0, null, 0, 0, [], [], [], []);
 
-        public Task<Domain.Models.BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria,
+        public Task<BookSummarySnapshot> GetSummaryAsync(Guid ownerId, BookSearchCriteria criteria,
             CancellationToken cancellationToken)
         {
             return Task.FromResult(Summary);
@@ -755,6 +754,12 @@ public class BookFeatureTests
         public Task AddAsync(Author author, CancellationToken cancellationToken)
         {
             Authors.Add(author);
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Author author, CancellationToken cancellationToken)
+        {
+            Authors.Remove(author);
             return Task.CompletedTask;
         }
 
@@ -772,6 +777,13 @@ public class BookFeatureTests
         public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
         {
             return Task.FromResult<IEnumerable<Author>>(Authors.Take(take));
+        }
+
+        public Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult<IEnumerable<Author>>(Authors.Where(author => author.CreatedBy == createdBy)
+                .Take(take));
         }
 
         public Task SaveAsync(CancellationToken cancellationToken)
@@ -911,6 +923,17 @@ public class BookFeatureTests
         {
             _tags.Add(tag);
             return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync(Tag tag, CancellationToken cancellationToken)
+        {
+            _tags.Remove(tag);
+            return Task.CompletedTask;
+        }
+
+        public Task<Tag?> GetByIdAsync(Guid ownerId, Guid id, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(_tags.FirstOrDefault(tag => tag.OwnerId == ownerId && tag.Id == id));
         }
 
         public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,

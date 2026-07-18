@@ -239,6 +239,29 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Book cover not found");
                 break;
 
+            case EntityNotFoundException<Tag, Guid>:
+            case EntityNotFoundException<Author, Guid>:
+                statusCode = HttpStatusCode.NotFound;
+                title = NotFoundTitle;
+                detail = exception.Message;
+                _logger.LogWarning("Managed library metadata was not found");
+                break;
+
+            case EntityAlreadyExistsException<Author, Guid> authorConflict:
+                statusCode = HttpStatusCode.Conflict;
+                title = ConflictTitle;
+                detail = $"The author name '{authorConflict.Name}' is already assigned to another author.";
+                _logger.LogWarning("Author alias already exists. ExistingId={ExistingId}", authorConflict.ExistingId);
+                break;
+
+            case EntityInUseException<Tag>:
+            case EntityInUseException<Author>:
+                statusCode = HttpStatusCode.Conflict;
+                title = ConflictTitle;
+                detail = exception.Message;
+                _logger.LogWarning("Managed library metadata conflict: {Message}", exception.Message);
+                break;
+
             case EntityAlreadyExistsException<Book, Guid> bookConflict:
                 statusCode = HttpStatusCode.Conflict;
                 title = ConflictTitle;
