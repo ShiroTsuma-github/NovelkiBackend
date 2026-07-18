@@ -10,9 +10,15 @@ public static class TestData
     public static readonly Guid NovelTypeId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     public static readonly Guid ReadingStatusId = Guid.Parse("20000000-0000-0000-0000-000000000001");
 
-    public static Author Author(string name)
+    public static Author Author(string name, Guid? ownerId = null, bool isPublic = true)
     {
-        var author = new Author { PrimaryName = name, NormalizedPrimaryName = MappingExtensions.NormalizeName(name) };
+        var author = new Author
+        {
+            OwnerId = ownerId,
+            IsPublic = isPublic,
+            PrimaryName = name,
+            NormalizedPrimaryName = MappingExtensions.NormalizeName(name)
+        };
         author.Names.Add(new AuthorName
         {
             Name = name, NormalizedName = MappingExtensions.NormalizeName(name), IsPrimary = true, Source = "Test"

@@ -768,21 +768,28 @@ public class BookFeatureTests
             return Task.FromResult(Authors.FirstOrDefault(a => a.Id == id));
         }
 
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        public Task<Author?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
             return Task.FromResult(Authors.FirstOrDefault(a =>
-                a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
+                a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name) ||
+                a.Names.Any(alias => alias.NormalizedName == MappingExtensions.NormalizeName(name))));
         }
 
-        public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
+        public Task<Author?> GetPublicByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return GetByNameAsync(Guid.Empty, name, cancellationToken);
+        }
+
+        public Task<IEnumerable<Author>> SearchAsync(Guid ownerId, string? search, int take,
+            CancellationToken cancellationToken)
         {
             return Task.FromResult<IEnumerable<Author>>(Authors.Take(take));
         }
 
-        public Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+        public Task<IEnumerable<Author>> SearchOwnedAsync(Guid ownerId, string? search, int take,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult<IEnumerable<Author>>(Authors.Where(author => author.CreatedBy == createdBy)
+            return Task.FromResult<IEnumerable<Author>>(Authors.Where(author => author.OwnerId == ownerId)
                 .Take(take));
         }
 

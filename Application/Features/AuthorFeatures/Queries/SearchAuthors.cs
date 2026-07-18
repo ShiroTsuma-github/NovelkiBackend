@@ -22,8 +22,8 @@ public class SearchAuthorsQueryHandler : IRequestHandler<SearchAuthorsQuery, IRe
         var take = Math.Clamp(request.Take, 1, 50);
         var authors = request.MineOnly &&
                       !_user.Roles.Contains(AuthorizationRoles.Admin, StringComparer.OrdinalIgnoreCase)
-            ? await _authorRepository.SearchCreatedByAsync(_user.RequiredId, request.Search, take, cancellationToken)
-            : await _authorRepository.SearchAsync(request.Search, take, cancellationToken);
+            ? await _authorRepository.SearchOwnedAsync(_user.RequiredId, request.Search, take, cancellationToken)
+            : await _authorRepository.SearchAsync(_user.RequiredId, request.Search, take, cancellationToken);
         return authors.Select(a => a.ToDto()).ToList();
     }
 }

@@ -186,14 +186,23 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<Author>(entity =>
         {
-            entity.HasIndex(a => a.NormalizedPrimaryName).IsUnique();
+            entity.HasIndex(a => a.NormalizedPrimaryName)
+                .IsUnique()
+                .HasFilter("\"IsPublic\" = TRUE");
+            entity.HasIndex(a => new { a.OwnerId, a.NormalizedPrimaryName })
+                .IsUnique()
+                .HasFilter("\"IsPublic\" = FALSE");
             entity.Property(a => a.PrimaryName).HasMaxLength(300);
             entity.Property(a => a.NormalizedPrimaryName).HasMaxLength(300);
+            entity.HasOne<User>()
+                .WithMany(user => user.OwnedAuthors)
+                .HasForeignKey(a => a.OwnerId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<AuthorName>(entity =>
         {
-            entity.HasIndex(a => a.NormalizedName).IsUnique();
+            entity.HasIndex(a => new { a.AuthorId, a.NormalizedName }).IsUnique();
             entity.Property(a => a.Name).HasMaxLength(300);
             entity.Property(a => a.NormalizedName).HasMaxLength(300);
             entity.Property(a => a.Language).HasMaxLength(10);

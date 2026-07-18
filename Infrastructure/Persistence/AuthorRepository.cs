@@ -10,29 +10,44 @@ public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
             .FirstOrDefaultAsync(a => a.Id == id, cancellationToken);
     }
 
-    public async Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
+    public async Task<Author?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
         return await context.Authors
             .Include(a => a.Names)
+            .Where(a => a.IsPublic || a.OwnerId == ownerId)
+            .OrderBy(a => a.IsPublic)
             .FirstOrDefaultAsync(
                 a => a.NormalizedPrimaryName == normalizedName ||
                      a.Names.Any(n => n.NormalizedName == normalizedName),
                 cancellationToken);
     }
 
-    public async Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
+    public async Task<Author?> GetPublicByNameAsync(string name, CancellationToken cancellationToken)
     {
-        return await SearchQuery(context.Authors.Include(a => a.Names), search)
-            .OrderBy(a => a.PrimaryName)
+        var normalizedName = MappingExtensions.NormalizeName(name);
+        return await context.Authors
+            .Include(a => a.Names)
+            .FirstOrDefaultAsync(a => a.IsPublic &&
+                                      (a.NormalizedPrimaryName == normalizedName ||
+                                       a.Names.Any(n => n.NormalizedName == normalizedName)), cancellationToken);
+    }
+
+    public async Task<IEnumerable<Author>> SearchAsync(Guid ownerId, string? search, int take,
+        CancellationToken cancellationToken)
+    {
+        return await SearchQuery(context.Authors.Include(a => a.Names)
+            .Where(a => a.IsPublic || a.OwnerId == ownerId), search)
+            .OrderBy(a => a.IsPublic)
+            .ThenBy(a => a.PrimaryName)
             .Take(take)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+    public async Task<IEnumerable<Author>> SearchOwnedAsync(Guid ownerId, string? search, int take,
         CancellationToken cancellationToken)
     {
-        return await SearchQuery(context.Authors.Include(a => a.Names).Where(a => a.CreatedBy == createdBy), search)
+        return await SearchQuery(context.Authors.Include(a => a.Names).Where(a => a.OwnerId == ownerId), search)
             .OrderBy(a => a.PrimaryName)
             .Take(take)
             .ToListAsync(cancellationToken);

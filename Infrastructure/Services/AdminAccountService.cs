@@ -5,7 +5,8 @@ using Application.Common.Models;
 
 public sealed class AdminAccountService(
     ApplicationDbContext context,
-    IAdminLibraryService libraryService) : IAdminAccountService
+    IAdminLibraryService libraryService,
+    IAuthorLifecycleService authorLifecycleService) : IAdminAccountService
 {
     public async Task<PaginatedResult<AdminUserDto>> SearchAsync(int skip, int take, string? search,
         CancellationToken cancellationToken)
@@ -33,7 +34,7 @@ public sealed class AdminAccountService(
                 user.CreatedAt,
                 user.Books.Count,
                 user.OwnedTags.Count,
-                context.Authors.Count(author => author.CreatedBy == user.Id)))
+                context.Authors.Count(author => author.OwnerId == user.Id)))
             .ToListAsync(cancellationToken);
         return PaginatedResult<AdminUserDto>.Create(skip, take, total, users);
     }
@@ -54,13 +55,7 @@ public sealed class AdminAccountService(
         var purge = await libraryService.DeleteAllBooksForOwnerAsync(userId, cancellationToken);
         context.ChangeTracker.Clear();
 
-        var extraDeletedAuthors = await context.Authors
-            .Where(author => author.CreatedBy == userId && !author.Books.Any())
-            .ExecuteDeleteAsync(cancellationToken);
-        await context.Authors
-            .Where(author => author.CreatedBy == userId)
-            .ExecuteUpdateAsync(update => update.SetProperty(author => author.CreatedBy, (Guid?)null),
-                cancellationToken);
+        var extraDeletedAuthors = await authorLifecycleService.DeleteOwnedAuthorsAsync(userId, cancellationToken);
         await context.Tags
             .Where(tag => tag.IsGlobal && tag.CreatedBy == userId)
             .ExecuteUpdateAsync(update => update.SetProperty(tag => tag.CreatedBy, (Guid?)null), cancellationToken);

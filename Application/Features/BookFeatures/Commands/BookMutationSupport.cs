@@ -26,14 +26,20 @@ internal static class BookMutationSupport
 
     public static async Task<Author?> ResolveAuthorAsync(
         IAuthorRepository authorRepository,
+        Guid ownerId,
         Guid? authorId,
         string? authorName,
         CancellationToken cancellationToken)
     {
         if (authorId.HasValue)
         {
-            return await authorRepository.GetByIdAsync(authorId.Value, cancellationToken)
-                   ?? throw new EntityNotFoundException<Author, Guid>(authorId.Value);
+            var selected = await authorRepository.GetByIdAsync(authorId.Value, cancellationToken);
+            if (selected is null || (!selected.IsPublic && selected.OwnerId != ownerId))
+            {
+                throw new EntityNotFoundException<Author, Guid>(authorId.Value);
+            }
+
+            return selected;
         }
 
         if (string.IsNullOrWhiteSpace(authorName))
@@ -42,7 +48,7 @@ internal static class BookMutationSupport
         }
 
         var normalizedAuthorName = authorName.Trim();
-        var existing = await authorRepository.GetByNameAsync(normalizedAuthorName, cancellationToken);
+        var existing = await authorRepository.GetByNameAsync(ownerId, normalizedAuthorName, cancellationToken);
         if (existing != null)
         {
             return existing;
@@ -50,6 +56,8 @@ internal static class BookMutationSupport
 
         var author = new Author
         {
+            OwnerId = ownerId,
+            IsPublic = false,
             PrimaryName = normalizedAuthorName,
             NormalizedPrimaryName = MappingExtensions.NormalizeName(normalizedAuthorName)
         };

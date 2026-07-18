@@ -58,6 +58,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBookSummaryQueryService, BookSummaryQueryService>();
         builder.Services.AddScoped<IBookAnalyticsQueryService, BookAnalyticsQueryService>();
         builder.Services.AddScoped<IAuthorRepository, AuthorRepository>();
+        builder.Services.AddScoped<IAuthorLifecycleService, AuthorLifecycleService>();
         builder.Services.AddScoped<IGenreRepository, GenreRepository>();
         builder.Services.AddScoped<IStatusRepository, StatusRepository>();
         builder.Services.AddScoped<ITypeRepository, TypeRepository>();
