@@ -12,6 +12,7 @@ import { buttonClass, inputClass, secondaryButtonClass } from '@/components/app/
 import { formatProgress } from './bookProgress'
 
 type ImportBooksDialogProps = {
+  mode?: 'csv' | 'full'
   open: boolean
   onClose: () => void
   onImported: (result: BookImportFinalizeResult) => void
@@ -35,7 +36,7 @@ export function getImportSessionStats(session: BookImportSessionDto | null) {
   }
 }
 
-export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDialogProps) {
+export function ImportBooksDialog({ mode = 'csv', open, onClose, onImported }: ImportBooksDialogProps) {
   const [session, setSession] = useState<BookImportSessionDto | null>(null)
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
@@ -45,16 +46,22 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const importStats = useMemo(() => getImportSessionStats(session), [session])
   const invalidRows = importStats.invalidRows
+  const isFullImport = mode === 'full'
+  const expectedExtension = isFullImport ? '.zip' : '.csv'
 
   const createSessionMutation = useMutation({
-    mutationFn: (file: File) => api.createBookImportSession(file),
+    mutationFn: (file: File) => isFullImport
+      ? api.createFullBookImportSession(file)
+      : api.createBookImportSession(file),
     onSuccess: (nextSession) => {
       setSession(nextSession)
       setExpandedRowId(null)
       toast.success('Import draft created.')
     },
     onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not parse CSV.')
+      toast.error(error instanceof HttpError
+        ? error.apiError.detail
+        : isFullImport ? 'Could not read the full backup.' : 'Could not parse CSV.')
     },
   })
 
@@ -145,8 +152,8 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
   }
 
   function handleSelectedFile(file: File) {
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-      toast.error('Choose a .csv file.')
+    if (!file.name.toLowerCase().endsWith(expectedExtension)) {
+      toast.error(`Choose a ${expectedExtension} file.`)
       return
     }
 
@@ -209,28 +216,38 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
       <DialogPanel data-testid="import-dialog-panel" className={`${session && !finalizeResult ? 'h-[calc(100vh-0.5rem)] sm:h-[calc(100vh-1rem)]' : 'max-h-[calc(100vh-0.5rem)] sm:max-h-[calc(100vh-1rem)]'} flex max-w-6xl flex-col gap-2 overflow-hidden p-3 sm:p-4`} onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-2">
           <div className="grid gap-1">
-            <h2 className={`${session && !finalizeResult ? 'text-base' : 'text-lg'} font-semibold text-slate-50`}>Import books from CSV</h2>
+            <h2 className={`${session && !finalizeResult ? 'text-base' : 'text-lg'} font-semibold text-slate-50`}>
+              {isFullImport ? 'Import books from full backup' : 'Import books from CSV'}
+            </h2>
             {session && !finalizeResult ? null : (
               <p className="text-sm text-slate-400">Upload a file, fix invalid rows, then finalize to save books to your library.</p>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              className={secondaryButtonClass}
-              disabled={templateMutation.isPending}
-              type="button"
-              onClick={() => templateMutation.mutate()}
-            >
-              <Download className="h-4 w-4" />
-              {templateMutation.isPending ? 'Downloading...' : 'Download template'}
-            </button>
+            {!isFullImport ? (
+              <button
+                className={secondaryButtonClass}
+                disabled={templateMutation.isPending}
+                type="button"
+                onClick={() => templateMutation.mutate()}
+              >
+                <Download className="h-4 w-4" />
+                {templateMutation.isPending ? 'Downloading...' : 'Download template'}
+              </button>
+            ) : null}
             <button aria-label="Close import dialog" className={`${buttonVariants.ghost} ui-icon-button`} type="button" onClick={handleDismiss}>
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <input accept=".csv,text/csv" className="hidden" ref={fileInputRef} type="file" onChange={handleFileSelection} />
+        <input
+          accept={isFullImport ? '.zip,application/zip' : '.csv,text/csv'}
+          className="hidden"
+          ref={fileInputRef}
+          type="file"
+          onChange={handleFileSelection}
+        />
 
         {finalizeResult ? (
           <ImportFinalizeSuccess result={finalizeResult} onClose={onClose} />
@@ -261,9 +278,13 @@ export function ImportBooksDialog({ open, onClose, onImported }: ImportBooksDial
             </div>
             <div className="grid gap-1">
               <div className="text-base font-semibold text-slate-50">
-                {createSessionMutation.isPending ? 'Parsing CSV draft...' : 'Choose a CSV file'}
+                {createSessionMutation.isPending
+                  ? isFullImport ? 'Reading full backup...' : 'Parsing CSV draft...'
+                  : isFullImport ? 'Choose a full backup ZIP' : 'Choose a CSV file'}
               </div>
-              <div className="text-sm text-slate-400">Drop a CSV here or use file selection. Nothing is written to the database until you press final save.</div>
+              <div className="text-sm text-slate-400">
+                Drop {isFullImport ? 'a backup ZIP' : 'a CSV'} here or use file selection. Nothing is written to the database until you press final save.
+              </div>
             </div>
             <div className="flex justify-center">
               <button className={buttonClass} disabled={createSessionMutation.isPending} type="button" onClick={openFilePicker}>

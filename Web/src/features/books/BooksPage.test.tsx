@@ -2,10 +2,12 @@ import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
+import { HttpError } from '@/api/http'
 import { readReadingTimeSettings, readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { expectReadableTextContrast } from '@/test/contrast'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
+import { toast } from 'sonner'
 import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardRowMinHeightClasses, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
 
 vi.mock('@/api/client', () => ({
@@ -13,6 +15,7 @@ vi.mock('@/api/client', () => ({
     getBooks: vi.fn(),
     getBooksSummary: vi.fn(),
     downloadBooksExport: vi.fn(),
+    downloadBooksFullExport: vi.fn(),
   },
 }))
 
@@ -165,10 +168,10 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     const topButtons = screen.getAllByRole('button')
     expect(topButtons.findIndex((button) => /summary/i.test(button.textContent ?? ''))).toBeLessThan(
-      topButtons.findIndex((button) => /export filtered csv/i.test(button.textContent ?? '')),
+      topButtons.findIndex((button) => /^export$/i.test(button.textContent?.trim() ?? '')),
     )
-    expect(screen.getByRole('button', { name: /export filtered csv/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
-    expect(screen.getByRole('button', { name: /import csv/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
+    expect(screen.getByRole('button', { name: /^export$/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
+    expect(screen.getByRole('button', { name: /^import$/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
     expect(screen.getByRole('link', { name: /add book/i })).toHaveClass('gap-2.5', 'pl-3.5', 'pr-4')
   })
 
@@ -183,7 +186,8 @@ describe('BooksPage', () => {
     renderWithProviders(<BooksPage />, { route: '/books?query=author%3AToika&sortBy=title&sortDirection=asc' })
 
     await screen.findByText('Lord of Mysteries')
-    await user.click(screen.getByRole('button', { name: /export filtered csv/i }))
+    await user.click(screen.getByRole('button', { name: /^export$/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^csv/i }))
 
     await waitFor(() => expect(api.downloadBooksExport).toHaveBeenCalledWith({
       query: 'author:Toika',
@@ -197,6 +201,49 @@ describe('BooksPage', () => {
     createObjectUrl.mockRestore()
     revokeObjectUrl.mockRestore()
     clickSpy.mockRestore()
+  })
+
+  it('offers csv above full backup for both export and import', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /^export$/i }))
+    let menuItems = screen.getAllByRole('menuitem')
+    expect(menuItems[0]).toHaveTextContent(/^CSV/)
+    expect(menuItems[1]).toHaveTextContent(/^Full backup/)
+
+    await user.click(screen.getByRole('button', { name: /^import$/i }))
+    menuItems = screen.getAllByRole('menuitem')
+    expect(menuItems[0]).toHaveTextContent(/^CSV/)
+    expect(menuItems[1]).toHaveTextContent(/^Full backup/)
+
+    await user.click(menuItems[1])
+    expect(screen.getByRole('heading', { name: /import books from full backup/i })).toBeInTheDocument()
+  })
+
+  it('shows the API detail when a full export is rate limited', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.downloadBooksFullExport).mockRejectedValue(new HttpError({
+      type: 'RateLimitExceeded',
+      title: 'Too Many Requests',
+      status: 429,
+      detail: 'Too many requests. Try again in 30 minutes.',
+      instance: '/book/export/full',
+    }))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /^export$/i }))
+    await user.click(screen.getByRole('menuitem', { name: /^full backup/i }))
+
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Too many requests. Try again in 30 minutes.')
+    })
   })
 
   it('does not fetch books summary before the panel is expanded', async () => {

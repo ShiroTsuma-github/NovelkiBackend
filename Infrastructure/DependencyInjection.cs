@@ -1,19 +1,17 @@
 ﻿namespace Infrastructure;
 
+using System.Text;
 using Amazon.Runtime;
 using Amazon.S3;
-using Application.Common.Interfaces;
 using Authentication;
 using BookCovers;
 using Caching;
-using Identity;
-using Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-using System.Text;
+using Services;
 
 public static class DependencyInjection
 {
@@ -70,9 +68,43 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBookListCache>(provider => provider.GetRequiredService<BookListCache>());
         builder.Services.AddScoped<IBookListCacheInvalidator>(provider => provider.GetRequiredService<BookListCache>());
         builder.Services.AddScoped<IBookCsvImportService, BookCsvImportService>();
+        builder.Services.AddOptions<BookImportSecurityOptions>()
+            .Bind(builder.Configuration.GetSection(BookImportSecurityOptions.SectionName))
+            .Validate(options => options.MaxArchiveEntries > 0 &&
+                                 options.MaxCsvRows > 0 &&
+                                 options.MaxManifestBooks > 0 &&
+                                 options.MaxCsvBytes > 0 &&
+                                 options.MaxManifestBytes > 0 &&
+                                 options.MaxCoverBytes > 0 &&
+                                 options.MaxUncompressedArchiveBytes > 0 &&
+                                 options.MaxCompressionRatio >= 1 &&
+                                 options.MaxConcurrentFullImportOperations > 0 &&
+                                 options.MaxActiveSessionsGlobal > 0 &&
+                                 options.MaxActiveSessionsPerUser > 0 &&
+                                 options.MaxActiveFullSessionsGlobal > 0 &&
+                                 options.MaxActiveFullSessionsPerUser > 0 &&
+                                 options.MaxActiveFullSessionsGlobal <= options.MaxActiveSessionsGlobal &&
+                                 options.MaxActiveFullSessionsPerUser <= options.MaxActiveSessionsPerUser &&
+                                 options.MaxStagedBytesGlobal >= options.MaxUncompressedArchiveBytes &&
+                                 options.SessionIdleTimeout > TimeSpan.Zero &&
+                                 options.SessionAbsoluteLifetime >= options.SessionIdleTimeout &&
+                                 options.CleanupInterval > TimeSpan.Zero &&
+                                 options.DraftProcessingTimeout > TimeSpan.Zero &&
+                                 options.FinalizeProcessingTimeout > TimeSpan.Zero,
+                "Book import security limits are invalid.")
+            .ValidateOnStart();
+        builder.Services.AddSingleton<BookImportSessionStore>();
+        builder.Services.AddSingleton<BookImportConcurrencyGate>();
+        builder.Services.AddHostedService<BookImportSessionCleanupService>();
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
 
-        builder.Services.Configure<BookCoverOptions>(builder.Configuration.GetSection(BookCoversSection));
+        builder.Services.AddOptions<BookCoverOptions>()
+            .Bind(builder.Configuration.GetSection(BookCoversSection))
+            .Validate(options => options.MaxBytes > 0 && options.MaxWidth > 0 && options.MaxHeight > 0 &&
+                                 options.MaxPixels > 0 &&
+                                 options.MaxPixels <= (long)options.MaxWidth * options.MaxHeight,
+                "Book cover security limits are invalid.")
+            .ValidateOnStart();
         var s3Options = builder.Configuration.GetSection(BookCoverS3Section).Get<BookCoverS3Options>();
         if (!string.IsNullOrWhiteSpace(s3Options?.Endpoint) &&
             !string.IsNullOrWhiteSpace(s3Options.AccessKey) &&

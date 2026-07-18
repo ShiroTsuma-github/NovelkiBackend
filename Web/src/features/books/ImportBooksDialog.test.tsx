@@ -10,6 +10,7 @@ import { getImportSessionStats, ImportBooksDialog } from './ImportBooksDialog'
 vi.mock('@/api/client', () => ({
   api: {
     createBookImportSession: vi.fn(),
+    createFullBookImportSession: vi.fn(),
     downloadBookImportTemplate: vi.fn(),
     updateBookImportRow: vi.fn(),
     deleteBookImportRow: vi.fn(),
@@ -84,6 +85,24 @@ describe('ImportBooksDialog', () => {
 
     expect(api.createBookImportSession).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith('Choose a .csv file.')
+  })
+
+  it('creates a full import session from a zip backup', async () => {
+    vi.mocked(api.createFullBookImportSession).mockResolvedValue(importSessionWithFieldErrors)
+
+    renderWithProviders(
+      <ImportBooksDialog mode="full" open onClose={vi.fn()} onImported={vi.fn()} />,
+    )
+
+    const dropzone = screen.getByText(/drop a backup zip here or use file selection/i).closest('div')
+    expect(dropzone).not.toBeNull()
+
+    const file = new File(['zip-content'], 'books-full-export.zip', { type: 'application/zip' })
+    fireEvent.drop(dropzone!, { dataTransfer: { files: [file] } })
+
+    await waitFor(() => {
+      expect(api.createFullBookImportSession).toHaveBeenCalledWith(file)
+    })
   })
 
   it('asks for confirmation before dismissing an active import session', async () => {

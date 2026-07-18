@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
+import { HttpError } from '@/api/http'
 import type { BookImportFinalizeResult, BookListItemDto, BookSummaryDto, BookSummaryTypeCountDto } from '@/api/types'
 import { extractAnalyticsDateFilters } from '@/features/analytics/dateQueryFilters'
 import {
@@ -93,6 +94,8 @@ export function BooksPage() {
   const [cardsPerRow, setCardsPerRow] = useCardsPerRow(cardsPerRowStorageKey)
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importMenuOpen, setImportMenuOpen] = useState(false)
+  const [importMode, setImportMode] = useState<'csv' | 'full'>('csv')
   const [summaryOpen, setSummaryOpen] = useState(false)
   const {
     pageSize,
@@ -154,10 +157,28 @@ export function BooksPage() {
       URL.revokeObjectURL(url)
       toast.success('Export ready.')
     },
-    onError: () => {
-      toast.error('Could not export books.')
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not export books.')
     },
   })
+  const fullExportMutation = useMutation({
+    mutationFn: () => api.downloadBooksFullExport({ query: requestQuery, sortBy, sortDirection }),
+    onSuccess: (blob) => {
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'books-full-export.zip'
+      document.body.append(link)
+      link.click()
+      link.remove()
+      URL.revokeObjectURL(url)
+      toast.success('Full backup ready.')
+    },
+    onError: (error) => {
+      toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not export the full backup.')
+    },
+  })
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
   function setSort(nextSortBy: string) {
     if (isCyclicSort(nextSortBy)) {
       cycleSortMutation.mutate({
@@ -211,14 +232,98 @@ export function BooksPage() {
             <span>Summary</span>
             <ChevronDown className={`h-4 w-4 transition ${summaryOpen ? 'rotate-180' : ''}`} />
           </button>
-          <button className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`} disabled={exportMutation.isPending} type="button" onClick={() => exportMutation.mutate()}>
-            <Download className="h-4 w-4" />
-            {exportMutation.isPending ? 'Exporting...' : 'Export filtered CSV'}
-          </button>
-          <button className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`} type="button" onClick={() => setImportDialogOpen(true)}>
-            <Upload className="h-4 w-4" />
-            Import CSV
-          </button>
+          <div className="relative">
+            <button
+              aria-expanded={exportMenuOpen}
+              aria-haspopup="menu"
+              className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`}
+              type="button"
+              onClick={() => {
+                setImportMenuOpen(false)
+                setExportMenuOpen((current) => !current)
+              }}
+            >
+              <Download className="h-4 w-4" />
+              Export
+              <ChevronDown className={`h-4 w-4 transition ${exportMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {exportMenuOpen ? (
+              <div className="ui-popover absolute right-0 z-20 mt-2 grid min-w-56 overflow-hidden p-1" role="menu">
+                <button
+                  className="rounded-[var(--qs-control-radius)] px-3 py-2 text-left text-sm font-semibold text-[var(--qs-text)] hover:bg-[var(--qs-surface-muted)] disabled:opacity-60"
+                  disabled={exportMutation.isPending}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setExportMenuOpen(false)
+                    exportMutation.mutate()
+                  }}
+                >
+                  {exportMutation.isPending ? 'Exporting CSV...' : 'CSV'}
+                  <span className="mt-0.5 block text-xs font-normal text-[var(--qs-muted)]">Books matching the current filters</span>
+                </button>
+                <button
+                  className="rounded-[var(--qs-control-radius)] px-3 py-2 text-left text-sm font-semibold text-[var(--qs-text)] hover:bg-[var(--qs-surface-muted)] disabled:opacity-60"
+                  disabled={fullExportMutation.isPending}
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setExportMenuOpen(false)
+                    fullExportMutation.mutate()
+                  }}
+                >
+                  {fullExportMutation.isPending ? 'Creating full backup...' : 'Full backup (ZIP)'}
+                  <span className="mt-0.5 block text-xs font-normal text-[var(--qs-muted)]">CSV plus stored cover files</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+          <div className="relative">
+            <button
+              aria-expanded={importMenuOpen}
+              aria-haspopup="menu"
+              className={`${secondaryButtonClass} ${topActionButtonSpacingClass}`}
+              type="button"
+              onClick={() => {
+                setExportMenuOpen(false)
+                setImportMenuOpen((current) => !current)
+              }}
+            >
+              <Upload className="h-4 w-4" />
+              Import
+              <ChevronDown className={`h-4 w-4 transition ${importMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {importMenuOpen ? (
+              <div className="ui-popover absolute right-0 z-20 mt-2 grid min-w-56 overflow-hidden p-1" role="menu">
+                <button
+                  className="rounded-[var(--qs-control-radius)] px-3 py-2 text-left text-sm font-semibold text-[var(--qs-text)] hover:bg-[var(--qs-surface-muted)]"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setImportMenuOpen(false)
+                    setImportMode('csv')
+                    setImportDialogOpen(true)
+                  }}
+                >
+                  CSV
+                  <span className="mt-0.5 block text-xs font-normal text-[var(--qs-muted)]">Import book data from a CSV file</span>
+                </button>
+                <button
+                  className="rounded-[var(--qs-control-radius)] px-3 py-2 text-left text-sm font-semibold text-[var(--qs-text)] hover:bg-[var(--qs-surface-muted)]"
+                  role="menuitem"
+                  type="button"
+                  onClick={() => {
+                    setImportMenuOpen(false)
+                    setImportMode('full')
+                    setImportDialogOpen(true)
+                  }}
+                >
+                  Full backup (ZIP)
+                  <span className="mt-0.5 block text-xs font-normal text-[var(--qs-muted)]">Restore book data and stored covers</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
           <Link className={`${buttonClass} ${topActionButtonSpacingClass}`} to="/books/new">
             <Plus className="h-4 w-4" />
             Add book
@@ -315,7 +420,7 @@ export function BooksPage() {
           onGoToPage={pagination.onGoToPage}
         />
       </Surface>
-      <ImportBooksDialog open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
+      <ImportBooksDialog mode={importMode} open={importDialogOpen} onClose={() => setImportDialogOpen(false)} onImported={handleImportComplete} />
       <ScrollShortcutButtons
         showBackToTop={scrollShortcuts.showBackToTop}
         showGoDown={scrollShortcuts.showGoDown}

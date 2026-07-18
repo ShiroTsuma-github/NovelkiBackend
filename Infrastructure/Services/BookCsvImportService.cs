@@ -1,13 +1,16 @@
 namespace Infrastructure.Services;
 
-using System.Collections.Concurrent;
+using System.IO.Compression;
+using System.Text.Json;
 using Application.Common.DTOs.Book;
 using FluentValidation;
+using Microsoft.Extensions.Options;
 using Microsoft.VisualBasic.FileIO;
 
 public sealed class BookCsvImportService : IBookCsvImportService
 {
     private const string ImportRowNotFoundMessage = "Import row not found.";
+    private const int FullBackupVersion = 1;
 
     private static readonly string[] RequiredColumns =
     [
@@ -37,23 +40,34 @@ public sealed class BookCsvImportService : IBookCsvImportService
         BookCsvColumns.ProgressHistory
     ];
 
-    private static readonly ConcurrentDictionary<Guid, ImportSession> Sessions = new();
     private readonly IBookCoverQueue _bookCoverQueue;
+    private readonly IBookCoverStorage _bookCoverStorage;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
+    private readonly BookImportConcurrencyGate _concurrencyGate;
 
     private readonly ApplicationDbContext _context;
+    private readonly BookImportSecurityOptions _securityOptions;
+    private readonly BookImportSessionStore _sessionStore;
     private readonly IUser _user;
 
     public BookCsvImportService(
         ApplicationDbContext context,
         IBookCoverQueue bookCoverQueue,
+        IBookCoverStorage bookCoverStorage,
         IBookListCacheInvalidator cacheInvalidator,
-        IUser user)
+        IUser user,
+        BookImportSessionStore sessionStore,
+        BookImportConcurrencyGate concurrencyGate,
+        IOptions<BookImportSecurityOptions> securityOptions)
     {
         _context = context;
         _bookCoverQueue = bookCoverQueue;
+        _bookCoverStorage = bookCoverStorage;
         _cacheInvalidator = cacheInvalidator;
         _user = user;
+        _sessionStore = sessionStore;
+        _concurrencyGate = concurrencyGate;
+        _securityOptions = securityOptions.Value;
     }
 
     public string CreateTemplate()
@@ -64,7 +78,167 @@ public sealed class BookCsvImportService : IBookCsvImportService
     public async Task<BookImportSessionDto> CreateSessionAsync(Stream csvStream, string fileName,
         CancellationToken cancellationToken)
     {
-        var ownerId = _user.RequiredId;
+        var csvBytes = await ReadStreamToBytesAsync(csvStream, _securityOptions.MaxCsvBytes, "CSV file",
+            cancellationToken);
+        await using var boundedCsv = new MemoryStream(csvBytes, false);
+        var session = await CreateCsvSessionAsync(boundedCsv, fileName, _user.RequiredId, cancellationToken);
+        _sessionStore.Add(session);
+        return BookCsvImportSessionMapper.ToDto(session);
+    }
+
+    public async Task<BookImportSessionDto> CreateFullSessionAsync(Stream archiveStream, string fileName,
+        CancellationToken cancellationToken)
+    {
+        using var operationLease = _concurrencyGate.TryAcquire();
+        using var sessionReservation = _sessionStore.ReserveFullSession(_user.RequiredId);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(_securityOptions.DraftProcessingTimeout);
+        try
+        {
+            return await CreateFullSessionCoreAsync(archiveStream, fileName, sessionReservation, timeout.Token);
+        }
+        catch (InvalidDataException)
+        {
+            throw new ValidationException("Full backup ZIP file is invalid or corrupted.");
+        }
+        catch (JsonException)
+        {
+            throw new ValidationException("Full backup manifest is invalid.");
+        }
+        catch (OperationCanceledException) when (timeout.IsCancellationRequested &&
+                                                 !cancellationToken.IsCancellationRequested)
+        {
+            throw new BookImportProcessingTimeoutException(
+                "Full backup processing exceeded the allowed time. Reduce the archive size and try again.");
+        }
+    }
+
+    public async Task<BookImportSessionDto> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        await session.OperationLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureSessionIsCurrent(session);
+            await RevalidateSessionAsync(session, cancellationToken);
+            return BookCsvImportSessionMapper.ToDto(session);
+        }
+        finally
+        {
+            session.OperationLock.Release();
+        }
+    }
+
+    public async Task<BookImportSessionDto> UpdateRowAsync(Guid sessionId, Guid rowId,
+        UpdateBookImportRowRequest request, CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        await session.OperationLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureSessionIsCurrent(session);
+            var row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
+                      ?? throw new ValidationException(ImportRowNotFoundMessage);
+            BookCsvImportRowMapper.ApplyRequest(row, request);
+            await RevalidateSessionAsync(session, cancellationToken);
+            return BookCsvImportSessionMapper.ToDto(session);
+        }
+        finally
+        {
+            session.OperationLock.Release();
+        }
+    }
+
+    public async Task<BookImportSessionDto> DeleteRowAsync(Guid sessionId, Guid rowId,
+        CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        await session.OperationLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureSessionIsCurrent(session);
+            var removed = session.Rows.RemoveAll(item => item.RowId == rowId);
+            if (removed == 0)
+            {
+                throw new ValidationException(ImportRowNotFoundMessage);
+            }
+
+            await RevalidateSessionAsync(session, cancellationToken);
+            return BookCsvImportSessionMapper.ToDto(session);
+        }
+        finally
+        {
+            session.OperationLock.Release();
+        }
+    }
+
+    public async Task<BookImportSessionDto> DeleteInvalidRowsAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        await session.OperationLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureSessionIsCurrent(session);
+            session.Rows.RemoveAll(item => item.Errors.Count > 0);
+            await RevalidateSessionAsync(session, cancellationToken);
+            return BookCsvImportSessionMapper.ToDto(session);
+        }
+        finally
+        {
+            session.OperationLock.Release();
+        }
+    }
+
+    public async Task<BookImportFinalizeResultDto> FinalizeAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        await session.OperationLock.WaitAsync(cancellationToken);
+        BookImportConcurrencyGate.Lease? operationLease = null;
+        CancellationTokenSource? timeout = null;
+        try
+        {
+            EnsureSessionIsCurrent(session);
+            if (session.IsFullImport)
+            {
+                operationLease = _concurrencyGate.TryAcquire();
+                timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                timeout.CancelAfter(_securityOptions.FinalizeProcessingTimeout);
+            }
+
+            return await FinalizeSessionAsync(session, timeout?.Token ?? cancellationToken);
+        }
+        catch (OperationCanceledException) when (timeout?.IsCancellationRequested == true &&
+                                                 !cancellationToken.IsCancellationRequested)
+        {
+            throw new BookImportProcessingTimeoutException(
+                "Full import finalization exceeded the allowed time. Try again later.");
+        }
+        finally
+        {
+            timeout?.Dispose();
+            operationLease?.Dispose();
+            session.OperationLock.Release();
+        }
+    }
+
+    public async Task CancelAsync(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var session = GetOwnedSession(sessionId);
+        await session.OperationLock.WaitAsync(cancellationToken);
+        try
+        {
+            EnsureSessionIsCurrent(session);
+            _sessionStore.Remove(session.SessionId);
+        }
+        finally
+        {
+            session.OperationLock.Release();
+        }
+    }
+
+    private async Task<ImportSession> CreateCsvSessionAsync(Stream csvStream, string fileName, Guid ownerId,
+        CancellationToken cancellationToken)
+    {
         using var reader = new StreamReader(csvStream, leaveOpen: true);
         var csv = await reader.ReadToEndAsync(cancellationToken);
         using var parser = new TextFieldParser(new StringReader(csv))
@@ -112,6 +286,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
             }
             catch (MalformedLineException ex)
             {
+                EnsureImportRowCapacity(session);
                 session.Rows.Add(new ImportRow
                 {
                     RowId = Guid.NewGuid(),
@@ -126,6 +301,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 continue;
             }
 
+            EnsureImportRowCapacity(session);
             var row = headerMap.ToDictionary(
                 pair => pair.Key,
                 pair => pair.Value < fields.Length ? fields[pair.Value] : string.Empty,
@@ -135,55 +311,144 @@ public sealed class BookCsvImportService : IBookCsvImportService
         }
 
         await RevalidateSessionAsync(session, cancellationToken);
-        Sessions[session.SessionId] = session;
-        return BookCsvImportSessionMapper.ToDto(session);
+        return session;
     }
 
-    public async Task<BookImportSessionDto> GetSessionAsync(Guid sessionId, CancellationToken cancellationToken)
+    private async Task<BookImportSessionDto> CreateFullSessionCoreAsync(Stream archiveStream, string fileName,
+        BookImportSessionStore.FullSessionReservation sessionReservation, CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
-        await RevalidateSessionAsync(session, cancellationToken);
-        return BookCsvImportSessionMapper.ToDto(session);
-    }
+        using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read, true);
+        var entries = ValidateArchiveMetadata(archive);
+        var csvEntry = GetRequiredEntry(entries, "books.csv");
+        var manifestEntry = GetRequiredEntry(entries, "manifest.json");
+        ValidateEntrySize(csvEntry, _securityOptions.MaxCsvBytes, "books.csv");
+        ValidateEntrySize(manifestEntry, _securityOptions.MaxManifestBytes, "manifest.json");
+        var readBudget = new ArchiveReadBudget(_securityOptions.MaxUncompressedArchiveBytes);
 
-    public async Task<BookImportSessionDto> UpdateRowAsync(Guid sessionId, Guid rowId,
-        UpdateBookImportRowRequest request, CancellationToken cancellationToken)
-    {
-        var session = GetOwnedSession(sessionId);
-        var row = session.Rows.FirstOrDefault(item => item.RowId == rowId)
-                  ?? throw new ValidationException(ImportRowNotFoundMessage);
+        var manifestBytes = await ReadEntryToBytesAsync(manifestEntry, _securityOptions.MaxManifestBytes,
+            readBudget, cancellationToken);
 
-        BookCsvImportRowMapper.ApplyRequest(row, request);
-
-        await RevalidateSessionAsync(session, cancellationToken);
-        return BookCsvImportSessionMapper.ToDto(session);
-    }
-
-    public async Task<BookImportSessionDto> DeleteRowAsync(Guid sessionId, Guid rowId,
-        CancellationToken cancellationToken)
-    {
-        var session = GetOwnedSession(sessionId);
-        var removed = session.Rows.RemoveAll(item => item.RowId == rowId);
-        if (removed == 0)
+        BookFullBackupManifest manifest;
+        await using (var manifestStream = new MemoryStream(manifestBytes, false))
         {
-            throw new ValidationException(ImportRowNotFoundMessage);
+            manifest = await JsonSerializer.DeserializeAsync<BookFullBackupManifest>(manifestStream,
+                           new JsonSerializerOptions { PropertyNameCaseInsensitive = true }, cancellationToken)
+                       ?? throw new ValidationException("Full backup manifest is invalid.");
         }
 
-        await RevalidateSessionAsync(session, cancellationToken);
-        return BookCsvImportSessionMapper.ToDto(session);
+        if (manifest.Version != FullBackupVersion)
+        {
+            throw new ValidationException($"Unsupported full backup version: {manifest.Version}.");
+        }
+
+        if (manifest.Books == null)
+        {
+            throw new ValidationException("Full backup manifest is missing its books list.");
+        }
+
+        if (manifest.Books.Count > _securityOptions.MaxManifestBooks)
+        {
+            throw new ValidationException("Full backup manifest contains too many books.");
+        }
+
+        var manifestByKey = new Dictionary<BookFullBackupKey, BookFullBackupManifestItem>();
+        var referencedCoverPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var allowedEntryPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "books.csv", "manifest.json" };
+        foreach (var item in manifest.Books)
+        {
+            if (string.IsNullOrWhiteSpace(item.PrimaryTitle) || string.IsNullOrWhiteSpace(item.ContentType) ||
+                item.PrimaryTitle.Length > 1_000 || item.ContentType.Length > 100)
+            {
+                throw new ValidationException("Full backup manifest contains a book without a title or content type.");
+            }
+
+            var key = new BookFullBackupKey(
+                MappingExtensions.NormalizeName(item.PrimaryTitle),
+                MappingExtensions.NormalizeName(item.ContentType));
+            if (!manifestByKey.TryAdd(key, item))
+            {
+                throw new ValidationException(
+                    $"Full backup manifest contains duplicate book '{item.PrimaryTitle}' ({item.ContentType}).");
+            }
+
+            ValidateManifestCoverReference(item.OriginalCoverPath, item.OriginalCoverMimeType, entries,
+                referencedCoverPaths, allowedEntryPaths);
+            ValidateManifestCoverReference(item.ThumbnailCoverPath, item.ThumbnailCoverMimeType, entries,
+                referencedCoverPaths, allowedEntryPaths);
+        }
+
+        var unexpectedEntry = entries.Keys.FirstOrDefault(path => !allowedEntryPaths.Contains(path));
+        if (unexpectedEntry != null)
+        {
+            throw new ValidationException($"Full backup contains unexpected entry '{unexpectedEntry}'.");
+        }
+
+        var csvBytes = await ReadEntryToBytesAsync(csvEntry, _securityOptions.MaxCsvBytes, readBudget,
+            cancellationToken);
+        await using var csvStream = new MemoryStream(csvBytes, false);
+        var session = await CreateCsvSessionAsync(csvStream, Path.GetFileNameWithoutExtension(fileName) + ".csv",
+            _user.RequiredId, cancellationToken);
+        session.IsFullImport = true;
+        session.TempDirectory = _sessionStore.CreateSessionDirectory(session.SessionId);
+        try
+        {
+            var processedCoverPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in session.Rows)
+            {
+                if (string.IsNullOrWhiteSpace(row.PrimaryTitle) || string.IsNullOrWhiteSpace(row.ContentType))
+                {
+                    continue;
+                }
+
+                var key = new BookFullBackupKey(
+                    MappingExtensions.NormalizeName(row.PrimaryTitle),
+                    MappingExtensions.NormalizeName(row.ContentType));
+                if (!manifestByKey.TryGetValue(key, out var item) || string.IsNullOrWhiteSpace(item.OriginalCoverPath))
+                {
+                    continue;
+                }
+
+                var coverEntry = entries[item.OriginalCoverPath];
+                var stagedPath = Path.Combine(session.TempDirectory, $"{row.RowId:N}.cover");
+                var stagedCover = await CopyEntryToFileAsync(coverEntry, stagedPath, _securityOptions.MaxCoverBytes,
+                    readBudget, cancellationToken);
+                if (!string.IsNullOrWhiteSpace(item.OriginalCoverMimeType) &&
+                    !string.Equals(item.OriginalCoverMimeType, stagedCover.MimeType,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new ValidationException(
+                        $"Cover '{item.OriginalCoverPath}' does not match its declared media type.");
+                }
+
+                session.StagedBytes += stagedCover.SizeBytes;
+                session.CoversByRowId[row.RowId] = new BookFullBackupCover(
+                    stagedPath,
+                    Path.GetFileName(coverEntry.FullName),
+                    stagedCover.MimeType,
+                    stagedCover.SizeBytes);
+                processedCoverPaths.Add(item.OriginalCoverPath);
+            }
+
+            foreach (var coverPath in referencedCoverPaths.Where(path => !processedCoverPaths.Contains(path)))
+            {
+                await DrainEntryAsync(entries[coverPath], _securityOptions.MaxCoverBytes, readBudget,
+                    cancellationToken);
+            }
+
+            var dto = BookCsvImportSessionMapper.ToDto(session);
+            sessionReservation.Commit(session);
+            return dto;
+        }
+        catch
+        {
+            _sessionStore.DeleteUncommittedDirectory(session.TempDirectory);
+            throw;
+        }
     }
 
-    public async Task<BookImportSessionDto> DeleteInvalidRowsAsync(Guid sessionId, CancellationToken cancellationToken)
+    private async Task<BookImportFinalizeResultDto> FinalizeSessionAsync(ImportSession session,
+        CancellationToken cancellationToken)
     {
-        var session = GetOwnedSession(sessionId);
-        session.Rows.RemoveAll(item => item.Errors.Count > 0);
-        await RevalidateSessionAsync(session, cancellationToken);
-        return BookCsvImportSessionMapper.ToDto(session);
-    }
-
-    public async Task<BookImportFinalizeResultDto> FinalizeAsync(Guid sessionId, CancellationToken cancellationToken)
-    {
-        var session = GetOwnedSession(sessionId);
         await RevalidateSessionAsync(session, cancellationToken);
         if (session.Rows.Any(row => row.Errors.Count > 0))
         {
@@ -209,7 +474,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         var imported = 0;
         var skipped = 0;
         var errors = new List<string>();
-        var createdBookIds = new List<Guid>();
+        var createdBooks = new List<(Book Book, Guid RowId)>();
         var importedBooks = new List<BookImportFinalizedBookDto>();
 
         foreach (var row in session.Rows)
@@ -328,7 +593,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             _context.Books.Add(book);
             existingKeys.Add(importKey);
-            createdBookIds.Add(book.Id);
+            createdBooks.Add((book, row.RowId));
             importedBooks.Add(new BookImportFinalizedBookDto
             {
                 PrimaryTitle = book.PrimaryTitle,
@@ -343,27 +608,77 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         if (imported > 0)
         {
-            await _context.SaveChangesAsync(cancellationToken);
-            foreach (var bookId in createdBookIds)
+            var restoredCoverBookIds = new HashSet<Guid>();
+            var persistedCoverFiles = new List<BookCoverStoredFiles>();
+            if (session.IsFullImport)
             {
-                await _bookCoverQueue.QueueAsync(bookId, cancellationToken);
+                foreach (var (book, rowId) in createdBooks)
+                {
+                    if (!session.CoversByRowId.TryGetValue(rowId, out var backupCover))
+                    {
+                        continue;
+                    }
+
+                    try
+                    {
+                        await using var coverStream = new FileStream(
+                            backupCover.StagedPath,
+                            FileMode.Open,
+                            FileAccess.Read,
+                            FileShare.Read,
+                            64 * 1024,
+                            FileOptions.Asynchronous | FileOptions.SequentialScan);
+                        var stored = await _bookCoverStorage.SaveAsync(
+                            ownerId,
+                            book.Id,
+                            coverStream,
+                            backupCover.FileName,
+                            backupCover.MimeType,
+                            cancellationToken);
+                        ApplyRestoredCover(book.Cover!, stored);
+                        persistedCoverFiles.Add(stored);
+                        restoredCoverBookIds.Add(book.Id);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        errors.Add(
+                            $"Could not restore the cover for '{book.PrimaryTitle}'. Automatic cover search was queued instead.");
+                    }
+                }
+            }
+
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch
+            {
+                foreach (var stored in persistedCoverFiles)
+                {
+                    await _bookCoverStorage.DeleteIfExistsAsync(stored.Original.StoragePath, CancellationToken.None);
+                    await _bookCoverStorage.DeleteIfExistsAsync(stored.Thumbnail.StoragePath,
+                        CancellationToken.None);
+                }
+
+                throw;
+            }
+
+            foreach (var (book, _) in createdBooks)
+            {
+                if (!restoredCoverBookIds.Contains(book.Id))
+                {
+                    await _bookCoverQueue.QueueAsync(book.Id, cancellationToken);
+                }
             }
 
             await _cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
         }
 
-        Sessions.TryRemove(sessionId, out _);
+        _sessionStore.Remove(session.SessionId);
         return new BookImportFinalizeResultDto
         {
             ImportedCount = imported, SkippedCount = skipped, ImportedBooks = importedBooks, Errors = errors
         };
-    }
-
-    public Task CancelAsync(Guid sessionId, CancellationToken cancellationToken)
-    {
-        var session = GetOwnedSession(sessionId);
-        Sessions.TryRemove(session.SessionId, out _);
-        return Task.CompletedTask;
     }
 
     private async Task RevalidateSessionAsync(ImportSession session, CancellationToken cancellationToken)
@@ -497,12 +812,16 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
     private ImportSession GetOwnedSession(Guid sessionId)
     {
-        if (!Sessions.TryGetValue(sessionId, out var session) || session.OwnerId != _user.RequiredId)
+        return _sessionStore.GetOwned(sessionId, _user.RequiredId);
+    }
+
+    private void EnsureSessionIsCurrent(ImportSession session)
+    {
+        var current = _sessionStore.GetOwned(session.SessionId, _user.RequiredId);
+        if (!ReferenceEquals(current, session))
         {
             throw new ValidationException("Import session not found or expired.");
         }
-
-        return session;
     }
 
     private Author? ResolveAuthor(string? authorName, Dictionary<string, Author> authorMap)
@@ -531,6 +850,270 @@ public sealed class BookCsvImportService : IBookCsvImportService
     private static int NormalizeLineNumber(int? lineNumber)
     {
         return lineNumber.HasValue && lineNumber.Value > 0 ? lineNumber.Value : 1;
+    }
+
+    private void EnsureImportRowCapacity(ImportSession session)
+    {
+        if (session.Rows.Count >= _securityOptions.MaxCsvRows)
+        {
+            throw new ValidationException($"CSV cannot contain more than {_securityOptions.MaxCsvRows} rows.");
+        }
+    }
+
+    private Dictionary<string, ZipArchiveEntry> ValidateArchiveMetadata(ZipArchive archive)
+    {
+        if (archive.Entries.Count == 0 || archive.Entries.Count > _securityOptions.MaxArchiveEntries)
+        {
+            throw new ValidationException("Full backup contains an invalid number of entries.");
+        }
+
+        var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
+        long declaredTotal = 0;
+        foreach (var entry in archive.Entries)
+        {
+            if (!IsSafeArchiveEntryName(entry.FullName) || !entries.TryAdd(entry.FullName, entry))
+            {
+                throw new ValidationException($"Full backup contains an unsafe or duplicate entry '{entry.FullName}'.");
+            }
+
+            if (entry.Length < 0 || entry.CompressedLength < 0 ||
+                entry.Length > _securityOptions.MaxUncompressedArchiveBytes - declaredTotal)
+            {
+                throw new ValidationException("Full backup archive is too large.");
+            }
+
+            declaredTotal += entry.Length;
+            if (entry.Length > 0)
+            {
+                if (entry.CompressedLength == 0 ||
+                    entry.Length / (double)entry.CompressedLength > _securityOptions.MaxCompressionRatio)
+                {
+                    throw new ValidationException(
+                        $"Full backup entry '{entry.FullName}' has a suspicious compression ratio.");
+                }
+            }
+        }
+
+        return entries;
+    }
+
+    private static ZipArchiveEntry GetRequiredEntry(IReadOnlyDictionary<string, ZipArchiveEntry> entries,
+        string entryName)
+    {
+        return entries.TryGetValue(entryName, out var entry)
+            ? entry
+            : throw new ValidationException($"Full backup is missing {entryName}.");
+    }
+
+    private void ValidateManifestCoverReference(
+        string? path,
+        string? mimeType,
+        IReadOnlyDictionary<string, ZipArchiveEntry> entries,
+        ISet<string> referencedCoverPaths,
+        ISet<string> allowedEntryPaths)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        if (!IsSafeCoverEntryName(path) || !referencedCoverPaths.Add(path))
+        {
+            throw new ValidationException($"Full backup manifest contains an unsafe or duplicate cover path '{path}'.");
+        }
+
+        if (!entries.TryGetValue(path, out var entry))
+        {
+            throw new ValidationException($"Full backup is missing cover '{path}'.");
+        }
+
+        ValidateEntrySize(entry, _securityOptions.MaxCoverBytes, path);
+        if (!string.IsNullOrWhiteSpace(mimeType) &&
+            mimeType is not ("image/jpeg" or "image/png" or "image/webp"))
+        {
+            throw new ValidationException($"Cover '{path}' has an unsupported media type.");
+        }
+
+        allowedEntryPaths.Add(path);
+    }
+
+    private static void ValidateEntrySize(ZipArchiveEntry entry, long maximumBytes, string entryName)
+    {
+        if (entry.Length <= 0 || entry.Length > maximumBytes)
+        {
+            throw new ValidationException($"Full backup entry '{entryName}' has an invalid size.");
+        }
+    }
+
+    private static bool IsSafeArchiveEntryName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 240 || name.Contains('\\') || name.Contains(':') ||
+            name.StartsWith('/') || name.EndsWith('/'))
+        {
+            return false;
+        }
+
+        var segments = name.Split('/');
+        return segments.All(segment => segment.Length > 0 && segment is not "." and not "..");
+    }
+
+    private static bool IsSafeCoverEntryName(string name)
+    {
+        if (!IsSafeArchiveEntryName(name) || !name.StartsWith("covers/", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return Path.GetExtension(name).ToLowerInvariant() is ".jpg" or ".jpeg" or ".png" or ".webp";
+    }
+
+    private static async Task<byte[]> ReadStreamToBytesAsync(Stream source, long maximumBytes, string sourceName,
+        CancellationToken cancellationToken)
+    {
+        using var destination = new MemoryStream((int)Math.Min(maximumBytes, 1024 * 1024));
+        var buffer = new byte[64 * 1024];
+        long total = 0;
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            total += read;
+            if (total > maximumBytes)
+            {
+                throw new ValidationException($"{sourceName} is too large.");
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        if (total == 0)
+        {
+            throw new ValidationException($"{sourceName} is empty.");
+        }
+
+        return destination.ToArray();
+    }
+
+    private static async Task<byte[]> ReadEntryToBytesAsync(ZipArchiveEntry entry, long maximumBytes,
+        ArchiveReadBudget budget, CancellationToken cancellationToken)
+    {
+        await using var source = entry.Open();
+        using var destination = new MemoryStream((int)Math.Min(entry.Length, maximumBytes));
+        await CopyBoundedAsync(source, destination, maximumBytes, entry.FullName, budget, cancellationToken);
+        return destination.ToArray();
+    }
+
+    private static async Task<StagedCoverResult> CopyEntryToFileAsync(ZipArchiveEntry entry, string destinationPath,
+        long maximumBytes, ArchiveReadBudget budget, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using var source = entry.Open();
+            await using (var destination = new FileStream(destinationPath, FileMode.CreateNew, FileAccess.Write,
+                             FileShare.None, 64 * 1024,
+                             FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await CopyBoundedAsync(source, destination, maximumBytes, entry.FullName, budget, cancellationToken);
+            }
+
+            var mimeType = await DetectCoverMimeTypeAsync(destinationPath, cancellationToken)
+                           ?? throw new ValidationException($"Cover '{entry.FullName}' is not a supported image.");
+            return new StagedCoverResult(new FileInfo(destinationPath).Length, mimeType);
+        }
+        catch
+        {
+            if (File.Exists(destinationPath))
+            {
+                File.Delete(destinationPath);
+            }
+
+            throw;
+        }
+    }
+
+    private static async Task DrainEntryAsync(ZipArchiveEntry entry, long maximumBytes, ArchiveReadBudget budget,
+        CancellationToken cancellationToken)
+    {
+        await using var source = entry.Open();
+        await CopyBoundedAsync(source, Stream.Null, maximumBytes, entry.FullName, budget, cancellationToken);
+    }
+
+    private static async Task CopyBoundedAsync(Stream source, Stream destination, long maximumBytes, string entryName,
+        ArchiveReadBudget budget, CancellationToken cancellationToken)
+    {
+        var buffer = new byte[64 * 1024];
+        long entryBytes = 0;
+        while (true)
+        {
+            var read = await source.ReadAsync(buffer, cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            entryBytes += read;
+            if (entryBytes > maximumBytes)
+            {
+                throw new ValidationException($"Full backup entry '{entryName}' is too large after decompression.");
+            }
+
+            budget.Add(read);
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+        }
+
+        if (entryBytes == 0)
+        {
+            throw new ValidationException($"Full backup entry '{entryName}' is empty.");
+        }
+    }
+
+    private static async Task<string?> DetectCoverMimeTypeAsync(string path, CancellationToken cancellationToken)
+    {
+        var header = new byte[12];
+        await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var read = await stream.ReadAsync(header, cancellationToken);
+        if (read >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF)
+        {
+            return "image/jpeg";
+        }
+
+        if (read >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47 &&
+            header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A)
+        {
+            return "image/png";
+        }
+
+        if (read >= 12 && header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 &&
+            header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50)
+        {
+            return "image/webp";
+        }
+
+        return null;
+    }
+
+    private static void ApplyRestoredCover(BookCover cover, BookCoverStoredFiles stored)
+    {
+        cover.Status = BookCoverStatus.Uploaded;
+        cover.Source = BookCoverSource.ManualUpload;
+        cover.StoragePath = stored.Original.StoragePath;
+        cover.ThumbnailStoragePath = stored.Thumbnail.StoragePath;
+        cover.OriginalImageUrl = null;
+        cover.MimeType = stored.Original.MimeType;
+        cover.ThumbnailMimeType = stored.Thumbnail.MimeType;
+        cover.SizeBytes = stored.Original.SizeBytes;
+        cover.ThumbnailSizeBytes = stored.Thumbnail.SizeBytes;
+        cover.Width = stored.Original.Width;
+        cover.Height = stored.Original.Height;
+        cover.ThumbnailWidth = stored.Thumbnail.Width;
+        cover.ThumbnailHeight = stored.Thumbnail.Height;
+        cover.FailureReason = null;
+        cover.LastAttemptAt = DateTimeOffset.UtcNow;
     }
 
     private static void ValidateJsonArray(ImportRow row, string? value, string fieldKey, string fieldName)
@@ -583,4 +1166,27 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         return count;
     }
+
+    private sealed class ArchiveReadBudget
+    {
+        private readonly long _maximumBytes;
+        private long _readBytes;
+
+        public ArchiveReadBudget(long maximumBytes)
+        {
+            _maximumBytes = maximumBytes;
+        }
+
+        public void Add(int bytes)
+        {
+            if (bytes > _maximumBytes - _readBytes)
+            {
+                throw new ValidationException("Full backup exceeds the decompressed data limit.");
+            }
+
+            _readBytes += bytes;
+        }
+    }
+
+    private sealed record StagedCoverResult(long SizeBytes, string MimeType);
 }

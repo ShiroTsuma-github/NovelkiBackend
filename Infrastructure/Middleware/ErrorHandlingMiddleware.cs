@@ -1,19 +1,21 @@
-﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-using System.Net;
-using System.Text.Json;
-using ValidationException = FluentValidation.ValidationException;
+﻿using ValidationException = FluentValidation.ValidationException;
 
 namespace Infrastructure.Middleware;
+
+using System.Net;
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using Services;
 
 public class ErrorHandlingMiddleware
 {
     private const string ConflictTitle = "Conflict";
     private const string NotFoundTitle = "Not Found";
     private const string AuthenticationFailedTitle = "Authentication Failed";
+    private readonly ILogger<ErrorHandlingMiddleware> _logger;
 
     private readonly RequestDelegate _next;
-    private readonly ILogger<ErrorHandlingMiddleware> _logger;
 
     public ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorHandlingMiddleware> logger)
     {
@@ -92,19 +94,76 @@ public class ErrorHandlingMiddleware
 
             case ValidationException validationException:
                 var validationErrors = validationException.Errors
-                    .GroupBy(e => e.PropertyName)
+                    .Where(error => !string.IsNullOrWhiteSpace(error.ErrorMessage))
+                    .GroupBy(error => string.IsNullOrWhiteSpace(error.PropertyName) ? "General" : error.PropertyName)
                     .ToDictionary(
                         g => g.Key,
-                        g => g.Select(e => e.ErrorMessage).ToArray()
+                        g => g.Select(e => e.ErrorMessage).Distinct().ToArray()
                     );
+
+                if (validationErrors.Count == 0)
+                {
+                    var message = string.IsNullOrWhiteSpace(validationException.Message)
+                        ? "The request contains invalid data."
+                        : validationException.Message;
+                    validationErrors["General"] = [message];
+                }
 
                 statusCode = HttpStatusCode.BadRequest;
                 title = "One or more validation errors occurred.";
                 detail = validationErrors
-                    .SelectMany(entry => entry.Value.Select(message => $"{entry.Key}: {message}"))
+                    .SelectMany(entry => entry.Value.Select(message =>
+                        entry.Key == "General" ? message : $"{entry.Key}: {message}"))
                     .FirstOrDefault() ?? "The request contains invalid data.";
                 errors = validationErrors;
-                _logger.LogWarning("User validation error. Errors: {@ValidationErrors}", validationErrors);
+                _logger.LogWarning(
+                    "User validation error for {Method} {Path}. Detail={ValidationDetail} Errors={@ValidationErrors} TraceId={TraceId}",
+                    context.Request.Method,
+                    context.Request.Path,
+                    detail,
+                    validationErrors,
+                    context.TraceIdentifier);
+                break;
+
+            case FullImportCapacityExceededException:
+                statusCode = HttpStatusCode.TooManyRequests;
+                title = "Full Import Capacity Reached";
+                detail = exception.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["General"] = new[] { exception.Message }
+                };
+                context.Response.Headers.RetryAfter = "60";
+                _logger.LogWarning(
+                    "Full import capacity rejected {Method} {Path}. Detail={Detail} TraceId={TraceId}",
+                    context.Request.Method, context.Request.Path, detail, context.TraceIdentifier);
+                break;
+
+            case ImportCapacityExceededException:
+                statusCode = HttpStatusCode.TooManyRequests;
+                title = "Import Capacity Reached";
+                detail = exception.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["General"] = new[] { exception.Message }
+                };
+                context.Response.Headers.RetryAfter = "60";
+                _logger.LogWarning(
+                    "Import capacity rejected {Method} {Path}. Detail={Detail} TraceId={TraceId}",
+                    context.Request.Method, context.Request.Path, detail, context.TraceIdentifier);
+                break;
+
+            case BookImportProcessingTimeoutException:
+                statusCode = HttpStatusCode.RequestTimeout;
+                title = "Full Import Timed Out";
+                detail = exception.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["General"] = new[] { exception.Message }
+                };
+                _logger.LogWarning(
+                    "Full import timed out for {Method} {Path}. Detail={Detail} TraceId={TraceId}",
+                    context.Request.Method, context.Request.Path, detail, context.TraceIdentifier);
                 break;
 
             case EntityAlreadyExistsException<Genre, Guid>:
@@ -176,8 +235,6 @@ public class ErrorHandlingMiddleware
                 _logger.LogError(exception, "Server (500) unhandled error: {Message}", exception.Message);
                 break;
         }
-
-        ;
 
         context.Response.StatusCode = (int)statusCode;
         var errorResponse = new

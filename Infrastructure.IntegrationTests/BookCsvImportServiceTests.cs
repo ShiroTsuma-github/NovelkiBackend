@@ -1,6 +1,8 @@
 namespace Infrastructure.IntegrationTests;
 
+using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using Application.Common;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
@@ -9,12 +11,19 @@ using Domain.Entities;
 using Domain.Models;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Persistence;
 using Services;
 using TestSupport;
 
 public class BookCsvImportServiceTests
 {
+    private static readonly IOptions<BookImportSecurityOptions> ImportSecurityOptions =
+        Options.Create(new BookImportSecurityOptions());
+
+    private static readonly BookImportSessionStore ImportSessionStore = new(ImportSecurityOptions);
+    private static readonly BookImportConcurrencyGate ImportConcurrencyGate = new(ImportSecurityOptions);
+
     [Fact]
     public async Task CreateSessionAsync_ShouldRejectCsvWithoutRequiredColumns()
     {
@@ -52,6 +61,24 @@ public class BookCsvImportServiceTests
         Assert.Equal("Semicolon Book", row.PrimaryTitle);
         Assert.Equal("Manhua", row.ContentType);
         Assert.Equal("Reading", row.Status);
+    }
+
+    [Fact]
+    public async Task CreateSessionAsync_ShouldRejectCsvAboveConfiguredRowLimit()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var options = Options.Create(new BookImportSecurityOptions { MaxCsvRows = 1 });
+        using var store = new BookImportSessionStore(options);
+        var service = CreateService(context, database.UserId, securityOptions: options, sessionStore: store,
+            concurrencyGate: new BookImportConcurrencyGate(options));
+        using var stream = CreateCsv(
+            "primaryTitle,contentType,status\nFirst,Novel,Reading\nSecond,Novel,Reading\n");
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateSessionAsync(stream, "books.csv", CancellationToken.None));
+
+        Assert.Contains("more than 1 rows", exception.Message);
     }
 
     [Fact]
@@ -343,6 +370,207 @@ public class BookCsvImportServiceTests
     }
 
     [Fact]
+    public async Task FullImport_ShouldRestoreCoverWithoutQueuingAutomaticLookup()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var queue = new TrackingBookCoverQueue();
+        var storage = new StubBookCoverStorage();
+        var service = CreateService(context, database.UserId, queue, coverStorage: storage);
+        using var archive = CreateFullBackup(
+            "primaryTitle,contentType,status\nBackup Book,Novel,Reading\n",
+            new BookFullBackupManifest
+            {
+                Books =
+                [
+                    new BookFullBackupManifestItem
+                    {
+                        PrimaryTitle = "Backup Book",
+                        ContentType = "Novel",
+                        OriginalCoverPath = "covers/000001/original.jpg",
+                        OriginalCoverMimeType = "image/jpeg"
+                    }
+                ]
+            },
+            "covers/000001/original.jpg",
+            [0xFF, 0xD8, 0xFF, 0x00]);
+
+        var session = await service.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None);
+        var result = await service.FinalizeAsync(session.SessionId, CancellationToken.None);
+
+        Assert.Equal(1, result.ImportedCount);
+        Assert.Empty(result.Errors);
+        Assert.Empty(queue.BookIds);
+        Assert.Equal(1, storage.SaveCount);
+        Assert.Equal([0xFF, 0xD8, 0xFF, 0x00], storage.SavedContent);
+
+        var book = await context.Books.Include(item => item.Cover).SingleAsync();
+        Assert.Equal(BookCoverStatus.Uploaded, book.Cover!.Status);
+        Assert.Equal(BookCoverSource.ManualUpload, book.Cover.Source);
+        Assert.NotNull(book.Cover.StoragePath);
+        Assert.NotNull(book.Cover.ThumbnailStoragePath);
+    }
+
+    [Fact]
+    public async Task FullImport_ShouldRejectUnexpectedArchiveEntries()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        using var archive = CreateValidFullBackup("Unexpected Entry Book", zip =>
+        {
+            var entry = zip.CreateEntry("payload.bin");
+            using var stream = entry.Open();
+            stream.Write([1, 2, 3]);
+        });
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None));
+
+        Assert.Contains("unexpected entry", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FullImport_ShouldRejectUnsafeCoverPaths()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        using var archive = CreateFullBackup(
+            "primaryTitle,contentType,status\nUnsafe Book,Novel,Reading\n",
+            new BookFullBackupManifest
+            {
+                Books =
+                [
+                    new BookFullBackupManifestItem
+                    {
+                        PrimaryTitle = "Unsafe Book",
+                        ContentType = "Novel",
+                        OriginalCoverPath = "covers/../escape.jpg",
+                        OriginalCoverMimeType = "image/jpeg"
+                    }
+                ]
+            },
+            "covers/../escape.jpg",
+            [0xFF, 0xD8, 0xFF, 0x00]);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None));
+
+        Assert.Contains("unsafe", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FullImport_ShouldRejectSuspiciousCompressionRatio()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        var oversizedTitle = new string('A', 500_000);
+        using var archive = CreateFullBackup(
+            $"primaryTitle,contentType,status\n{oversizedTitle},Novel,Reading\n",
+            new BookFullBackupManifest(),
+            "covers/000001/original.jpg",
+            [0xFF, 0xD8, 0xFF, 0x00]);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None));
+
+        Assert.Contains("compression ratio", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task FullImport_ShouldLimitActiveDraftsAndReleaseStagedDiskOnCancel()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var options = Options.Create(new BookImportSecurityOptions
+        {
+            MaxActiveFullSessionsGlobal = 2, MaxActiveFullSessionsPerUser = 1
+        });
+        using var store = new BookImportSessionStore(options);
+        var gate = new BookImportConcurrencyGate(options);
+        var service = CreateService(context, database.UserId, securityOptions: options, sessionStore: store,
+            concurrencyGate: gate);
+        using var firstArchive = CreateValidFullBackup("First Draft");
+        var first = await service.CreateFullSessionAsync(firstArchive, "first.zip", CancellationToken.None);
+
+        Assert.Equal(1, store.ActiveFullSessionCount);
+        Assert.True(store.ReservedStagedBytes > 0);
+        using var secondArchive = CreateValidFullBackup("Second Draft");
+        var exception = await Assert.ThrowsAsync<FullImportCapacityExceededException>(() =>
+            service.CreateFullSessionAsync(secondArchive, "second.zip", CancellationToken.None));
+        Assert.Contains("active full import drafts", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        await service.CancelAsync(first.SessionId, CancellationToken.None);
+        Assert.Equal(0, store.ActiveFullSessionCount);
+        Assert.Equal(0, store.ReservedStagedBytes);
+    }
+
+    [Fact]
+    public void FullImportConcurrencyGate_ShouldRejectOperationsAboveGlobalLimit()
+    {
+        var options = Options.Create(new BookImportSecurityOptions { MaxConcurrentFullImportOperations = 1 });
+        var gate = new BookImportConcurrencyGate(options);
+        using var first = gate.TryAcquire();
+
+        Assert.Throws<FullImportCapacityExceededException>(() => gate.TryAcquire());
+
+        first.Dispose();
+        using var next = gate.TryAcquire();
+    }
+
+    [Fact]
+    public async Task FullImport_ShouldLimitActiveDraftsAcrossAllUsers()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var options = Options.Create(new BookImportSecurityOptions
+        {
+            MaxActiveFullSessionsGlobal = 1, MaxActiveFullSessionsPerUser = 1
+        });
+        using var store = new BookImportSessionStore(options);
+        var gate = new BookImportConcurrencyGate(options);
+        var firstService = CreateService(context, database.UserId, securityOptions: options, sessionStore: store,
+            concurrencyGate: gate);
+        var secondService = CreateService(context, Guid.NewGuid(), securityOptions: options, sessionStore: store,
+            concurrencyGate: gate);
+        using var firstArchive = CreateValidFullBackup("Global First Draft");
+        var first = await firstService.CreateFullSessionAsync(firstArchive, "first.zip", CancellationToken.None);
+
+        using var secondArchive = CreateValidFullBackup("Global Second Draft");
+        var exception = await Assert.ThrowsAsync<FullImportCapacityExceededException>(() =>
+            secondService.CreateFullSessionAsync(secondArchive, "second.zip", CancellationToken.None));
+
+        Assert.Contains("server", exception.Message, StringComparison.OrdinalIgnoreCase);
+        await firstService.CancelAsync(first.SessionId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ImportSessionStore_ShouldExpireAbandonedDrafts()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var options = Options.Create(new BookImportSecurityOptions
+        {
+            SessionIdleTimeout = TimeSpan.FromMilliseconds(20),
+            SessionAbsoluteLifetime = TimeSpan.FromMilliseconds(40),
+            CleanupInterval = TimeSpan.FromMilliseconds(10)
+        });
+        using var store = new BookImportSessionStore(options);
+        var service = CreateService(context, database.UserId, securityOptions: options, sessionStore: store,
+            concurrencyGate: new BookImportConcurrencyGate(options));
+        using var csv = CreateCsv("primaryTitle,contentType,status\nExpiring Book,Novel,Reading\n");
+        var session = await service.CreateSessionAsync(csv, "books.csv", CancellationToken.None);
+
+        await Task.Delay(100);
+        store.CleanupExpired();
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.GetSessionAsync(session.SessionId, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task FinalizeAsync_ShouldCollapseWhitespaceInIdentifyingFields()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
@@ -428,6 +656,35 @@ public class BookCsvImportServiceTests
     }
 
     [Fact]
+    public async Task FinalizeAsync_ShouldAllowOnlyOneConcurrentFinalizationPerSession()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        using var csv = CreateCsv("primaryTitle,contentType,status\nSingle Finalize,Novel,Reading\n");
+        var session = await service.CreateSessionAsync(csv, "books.csv", CancellationToken.None);
+
+        async Task<Exception?> TryFinalizeAsync()
+        {
+            try
+            {
+                await service.FinalizeAsync(session.SessionId, CancellationToken.None);
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception;
+            }
+        }
+
+        var outcomes = await Task.WhenAll(TryFinalizeAsync(), TryFinalizeAsync());
+
+        Assert.Single(outcomes, outcome => outcome == null);
+        Assert.Single(outcomes, outcome => outcome is ValidationException);
+        Assert.Equal(1, await context.Books.CountAsync());
+    }
+
+    [Fact]
     public async Task DeleteInvalidRowsAsync_ShouldRemoveOnlyInvalidRows()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
@@ -499,13 +756,22 @@ public class BookCsvImportServiceTests
         ApplicationDbContext context,
         Guid ownerId,
         TrackingBookCoverQueue? queue = null,
-        TrackingCacheInvalidator? cacheInvalidator = null)
+        TrackingCacheInvalidator? cacheInvalidator = null,
+        IBookCoverStorage? coverStorage = null,
+        IOptions<BookImportSecurityOptions>? securityOptions = null,
+        BookImportSessionStore? sessionStore = null,
+        BookImportConcurrencyGate? concurrencyGate = null)
     {
+        var effectiveOptions = securityOptions ?? ImportSecurityOptions;
         return new BookCsvImportService(
             context,
             queue ?? new TrackingBookCoverQueue(),
+            coverStorage ?? new StubBookCoverStorage(),
             cacheInvalidator ?? new TrackingCacheInvalidator(),
-            new TestUser(ownerId));
+            new TestUser(ownerId),
+            sessionStore ?? ImportSessionStore,
+            concurrencyGate ?? ImportConcurrencyGate,
+            effectiveOptions);
     }
 
     private static MemoryStream CreateCsv(string content)
@@ -513,6 +779,59 @@ public class BookCsvImportServiceTests
         var normalized = content.Replace("\r\n", "\n", StringComparison.Ordinal);
         return new MemoryStream(
             Encoding.UTF8.GetBytes(normalized.Replace("\n", Environment.NewLine, StringComparison.Ordinal)));
+    }
+
+    private static MemoryStream CreateFullBackup(string csv, BookFullBackupManifest manifest, string coverPath,
+        byte[] coverBytes, Action<ZipArchive>? addEntries = null)
+    {
+        var stream = new MemoryStream();
+        using (var archive = new ZipArchive(stream, ZipArchiveMode.Create, true))
+        {
+            var csvEntry = archive.CreateEntry("books.csv");
+            using (var writer = new StreamWriter(csvEntry.Open(), Encoding.UTF8))
+            {
+                writer.Write(csv);
+            }
+
+            var manifestEntry = archive.CreateEntry("manifest.json");
+            using (var manifestStream = manifestEntry.Open())
+            {
+                JsonSerializer.Serialize(manifestStream, manifest);
+            }
+
+            var coverEntry = archive.CreateEntry(coverPath);
+            using (var coverStream = coverEntry.Open())
+            {
+                coverStream.Write(coverBytes);
+            }
+
+            addEntries?.Invoke(archive);
+        }
+
+        stream.Position = 0;
+        return stream;
+    }
+
+    private static MemoryStream CreateValidFullBackup(string title, Action<ZipArchive>? addEntries = null)
+    {
+        return CreateFullBackup(
+            $"primaryTitle,contentType,status\n{title},Novel,Reading\n",
+            new BookFullBackupManifest
+            {
+                Books =
+                [
+                    new BookFullBackupManifestItem
+                    {
+                        PrimaryTitle = title,
+                        ContentType = "Novel",
+                        OriginalCoverPath = "covers/000001/original.jpg",
+                        OriginalCoverMimeType = "image/jpeg"
+                    }
+                ]
+            },
+            "covers/000001/original.jpg",
+            [0xFF, 0xD8, 0xFF, 0x00],
+            addEntries);
     }
 
     private sealed class TrackingBookCoverQueue : IBookCoverQueue
@@ -533,6 +852,38 @@ public class BookCsvImportServiceTests
         public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken)
         {
             InvalidatedOwnerId = ownerId;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class StubBookCoverStorage : IBookCoverStorage
+    {
+        public int SaveCount { get; private set; }
+        public byte[] SavedContent { get; private set; } = [];
+
+        public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
+            string? contentType, CancellationToken cancellationToken)
+        {
+            using var buffer = new MemoryStream();
+            content.CopyTo(buffer);
+            SavedContent = buffer.ToArray();
+            SaveCount++;
+            var stored = new BookCoverStoredFiles(
+                new BookCoverStoredVariant($"covers/{ownerId:N}/{bookId:N}/original.jpg", "image/jpeg",
+                    SavedContent.Length,
+                    600, 900),
+                new BookCoverStoredVariant($"covers/{ownerId:N}/{bookId:N}/thumbnail.webp", "image/webp", 10,
+                    200, 300));
+            return Task.FromResult(stored);
+        }
+
+        public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken)
+        {
+            return Task.FromResult<Stream>(new MemoryStream());
+        }
+
+        public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
+        {
             return Task.CompletedTask;
         }
     }
