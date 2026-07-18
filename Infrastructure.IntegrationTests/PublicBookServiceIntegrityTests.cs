@@ -373,6 +373,8 @@ public sealed class PublicBookServiceIntegrityTests
         await service.UnlistBySourceBookAsync(Guid.NewGuid(), CancellationToken.None);
         await service.UnlistAllForOwnerAsync(Guid.NewGuid(), CancellationToken.None);
         var firstSnapshot = await service.PublishAsync(first.Id, CancellationToken.None);
+        await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<PublicBookSnapshot, Guid>>(() =>
+            service.OpenCoverAsync(firstSnapshot.Id, CancellationToken.None));
         await service.UnlistBySourceBookAsync(first.Id, CancellationToken.None);
         Assert.False(await context.PublicBookSnapshots.AnyAsync(item => item.Id == firstSnapshot.Id));
 
@@ -420,6 +422,57 @@ public sealed class PublicBookServiceIntegrityTests
         var tag = Assert.Single(copied.BookTags).Tag;
         Assert.False(tag.IsGlobal);
         Assert.Equal(targetOwner, tag.OwnerId);
+    }
+
+    [Fact]
+    public async Task Refresh_ShouldRetryOneTransientDatabaseFailure()
+    {
+        using var database = new SqliteTestDatabase();
+        Guid snapshotId;
+        await using (var seed = database.CreateContext())
+        {
+            var book = await TestData.AddBookAsync(seed, database.UserId, "Transient refresh");
+            snapshotId = (await CreateService(seed, database.UserId, new MemoryStorage())
+                .PublishAsync(book.Id, CancellationToken.None)).Id;
+        }
+
+        var interceptor = new FailSnapshotUpdateOnceInterceptor();
+        await using var context = database.CreateContext(interceptor);
+        var refreshed = await CreateService(context, database.UserId, new MemoryStorage())
+            .RefreshAsync(snapshotId, CancellationToken.None);
+
+        Assert.Equal(snapshotId, refreshed.Id);
+        Assert.Equal(1, interceptor.FailureCount);
+    }
+
+    [Fact]
+    public async Task FailedPublish_ShouldFallBackWhenCleanupQueueAndStorageDeleteFail()
+    {
+        using var database = new SqliteTestDatabase();
+        Guid bookId;
+        await using (var seed = database.CreateContext())
+        {
+            var book = TestData.Book(database.UserId, "Cleanup fallback");
+            book.Cover = new BookCover
+            {
+                Book = book, BookId = book.Id, StoragePath = "source/fallback.jpg", MimeType = "image/jpeg"
+            };
+            seed.Books.Add(book);
+            await seed.SaveChangesAsync();
+            bookId = book.Id;
+        }
+
+        var storage = new MemoryStorage { FailDelete = true };
+        storage.Files["source/fallback.jpg"] = [1];
+        await using var context = database.CreateContext(new FailSnapshotSaveInterceptor());
+        var cache = new NoopCache();
+        var service = new PublicBookService(context, new TestUser(database.UserId), storage,
+            new AuthorLifecycleService(context, cache), cache, new ThrowingCleanupQueue());
+
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            service.PublishAsync(bookId, CancellationToken.None));
+
+        Assert.True(storage.DeletedPaths.Count >= 6);
     }
 
     private static PublicBookService CreateService(ApplicationDbContext context, Guid userId,
@@ -474,6 +527,8 @@ public sealed class PublicBookServiceIntegrityTests
     {
         public Dictionary<string, byte[]> Files { get; } = new(StringComparer.Ordinal);
         public bool FailSave { get; init; }
+        public bool FailDelete { get; init; }
+        public List<string> DeletedPaths { get; } = [];
 
         public async Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
             string? contentType, CancellationToken cancellationToken)
@@ -497,9 +552,23 @@ public sealed class PublicBookServiceIntegrityTests
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
         {
-            if (storagePath is not null) Files.Remove(storagePath);
+            if (storagePath is not null)
+            {
+                DeletedPaths.Add(storagePath);
+                Files.Remove(storagePath);
+                if (FailDelete && DeletedPaths.Count % 2 == 0)
+                {
+                    throw new IOException("forced delete failure");
+                }
+            }
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class ThrowingCleanupQueue : IStorageCleanupQueue
+    {
+        public Task EnqueueAsync(IEnumerable<string?> storagePaths, CancellationToken cancellationToken) =>
+            Task.FromException(new DbUpdateException("forced cleanup queue failure"));
     }
 
     private sealed class FailSnapshotSaveInterceptor : SaveChangesInterceptor
@@ -511,6 +580,24 @@ public sealed class PublicBookServiceIntegrityTests
                 .Any(entry => entry.State == EntityState.Added))
             {
                 throw new DbUpdateException("forced snapshot save failure");
+            }
+
+            return ValueTask.FromResult(result);
+        }
+    }
+
+    private sealed class FailSnapshotUpdateOnceInterceptor : SaveChangesInterceptor
+    {
+        public int FailureCount { get; private set; }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(DbContextEventData eventData,
+            InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            if (FailureCount == 0 && eventData.Context!.ChangeTracker.Entries<PublicBookSnapshot>()
+                    .Any(entry => entry.State == EntityState.Modified))
+            {
+                FailureCount++;
+                throw new DbUpdateException("forced transient refresh failure");
             }
 
             return ValueTask.FromResult(result);
