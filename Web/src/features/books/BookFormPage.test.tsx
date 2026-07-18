@@ -225,4 +225,21 @@ describe('BookFormPage', () => {
     )).toBeInTheDocument()
     expect(screen.queryByText(/301 \(Moved Permanently\)/)).not.toBeInTheDocument()
   })
+
+  it('shows tag descriptions in the suggestion list', async () => {
+    vi.mocked(api.searchTags).mockResolvedValue([{
+      id: 'tag-1',
+      name: 'cultivation',
+      description: 'Progression through spiritual realms and techniques.',
+      isGlobal: true,
+    }])
+
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.type(screen.getByPlaceholderText('Start typing a tag'), 'cult')
+
+    expect(await screen.findByText('Progression through spiritual realms and techniques.')).toBeInTheDocument()
+  })
 })

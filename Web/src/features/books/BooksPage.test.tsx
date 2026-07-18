@@ -39,6 +39,11 @@ describe('BooksPage', () => {
 
     expect(await screen.findByText('Lord of Mysteries')).toBeInTheDocument()
     expect(screen.getByText('Cuttlefish')).toBeInTheDocument()
+    expect(screen.getByLabelText('1 alternative name')).toHaveAttribute(
+      'title',
+      'Alternative name: Cuttlefish That Loves Diving',
+    )
+    expect(screen.getByText('favorite')).toHaveAttribute('title', 'A personal favorite.')
     expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({
       skip: 0,
       take: 20,
@@ -59,7 +64,7 @@ describe('BooksPage', () => {
     expect(screen.getByRole('columnheader', { name: /actions/i })).toHaveClass('sticky', 'right-0')
     expect(screen.queryByRole('columnheader', { name: /^id$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: /alternative titles/i })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('1 alternative titles')).toHaveTextContent('+1')
+    expect(screen.getByLabelText('1 alternative title')).toHaveTextContent('+1')
   })
 
   it('keeps all enabled table columns inside a symmetric scroll container', async () => {
@@ -96,6 +101,10 @@ describe('BooksPage', () => {
     expect(section).toHaveClass('min-w-0', 'overflow-hidden')
     expect(screen.queryByRole('columnheader', { name: /^id$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: /alternative titles/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Fantasy')).toHaveAttribute(
+      'title',
+      'Magic, strange worlds, and supernatural stories.',
+    )
   })
 
   it('shows the colon-based rating operator syntax in advanced search help', async () => {

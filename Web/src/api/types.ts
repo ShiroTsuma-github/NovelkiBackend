@@ -75,6 +75,7 @@ export type BookListItemDto = {
   alternativeTitles: string[]
   alternativeTitlesCount: number
   author?: string | null
+  authorOtherNames: string[]
   contentType: string
   status: string
   currentChapterNumber?: number | null
@@ -85,8 +86,10 @@ export type BookListItemDto = {
   notes?: string | null
   cover?: BookCoverDto | null
   genres: string[]
+  genreDescriptions: Record<string, string | null>
   genresCount: number
   tags: string[]
+  tagDescriptions: Record<string, string | null>
   tagsCount: number
   linksCount: number
 }
