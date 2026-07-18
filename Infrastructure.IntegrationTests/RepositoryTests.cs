@@ -1741,6 +1741,46 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task AuthorRepository_SearchShouldPreferPrivateAuthorAndHideOverlappingPublicAuthor()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var publicOwnerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
+        context.Users.Add(new User
+        {
+            Id = publicOwnerId,
+            UserName = "public-author-owner",
+            NormalizedUserName = "PUBLIC-AUTHOR-OWNER"
+        });
+        var privateAuthor = TestData.Author("Local Pen Name", database.UserId, false);
+        privateAuthor.Names.Add(new AuthorName
+        {
+            Name = "Shared Identity",
+            NormalizedName = MappingExtensions.NormalizeName("Shared Identity"),
+            IsPrimary = false,
+            Source = "Test"
+        });
+        var publicAuthor = TestData.Author("Shared Identity", publicOwnerId, true);
+        publicAuthor.Names.Add(new AuthorName
+        {
+            Name = "Global Alias",
+            NormalizedName = MappingExtensions.NormalizeName("Global Alias"),
+            IsPrimary = false,
+            Source = "Test"
+        });
+        context.Authors.AddRange(privateAuthor, publicAuthor);
+        await context.SaveChangesAsync();
+        var repository = new AuthorRepository(context);
+
+        var result = (await repository.SearchAsync(database.UserId, "Shared Identity", 10,
+            CancellationToken.None)).ToList();
+
+        var author = Assert.Single(result);
+        Assert.Equal(privateAuthor.Id, author.Id);
+        Assert.False(author.IsPublic);
+    }
+
+    [Fact]
     public async Task TagRepository_ShouldReturnOnlyOwnerTags()
     {
         using var database = new SqliteTestDatabase();
