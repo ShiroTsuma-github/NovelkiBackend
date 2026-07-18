@@ -102,6 +102,7 @@ public static class DependencyInjection
         builder.Services.AddSingleton<AccountAbuseGuard>();
         builder.Services.AddHostedService<BookImportSessionCleanupService>();
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
+        builder.Services.AddScoped<IGlobalTagService, GlobalTagService>();
 
         builder.Services.AddOptions<BookCoverOptions>()
             .Bind(builder.Configuration.GetSection(BookCoversSection))

@@ -1,13 +1,14 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Edit, Plus } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { Edit } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
-import type { AdminBookListItemDto, DictionaryMutationRequest } from '@/api/types'
+import type { AdminBookListItemDto } from '@/api/types'
 import { HttpError } from '@/api/http'
 import { buttonVariants, PageHeader, Surface } from '@/components/app/DesignSystem'
 import { inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { AdminMetadataManager } from './AdminMetadataManager'
 import { BookDataTable } from '@/features/books/BookDataTable'
 import {
   ColumnSettingsPopup,
@@ -115,27 +116,7 @@ export function AdminPage() {
         title="Admin panel"
       />
 
-      <Surface className="grid gap-4 p-5">
-        <h2 className="ui-panel-title">Add dictionary item</h2>
-        <p className="ui-panel-description">The description is shown as help when users choose a type, status, or genre.</p>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <DictionaryCreateForm
-            label="Status"
-            mutationFn={api.createAdminStatus}
-            queryKeys={['statuses']}
-          />
-          <DictionaryCreateForm
-            label="Type"
-            mutationFn={api.createAdminType}
-            queryKeys={['types']}
-          />
-          <DictionaryCreateForm
-            label="Genre"
-            mutationFn={api.createAdminGenre}
-            queryKeys={['genres']}
-          />
-        </div>
-      </Surface>
+      <AdminMetadataManager />
 
       <Surface className="grid gap-4 p-5" tone="danger">
         <h2 className="ui-panel-title text-inherit">Purge user library</h2>
@@ -210,52 +191,6 @@ export function AdminPage() {
         onGoDown={scrollShortcuts.scrollToPageBottom}
       />
     </div>
-  )
-}
-
-function DictionaryCreateForm({
-  label,
-  mutationFn,
-  queryKeys,
-}: {
-  label: string
-  mutationFn: (request: DictionaryMutationRequest) => Promise<unknown>
-  queryKeys: string[]
-}) {
-  const queryClient = useQueryClient()
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const mutation = useMutation({
-    mutationFn,
-    onSuccess: async () => {
-      setName('')
-      setDescription('')
-      await Promise.all(queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] })))
-      toast.success(`${label} added.`)
-    },
-    onError: (error) => {
-      toast.error(error instanceof HttpError ? error.apiError.detail : error.message)
-    },
-  })
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault()
-    mutation.mutate({
-      name: name.trim(),
-      description: description.trim() || null,
-    })
-  }
-
-  return (
-    <form className="grid gap-3" onSubmit={handleSubmit}>
-      <div className="text-sm font-semibold text-slate-700">{label}</div>
-      <input className={inputClass} placeholder="Name" required value={name} onChange={(event) => setName(event.target.value)} />
-      <input className={inputClass} placeholder="Help description" value={description} onChange={(event) => setDescription(event.target.value)} />
-      <button className={buttonVariants.primary} disabled={mutation.isPending || !name.trim()} type="submit">
-        <Plus className="h-4 w-4" />
-        Add
-      </button>
-    </form>
   )
 }
 
