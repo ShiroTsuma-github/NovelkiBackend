@@ -50,7 +50,8 @@ public sealed class PublicBookService(
             return await RefreshAsync(existingId.Value, cancellationToken);
         }
 
-        for (var attempt = 0; attempt < MaxMutationAttempts; attempt++)
+        var attempt = 0;
+        while (true)
         {
             BookCoverStoredFiles? storedCover = null;
             await using var transaction = await BeginTransactionIfNeededAsync(cancellationToken);
@@ -87,7 +88,7 @@ public sealed class PublicBookService(
                 await CommitIfOwnedAsync(transaction, cancellationToken);
                 return ToDto(snapshot);
             }
-            catch (DbUpdateException) when (attempt < MaxMutationAttempts - 1)
+            catch (DbUpdateException) when (attempt++ < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
                 await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
@@ -108,13 +109,12 @@ public sealed class PublicBookService(
                 throw;
             }
         }
-
-        throw new InvalidOperationException("Publishing the public book could not be completed after retrying.");
     }
 
     public async Task<PublicBookSnapshotDto> RefreshAsync(Guid snapshotId, CancellationToken cancellationToken)
     {
-        for (var attempt = 0; attempt < MaxMutationAttempts; attempt++)
+        var attempt = 0;
+        while (true)
         {
             BookCoverStoredFiles? storedCover = null;
             string? oldCoverPath = null;
@@ -137,7 +137,7 @@ public sealed class PublicBookService(
                 await CommitIfOwnedAsync(transaction, cancellationToken);
                 return ToDto(snapshot);
             }
-            catch (DbUpdateConcurrencyException) when (attempt < MaxMutationAttempts - 1)
+            catch (DbUpdateConcurrencyException) when (attempt++ < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
                 await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
@@ -149,7 +149,7 @@ public sealed class PublicBookService(
                     throw new EntityNotFoundException<PublicBookSnapshot, Guid>(snapshotId);
                 }
             }
-            catch (DbUpdateException) when (attempt < MaxMutationAttempts - 1)
+            catch (DbUpdateException) when (attempt++ < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
                 await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
@@ -163,15 +163,6 @@ public sealed class PublicBookService(
                 throw;
             }
         }
-
-        context.ChangeTracker.Clear();
-        if (!await context.PublicBookSnapshots.AsNoTracking().AnyAsync(
-                snapshot => snapshot.Id == snapshotId && snapshot.OwnerId == user.RequiredId, cancellationToken))
-        {
-            throw new EntityNotFoundException<PublicBookSnapshot, Guid>(snapshotId);
-        }
-
-        throw new InvalidOperationException("Refreshing the public book could not be completed after retrying.");
     }
 
     public async Task UnlistAsync(Guid snapshotId, CancellationToken cancellationToken)
@@ -245,7 +236,8 @@ public sealed class PublicBookService(
 
     public async Task<CopyPublicBookResult> CopyAsync(Guid snapshotId, CancellationToken cancellationToken)
     {
-        for (var attempt = 0; attempt < MaxMutationAttempts; attempt++)
+        var attempt = 0;
+        while (true)
         {
             BookCoverStoredFiles? storedCover = null;
             await using var transaction = await BeginTransactionIfNeededAsync(cancellationToken);
@@ -311,7 +303,7 @@ public sealed class PublicBookService(
                 await cacheInvalidator.InvalidateBooksAsync(user.RequiredId, cancellationToken);
                 return new CopyPublicBookResult(book.Id);
             }
-            catch (DbUpdateException) when (attempt < MaxMutationAttempts - 1)
+            catch (DbUpdateException) when (attempt++ < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
                 await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
@@ -341,8 +333,6 @@ public sealed class PublicBookService(
                 throw;
             }
         }
-
-        throw new InvalidOperationException("Copying the public book could not be completed after retrying.");
     }
 
     public async Task<(Stream Content, string MimeType)> OpenCoverAsync(Guid snapshotId,
