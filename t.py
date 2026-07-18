@@ -15,8 +15,7 @@ korean_manhwas = {
     "City of the Dead Sorcerer", "MZ", "I Am The Sorcerer King", "The World Where I Belong",
     "The Road of Karma", "Boss in School", "The Girl from Random Chatting", "Her Summon",
     "Warble", "Springtime for Blossom", "Annoying Alice", "Mr.Kang", "The V Squad",
-    "Legend: The Beginning", "School Shock", "Sweetheart : The Boss Is Too Kind!",
-    "My Dear Vampire Lord", "The Superb Captain in the City", "Battle Frenzy",
+    "Legend: The Beginning", "School Shock", "Battle Frenzy",
     "The Strongest War God", "Vicious Luck", "The Beginning After The End",
     "Mercenary Enrollment", "Tomb Raider King", "Return Survival", "Max Level Returner",
     "Memorize", "Gang of School", "Jungle Juice", "Reverse Villain", "Reincarnation Cycle",
@@ -86,3 +85,159 @@ chinese_manhuas = {
     "Another Emperor Reborn", "Swallowed Star", "Journey to Heaven", "Invicible at the start",
     "I am Cultivation Bigshot", "Am I Invicible", "I Built a Lifespan Club", "The OutCast"
 }
+
+"""Assign Manhwa/Manhua content types to titles listed above.
+
+The script reads ``input.csv`` and writes ``KSIAZKI_POPRAWIONE.csv`` by default. It
+only reclassifies rows currently marked as ``Manga``, so a novel and comic sharing a
+title remain separate. A match is accepted only when its Levenshtein distance is
+small enough for the title length. This handles harmless differences in case,
+punctuation and typos without reclassifying unrelated titles.
+"""
+
+import argparse
+import csv
+import re
+import unicodedata
+from pathlib import Path
+
+
+CATEGORY_CONTENT_TYPES = {
+    "korean_manhwa": "Manhwa",
+    "chinese_manhua": "Manhua",
+}
+
+
+def make_details_link(title, content_type):
+    clean_title = re.sub(r'\(.*?\)', '', title)
+    clean_title = re.sub(r'\[.*?\]', '', clean_title)
+    clean_title = re.sub(r'[^a-zA-Z0-9\s-]', ' ', clean_title)
+    slug = re.sub(r'\s+', '-', clean_title.strip().lower())
+
+    if content_type == 'Novel':
+        return f"https://www.novelupdates.com/series/{slug}/"
+    else:
+        return f"https://www.anime-planet.com/manga/{slug}"
+
+def normalize_title(title: str) -> str:
+    """Normalize formatting differences while retaining the title's words."""
+    decomposed = unicodedata.normalize("NFKD", title.casefold())
+    without_diacritics = "".join(char for char in decomposed if not unicodedata.combining(char))
+    return re.sub(r"[^\w]+", "", without_diacritics, flags=re.UNICODE)
+
+
+def levenshtein_distance(left: str, right: str) -> int:
+    """Return the edit distance using only the Python standard library."""
+    if len(left) < len(right):
+        left, right = right, left
+    if not right:
+        return len(left)
+
+    previous = list(range(len(right) + 1))
+    for left_index, left_char in enumerate(left, start=1):
+        current = [left_index]
+        for right_index, right_char in enumerate(right, start=1):
+            current.append(min(
+                current[-1] + 1,
+                previous[right_index] + 1,
+                previous[right_index - 1] + (left_char != right_char),
+            ))
+        previous = current
+    return previous[-1]
+
+
+def maximum_distance(title: str) -> int:
+    """Allow small typos, but keep short titles especially strict."""
+    length = len(title)
+    if length <= 6:
+        return 1
+    return max(1, round(length * 0.18))
+
+
+def find_category(title: str, candidates: list[tuple[str, str, str]]) -> tuple[str | None, int | None, bool]:
+    """Return category, edit distance and whether the best match is ambiguous."""
+    normalized = normalize_title(title)
+    if not normalized:
+        return None, None, False
+
+    matches = []
+    for category, source_title, normalized_source in candidates:
+        distance = levenshtein_distance(normalized, normalized_source)
+        if distance <= maximum_distance(max(normalized, normalized_source, key=len)):
+            matches.append((distance, category, source_title))
+
+    if not matches:
+        return None, None, False
+
+    matches.sort(key=lambda match: (match[0], match[1], match[2]))
+    best_distance = matches[0][0]
+    best_categories = {category for distance, category, _ in matches if distance == best_distance}
+    if len(best_categories) > 1:
+        return None, best_distance, True
+
+    return matches[0][1], best_distance, False
+
+
+def update_content_types(input_path: Path, output_path: Path) -> None:
+    candidates = [
+        (category, title, normalize_title(title))
+        for category, titles in {
+            "korean_manhwa": korean_manhwas,
+            "chinese_manhua": chinese_manhuas,
+        }.items()
+        for title in titles
+    ]
+
+    with input_path.open("r", encoding="utf-8-sig", newline="") as source:
+        reader = csv.DictReader(source, delimiter=";")
+        if reader.fieldnames is None or "primaryTitle" not in reader.fieldnames or "contentType" not in reader.fieldnames:
+            raise ValueError("CSV must contain primaryTitle and contentType columns.")
+        rows = list(reader)
+        fieldnames = reader.fieldnames
+
+    changed = []
+    ambiguous = []
+    for row in rows:
+        if row["contentType"] != "Manga":
+            continue
+
+        title = row["primaryTitle"].strip()
+        category, distance, is_ambiguous = find_category(title, candidates)
+        if is_ambiguous:
+            ambiguous.append((title, distance))
+            continue
+        if category is None:
+            continue
+
+        content_type = CATEGORY_CONTENT_TYPES[category]
+        if row["contentType"] != content_type:
+            changed.append((title, row["contentType"], content_type, distance))
+            row["contentType"] = content_type
+
+    with output_path.open("w", encoding="utf-8", newline="") as destination:
+        writer = csv.DictWriter(destination, fieldnames=fieldnames, delimiter=";", extrasaction="raise")
+        writer.writeheader()
+        writer.writerows(rows)
+
+    print(f"Updated {len(changed)} rows in {output_path}.")
+    fuzzy_matches = [change for change in changed if change[3] > 0]
+    if fuzzy_matches:
+        print(f"Accepted {len(fuzzy_matches)} fuzzy matches:")
+        for title, previous, content_type, distance in fuzzy_matches:
+            print(f"  {title}: {previous} -> {content_type} (distance {distance})")
+    if ambiguous:
+        print(f"Skipped {len(ambiguous)} ambiguous titles:")
+        for title, distance in ambiguous:
+            print(f"  {title} (distance {distance})")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Classify Korean and Chinese comics in a Novelki CSV export.")
+    parser.add_argument("input", nargs="?", type=Path, default=Path("input.csv"))
+    parser.add_argument("output", nargs="?", type=Path, default=Path("KSIAZKI_POPRAWIONE.csv"))
+    arguments = parser.parse_args()
+    update_content_types(arguments.input, arguments.output)
+
+
+if __name__ == "__main__":
+    main()

@@ -38,9 +38,13 @@ public class BookProgressTests
     }
 
     [Fact]
-    public async Task UpdateProgress_ShouldAddHistoryWhenOnlyCommentChanges()
+    public async Task UpdateProgress_ShouldUpdateLatestHistoryWhenOnlyCommentChanges()
     {
         var book = CreateBook();
+        book.ProgressHistory.Add(new BookProgressHistory
+        {
+            BookId = book.Id, ChapterNumber = 10, ChapterLabel = "10", Comment = "initial note"
+        });
         var repository = new FakeBookRepository(book);
         var handler = new UpdateBookProgressHandler(repository, new FakeBookListCacheInvalidator(), new FakeUser());
 
@@ -137,7 +141,7 @@ public class BookProgressTests
             var hasComment = !string.IsNullOrWhiteSpace(comment);
             _book.CurrentChapterNumber = currentChapterNumber;
             _book.CurrentChapterLabel = currentChapterLabel;
-            if (progressChanged || hasComment)
+            if (progressChanged)
             {
                 _book.ProgressHistory.Add(new BookProgressHistory
                 {
@@ -146,6 +150,29 @@ public class BookProgressTests
                     ChapterLabel = currentChapterLabel,
                     Comment = comment
                 });
+            }
+            else if (hasComment)
+            {
+                var latestHistory = _book.ProgressHistory
+                    .OrderByDescending(history => history.ChangedAt)
+                    .ThenByDescending(history => history.Id)
+                    .FirstOrDefault();
+
+                if (latestHistory is not null && latestHistory.ChapterNumber == currentChapterNumber &&
+                    latestHistory.ChapterLabel == currentChapterLabel)
+                {
+                    latestHistory.Comment = comment;
+                }
+                else
+                {
+                    _book.ProgressHistory.Add(new BookProgressHistory
+                    {
+                        BookId = _book.Id,
+                        ChapterNumber = currentChapterNumber,
+                        ChapterLabel = currentChapterLabel,
+                        Comment = comment
+                    });
+                }
             }
 
             Saved = true;

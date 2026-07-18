@@ -40,6 +40,8 @@ public class BookCoverProcessorTests
     public async Task ProcessAsync_ShouldMarkNotFoundWhenProvidersReturnNoCandidate()
     {
         var cover = Cover(BookCoverStatus.Pending);
+        var originalLastModified = DateTimeOffset.UtcNow.AddDays(-1);
+        cover.Book.LastModified = originalLastModified;
         var repository = new FakeBookCoverRepository { Cover = cover };
         var processor = CreateProcessor(repository);
 
@@ -48,6 +50,7 @@ public class BookCoverProcessorTests
         Assert.Equal(BookCoverStatus.NotFound, cover.Status);
         Assert.Contains("No cover found", cover.FailureReason);
         Assert.NotNull(cover.LastAttemptAt);
+        Assert.Equal(originalLastModified, cover.Book.LastModified);
         Assert.Equal(2, repository.SaveCount);
     }
 
@@ -103,6 +106,8 @@ public class BookCoverProcessorTests
     public async Task ProcessAsync_ShouldMarkNotFoundWithoutCacheInvalidationForProviderResponseFailure()
     {
         var cover = Cover(BookCoverStatus.Pending);
+        var originalLastModified = DateTimeOffset.UtcNow.AddDays(-1);
+        cover.Book.LastModified = originalLastModified;
         var repository = new FakeBookCoverRepository { Cover = cover };
         var cache = new FakeBookListCacheInvalidator();
         var processor = CreateProcessor(
@@ -116,6 +121,7 @@ public class BookCoverProcessorTests
 
         Assert.Equal(BookCoverStatus.NotFound, cover.Status);
         Assert.Equal("No valid cover response was found from the configured providers.", cover.FailureReason);
+        Assert.Equal(originalLastModified, cover.Book.LastModified);
         Assert.Equal(0, cache.InvalidateCount);
     }
 

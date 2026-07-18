@@ -130,7 +130,6 @@ public sealed class BookCoverProcessor
                 cover.Status = BookCoverStatus.NotFound;
                 cover.FailureReason =
                     "No cover found in saved links, AniList, Jikan, Google Books, Open Library, or Wikidata.";
-                CoverLinkHelper.TouchBook(cover.Book);
                 await _coverRepository.SaveAsync(cancellationToken);
                 return;
             }
@@ -188,7 +187,10 @@ public sealed class BookCoverProcessor
                 cover.FailureReason = ex.Message.Length > 1000 ? ex.Message[..1000] : ex.Message;
             }
 
-            CoverLinkHelper.TouchBook(cover.Book);
+            if (shouldInvalidateCache)
+            {
+                CoverLinkHelper.TouchBook(cover.Book);
+            }
             await _coverRepository.SaveAsync(cancellationToken);
             if (shouldInvalidateCache)
             {
