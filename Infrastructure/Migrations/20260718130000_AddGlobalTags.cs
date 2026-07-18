@@ -1,13 +1,9 @@
-using Infrastructure.Contexts;
-using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace Infrastructure.Migrations;
 
-[DbContext(typeof(ApplicationDbContext))]
-[Migration("20260718130000_AddGlobalTags")]
 public partial class AddGlobalTags : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
