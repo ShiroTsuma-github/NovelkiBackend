@@ -7,6 +7,5 @@ public sealed class UpdateTagCommandValidator : AbstractValidator<UpdateTagComma
     public UpdateTagCommandValidator()
     {
         RuleFor(x => x.Id).NotEmpty();
-        RuleFor(x => x.Description).MaximumLength(500);
     }
 }

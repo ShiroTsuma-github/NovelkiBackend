@@ -9,8 +9,5 @@ public class CreateGenreCommandValidator : AbstractValidator<CreateGenreCommand>
         RuleFor(x => x.Name)
             .NotEmpty()
             .MaximumLength(50);
-
-        RuleFor(x => x.Description)
-            .MaximumLength(500);
     }
 }
