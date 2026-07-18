@@ -59,8 +59,8 @@ const dictionaries = {
 }
 
 const managedTags = [
-  { id: '40000000-0000-0000-0000-000000000001', name: 'favorite', description: 'Worth rereading', color: null },
-  { id: '40000000-0000-0000-0000-000000000002', name: 'mystery', description: null, color: null },
+  { id: '40000000-0000-0000-0000-000000000001', name: 'favorite', description: 'Worth rereading', color: null, isGlobal: false },
+  { id: '40000000-0000-0000-0000-000000000002', name: 'mystery', description: null, color: null, isGlobal: true },
 ]
 
 const managedAuthors = [

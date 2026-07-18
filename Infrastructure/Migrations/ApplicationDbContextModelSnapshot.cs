@@ -182,7 +182,7 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Notes")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("OwnerId")
+                    b.Property<Guid?>("OwnerId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("PrimaryTitle")
@@ -750,6 +750,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastModified")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<bool>("IsGlobal")
+                        .HasColumnType("boolean");
+
                     b.Property<Guid?>("LastModifiedBy")
                         .HasColumnType("uuid");
 
@@ -763,13 +766,17 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid>("OwnerId")
+                    b.Property<Guid?>("OwnerId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
                     b.HasIndex("OwnerId", "NormalizedName")
                         .IsUnique();
+
+                    b.HasIndex("NormalizedName")
+                        .IsUnique()
+                        .HasFilter("\"IsGlobal\" = TRUE");
 
                     b.ToTable("Tags");
                 });
@@ -1037,8 +1044,7 @@ namespace Infrastructure.Migrations
                     b.HasOne("Infrastructure.Identity.User", null)
                         .WithMany("Books")
                         .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Domain.Entities.Status", "Status")
                         .WithMany("Books")
@@ -1111,8 +1117,7 @@ namespace Infrastructure.Migrations
                     b.HasOne("Infrastructure.Identity.User", null)
                         .WithMany("OwnedTags")
                         .HasForeignKey("OwnerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

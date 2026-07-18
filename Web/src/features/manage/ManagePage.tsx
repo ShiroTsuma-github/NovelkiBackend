@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Search, Tags, Trash2, Users, X } from 'lucide-react'
+import { Plus, Search, Tags, Trash2, Users, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
@@ -9,7 +9,7 @@ import { Badge, buttonVariants, controlClass, DialogPanel, PageHeader, Surface, 
 import { cn } from '@/lib/utils'
 
 type ManageSection = 'tags' | 'authors'
-type ManagedItem = { kind: 'tag'; value: TagDto } | { kind: 'author'; value: AuthorDto }
+type ManagedItem = { kind: 'tag'; value: TagDto | null } | { kind: 'author'; value: AuthorDto | null }
 
 export function ManagePage() {
   const [section, setSection] = useState<ManageSection>('tags')
@@ -75,7 +75,17 @@ export function ManagePage() {
               <div className="ui-eyebrow">{section === 'tags' ? 'Personal taxonomy' : 'Shared identities'}</div>
               <h2 className="manage-title">{section === 'tags' ? 'Saved tags' : 'Known authors'}</h2>
             </div>
-            <Badge tone="neutral">{itemCount} shown</Badge>
+            <div className="flex items-center gap-2">
+              <Badge tone="neutral">{itemCount} shown</Badge>
+              <button
+                className={buttonVariants.primary}
+                type="button"
+                onClick={() => setSelected({ kind: section === 'tags' ? 'tag' : 'author', value: null } as ManagedItem)}
+              >
+                <Plus className="h-4 w-4" />
+                Add {section === 'tags' ? 'tag' : 'author'}
+              </button>
+            </div>
           </div>
 
           <label className="manage-search">
@@ -100,7 +110,7 @@ export function ManagePage() {
           ) : itemCount === 0 ? (
             <div className="manage-state">
               <span>No {section} found.</span>
-              <small>{search.trim() ? 'Try a broader search.' : 'Items appear here when they are added to a book.'}</small>
+              <small>{search.trim() ? 'Try a broader search.' : `Use Add ${section === 'tags' ? 'tag' : 'author'} to create one.`}</small>
             </div>
           ) : section === 'tags' ? (
             <TagList tags={results.data as TagDto[]} onEdit={(tag) => setSelected({ kind: 'tag', value: tag })} />
@@ -119,12 +129,13 @@ function TagList({ tags, onEdit }: { tags: TagDto[]; onEdit: (tag: TagDto) => vo
   return (
     <div className="manage-list" aria-label="Tags">
       {tags.map((tag) => (
-        <ManageRow key={tag.id} label={`Edit tag ${tag.name}`} onEdit={() => onEdit(tag)}>
+        <ManageRow editable={!tag.isGlobal} key={tag.id} label={`Edit tag ${tag.name}`} onEdit={() => onEdit(tag)}>
           <span className="manage-item__icon"><Tags className="h-4 w-4" /></span>
           <span className="manage-item__body">
             <strong>{tag.name}</strong>
             <small>{tag.description || 'No description yet'}</small>
           </span>
+          {tag.isGlobal ? <Badge tone="accent">Global</Badge> : null}
         </ManageRow>
       ))}
     </div>
@@ -148,17 +159,17 @@ function AuthorList({ authors, onEdit }: { authors: AuthorDto[]; onEdit: (author
   )
 }
 
-function ManageRow({ children, label, onEdit }: { children: React.ReactNode; label: string; onEdit: () => void }) {
+function ManageRow({ children, editable = true, label, onEdit }: { children: React.ReactNode; editable?: boolean; label: string; onEdit: () => void }) {
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    if (event.key === 'Enter') {
+    if (editable && event.key === 'Enter') {
       onEdit()
     }
   }
 
   return (
-    <div className="manage-item" role="group" tabIndex={0} onDoubleClick={onEdit} onKeyDown={handleKeyDown}>
+    <div className="manage-item" role="group" tabIndex={editable ? 0 : -1} onDoubleClick={editable ? onEdit : undefined} onKeyDown={handleKeyDown}>
       {children}
-      <button aria-label={label} className={buttonVariants.ghost} type="button" onClick={onEdit}>Edit</button>
+      {editable ? <button aria-label={label} className={buttonVariants.ghost} type="button" onClick={onEdit}>Edit</button> : <span className="text-xs text-[var(--qs-subtle)]">Managed by admin</span>}
     </div>
   )
 }
@@ -166,7 +177,9 @@ function ManageRow({ children, label, onEdit }: { children: React.ReactNode; lab
 function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: () => void }) {
   const queryClient = useQueryClient()
   const titleId = useId()
+  const nameFieldRef = useRef<HTMLInputElement>(null)
   const firstFieldRef = useRef<HTMLTextAreaElement>(null)
+  const [nameValue, setNameValue] = useState('')
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -177,9 +190,10 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
       return
     }
 
-    setValue(item.kind === 'tag' ? item.value.description ?? '' : item.value.otherNames.join('\n'))
+    setNameValue(item.value ? (item.kind === 'tag' ? item.value.name : item.value.primaryName) : '')
+    setValue(item.value ? (item.kind === 'tag' ? item.value.description ?? '' : item.value.otherNames.join('\n')) : '')
     setConfirmDelete(false)
-    window.setTimeout(() => firstFieldRef.current?.focus(), 0)
+    window.setTimeout(() => (item.value ? firstFieldRef.current : nameFieldRef.current)?.focus(), 0)
   }, [item])
 
   useEffect(() => {
@@ -201,20 +215,28 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
     return null
   }
 
-  const name = item.kind === 'tag' ? item.value.name : item.value.primaryName
+  const isCreate = item.value === null
+  const name = item.value ? (item.kind === 'tag' ? item.value.name : item.value.primaryName) : nameValue
   const section = item.kind === 'tag' ? 'tags' : 'authors'
 
   async function handleSave(event: FormEvent) {
     event.preventDefault()
     setSaving(true)
     try {
-      if (item?.kind === 'tag') {
+      if (item?.kind === 'tag' && item.value) {
         await api.updateTag(item.value.id, { description: value.trim() || null })
         toast.success(`Tag “${item.value.name}” updated.`)
-      } else if (item?.kind === 'author') {
+      } else if (item?.kind === 'tag') {
+        await api.createTag({ name: nameValue.trim(), description: value.trim() || null })
+        toast.success(`Tag “${nameValue.trim()}” created.`)
+      } else if (item?.kind === 'author' && item.value) {
         const otherNames = value.split('\n').map((alias) => alias.trim()).filter(Boolean)
         await api.updateAuthor(item.value.id, { otherNames })
         toast.success(`Author “${item.value.primaryName}” updated.`)
+      } else if (item?.kind === 'author') {
+        const otherNames = value.split('\n').map((alias) => alias.trim()).filter(Boolean)
+        await api.createAuthor({ primaryName: nameValue.trim(), otherNames })
+        toast.success(`Author “${nameValue.trim()}” created.`)
       }
       await queryClient.invalidateQueries({ queryKey: ['manage-metadata', section] })
       onClose()
@@ -233,9 +255,9 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
 
     setSaving(true)
     try {
-      if (item?.kind === 'tag') {
+      if (item?.kind === 'tag' && item.value) {
         await api.deleteTag(item.value.id)
-      } else if (item?.kind === 'author') {
+      } else if (item?.kind === 'author' && item.value) {
         await api.deleteAuthor(item.value.id)
       }
       toast.success(`${item?.kind === 'tag' ? 'Tag' : 'Author'} “${name}” deleted.`)
@@ -254,8 +276,8 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
       <DialogPanel className="manage-dialog__panel" onMouseDown={(event) => event.stopPropagation()}>
         <div className="manage-dialog__header">
           <div>
-            <div className="ui-eyebrow">Edit {item.kind}</div>
-            <h2 id={titleId}>{name}</h2>
+            <div className="ui-eyebrow">{isCreate ? 'Create' : 'Edit'} {item.kind}</div>
+            <h2 id={titleId}>{isCreate ? `New ${item.kind}` : name}</h2>
           </div>
           <button aria-label="Close dialog" className={`${buttonVariants.ghost} ui-icon-button`} disabled={saving} type="button" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -263,6 +285,20 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
         </div>
 
         <form className="manage-dialog__form" onSubmit={handleSave}>
+          {isCreate ? (
+            <label>
+              <span>{item.kind === 'tag' ? 'Tag name' : 'Primary name'}</span>
+              <input
+                ref={nameFieldRef}
+                aria-label={item.kind === 'tag' ? 'Tag name' : 'Primary name'}
+                className={controlClass}
+                maxLength={item.kind === 'tag' ? 100 : 300}
+                required
+                value={nameValue}
+                onChange={(event) => setNameValue(event.target.value)}
+              />
+            </label>
+          ) : null}
           {item.kind === 'tag' ? (
             <label>
               <span>Description</span>
@@ -295,7 +331,7 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
           )}
 
           <div className="manage-dialog__actions">
-            <button
+            {!isCreate ? <button
               className={cn(buttonVariants.destructive, confirmDelete && 'manage-delete--confirm')}
               disabled={saving}
               type="button"
@@ -303,10 +339,10 @@ function ManageDialog({ item, onClose }: { item: ManagedItem | null; onClose: ()
             >
               <Trash2 className="h-4 w-4" />
               {confirmDelete ? 'Confirm delete' : `Delete ${item.kind}`}
-            </button>
+            </button> : null}
             <span className="manage-dialog__action-spacer" />
             <button className={buttonVariants.secondary} disabled={saving} type="button" onClick={onClose}>Cancel</button>
-            <button className={buttonVariants.primary} disabled={saving} type="submit">{saving ? 'Saving…' : 'Save changes'}</button>
+            <button className={buttonVariants.primary} disabled={saving || (isCreate && !nameValue.trim())} type="submit">{saving ? 'Saving…' : isCreate ? `Create ${item.kind}` : 'Save changes'}</button>
           </div>
           {confirmDelete ? <p className="manage-delete-note">This cannot be undone. Items still used by books cannot be deleted.</p> : null}
         </form>

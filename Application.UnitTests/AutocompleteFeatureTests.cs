@@ -28,20 +28,23 @@ public class AutocompleteFeatureTests
     }
 
     [Fact]
-    public async Task SearchTags_ShouldReturnOnlyCurrentUsersTags()
+    public async Task SearchTags_ShouldReturnCurrentUsersAndGlobalTags()
     {
         var repository = new FakeTagRepository();
         await repository.AddAsync(new Tag { OwnerId = OwnerId, Name = "favorite", NormalizedName = "FAVORITE" },
             CancellationToken.None);
         await repository.AddAsync(new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" },
             CancellationToken.None);
+        await repository.AddAsync(new Tag { IsGlobal = true, Name = "official favorite", NormalizedName = "OFFICIAL FAVORITE" },
+            CancellationToken.None);
         var handler = new SearchTagsQueryHandler(repository, new FakeUser());
 
         var result =
             await handler.Handle(new SearchTagsQuery("fav", 10), CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal("favorite", result.First().Name);
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, tag => tag.Name == "favorite" && !tag.IsGlobal);
+        Assert.Contains(result, tag => tag.Name == "official favorite" && tag.IsGlobal);
     }
 
     private sealed class FakeUser : IUser
@@ -133,13 +136,13 @@ public class AutocompleteFeatureTests
         {
             var normalizedNames = names.Select(MappingExtensions.NormalizeName).ToList();
             return Task.FromResult<IEnumerable<Tag>>(_tags
-                .Where(t => t.OwnerId == ownerId && normalizedNames.Contains(t.NormalizedName)).ToList());
+                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && normalizedNames.Contains(t.NormalizedName)).ToList());
         }
 
         public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
             return Task.FromResult(_tags.FirstOrDefault(t =>
-                t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
+                (t.IsGlobal || t.OwnerId == ownerId) && t.NormalizedName == MappingExtensions.NormalizeName(name)));
         }
 
         public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
@@ -147,7 +150,7 @@ public class AutocompleteFeatureTests
         {
             var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Tag>>(_tags
-                .Where(t => t.OwnerId == ownerId && t.NormalizedName.Contains(normalizedSearch))
+                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && t.NormalizedName.Contains(normalizedSearch))
                 .Take(take)
                 .ToList());
         }

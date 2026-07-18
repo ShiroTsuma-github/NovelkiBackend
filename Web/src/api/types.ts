@@ -457,6 +457,17 @@ export type TagDto = {
   name: string
   description?: string | null
   color?: string | null
+  isGlobal: boolean
+}
+
+export type CreateTagRequest = {
+  name: string
+  description?: string | null
+}
+
+export type CreateAuthorRequest = {
+  primaryName: string
+  otherNames: string[]
 }
 
 export type UpdateTagRequest = {

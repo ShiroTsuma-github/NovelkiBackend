@@ -22,6 +22,14 @@ public class TagController : ControllerBase
         return Ok(tags);
     }
 
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> Create(CreateTagCommand command)
+    {
+        var tag = await _mediator.Send(command);
+        return Created($"/{ApiRoutes.Tag}/{tag.Id}", tag);
+    }
+
     [HttpPut(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> Update(Guid id, UpdateTagCommand command)

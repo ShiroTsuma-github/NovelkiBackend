@@ -34,7 +34,11 @@ public static partial class MappingExtensions
     {
         return new TagDto
         {
-            Id = source.Id, Name = source.Name, Description = source.Description, Color = source.Color
+            Id = source.Id,
+            Name = source.Name,
+            Description = source.Description,
+            Color = source.Color,
+            IsGlobal = source.IsGlobal
         };
     }
 
