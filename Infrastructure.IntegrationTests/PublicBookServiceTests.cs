@@ -63,6 +63,7 @@ public sealed class PublicBookServiceTests
         Assert.Contains("Squid", snapshot.AuthorOtherNames);
         Assert.Contains(snapshot.Tags, item => item.Name == "Mystery" && item.Description == tag.Description);
         Assert.Contains(snapshot.Genres, item => item.Name == "Fantasy" && item.Description == genre.Description);
+        Assert.Single((await ownerService.SearchAsync("Squid", 0, 20, false, CancellationToken.None)).Data);
 
         var otherService = CreateService(context, new TestUser(otherOwnerId), storage, cache);
         var copyResult = await otherService.CopyAsync(snapshot.Id, CancellationToken.None);
