@@ -1,8 +1,9 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { Route, Routes } from 'react-router-dom'
 import { api } from '@/api/client'
-import { dictionaries, genres, paginated, statuses } from '@/test/fixtures'
+import { books, dictionaries, genres, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { BookFormPage } from './BookFormPage'
 
@@ -200,5 +201,28 @@ describe('BookFormPage', () => {
       authorId: 'author-1',
       authorName: 'Er Gen',
     })
+  })
+
+  it('hides a technical cover download error on the edit page', async () => {
+    vi.mocked(api.getBook).mockResolvedValue({
+      ...books[0],
+      cover: {
+        id: 'cover-1',
+        status: 'Failed',
+        failureReason: 'Response status code does not indicate success: 301 (Moved Permanently).',
+      },
+    })
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookFormPage mode="edit" />} path="/books/:id/edit" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/edit' },
+    )
+
+    expect(await screen.findByText(
+      'A cover was found, but the image could not be downloaded. Try searching again or upload a cover manually.',
+    )).toBeInTheDocument()
+    expect(screen.queryByText(/301 \(Moved Permanently\)/)).not.toBeInTheDocument()
   })
 })

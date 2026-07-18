@@ -12,6 +12,7 @@ import { buttonVariants, DialogPanel, PageHeader, Surface, useBodyScrollLock } f
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
+import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
 
 type BookFormPageProps = {
   mode: 'create' | 'edit'
@@ -341,6 +342,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const effectiveCurrentCover = mode === 'edit' && (existingCoverChange.kind === 'remove' || draftCover)
     ? null
     : currentCover
+  const displayCoverFailure = getDisplayCoverFailure(effectiveCurrentCover?.failureReason)
   const coverInfo: CoverInfoItem[] = mode === 'create'
     ? [
       draftCover ? { text: 'Status: Ready to save' } : { text: 'Status: Missing' },
@@ -355,9 +357,9 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       ].filter(isCoverInfoItem)
     : effectiveCurrentCover
       ? [
-        { text: `Status: ${effectiveCurrentCover.status}` },
+        { text: `Status: ${getDisplayCoverStatus(effectiveCurrentCover.status, effectiveCurrentCover.failureReason)}` },
         effectiveCurrentCover.source ? { text: `Source: ${effectiveCurrentCover.source}` } : null,
-        effectiveCurrentCover.failureReason ? { text: effectiveCurrentCover.failureReason } : null,
+        displayCoverFailure ? { text: displayCoverFailure } : null,
       ].filter(isCoverInfoItem)
       : existingCoverChange.kind === 'remove'
         ? [{ text: 'Status: Will be removed on save' }]
@@ -501,7 +503,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
               <div className="book-form-cover-meta">
                 {coverInfo.map((item) => (
                   <p
-                    className={`${item.text === effectiveCurrentCover?.failureReason ? 'text-[var(--qs-danger)]' : ''} ${item.truncate ? 'truncate' : ''}`}
+                    className={`${item.text === displayCoverFailure ? 'text-[var(--qs-danger)]' : ''} ${item.truncate ? 'truncate' : ''}`}
                     key={item.text}
                     title={item.truncate ? item.text : undefined}
                   >
