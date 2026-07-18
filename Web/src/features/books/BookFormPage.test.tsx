@@ -188,7 +188,8 @@ describe('BookFormPage', () => {
     await screen.findByText('Add book')
     await user.type(screen.getByLabelText('Primary title'), 'Renegade Immortal')
     await user.type(screen.getByLabelText('Author'), 'Ergen')
-    await user.click(await screen.findByRole('button', { name: /Er Gen \(Ergen\).*Public/i }))
+    expect(await screen.findByRole('button', { name: /Er Gen \(Ergen\).*Public/i })).toBeInTheDocument()
+    await user.click(screen.getByLabelText('Current chapter'))
 
     expect(screen.getByLabelText('Author')).toHaveValue('Er Gen (Ergen)')
     await user.type(screen.getByLabelText('Current chapter'), '1')
