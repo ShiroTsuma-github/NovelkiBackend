@@ -30,8 +30,17 @@ public class MappingExtensionTests
     {
         var coverVersion = DateTimeOffset.Parse("2026-07-06T10:00:00Z");
         var author = new Author { PrimaryName = "Toika", NormalizedPrimaryName = "TOIKA" };
-        var genre = new Genre { Name = "Fantasy", NormalizedName = "FANTASY" };
-        var tag = new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" };
+        var genre = new Genre
+        {
+            Name = "Fantasy", NormalizedName = "FANTASY", Description = "Magic and supernatural stories."
+        };
+        var tag = new Tag
+        {
+            OwnerId = Guid.NewGuid(),
+            Name = "favorite",
+            NormalizedName = "FAVORITE",
+            Description = "A personal favorite."
+        };
         var book = new Book
         {
             Created = DateTimeOffset.Parse("2026-07-01T10:00:00Z"),
@@ -88,7 +97,9 @@ public class MappingExtensionTests
         Assert.Equal("Novel", dto.ContentType);
         Assert.Equal("Reading", dto.Status);
         Assert.Contains("Fantasy", dto.Genres);
+        Assert.Equal("Magic and supernatural stories.", dto.GenreDescriptions["Fantasy"]);
         Assert.Contains("favorite", dto.Tags);
+        Assert.Equal("A personal favorite.", dto.TagDescriptions["favorite"]);
         Assert.Single(dto.Links);
         var progressEntry = Assert.Single(dto.ProgressHistory);
         Assert.Equal("Progress note", progressEntry.Comment);
