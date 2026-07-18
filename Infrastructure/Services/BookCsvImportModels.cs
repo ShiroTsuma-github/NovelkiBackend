@@ -17,9 +17,11 @@ internal sealed class ImportRow
     public Guid RowId { get; init; }
     public int LineNumber { get; init; }
     public string? PrimaryTitle { get; set; }
+    public string? AlternativeTitles { get; set; }
     public string? AuthorName { get; set; }
     public string? ContentType { get; set; }
     public string? Status { get; set; }
+    public string? Genres { get; set; }
     public string? Tags { get; set; }
     public string? TotalChapters { get; set; }
     public string? CurrentChapterNumber { get; set; }
@@ -29,6 +31,14 @@ internal sealed class ImportRow
     public string? Description { get; set; }
     public string? Notes { get; set; }
     public string? RawImportedLine { get; set; }
+    public string? Links { get; set; }
+    public string? ProgressHistory { get; set; }
     public List<string> Errors { get; set; } = [];
     public Dictionary<string, List<string>> FieldErrors { get; } = [];
 }
+
+internal sealed record BookProgressHistoryCsvItem(
+    DateTimeOffset ChangedAt,
+    decimal? ChapterNumber,
+    string? ChapterLabel,
+    string? Comment);

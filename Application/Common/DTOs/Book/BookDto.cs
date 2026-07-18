@@ -18,6 +18,7 @@ public record BookDto
     public int? Rating { get; set; }
     public int? Priority { get; set; }
     public string? Notes { get; set; }
+    public string? RawImportedLine { get; set; }
 
     public IReadOnlyCollection<BookProgressHistoryDto> ProgressHistory { get; set; } =
         Array.Empty<BookProgressHistoryDto>();

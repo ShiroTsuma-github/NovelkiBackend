@@ -19,9 +19,11 @@ public sealed class BookCsvImportService : IBookCsvImportService
     private static readonly string[] TemplateColumns =
     [
         BookCsvColumns.PrimaryTitle,
+        BookCsvColumns.AlternativeTitles,
         BookCsvColumns.AuthorName,
         BookCsvColumns.ContentType,
         BookCsvColumns.Status,
+        BookCsvColumns.Genres,
         BookCsvColumns.Tags,
         BookCsvColumns.TotalChapters,
         BookCsvColumns.CurrentChapterNumber,
@@ -30,7 +32,9 @@ public sealed class BookCsvImportService : IBookCsvImportService
         BookCsvColumns.Priority,
         BookCsvColumns.Description,
         BookCsvColumns.Notes,
-        BookCsvColumns.RawImportedLine
+        BookCsvColumns.RawImportedLine,
+        BookCsvColumns.Links,
+        BookCsvColumns.ProgressHistory
     ];
 
     private static readonly ConcurrentDictionary<Guid, ImportSession> Sessions = new();
@@ -193,6 +197,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
             .ToDictionaryAsync(s => MappingExtensions.NormalizeName(s.Name), s => s, cancellationToken);
         var authorMap = await _context.Authors.Include(a => a.Names)
             .ToDictionaryAsync(a => a.NormalizedPrimaryName, cancellationToken);
+        var genreMap = await _context.Genres
+            .ToDictionaryAsync(genre => genre.NormalizedName, cancellationToken);
         var tagMap = await _context.Tags.Where(t => t.OwnerId == ownerId)
             .ToDictionaryAsync(t => t.NormalizedName, cancellationToken);
         var existingKeys = await _context.Books.AsNoTracking()
@@ -245,6 +251,36 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
             book.Titles.Add(book.PrimaryTitle.ToPrimaryTitle());
 
+            foreach (var title in BookCsvImportRowMapper.DeserializeCollection<BookTitleInput>(row.AlternativeTitles))
+            {
+                var value = MappingExtensions.CollapseWhitespace(title.Title);
+                if (value.Length == 0 || string.Equals(value, book.PrimaryTitle, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                book.Titles.Add(new BookTitle
+                {
+                    Title = value,
+                    NormalizedTitle = MappingExtensions.NormalizeName(value),
+                    Language = title.Language,
+                    Source = title.Source,
+                    IsPrimary = false
+                });
+            }
+
+            foreach (var link in BookCsvImportRowMapper.DeserializeCollection<BookLinkInput>(row.Links))
+            {
+                book.Links.Add(new BookLink
+                {
+                    Url = link.Url,
+                    Label = link.Label,
+                    SourceType = link.SourceType,
+                    IsPrimary = link.IsPrimary,
+                    LastReadHere = link.LastReadHere
+                });
+            }
+
             foreach (var tagName in BookCsvImportRowMapper.SplitTags(row.Tags))
             {
                 var normalizedTag = MappingExtensions.NormalizeName(tagName);
@@ -258,7 +294,29 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 book.BookTags.Add(new BookTag { Book = book, Tag = tag });
             }
 
-            if (book.CurrentChapterNumber.HasValue || !string.IsNullOrWhiteSpace(book.CurrentChapterLabel))
+            foreach (var genreName in BookCsvImportRowMapper.SplitTags(row.Genres))
+            {
+                book.BookGenres.Add(new BookGenre
+                {
+                    Book = book, Genre = genreMap[MappingExtensions.NormalizeName(genreName)]
+                });
+            }
+
+            if (row.ProgressHistory != null)
+            {
+                foreach (var history in
+                         BookCsvImportRowMapper.DeserializeCollection<BookProgressHistoryCsvItem>(row.ProgressHistory))
+                {
+                    book.ProgressHistory.Add(new BookProgressHistory
+                    {
+                        ChangedAt = history.ChangedAt,
+                        ChapterNumber = history.ChapterNumber,
+                        ChapterLabel = history.ChapterLabel,
+                        Comment = history.Comment
+                    });
+                }
+            }
+            else if (book.CurrentChapterNumber.HasValue || !string.IsNullOrWhiteSpace(book.CurrentChapterLabel))
             {
                 book.ProgressHistory.Add(new BookProgressHistory
                 {
@@ -320,6 +378,9 @@ public sealed class BookCsvImportService : IBookCsvImportService
             .OrderBy(s => s.Id.ToString())
             .Select(s => s.Name)
             .ToListAsync(cancellationToken);
+        var genreNames = await _context.Genres.AsNoTracking()
+            .Select(genre => genre.NormalizedName)
+            .ToHashSetAsync(cancellationToken);
         session.AvailableContentTypes = types
             .Select(type => type.Name)
             .ToArray();
@@ -372,6 +433,19 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 BookCsvColumns.CurrentChapterNumber, nameof(row.CurrentChapterNumber));
             _ = BookCsvImportRowMapper.ParseInt(row, row.Rating, BookCsvColumns.Rating, nameof(row.Rating), 1, 10);
             _ = BookCsvImportRowMapper.ParseInt(row, row.Priority, BookCsvColumns.Priority, nameof(row.Priority), 1, 5);
+
+            foreach (var genreName in BookCsvImportRowMapper.SplitTags(row.Genres))
+            {
+                if (!genreNames.Contains(MappingExtensions.NormalizeName(genreName)))
+                {
+                    BookCsvImportRowMapper.AddFieldError(row, BookCsvColumns.Genres,
+                        $"Genre '{genreName}' does not exist.");
+                }
+            }
+
+            ValidateJsonArray(row, row.AlternativeTitles, BookCsvColumns.AlternativeTitles, "Alternative titles");
+            ValidateJsonArray(row, row.Links, BookCsvColumns.Links, "Links");
+            ValidateJsonArray(row, row.ProgressHistory, BookCsvColumns.ProgressHistory, "Progress history");
 
             if (currentChapterNumber.HasValue && currentChapterNumber < 0)
             {
@@ -457,6 +531,14 @@ public sealed class BookCsvImportService : IBookCsvImportService
     private static int NormalizeLineNumber(int? lineNumber)
     {
         return lineNumber.HasValue && lineNumber.Value > 0 ? lineNumber.Value : 1;
+    }
+
+    private static void ValidateJsonArray(ImportRow row, string? value, string fieldKey, string fieldName)
+    {
+        if (!BookCsvImportRowMapper.IsJsonArray(value))
+        {
+            BookCsvImportRowMapper.AddFieldError(row, fieldKey, $"{fieldName} must be a JSON array.");
+        }
     }
 
     private static string DetectDelimiter(string csv)

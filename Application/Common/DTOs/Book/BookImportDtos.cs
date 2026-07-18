@@ -22,6 +22,7 @@ public record BookImportRowDto
     public string? AuthorName { get; set; }
     public string? ContentType { get; set; }
     public string? Status { get; set; }
+    public string? Genres { get; set; }
     public string? Tags { get; set; }
     public string? TotalChapters { get; set; }
     public string? CurrentChapterNumber { get; set; }
@@ -42,6 +43,7 @@ public record UpdateBookImportRowRequest(
     string? AuthorName,
     string? ContentType,
     string? Status,
+    string? Genres,
     string? Tags,
     string? TotalChapters,
     string? CurrentChapterNumber,

@@ -1,7 +1,6 @@
 namespace Application.Common;
 
-using Application.Common.DTOs.Book;
-using Features.BookFeatures.Commands;
+using DTOs.Book;
 
 public static partial class MappingExtensions
 {
@@ -81,6 +80,7 @@ public static partial class MappingExtensions
         destination.Rating = source.Rating;
         destination.Priority = source.Priority;
         destination.Notes = source.Notes;
+        destination.RawImportedLine = source.RawImportedLine;
         destination.ProgressHistory = source.ProgressHistory
             .OrderByDescending(h => h.ChangedAt)
             .Select(h => new BookProgressHistoryDto

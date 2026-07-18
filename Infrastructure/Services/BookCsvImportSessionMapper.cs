@@ -27,6 +27,7 @@ internal static class BookCsvImportSessionMapper
                     AuthorName = row.AuthorName,
                     ContentType = row.ContentType,
                     Status = row.Status,
+                    Genres = row.Genres,
                     Tags = row.Tags,
                     TotalChapters = row.TotalChapters,
                     CurrentChapterNumber = row.CurrentChapterNumber,

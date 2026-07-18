@@ -1,19 +1,17 @@
-using Application.Common.Interfaces;
-using Application.Common.DTOs.Book;
-using Application.Common;
-using Domain.Associations;
-using Domain.Entities;
-using FluentValidation;
-using Infrastructure.IntegrationTests.TestSupport;
-using Infrastructure.Persistence;
-using Infrastructure.Services;
-using Microsoft.EntityFrameworkCore;
-using System.Text;
-
 namespace Infrastructure.IntegrationTests;
 
+using System.Text;
+using Application.Common;
+using Application.Common.DTOs.Book;
+using Application.Common.Interfaces;
 using Contexts;
+using Domain.Entities;
 using Domain.Models;
+using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Persistence;
+using Services;
+using TestSupport;
 
 public class BookCsvImportServiceTests
 {
@@ -172,6 +170,7 @@ public class BookCsvImportServiceTests
                 "Toika",
                 "Novel",
                 "Reading",
+                null,
                 "favorite; favorite; action",
                 "12",
                 "10",
@@ -198,10 +197,12 @@ public class BookCsvImportServiceTests
         var queue = new TrackingBookCoverQueue();
         var cacheInvalidator = new TrackingCacheInvalidator();
         var service = CreateService(context, database.UserId, queue, cacheInvalidator);
+        context.Genres.Add(new Genre { Name = "Fantasy", NormalizedName = MappingExtensions.NormalizeName("Fantasy") });
+        await context.SaveChangesAsync();
 
         using var stream = CreateCsv("""
-                                     primaryTitle,authorName,contentType,status,tags,totalChapters,currentChapterNumber,currentChapterLabel,rating,priority,description,notes,rawImportedLine
-                                      The Novel , Toika , Novel , Reading , favorite; action; favorite , 200 , 49 , Progress: 49 , 8 , 2 , Desc , line1|line2 , source line
+                                     primaryTitle,authorName,contentType,status,genres,tags,totalChapters,currentChapterNumber,currentChapterLabel,rating,priority,description,notes,rawImportedLine
+                                      The Novel , Toika , Novel , Reading , Fantasy , favorite; action; favorite , 200 , 49 , Progress: 49 , 8 , 2 , Desc , line1|line2 , source line
                                      """);
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
@@ -223,6 +224,7 @@ public class BookCsvImportServiceTests
 
         var savedBook = await context.Books
             .Include(b => b.Author)
+            .Include(b => b.BookGenres).ThenInclude(bg => bg.Genre)
             .Include(b => b.BookTags).ThenInclude(bt => bt.Tag)
             .Include(b => b.ProgressHistory)
             .Include(b => b.Cover)
@@ -232,6 +234,7 @@ public class BookCsvImportServiceTests
         Assert.NotNull(savedBook.Author);
         Assert.Equal("Toika", savedBook.Author!.PrimaryName);
         Assert.NotNull(savedBook.AuthorId);
+        Assert.Contains(savedBook.BookGenres, bg => bg.Genre.Name == "Fantasy");
         Assert.Equal(2, savedBook.BookTags.Count);
         Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "favorite");
         Assert.Contains(savedBook.BookTags, bt => bt.Tag.Name == "action");
@@ -259,6 +262,84 @@ public class BookCsvImportServiceTests
             Assert.Single(analytics.Quality.FieldCompleteness, item => item.Field == "author");
         Assert.Equal(1, authorCompleteness.BookCount);
         Assert.Equal(1d, authorCompleteness.ShareOfBooks, 6);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_ShouldRoundTripExportedBookMetadata()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        context.Genres.Add(new Genre { Name = "Fantasy", NormalizedName = MappingExtensions.NormalizeName("Fantasy") });
+        await context.SaveChangesAsync();
+        var service = CreateService(context, database.UserId);
+        var csv = new BookCsvExportService().Build([
+            new BookDto
+            {
+                PrimaryTitle = "Round Trip Book",
+                AlternativeTitles = ["Alternate title"],
+                Author = "Author Name",
+                ContentType = "Novel",
+                Status = "Reading",
+                CurrentChapterNumber = 12,
+                CurrentChapterLabel = "12.5",
+                TotalChapters = 100,
+                Rating = 8,
+                Priority = 2,
+                Description = "Description",
+                Notes = "Notes",
+                RawImportedLine = "Original source line",
+                Genres = ["Fantasy"],
+                Tags = ["favorite"],
+                Links =
+                [
+                    new BookLinkDto
+                    {
+                        Id = Guid.NewGuid(),
+                        Url = "https://example.com/book",
+                        Label = "Official",
+                        SourceType = "Official",
+                        IsPrimary = true
+                    }
+                ],
+                ProgressHistory =
+                [
+                    new BookProgressHistoryDto
+                    {
+                        Id = Guid.NewGuid(),
+                        ChangedAt = new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero),
+                        ChapterNumber = 12,
+                        ChapterLabel = "12.5",
+                        Comment = "Read today"
+                    }
+                ]
+            }
+        ]);
+        using var stream = CreateCsv(csv);
+
+        var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
+        Assert.True(session.CanFinalize);
+        await service.FinalizeAsync(session.SessionId, CancellationToken.None);
+
+        var saved = await context.Books
+            .Include(book => book.Author)
+            .Include(book => book.Titles)
+            .Include(book => book.BookGenres).ThenInclude(bookGenre => bookGenre.Genre)
+            .Include(book => book.BookTags).ThenInclude(bookTag => bookTag.Tag)
+            .Include(book => book.Links)
+            .Include(book => book.ProgressHistory)
+            .SingleAsync();
+
+        Assert.Equal("Author Name", saved.Author!.PrimaryName);
+        Assert.Equal("Description", saved.Description);
+        Assert.Equal("Notes", saved.Notes);
+        Assert.Equal("Original source line", saved.RawImportedLine);
+        Assert.Contains(saved.Titles, title => title.Title == "Alternate title" && !title.IsPrimary);
+        Assert.Contains(saved.BookGenres, genre => genre.Genre.Name == "Fantasy");
+        Assert.Contains(saved.BookTags, tag => tag.Tag.Name == "favorite");
+        Assert.Contains(saved.Links, link => link.Url == "https://example.com/book" && link.IsPrimary);
+        var history = Assert.Single(saved.ProgressHistory);
+        Assert.Equal("Read today", history.Comment);
+        Assert.Equal(new DateTimeOffset(2026, 1, 1, 12, 0, 0, TimeSpan.Zero), history.ChangedAt);
     }
 
     [Fact]

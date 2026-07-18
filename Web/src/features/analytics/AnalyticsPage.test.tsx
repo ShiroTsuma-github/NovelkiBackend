@@ -553,9 +553,9 @@ describe('AnalyticsPage', () => {
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
 
-    expect(await screen.findByRole('link', { name: 'Fantasy' })).toHaveAttribute('href', '/books?query=genre%3AFantasy')
-    expect(await screen.findByRole('link', { name: 'Drama "Special" / 2026' })).toHaveAttribute('href', '/books?query=genre%3A%22Drama%20%5C%22Special%5C%22%20%2F%202026%22')
-    expect(await screen.findByRole('link', { name: 'slow burn' })).toHaveAttribute('href', '/books?query=tag%3A%22slow%20burn%22')
+    expect(await screen.findByRole('link', { name: 'Fantasy' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20genre%3AFantasy')
+    expect(await screen.findByRole('link', { name: 'Drama "Special" / 2026' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20genre%3A%22Drama%20%5C%22Special%5C%22%20%2F%202026%22')
+    expect(await screen.findByRole('link', { name: 'slow burn' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20tag%3A%22slow%20burn%22')
     expect(await screen.findByText('Other')).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: /view data for top genres/i }))
@@ -594,13 +594,13 @@ describe('AnalyticsPage', () => {
         })),
       },
     }))
-    renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01' })
+    renderWithProviders(<AnalyticsPage />, { route: '/analytics?query=type%3AManga&from=2026-01-01&to=2026-02-01' })
 
     expect(await screen.findByText('10%')).toBeInTheDocument()
     expect(document.querySelector('.analytics-drilldown-chart')).toBeTruthy()
     expect(screen.getAllByText('Unrated: 9')).toHaveLength(1)
-    expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=rating%3Anone')
-    expect(screen.getByRole('link', { name: /open rating 10 books/i })).toHaveAttribute('href', '/books?query=rating%3A10')
+    expect(screen.getByRole('link', { name: /unrated: 9/i })).toHaveAttribute('href', '/books?query=type%3AManga%20created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20rating%3Anone')
+    expect(screen.getByRole('link', { name: /open rating 10 books/i })).toHaveAttribute('href', '/books?query=type%3AManga%20created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20rating%3A10')
     expect(screen.queryByRole('button', { name: /view data for rating distribution/i })).not.toBeInTheDocument()
   })
 
@@ -622,10 +622,10 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByTestId('priority-heatmap')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view data for priority by status/i })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Plan to Read' })).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22')
+    expect(screen.getByRole('link', { name: 'Plan to Read' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20status%3A%22Plan%20to%20Read%22')
     expect(screen.getByRole('columnheader', { name: 'Unset' })).toHaveClass('analytics-priority-heading')
     const unsetLink = screen.getByRole('link', { name: '3' })
-    expect(unsetLink).toHaveAttribute('href', '/books?query=status%3A%22Plan%20to%20Read%22%20priority%3Anone')
+    expect(unsetLink).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20status%3A%22Plan%20to%20Read%22%20priority%3Anone')
     expect(unsetLink).toHaveClass('analytics-heat-value')
     expect(screen.getByText('75%')).toHaveClass('text-current/85')
   })
@@ -655,8 +655,8 @@ describe('AnalyticsPage', () => {
     expect(screen.getByText('Current chapters by type')).toBeInTheDocument()
     expect(document.querySelectorAll('.analytics-drilldown-chart').length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByText(/Current chapters: 120.5/)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /open manga books by count/i })).toHaveAttribute('href', '/books?query=type%3AManga')
-    expect(screen.getByRole('link', { name: /open manga books by current chapters/i })).toHaveAttribute('href', '/books?query=type%3AManga')
+    expect(screen.getByRole('link', { name: /open manga books by count/i })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3AManga')
+    expect(screen.getByRole('link', { name: /open manga books by current chapters/i })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3AManga')
   })
 
   it('exposes status by type drill-down links for chart segments', async () => {
@@ -678,9 +678,9 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByText('Manga')).toBeInTheDocument()
     expect(screen.getByTestId('status-by-type-chart')).toHaveClass('analytics-drilldown-chart')
     expect(screen.queryByRole('link', { name: 'Manga' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /open manga books$/i })).toHaveAttribute('href', '/books?query=type%3AManga')
-    expect(screen.getByRole('link', { name: /open manga reading books/i })).toHaveAttribute('href', '/books?query=type%3AManga%20status%3AReading')
-    expect(screen.getByRole('link', { name: /open manga completed books/i })).toHaveAttribute('href', '/books?query=type%3AManga%20status%3ACompleted')
+    expect(screen.getByRole('link', { name: /open manga books$/i })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3AManga')
+    expect(screen.getByRole('link', { name: /open manga reading books/i })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3AManga%20status%3AReading')
+    expect(screen.getByRole('link', { name: /open manga completed books/i })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3AManga%20status%3ACompleted')
   })
 
   it('estimates reading time from shared localStorage without refetching', async () => {
@@ -756,7 +756,7 @@ describe('AnalyticsPage', () => {
     expect(screen.queryByRole('link', { name: /January 15/i })).not.toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Novel: 1,000,000/i })).toHaveAttribute(
       'href',
-      '/books?query=type%3ANovel%20created%3A%3E%3D2026-01-15%20created%3A%3C2026-01-22',
+      '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3ANovel%20created%3A%3E%3D2026-01-15%20created%3A%3C2026-01-22',
     )
 
     await user.click(screen.getByRole('button', { name: /view data for library growth/i }))
@@ -853,7 +853,7 @@ describe('AnalyticsPage', () => {
 
     expect(await screen.findByText(/Cleanup queue/i)).toBeInTheDocument()
     expect(screen.getByText(/Usable covers are counted only/i)).toBeInTheDocument()
-    expect(screen.getByTitle('Open books filtered by cover:none')).toBeInTheDocument()
+    expect(screen.getByTitle('Open books filtered by created:>=2026-01-01 created:<2026-02-01 cover:none')).toBeInTheDocument()
     expect(screen.getByText(/Unknown status bucket: 2 books/i)).toBeInTheDocument()
     expect(screen.getByText(/Very Long Source Name/i)).toBeInTheDocument()
 
@@ -906,9 +906,10 @@ describe('AnalyticsPage', () => {
       'alternateTitle:none',
       'cover:none',
     ]) {
-      const expectedHref = `/books?query=${encodeURIComponent(query)}`
+      const scopedQuery = `created:>=2026-01-01 created:<2026-02-01 ${query}`
+      const expectedHref = `/books?query=${encodeURIComponent(scopedQuery)}`
       expect(
-        screen.getAllByTitle(`Open books filtered by ${query}`)
+        screen.getAllByTitle(`Open books filtered by ${scopedQuery}`)
           .some((link) => link.getAttribute('href') === expectedHref),
       ).toBe(true)
     }
