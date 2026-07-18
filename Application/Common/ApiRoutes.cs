@@ -7,6 +7,7 @@ public static class ApiRoutes
     public const string Admin = VersionPrefix + "/admin";
     public const string Author = VersionPrefix + "/author";
     public const string Book = VersionPrefix + "/book";
+    public const string PublicBook = VersionPrefix + "/public-book";
     public const string Genre = VersionPrefix + "/genre";
     public const string Status = VersionPrefix + "/status";
     public const string Tag = VersionPrefix + "/tag";
@@ -20,6 +21,11 @@ public static class ApiRoutes
     public static string BookCoverThumbnail(Guid bookId, long version)
     {
         return $"/{Book}/{bookId}/cover/thumbnail?v={version}";
+    }
+
+    public static string PublicBookCover(Guid snapshotId, long version)
+    {
+        return $"/{PublicBook}/{snapshotId}/cover?v={version}";
     }
 
     public static string GenreById(Guid genreId)
