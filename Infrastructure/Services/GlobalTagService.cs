@@ -3,7 +3,9 @@ namespace Infrastructure.Services;
 using Application.Common;
 using Application.Common.Interfaces;
 
-public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagService
+public sealed class GlobalTagService(
+    ApplicationDbContext context,
+    IBookListCacheInvalidator cacheInvalidator) : IGlobalTagService
 {
     public async Task<IReadOnlyCollection<Tag>> SearchAsync(string? search, int take,
         CancellationToken cancellationToken)
@@ -38,7 +40,8 @@ public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagS
         };
         context.Tags.Add(tag);
         await context.SaveChangesAsync(cancellationToken);
-        await MergePrivateDuplicatesAsync(tag, cancellationToken);
+        var affectedOwners = await MergePrivateDuplicatesAsync(tag, cancellationToken);
+        await InvalidateOwnersAsync(affectedOwners, cancellationToken);
         return tag;
     }
 
@@ -48,6 +51,7 @@ public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagS
         var tag = await context.Tags.Include(item => item.BookTags)
                       .FirstOrDefaultAsync(item => item.IsGlobal && item.Id == id, cancellationToken)
                   ?? throw new EntityNotFoundException<Tag, Guid>(id);
+        var affectedOwners = await GetLinkedOwnerIdsAsync(tag.Id, cancellationToken);
         var normalizedName = MappingExtensions.NormalizeName(name);
         var conflict = await context.Tags.FirstOrDefaultAsync(
             item => item.IsGlobal && item.Id != id && item.NormalizedName == normalizedName, cancellationToken);
@@ -60,7 +64,8 @@ public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagS
         tag.NormalizedName = normalizedName;
         tag.Description = TrimToNull(description);
         await context.SaveChangesAsync(cancellationToken);
-        await MergePrivateDuplicatesAsync(tag, cancellationToken);
+        affectedOwners.UnionWith(await MergePrivateDuplicatesAsync(tag, cancellationToken));
+        await InvalidateOwnersAsync(affectedOwners, cancellationToken);
         return tag;
     }
 
@@ -68,11 +73,14 @@ public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagS
     {
         var tag = await context.Tags.FirstOrDefaultAsync(item => item.IsGlobal && item.Id == id, cancellationToken)
                   ?? throw new EntityNotFoundException<Tag, Guid>(id);
+        var affectedOwners = await GetLinkedOwnerIdsAsync(tag.Id, cancellationToken);
         context.Tags.Remove(tag);
         await context.SaveChangesAsync(cancellationToken);
+        await InvalidateOwnersAsync(affectedOwners, cancellationToken);
     }
 
-    private async Task MergePrivateDuplicatesAsync(Tag globalTag, CancellationToken cancellationToken)
+    private async Task<HashSet<Guid>> MergePrivateDuplicatesAsync(Tag globalTag,
+        CancellationToken cancellationToken)
     {
         var privateTags = await context.Tags
             .Include(tag => tag.BookTags)
@@ -80,8 +88,12 @@ public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagS
             .ToListAsync(cancellationToken);
         if (privateTags.Count == 0)
         {
-            return;
+            return [];
         }
+
+        var privateBookIds = privateTags.SelectMany(tag => tag.BookTags).Select(link => link.BookId).Distinct().ToArray();
+        var affectedOwners = await context.Books.Where(book => privateBookIds.Contains(book.Id))
+            .Select(book => book.OwnerId).ToHashSetAsync(cancellationToken);
 
         var globallyLinkedBookIds = await context.Set<Domain.Associations.BookTag>()
             .Where(link => link.TagId == globalTag.Id)
@@ -101,6 +113,21 @@ public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagS
 
         context.Tags.RemoveRange(privateTags);
         await context.SaveChangesAsync(cancellationToken);
+        return affectedOwners;
+    }
+
+    private Task<HashSet<Guid>> GetLinkedOwnerIdsAsync(Guid tagId, CancellationToken cancellationToken) =>
+        context.Set<Domain.Associations.BookTag>()
+            .Where(link => link.TagId == tagId)
+            .Select(link => link.Book.OwnerId)
+            .ToHashSetAsync(cancellationToken);
+
+    private async Task InvalidateOwnersAsync(IEnumerable<Guid> ownerIds, CancellationToken cancellationToken)
+    {
+        foreach (var ownerId in ownerIds)
+        {
+            await cacheInvalidator.InvalidateBooksAsync(ownerId, cancellationToken);
+        }
     }
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();

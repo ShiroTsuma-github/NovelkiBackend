@@ -22,6 +22,10 @@ public class TypeRepository : ITypeRepository
         var type = await _context.ContentTypes.FindAsync(new object[] { id }, cancellationToken);
         if (type != null)
         {
+            if (await _context.Books.AnyAsync(book => book.ContentTypeId == id, cancellationToken))
+            {
+                throw new EntityInUseException<ContentType>(type.Name);
+            }
             _context.ContentTypes.Remove(type);
             await _context.SaveChangesAsync(cancellationToken);
         }

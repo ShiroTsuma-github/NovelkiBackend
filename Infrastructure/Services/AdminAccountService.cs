@@ -61,6 +61,9 @@ public sealed class AdminAccountService(
         await context.Authors
             .Where(author => author.CreatedBy == userId)
             .ExecuteUpdateAsync(update => update.SetProperty(author => author.CreatedBy, (Guid?)null), cancellationToken);
+        await context.Tags
+            .Where(tag => tag.IsGlobal && tag.CreatedBy == userId)
+            .ExecuteUpdateAsync(update => update.SetProperty(tag => tag.CreatedBy, (Guid?)null), cancellationToken);
         var remainingTags = await context.Tags.CountAsync(tag => tag.OwnerId == userId, cancellationToken);
 
         var user = await context.Users.FirstAsync(item => item.Id == userId, cancellationToken);

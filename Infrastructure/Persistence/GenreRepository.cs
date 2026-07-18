@@ -44,6 +44,10 @@ public class GenreRepository : IGenreRepository
         var genre = await _context.Genres.FindAsync(new object[] { id }, cancellationToken);
         if (genre != null)
         {
+            if (await _context.Set<BookGenre>().AnyAsync(link => link.GenreId == id, cancellationToken))
+            {
+                throw new EntityInUseException<Genre>(genre.Name);
+            }
             _context.Genres.Remove(genre);
             await _context.SaveChangesAsync(cancellationToken);
         }
