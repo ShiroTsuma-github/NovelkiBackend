@@ -108,16 +108,26 @@ CATEGORY_CONTENT_TYPES = {
 }
 
 
-def make_details_link(title, content_type):
+def make_details_link(title: str, content_type: str) -> str:
+    """Build the expected public details URL for a book row."""
     clean_title = re.sub(r'\(.*?\)', '', title)
     clean_title = re.sub(r'\[.*?\]', '', clean_title)
+    clean_title = re.sub(r"['’‘`´]", '', clean_title)
     clean_title = re.sub(r'[^a-zA-Z0-9\s-]', ' ', clean_title)
     slug = re.sub(r'\s+', '-', clean_title.strip().lower())
 
-    if content_type == 'Novel':
+    if content_type.strip().casefold() == 'novel':
         return f"https://www.novelupdates.com/series/{slug}/"
-    else:
-        return f"https://www.anime-planet.com/manga/{slug}"
+    return f"https://www.anime-planet.com/manga/{slug}"
+
+
+def make_details_links(rows: list[dict[str, str]]) -> list[str]:
+    """Build one details URL for every CSV-like row."""
+    return [
+        make_details_link(row.get("primaryTitle", ""), row.get("contentType", ""))
+        for row in rows
+    ]
+
 
 def normalize_title(title: str) -> str:
     """Normalize formatting differences while retaining the title's words."""
