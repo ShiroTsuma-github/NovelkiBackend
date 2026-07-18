@@ -86,6 +86,9 @@ public sealed class BookCoverBackgroundService : BackgroundService
 
 public sealed class BookCoverProcessor
 {
+    private const string CoverDownloadFailureMessage =
+        "A cover was found, but the image could not be downloaded. Try searching again or upload a cover manually.";
+
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -178,6 +181,11 @@ public sealed class BookCoverProcessor
                 cover.Status = BookCoverStatus.NotFound;
                 cover.FailureReason = "No valid cover response was found from the configured providers.";
                 shouldInvalidateCache = false;
+            }
+            else if (ex is HttpRequestException)
+            {
+                cover.Status = BookCoverStatus.Failed;
+                cover.FailureReason = CoverDownloadFailureMessage;
             }
             else
             {

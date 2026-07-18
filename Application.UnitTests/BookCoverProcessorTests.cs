@@ -126,6 +126,32 @@ public class BookCoverProcessorTests
     }
 
     [Fact]
+    public async Task ProcessAsync_ShouldUseHelpfulGenericMessageWhenCoverDownloadFails()
+    {
+        var cover = Cover(BookCoverStatus.Pending);
+        var repository = new FakeBookCoverRepository { Cover = cover };
+        var cache = new FakeBookListCacheInvalidator();
+        var processor = CreateProcessor(
+            repository,
+            cacheInvalidator: cache,
+            provider: new FakeBookCoverProvider(new BookCoverCandidate(BookCoverSource.GoogleBooks,
+                "https://cdn.example.com/redirected-cover.jpg")),
+            httpClientFactory: new FakeHttpClientFactory(exception: new HttpRequestException(
+                "Response status code does not indicate success: 301 (Moved Permanently).",
+                null,
+                HttpStatusCode.MovedPermanently)));
+
+        await processor.ProcessAsync(BookId, CancellationToken.None);
+
+        Assert.Equal(BookCoverStatus.Failed, cover.Status);
+        Assert.Equal(
+            "A cover was found, but the image could not be downloaded. Try searching again or upload a cover manually.",
+            cover.FailureReason);
+        Assert.DoesNotContain("301", cover.FailureReason);
+        Assert.Equal(1, cache.InvalidateCount);
+    }
+
+    [Fact]
     public async Task ProcessAsync_ShouldTruncateUnexpectedFailureReasonAndInvalidateCache()
     {
         var cover = Cover(BookCoverStatus.Pending);
