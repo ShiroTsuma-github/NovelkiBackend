@@ -41,7 +41,7 @@ describe('BooksPage', () => {
     expect(screen.getByText('Cuttlefish')).toBeInTheDocument()
     expect(screen.getByLabelText('1 alternative name')).toHaveAttribute(
       'title',
-      'Alternative name: Cuttlefish That Loves Diving',
+      'Alternative name:\nCuttlefish That Loves Diving',
     )
     expect(screen.getByText('favorite')).toHaveAttribute('title', 'A personal favorite.')
     expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({

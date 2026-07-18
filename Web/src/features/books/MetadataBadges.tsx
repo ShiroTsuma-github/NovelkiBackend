@@ -78,8 +78,11 @@ function buildAlternativeTooltip(alternatives: string[], totalCount: number, cou
   }
 
   const hiddenCount = Math.max(0, totalCount - alternatives.length)
-  const hiddenSuffix = hiddenCount ? ` (+${hiddenCount} more)` : ''
-  return `${capitalize(pluralize(countNoun, totalCount))}: ${alternatives.join(', ')}${hiddenSuffix}`
+  return [
+    `${capitalize(pluralize(countNoun, totalCount))}:`,
+    ...alternatives,
+    hiddenCount ? `+${hiddenCount} more` : null,
+  ].filter((line): line is string => Boolean(line)).join('\n')
 }
 
 function pluralize(value: string, count: number) {
