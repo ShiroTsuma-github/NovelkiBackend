@@ -50,7 +50,10 @@ public sealed class AdminLibraryService : IAdminLibraryService
         var deletedAuthors = authorIds.Length == 0
             ? 0
             : await _context.Authors
-                .Where(author => authorIds.Contains(author.Id) && !author.Books.Any())
+                .Where(author => authorIds.Contains(author.Id) &&
+                                 author.OwnerId == ownerId &&
+                                 !author.IsPublic &&
+                                 !author.Books.Any())
                 .ExecuteDeleteAsync(cancellationToken);
 
         await transaction.CommitAsync(cancellationToken);

@@ -48,12 +48,13 @@ public class ManageMetadataFeatureTests
     public async Task CreateAuthor_ShouldCreatePrimaryAndAlternativeNames()
     {
         var repository = new FakeAuthorRepository();
-        var handler = new CreateAuthorCommandHandler(repository);
+        var handler = new CreateAuthorCommandHandler(repository, new FakeUser());
 
         var created = await handler.Handle(new CreateAuthorCommand("New Author", ["Pen Name"]), CancellationToken.None);
 
         Assert.Equal("New Author", created.PrimaryName);
         Assert.Equal(["Pen Name"], created.OtherNames);
+        Assert.False(created.IsPublic);
     }
 
     [Fact]
@@ -103,7 +104,7 @@ public class ManageMetadataFeatureTests
     public async Task UpdateAuthor_ShouldHideAuthorCreatedByAnotherUser()
     {
         var author = CreateAuthor("Er Gen");
-        author.CreatedBy = Guid.Parse("22222222-2222-2222-2222-222222222222");
+        author.OwnerId = Guid.Parse("22222222-2222-2222-2222-222222222222");
         var handler = new UpdateAuthorCommandHandler(new FakeAuthorRepository(author), new FakeUser());
 
         await Assert.ThrowsAsync<EntityNotFoundException<Author, Guid>>(() =>
@@ -119,13 +120,13 @@ public class ManageMetadataFeatureTests
         {
             OwnerId = OwnerId, PrimaryTitle = "Renegade Immortal", NormalizedPrimaryTitle = "RENEGADE IMMORTAL"
         });
-        var repository = new FakeAuthorRepository(author);
-        var handler = new DeleteAuthorCommandHandler(repository, new FakeUser());
+        var lifecycle = new FakeAuthorLifecycleService(author);
+        var handler = new DeleteAuthorCommandHandler(lifecycle, new FakeUser());
 
         await Assert.ThrowsAsync<EntityInUseException<Author>>(() =>
             handler.Handle(new DeleteAuthorCommand(author.Id), CancellationToken.None));
 
-        Assert.False(repository.Deleted);
+        Assert.False(lifecycle.Deleted);
     }
 
     private static Tag CreateTag(Guid? ownerId, string name)
@@ -139,7 +140,7 @@ public class ManageMetadataFeatureTests
         {
             PrimaryName = primaryName,
             NormalizedPrimaryName = MappingExtensions.NormalizeName(primaryName),
-            CreatedBy = OwnerId
+            OwnerId = OwnerId
         };
         author.Names.Add(new AuthorName
         {
@@ -228,7 +229,7 @@ public class ManageMetadataFeatureTests
             return Task.FromResult(_authors.FirstOrDefault(author => author.Id == id));
         }
 
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        public Task<Author?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
             var normalized = MappingExtensions.NormalizeName(name);
             return Task.FromResult(_authors.FirstOrDefault(author =>
@@ -236,16 +237,24 @@ public class ManageMetadataFeatureTests
                 author.Names.Any(alias => alias.NormalizedName == normalized)));
         }
 
-        public Task<IEnumerable<Author>> SearchAsync(string? search, int take,
+        public Task<Author?> GetPublicByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            var normalized = MappingExtensions.NormalizeName(name);
+            return Task.FromResult(_authors.FirstOrDefault(author => author.IsPublic &&
+                (author.NormalizedPrimaryName == normalized ||
+                 author.Names.Any(alias => alias.NormalizedName == normalized))));
+        }
+
+        public Task<IEnumerable<Author>> SearchAsync(Guid ownerId, string? search, int take,
             CancellationToken cancellationToken)
         {
             return Task.FromResult<IEnumerable<Author>>(_authors.Take(take));
         }
 
-        public Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+        public Task<IEnumerable<Author>> SearchOwnedAsync(Guid ownerId, string? search, int take,
             CancellationToken cancellationToken)
         {
-            return Task.FromResult<IEnumerable<Author>>(_authors.Where(author => author.CreatedBy == createdBy)
+            return Task.FromResult<IEnumerable<Author>>(_authors.Where(author => author.OwnerId == ownerId)
                 .Take(take));
         }
 
@@ -266,6 +275,34 @@ public class ManageMetadataFeatureTests
         {
             SaveCount++;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAuthorLifecycleService(Author author) : IAuthorLifecycleService
+    {
+        public bool Deleted { get; private set; }
+
+        public Task<Author> SetVisibilityAsync(Guid authorId, Guid actorId, bool isAdmin, bool isPublic,
+            CancellationToken cancellationToken)
+        {
+            author.IsPublic = isPublic;
+            return Task.FromResult(author);
+        }
+
+        public Task DeleteAsync(Guid authorId, Guid actorId, bool isAdmin, CancellationToken cancellationToken)
+        {
+            if (author.Books.Count > 0)
+            {
+                throw new EntityInUseException<Author>(author.PrimaryName);
+            }
+
+            Deleted = true;
+            return Task.CompletedTask;
+        }
+
+        public Task<int> DeleteOwnedAuthorsAsync(Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(0);
         }
     }
 }

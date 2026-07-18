@@ -1734,7 +1734,7 @@ public class RepositoryTests
         await context.SaveChangesAsync();
         var repository = new AuthorRepository(context);
 
-        var result = await repository.GetByNameAsync("Ergen", CancellationToken.None);
+        var result = await repository.GetByNameAsync(database.UserId, "Ergen", CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("Er Gen", result.PrimaryName);

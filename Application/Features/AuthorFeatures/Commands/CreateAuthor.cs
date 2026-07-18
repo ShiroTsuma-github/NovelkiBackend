@@ -5,7 +5,7 @@ using Common.DTOs.Author;
 public sealed record CreateAuthorCommand(string PrimaryName, IReadOnlyCollection<string>? OtherNames = null)
     : IRequest<AuthorDto>;
 
-public sealed class CreateAuthorCommandHandler(IAuthorRepository authorRepository)
+public sealed class CreateAuthorCommandHandler(IAuthorRepository authorRepository, IUser user)
     : IRequestHandler<CreateAuthorCommand, AuthorDto>
 {
     public async Task<AuthorDto> Handle(CreateAuthorCommand request, CancellationToken cancellationToken)
@@ -19,7 +19,7 @@ public sealed class CreateAuthorCommandHandler(IAuthorRepository authorRepositor
             .ToList();
         foreach (var name in names)
         {
-            var existing = await authorRepository.GetByNameAsync(name, cancellationToken);
+            var existing = await authorRepository.GetByNameAsync(user.RequiredId, name, cancellationToken);
             if (existing is not null)
             {
                 throw new EntityAlreadyExistsException<Author, Guid>(name, existing.Id);
@@ -28,7 +28,10 @@ public sealed class CreateAuthorCommandHandler(IAuthorRepository authorRepositor
 
         var author = new Author
         {
-            PrimaryName = primaryName, NormalizedPrimaryName = MappingExtensions.NormalizeName(primaryName)
+            OwnerId = user.RequiredId,
+            IsPublic = false,
+            PrimaryName = primaryName,
+            NormalizedPrimaryName = MappingExtensions.NormalizeName(primaryName)
         };
         author.Names.Add(new AuthorName
         {

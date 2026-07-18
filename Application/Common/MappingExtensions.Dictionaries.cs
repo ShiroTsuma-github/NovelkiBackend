@@ -26,7 +26,8 @@ public static partial class MappingExtensions
         {
             Id = source.Id,
             PrimaryName = source.PrimaryName,
-            OtherNames = source.Names.Where(n => !n.IsPrimary).OrderBy(n => n.Name).Select(n => n.Name).ToList()
+            OtherNames = source.Names.Where(n => !n.IsPrimary).OrderBy(n => n.Name).Select(n => n.Name).ToList(),
+            IsPublic = source.IsPublic
         };
     }
 

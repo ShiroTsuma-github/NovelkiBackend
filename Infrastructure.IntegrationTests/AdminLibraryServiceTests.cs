@@ -19,8 +19,8 @@ public class AdminLibraryServiceTests
         var otherOwnerId = Guid.Parse("66666666-6666-6666-6666-666666666666");
         context.Users.Add(new Identity.User { Id = otherOwnerId, UserName = "other", NormalizedUserName = "OTHER" });
 
-        var sharedAuthor = TestData.Author("Shared Author");
-        var ownedOnlyAuthor = TestData.Author("Owned Only Author");
+        var sharedAuthor = TestData.Author("Shared Author", database.UserId, true);
+        var ownedOnlyAuthor = TestData.Author("Owned Only Author", database.UserId, false);
         var ownerTag = TestData.Tag(database.UserId, "favorite");
         var otherTag = TestData.Tag(otherOwnerId, "favorite");
         context.Authors.AddRange(sharedAuthor, ownedOnlyAuthor);
@@ -92,6 +92,22 @@ public class AdminLibraryServiceTests
         Assert.Equal(new AdminLibraryPurgeResult(0, 0, 0), result);
         Assert.Equal(database.UserId, cacheInvalidator.InvalidatedOwnerId);
         Assert.Empty(storage.DeletedPaths);
+    }
+
+    [Fact]
+    public async Task DeleteAllBooksForOwnerAsync_ShouldKeepPublicAuthorAfterLastBookIsPurged()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var author = TestData.Author("Public Author", database.UserId, true);
+        context.Add(TestData.Book(database.UserId, "Only book", author));
+        await context.SaveChangesAsync();
+
+        var service = new AdminLibraryService(context, new TrackingBookCoverStorage(), new TrackingCacheInvalidator());
+        var result = await service.DeleteAllBooksForOwnerAsync(database.UserId, CancellationToken.None);
+
+        Assert.Equal(0, result.DeletedAuthors);
+        Assert.True(await context.Authors.AnyAsync(item => item.Id == author.Id && item.IsPublic));
     }
 
     private sealed class TrackingCacheInvalidator : IBookListCacheInvalidator

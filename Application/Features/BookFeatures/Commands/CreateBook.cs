@@ -72,7 +72,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             request.AlternativeTitles,
             cancellationToken);
 
-        var author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, request.AuthorId,
+        var author = await BookMutationSupport.ResolveAuthorAsync(_authorRepository, ownerId, request.AuthorId,
             request.AuthorName, cancellationToken);
         var primaryTitle = request.PrimaryTitle.Trim();
         var description = BookMutationSupport.TrimToNull(request.Description);

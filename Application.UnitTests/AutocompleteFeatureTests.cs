@@ -80,13 +80,19 @@ public class AutocompleteFeatureTests
             return Task.FromResult(_authors.FirstOrDefault(a => a.Id == id));
         }
 
-        public Task<Author?> GetByNameAsync(string name, CancellationToken cancellationToken)
+        public Task<Author?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
             return Task.FromResult(_authors.FirstOrDefault(a =>
                 a.NormalizedPrimaryName == MappingExtensions.NormalizeName(name)));
         }
 
-        public Task<IEnumerable<Author>> SearchAsync(string? search, int take, CancellationToken cancellationToken)
+        public Task<Author?> GetPublicByNameAsync(string name, CancellationToken cancellationToken)
+        {
+            return GetByNameAsync(Guid.Empty, name, cancellationToken);
+        }
+
+        public Task<IEnumerable<Author>> SearchAsync(Guid ownerId, string? search, int take,
+            CancellationToken cancellationToken)
         {
             var normalizedSearch = search == null ? string.Empty : MappingExtensions.NormalizeName(search);
             return Task.FromResult<IEnumerable<Author>>(_authors
@@ -96,11 +102,11 @@ public class AutocompleteFeatureTests
                 .ToList());
         }
 
-        public Task<IEnumerable<Author>> SearchCreatedByAsync(Guid createdBy, string? search, int take,
+        public Task<IEnumerable<Author>> SearchOwnedAsync(Guid ownerId, string? search, int take,
             CancellationToken cancellationToken)
         {
             return Task.FromResult<IEnumerable<Author>>(_authors
-                .Where(author => author.CreatedBy == createdBy)
+                .Where(author => author.OwnerId == ownerId)
                 .Take(take)
                 .ToList());
         }

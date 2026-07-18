@@ -38,6 +38,14 @@ public class AuthorController : ControllerBase
         return Ok(await _mediator.Send(command));
     }
 
+    [HttpPut("{id:guid}/visibility")]
+    [Authorize]
+    public async Task<IActionResult> UpdateVisibility(Guid id, UpdateAuthorVisibilityCommand command)
+    {
+        command.Id = id;
+        return Ok(await _mediator.Send(command));
+    }
+
     [HttpDelete(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> Delete(Guid id)

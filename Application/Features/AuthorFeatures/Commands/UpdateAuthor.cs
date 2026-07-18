@@ -15,7 +15,7 @@ public sealed class UpdateAuthorCommandHandler(IAuthorRepository authorRepositor
     {
         var author = await authorRepository.GetByIdAsync(request.Id, cancellationToken)
                      ?? throw new EntityNotFoundException<Author, Guid>(request.Id);
-        if (author.CreatedBy != user.RequiredId &&
+        if (author.OwnerId != user.RequiredId &&
             !user.Roles.Contains(AuthorizationRoles.Admin, StringComparer.OrdinalIgnoreCase))
         {
             throw new EntityNotFoundException<Author, Guid>(request.Id);
@@ -29,7 +29,9 @@ public sealed class UpdateAuthorCommandHandler(IAuthorRepository authorRepositor
 
         foreach (var name in names)
         {
-            var existing = await authorRepository.GetByNameAsync(name, cancellationToken);
+            var existing = author.OwnerId.HasValue
+                ? await authorRepository.GetByNameAsync(author.OwnerId.Value, name, cancellationToken)
+                : await authorRepository.GetPublicByNameAsync(name, cancellationToken);
             if (existing is not null && existing.Id != author.Id)
             {
                 throw new EntityAlreadyExistsException<Author, Guid>(name, existing.Id);
