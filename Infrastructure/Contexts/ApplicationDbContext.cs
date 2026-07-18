@@ -28,6 +28,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<PublicBookSnapshot> PublicBookSnapshots { get; set; }
     public DbSet<BookShareAuthorPromotion> BookShareAuthorPromotions { get; set; }
     public DbSet<BookShareTagPromotion> BookShareTagPromotions { get; set; }
+    public DbSet<StorageCleanupQueueItem> StorageCleanupQueueItems { get; set; }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new())
     {
@@ -61,6 +62,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         ConfigureContentType(modelBuilder);
         ConfigureTag(modelBuilder);
         ConfigurePublicBooks(modelBuilder);
+        ConfigureStorageCleanupQueue(modelBuilder);
         ConfigureIdentity(modelBuilder);
         SeedSystemDictionaries(modelBuilder);
     }
@@ -316,6 +318,17 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
                 .WithMany(u => u.RefreshTokens)
                 .HasForeignKey(t => t.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureStorageCleanupQueue(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<StorageCleanupQueueItem>(entity =>
+        {
+            entity.HasIndex(item => item.StoragePath).IsUnique();
+            entity.HasIndex(item => item.NextAttemptAt);
+            entity.Property(item => item.StoragePath).HasMaxLength(500);
+            entity.Property(item => item.LastError).HasMaxLength(2000);
         });
     }
 

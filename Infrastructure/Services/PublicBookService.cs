@@ -11,7 +11,8 @@ public sealed class PublicBookService(
     IUser user,
     IBookCoverStorage storage,
     IAuthorLifecycleService authorLifecycle,
-    IBookListCacheInvalidator cacheInvalidator) : IPublicBookService
+    IBookListCacheInvalidator cacheInvalidator,
+    IStorageCleanupQueue cleanupQueue) : IPublicBookService
 {
     private const int MaxMutationAttempts = 3;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -89,7 +90,7 @@ public sealed class PublicBookService(
             catch (DbUpdateException) when (attempt < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
 
                 var winner = await context.PublicBookSnapshots.AsNoTracking()
@@ -102,7 +103,7 @@ public sealed class PublicBookService(
             catch
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
                 throw;
             }
@@ -132,15 +133,14 @@ public sealed class PublicBookService(
                 storedCover = await StoreSnapshotCoverAsync(snapshot, book.Cover, cancellationToken);
                 await context.SaveChangesAsync(cancellationToken);
                 await CleanupPromotionsAsync(oldAuthorId, oldTagIds, snapshot.OwnerId, cancellationToken);
+                await QueueReplacedFilesAsync(oldCoverPath, oldThumbnailPath, snapshot, cancellationToken);
                 await CommitIfOwnedAsync(transaction, cancellationToken);
-
-                await DeleteReplacedFilesAsync(oldCoverPath, oldThumbnailPath, snapshot, cancellationToken);
                 return ToDto(snapshot);
             }
             catch (DbUpdateConcurrencyException) when (attempt < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
                 if (!await context.PublicBookSnapshots.AsNoTracking().AnyAsync(
                         snapshot => snapshot.Id == snapshotId && snapshot.OwnerId == user.RequiredId,
@@ -152,13 +152,13 @@ public sealed class PublicBookService(
             catch (DbUpdateException) when (attempt < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
             }
             catch
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
                 throw;
             }
@@ -177,11 +177,10 @@ public sealed class PublicBookService(
     public async Task UnlistAsync(Guid snapshotId, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionIfNeededAsync(cancellationToken);
-        IReadOnlyList<string> storagePaths;
         try
         {
             var snapshot = await GetOwnedSnapshotAsync(snapshotId, cancellationToken);
-            storagePaths = await RemoveSnapshotsAsync([snapshot], cancellationToken);
+            await RemoveSnapshotsAsync([snapshot], cancellationToken);
             await CommitIfOwnedAsync(transaction, cancellationToken);
         }
         catch (DbUpdateConcurrencyException)
@@ -196,21 +195,18 @@ public sealed class PublicBookService(
             context.ChangeTracker.Clear();
             throw;
         }
-
-        await DeleteStoragePathsAsync(storagePaths, cancellationToken);
     }
 
     public async Task UnlistBySourceBookAsync(Guid bookId, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionIfNeededAsync(cancellationToken);
-        IReadOnlyList<string> storagePaths = [];
         try
         {
             var snapshot = await context.PublicBookSnapshots.FirstOrDefaultAsync(
                 item => item.SourceBookId == bookId && item.OwnerId == user.RequiredId, cancellationToken);
             if (snapshot is not null)
             {
-                storagePaths = await RemoveSnapshotsAsync([snapshot], cancellationToken);
+                await RemoveSnapshotsAsync([snapshot], cancellationToken);
             }
 
             await CommitIfOwnedAsync(transaction, cancellationToken);
@@ -227,19 +223,16 @@ public sealed class PublicBookService(
             context.ChangeTracker.Clear();
             throw;
         }
-
-        await DeleteStoragePathsAsync(storagePaths, cancellationToken);
     }
 
     public async Task UnlistAllForOwnerAsync(Guid ownerId, CancellationToken cancellationToken)
     {
         await using var transaction = await BeginTransactionIfNeededAsync(cancellationToken);
-        IReadOnlyList<string> storagePaths;
         try
         {
             var snapshots = await context.PublicBookSnapshots.Where(snapshot => snapshot.OwnerId == ownerId)
                 .ToListAsync(cancellationToken);
-            storagePaths = await RemoveSnapshotsAsync(snapshots, cancellationToken);
+            await RemoveSnapshotsAsync(snapshots, cancellationToken);
             await CommitIfOwnedAsync(transaction, cancellationToken);
         }
         catch
@@ -248,8 +241,6 @@ public sealed class PublicBookService(
             context.ChangeTracker.Clear();
             throw;
         }
-
-        await DeleteStoragePathsAsync(storagePaths, cancellationToken);
     }
 
     public async Task<CopyPublicBookResult> CopyAsync(Guid snapshotId, CancellationToken cancellationToken)
@@ -323,7 +314,7 @@ public sealed class PublicBookService(
             catch (DbUpdateException) when (attempt < MaxMutationAttempts - 1)
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
 
                 var snapshot = await context.PublicBookSnapshots.AsNoTracking()
@@ -345,7 +336,7 @@ public sealed class PublicBookService(
             catch
             {
                 await RollbackIfOwnedAsync(transaction, cancellationToken);
-                await TryDeleteStoredFilesAsync(storedCover, cancellationToken);
+                await QueueCompensatingCleanupAsync(storedCover, cancellationToken);
                 context.ChangeTracker.Clear();
                 throw;
             }
@@ -433,12 +424,12 @@ public sealed class PublicBookService(
         return ids.ToArray();
     }
 
-    private async Task<IReadOnlyList<string>> RemoveSnapshotsAsync(IReadOnlyCollection<PublicBookSnapshot> snapshots,
+    private async Task RemoveSnapshotsAsync(IReadOnlyCollection<PublicBookSnapshot> snapshots,
         CancellationToken cancellationToken)
     {
         if (snapshots.Count == 0)
         {
-            return [];
+            return;
         }
 
         var promotions = snapshots.Select(snapshot => new
@@ -458,8 +449,7 @@ public sealed class PublicBookService(
             await CleanupPromotionsAsync(promotion.PublicAuthorId, promotion.TagIds, promotion.OwnerId,
                 cancellationToken);
         }
-
-        return storagePaths;
+        await cleanupQueue.EnqueueAsync(storagePaths, cancellationToken);
     }
 
     private async Task CleanupPromotionsAsync(Guid? authorId, IEnumerable<Guid> tagIds, Guid promotionOwnerId,
@@ -711,8 +701,15 @@ public sealed class PublicBookService(
             ? await context.Database.BeginTransactionAsync(cancellationToken)
             : null;
 
-    private static Task CommitIfOwnedAsync(IDbContextTransaction? transaction,
-        CancellationToken cancellationToken) => transaction?.CommitAsync(cancellationToken) ?? Task.CompletedTask;
+    private static async Task CommitIfOwnedAsync(IDbContextTransaction? transaction,
+        CancellationToken cancellationToken)
+    {
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            await transaction.DisposeAsync();
+        }
+    }
 
     private static async Task RollbackIfOwnedAsync(IDbContextTransaction? transaction,
         CancellationToken cancellationToken)
@@ -720,10 +717,11 @@ public sealed class PublicBookService(
         if (transaction is not null)
         {
             await transaction.RollbackAsync(cancellationToken);
+            await transaction.DisposeAsync();
         }
     }
 
-    private async Task DeleteReplacedFilesAsync(string? oldCoverPath, string? oldThumbnailPath,
+    private Task QueueReplacedFilesAsync(string? oldCoverPath, string? oldThumbnailPath,
         PublicBookSnapshot snapshot, CancellationToken cancellationToken)
     {
         var paths = new[] { oldCoverPath, oldThumbnailPath }
@@ -732,18 +730,11 @@ public sealed class PublicBookService(
             .Cast<string>()
             .Distinct()
             .ToArray();
-        await DeleteStoragePathsAsync(paths, cancellationToken);
+        return cleanupQueue.EnqueueAsync(paths, cancellationToken);
     }
 
-    private async Task DeleteStoragePathsAsync(IEnumerable<string> paths, CancellationToken cancellationToken)
-    {
-        foreach (var path in paths.Distinct())
-        {
-            await storage.DeleteIfExistsAsync(path, cancellationToken);
-        }
-    }
-
-    private async Task TryDeleteStoredFilesAsync(BookCoverStoredFiles? stored, CancellationToken cancellationToken)
+    private async Task QueueCompensatingCleanupAsync(BookCoverStoredFiles? stored,
+        CancellationToken cancellationToken)
     {
         if (stored is null)
         {
@@ -752,12 +743,20 @@ public sealed class PublicBookService(
 
         try
         {
-            await storage.DeleteIfExistsAsync(stored.Original.StoragePath, cancellationToken);
-            await storage.DeleteIfExistsAsync(stored.Thumbnail.StoragePath, cancellationToken);
+            await cleanupQueue.EnqueueAsync(
+                [stored.Original.StoragePath, stored.Thumbnail.StoragePath], cancellationToken);
         }
         catch
         {
-            // The durable cleanup queue is responsible for retrying failed compensating deletes.
+            try
+            {
+                await storage.DeleteIfExistsAsync(stored.Original.StoragePath, cancellationToken);
+                await storage.DeleteIfExistsAsync(stored.Thumbnail.StoragePath, cancellationToken);
+            }
+            catch
+            {
+                // Both durable and immediate cleanup are best-effort when the database and storage are unavailable.
+            }
         }
     }
 
