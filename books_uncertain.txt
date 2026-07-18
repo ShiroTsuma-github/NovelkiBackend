@@ -1,0 +1,12 @@
+﻿Assumptions:
+- numbering: `X` -> Manga, `1.X` -> Novel, `1.1.X` -> Manhwa with tag `h-manhwa`
+- status: `✓` -> Completed, `✓?` -> Completed with note `chyba skonczone`, `✓❌` -> Unknown with note `chyba autor porzucil`
+- rating: `💯` -> 8, `💯💯` -> 9, `💯💯💯` or more -> 10
+- `💩` lowers rating further: one `💩` -> 4, two `💩` -> 3, etc.
+- priority: count of `⭐` and `🌟`, capped at 5
+- `~x` moved into notes as release frequency, `~?` ignored
+
+Entries requiring review:
+Line 813: 1.1.67
+  Parsed title: 
+  Reasons: empty parsed title, missing standalone chapter count
