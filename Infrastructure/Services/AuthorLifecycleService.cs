@@ -7,7 +7,9 @@ public sealed class AuthorLifecycleService(
     public async Task<Author> SetVisibilityAsync(Guid authorId, Guid actorId, bool isAdmin, bool isPublic,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         var author = await GetManagedAuthorAsync(authorId, actorId, isAdmin, cancellationToken);
         if (author.IsPublic == isPublic)
         {
@@ -32,14 +34,19 @@ public sealed class AuthorLifecycleService(
         }
 
         await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
         return author;
     }
 
     public async Task DeleteAsync(Guid authorId, Guid actorId, bool isAdmin,
         CancellationToken cancellationToken)
     {
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        await using var transaction = context.Database.CurrentTransaction is null
+            ? await context.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         var author = await GetManagedAuthorAsync(authorId, actorId, isAdmin, cancellationToken);
         if (!author.IsPublic)
         {
@@ -60,7 +67,10 @@ public sealed class AuthorLifecycleService(
 
         context.Authors.Remove(author);
         await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+        }
     }
 
     public async Task<int> DeleteOwnedAuthorsAsync(Guid ownerId, CancellationToken cancellationToken)

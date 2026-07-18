@@ -281,6 +281,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.Property(snapshot => snapshot.CoverStoragePath).HasMaxLength(500);
             entity.Property(snapshot => snapshot.CoverThumbnailStoragePath).HasMaxLength(500);
             entity.Property(snapshot => snapshot.CoverMimeType).HasMaxLength(100);
+            entity.Property(snapshot => snapshot.SnapshotAt).IsConcurrencyToken();
             entity.HasOne(snapshot => snapshot.SourceBook).WithOne()
                 .HasForeignKey<PublicBookSnapshot>(snapshot => snapshot.SourceBookId)
                 .OnDelete(DeleteBehavior.Cascade);
