@@ -23,6 +23,10 @@ public class StatusRepository : IStatusRepository
         var status = await _context.Statuses.FindAsync(new object[] { id }, cancellationToken);
         if (status != null)
         {
+            if (await _context.Books.AnyAsync(book => book.StatusId == id, cancellationToken))
+            {
+                throw new EntityInUseException<Status>(status.Name);
+            }
             _context.Statuses.Remove(status);
             await _context.SaveChangesAsync(cancellationToken);
         }

@@ -17,7 +17,7 @@ public sealed class GlobalTagServiceTests
         book.BookTags.Add(new BookTag { Book = book, Tag = privateTag });
         context.AddRange(privateTag, book);
         await context.SaveChangesAsync();
-        var service = new GlobalTagService(context);
+        var service = new GlobalTagService(context, new NoopCache());
 
         var global = await service.CreateAsync("favorite", "Shared tag", CancellationToken.None);
 
@@ -32,7 +32,7 @@ public sealed class GlobalTagServiceTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var service = new GlobalTagService(context);
+        var service = new GlobalTagService(context, new NoopCache());
         var global = await service.CreateAsync("official", null, CancellationToken.None);
         var book = TestData.Book(database.UserId, "Tagged book");
         book.BookTags.Add(new BookTag { Book = book, Tag = global });
@@ -43,5 +43,10 @@ public sealed class GlobalTagServiceTests
 
         Assert.False(await context.Tags.AnyAsync(tag => tag.Id == global.Id));
         Assert.False(await context.Set<BookTag>().AnyAsync(link => link.TagId == global.Id));
+    }
+
+    private sealed class NoopCache : Application.Common.Interfaces.IBookListCacheInvalidator
+    {
+        public Task InvalidateBooksAsync(Guid ownerId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }

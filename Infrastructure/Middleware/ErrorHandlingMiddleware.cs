@@ -277,6 +277,9 @@ public class ErrorHandlingMiddleware
 
             case EntityInUseException<Tag>:
             case EntityInUseException<Author>:
+            case EntityInUseException<Genre>:
+            case EntityInUseException<Status>:
+            case EntityInUseException<ContentType>:
                 statusCode = HttpStatusCode.Conflict;
                 title = ConflictTitle;
                 detail = exception.Message;

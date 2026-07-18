@@ -43,6 +43,9 @@ public class ErrorHandlingMiddlewareTests
         { new EntityNotFoundException<Author, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         { new EntityInUseException<Tag>("favorite"), StatusCodes.Status409Conflict, "Conflict" },
         { new EntityInUseException<Author>("Er Gen"), StatusCodes.Status409Conflict, "Conflict" },
+        { new EntityInUseException<Genre>("Fantasy"), StatusCodes.Status409Conflict, "Conflict" },
+        { new EntityInUseException<Status>("Reading"), StatusCodes.Status409Conflict, "Conflict" },
+        { new EntityInUseException<ContentType>("Novel"), StatusCodes.Status409Conflict, "Conflict" },
         {
             new FullImportCapacityExceededException("Full import capacity reached."),
             StatusCodes.Status429TooManyRequests, "Full Import Capacity Reached"
