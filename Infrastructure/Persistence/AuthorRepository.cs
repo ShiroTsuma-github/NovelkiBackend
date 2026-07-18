@@ -36,8 +36,20 @@ public class AuthorRepository(ApplicationDbContext context) : IAuthorRepository
     public async Task<IEnumerable<Author>> SearchAsync(Guid ownerId, string? search, int take,
         CancellationToken cancellationToken)
     {
-        return await SearchQuery(context.Authors.Include(a => a.Names)
-            .Where(a => a.IsPublic || a.OwnerId == ownerId), search)
+        var availableAuthors = context.Authors
+            .Where(author => author.IsPublic || author.OwnerId == ownerId)
+            .Where(author => !author.IsPublic || !context.Authors.Any(privateAuthor =>
+                !privateAuthor.IsPublic &&
+                privateAuthor.OwnerId == ownerId &&
+                (privateAuthor.NormalizedPrimaryName == author.NormalizedPrimaryName ||
+                 privateAuthor.Names.Any(privateName =>
+                     privateName.NormalizedName == author.NormalizedPrimaryName) ||
+                 author.Names.Any(publicName =>
+                     publicName.NormalizedName == privateAuthor.NormalizedPrimaryName) ||
+                 privateAuthor.Names.Any(privateName =>
+                     author.Names.Any(publicName => publicName.NormalizedName == privateName.NormalizedName)))));
+
+        return await SearchQuery(availableAuthors.Include(a => a.Names), search)
             .OrderBy(a => a.IsPublic)
             .ThenBy(a => a.PrimaryName)
             .Take(take)
