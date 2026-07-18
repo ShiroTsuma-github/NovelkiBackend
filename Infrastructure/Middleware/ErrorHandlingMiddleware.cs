@@ -253,6 +253,13 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Book cover not found");
                 break;
 
+            case EntityNotFoundException<PublicBookSnapshot, Guid>:
+                statusCode = HttpStatusCode.NotFound;
+                title = NotFoundTitle;
+                detail = exception.Message;
+                _logger.LogWarning("Public book snapshot not found");
+                break;
+
             case EntityNotFoundException<Tag, Guid>:
             case EntityNotFoundException<Author, Guid>:
                 statusCode = HttpStatusCode.NotFound;
