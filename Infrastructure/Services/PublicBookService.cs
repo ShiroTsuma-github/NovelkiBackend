@@ -25,10 +25,12 @@ public sealed class PublicBookService(
         {
             var normalized = MappingExtensions.NormalizeName(search);
             query = query.Where(snapshot => snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
-                                            (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)));
+                                            snapshot.AlternativeTitlesJson.ToUpper().Contains(normalized) ||
+                                            (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)) ||
+                                            snapshot.AuthorOtherNamesJson.ToUpper().Contains(normalized));
         }
         var total = await query.CountAsync(cancellationToken);
-        var snapshots = await query.OrderByDescending(snapshot => snapshot.SnapshotAt).ThenBy(snapshot => snapshot.PrimaryTitle)
+        var snapshots = await query.OrderBy(snapshot => snapshot.PrimaryTitle).ThenBy(snapshot => snapshot.Id)
             .Skip(skip).Take(take).ToListAsync(cancellationToken);
         return PaginatedResult<PublicBookSnapshotDto>.Create(skip, take, total, snapshots.Select(ToDto));
     }
