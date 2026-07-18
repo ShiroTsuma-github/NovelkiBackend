@@ -94,7 +94,11 @@ public static partial class MappingExtensions
             .ToList();
         destination.Cover = source.Cover?.ToDto(source.Id);
         destination.Genres = source.BookGenres.Select(bg => bg.Genre.Name).ToList();
+        destination.GenreDescriptions = source.BookGenres
+            .ToDictionary(bookGenre => bookGenre.Genre.Name, bookGenre => bookGenre.Genre.Description);
         destination.Tags = source.BookTags.Select(bt => bt.Tag.Name).ToList();
+        destination.TagDescriptions = source.BookTags
+            .ToDictionary(bookTag => bookTag.Tag.Name, bookTag => bookTag.Tag.Description);
         destination.Links = source.Links.Select(l => new BookLinkDto
         {
             Id = l.Id,
