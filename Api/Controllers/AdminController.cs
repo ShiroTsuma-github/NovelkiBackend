@@ -6,6 +6,7 @@ using Application.Features.BookFeatures.Queries.GetBook;
 using Application.Features.GenreFeatures.Commands;
 using Application.Features.StatusFeatures.Commands;
 using Application.Features.TypeFeatures.Commands;
+using Application.Features.TagFeatures.Commands;
 using Observability;
 
 [ApiController]
@@ -113,6 +114,33 @@ public class AdminController : ControllerBase
         _logger.LogInformation("Admin created genre. GenreId={GenreId}", genre.Id);
 
         return Created(ApiRoutes.GenreById(genre.Id), genre);
+    }
+
+    [HttpGet("tags")]
+    public async Task<IActionResult> SearchGlobalTags([FromQuery] SearchGlobalTagsQuery query)
+    {
+        return Ok(await _mediator.Send(query));
+    }
+
+    [HttpPost("tags")]
+    public async Task<IActionResult> CreateGlobalTag(CreateGlobalTagCommand command)
+    {
+        var tag = await _mediator.Send(command);
+        return Created($"/{ApiRoutes.Admin}/tags/{tag.Id}", tag);
+    }
+
+    [HttpPut("tags/{id:guid}")]
+    public async Task<IActionResult> UpdateGlobalTag(Guid id, UpdateGlobalTagCommand command)
+    {
+        command.Id = id;
+        return Ok(await _mediator.Send(command));
+    }
+
+    [HttpDelete("tags/{id:guid}")]
+    public async Task<IActionResult> DeleteGlobalTag(Guid id)
+    {
+        await _mediator.Send(new DeleteGlobalTagCommand(id));
+        return NoContent();
     }
 
     [HttpDelete("books/owner/{ownerId:guid}")]

@@ -1,0 +1,107 @@
+namespace Infrastructure.Services;
+
+using Application.Common;
+using Application.Common.Interfaces;
+
+public sealed class GlobalTagService(ApplicationDbContext context) : IGlobalTagService
+{
+    public async Task<IReadOnlyCollection<Tag>> SearchAsync(string? search, int take,
+        CancellationToken cancellationToken)
+    {
+        var query = context.Tags.Where(tag => tag.IsGlobal);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var normalized = MappingExtensions.NormalizeName(search);
+            query = query.Where(tag => tag.NormalizedName.Contains(normalized));
+        }
+
+        return await query.OrderBy(tag => tag.Name).Take(Math.Clamp(take, 1, 100)).ToListAsync(cancellationToken);
+    }
+
+    public async Task<Tag> CreateAsync(string name, string? description, CancellationToken cancellationToken)
+    {
+        var normalizedName = MappingExtensions.NormalizeName(name);
+        var existing = await context.Tags.FirstOrDefaultAsync(
+            tag => tag.IsGlobal && tag.NormalizedName == normalizedName, cancellationToken);
+        if (existing is not null)
+        {
+            throw new EntityAlreadyExistsException<Tag, Guid>(name, existing.Id);
+        }
+
+        var tag = new Tag
+        {
+            IsGlobal = true,
+            OwnerId = null,
+            Name = MappingExtensions.CollapseWhitespace(name),
+            NormalizedName = normalizedName,
+            Description = TrimToNull(description)
+        };
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync(cancellationToken);
+        await MergePrivateDuplicatesAsync(tag, cancellationToken);
+        return tag;
+    }
+
+    public async Task<Tag> UpdateAsync(Guid id, string name, string? description,
+        CancellationToken cancellationToken)
+    {
+        var tag = await context.Tags.Include(item => item.BookTags)
+                      .FirstOrDefaultAsync(item => item.IsGlobal && item.Id == id, cancellationToken)
+                  ?? throw new EntityNotFoundException<Tag, Guid>(id);
+        var normalizedName = MappingExtensions.NormalizeName(name);
+        var conflict = await context.Tags.FirstOrDefaultAsync(
+            item => item.IsGlobal && item.Id != id && item.NormalizedName == normalizedName, cancellationToken);
+        if (conflict is not null)
+        {
+            throw new EntityAlreadyExistsException<Tag, Guid>(name, conflict.Id);
+        }
+
+        tag.Name = MappingExtensions.CollapseWhitespace(name);
+        tag.NormalizedName = normalizedName;
+        tag.Description = TrimToNull(description);
+        await context.SaveChangesAsync(cancellationToken);
+        await MergePrivateDuplicatesAsync(tag, cancellationToken);
+        return tag;
+    }
+
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken)
+    {
+        var tag = await context.Tags.FirstOrDefaultAsync(item => item.IsGlobal && item.Id == id, cancellationToken)
+                  ?? throw new EntityNotFoundException<Tag, Guid>(id);
+        context.Tags.Remove(tag);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task MergePrivateDuplicatesAsync(Tag globalTag, CancellationToken cancellationToken)
+    {
+        var privateTags = await context.Tags
+            .Include(tag => tag.BookTags)
+            .Where(tag => !tag.IsGlobal && tag.NormalizedName == globalTag.NormalizedName)
+            .ToListAsync(cancellationToken);
+        if (privateTags.Count == 0)
+        {
+            return;
+        }
+
+        var globallyLinkedBookIds = await context.Set<Domain.Associations.BookTag>()
+            .Where(link => link.TagId == globalTag.Id)
+            .Select(link => link.BookId)
+            .ToHashSetAsync(cancellationToken);
+        foreach (var privateTag in privateTags)
+        {
+            foreach (var link in privateTag.BookTags.ToList())
+            {
+                context.Remove(link);
+                if (globallyLinkedBookIds.Add(link.BookId))
+                {
+                    context.Add(new Domain.Associations.BookTag { BookId = link.BookId, TagId = globalTag.Id });
+                }
+            }
+        }
+
+        context.Tags.RemoveRange(privateTags);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+}

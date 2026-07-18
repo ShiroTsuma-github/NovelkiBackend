@@ -148,6 +148,22 @@ export const api = {
     apiRequest<DictionaryDto>('/admin/types', { method: 'POST', body: request }),
   createAdminGenre: (request: DictionaryMutationRequest) =>
     apiRequest<DictionaryDto>('/admin/genres', { method: 'POST', body: request }),
+  updateAdminStatus: (id: string, request: DictionaryMutationRequest) =>
+    apiRequest<DictionaryDto>(`/status/${id}`, { method: 'PUT', body: request }),
+  deleteAdminStatus: (id: string) => apiRequest<void>(`/status/${id}`, { method: 'DELETE' }),
+  updateAdminType: (id: string, request: DictionaryMutationRequest) =>
+    apiRequest<DictionaryDto>(`/type/${id}`, { method: 'PUT', body: request }),
+  deleteAdminType: (id: string) => apiRequest<void>(`/type/${id}`, { method: 'DELETE' }),
+  updateAdminGenre: (id: string, request: DictionaryMutationRequest) =>
+    apiRequest<DictionaryDto>(`/genre/${id}`, { method: 'PUT', body: request }),
+  deleteAdminGenre: (id: string) => apiRequest<void>(`/genre/${id}`, { method: 'DELETE' }),
+  searchAdminGlobalTags: (search = '', take = 100) =>
+    apiRequest<TagDto[]>(`/admin/tags${toQueryString({ search, take })}`),
+  createAdminGlobalTag: (request: DictionaryMutationRequest) =>
+    apiRequest<TagDto>('/admin/tags', { method: 'POST', body: request }),
+  updateAdminGlobalTag: (id: string, request: DictionaryMutationRequest) =>
+    apiRequest<TagDto>(`/admin/tags/${id}`, { method: 'PUT', body: request }),
+  deleteAdminGlobalTag: (id: string) => apiRequest<void>(`/admin/tags/${id}`, { method: 'DELETE' }),
   deleteAdminBooksByOwner: (ownerId: string) =>
     apiRequest<AdminLibraryPurgeResult>(`/admin/books/owner/${ownerId}`, { method: 'DELETE' }),
 }
