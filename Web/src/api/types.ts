@@ -62,7 +62,9 @@ export type BookDto = {
   progressHistory: BookProgressHistoryDto[]
   cover?: BookCoverDto | null
   genres: string[]
+  genreDescriptions: Record<string, string | null>
   tags: string[]
+  tagDescriptions: Record<string, string | null>
   links: BookLinkDto[]
 }
 

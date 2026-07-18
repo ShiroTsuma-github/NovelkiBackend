@@ -1,3 +1,5 @@
+import { useId, type ReactNode } from 'react'
+
 type MetadataSummaryProps = {
   primary: string
   alternatives: string[]
@@ -35,40 +37,89 @@ export function DescribedMetadataPills({
   values,
   descriptions = {},
   maxVisible = 3,
+  empty = '-',
+  variant = 'table',
 }: {
   values: string[]
   descriptions?: Record<string, string | null | undefined>
   maxVisible?: number
+  empty?: ReactNode
+  variant?: 'table' | 'detail'
 }) {
   if (!values.length) {
-    return '-'
+    return empty
   }
 
   const visibleValues = values.slice(0, maxVisible)
   const hiddenValues = values.slice(maxVisible)
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className={`flex flex-wrap ${variant === 'detail' ? 'gap-2' : 'gap-1'}`}>
       {visibleValues.map((value) => (
-        <span
-          aria-label={descriptions[value] ? `${value}: ${descriptions[value]}` : undefined}
-          className="book-table-badge rounded px-2 py-1 text-xs"
+        <DescribedMetadataPill
+          description={descriptions[value]}
           key={value}
-          title={descriptions[value] ?? undefined}
-        >
-          {value}
-        </span>
+          value={value}
+          variant={variant}
+        />
       ))}
       {hiddenValues.length > 0 ? (
         <span
           aria-label={`${hiddenValues.length} more: ${hiddenValues.join(', ')}`}
-          className="book-table-badge rounded px-2 py-1 text-xs font-medium"
-          title={hiddenValues.join(', ')}
+          className={variant === 'detail'
+            ? 'rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700'
+            : 'book-table-badge rounded px-2 py-1 text-xs font-medium'}
+          title={hiddenValues.join('\n')}
         >
           +{hiddenValues.length} more
         </span>
       ) : null}
     </div>
+  )
+}
+
+function DescribedMetadataPill({
+  value,
+  description,
+  variant,
+}: {
+  value: string
+  description?: string | null
+  variant: 'table' | 'detail'
+}) {
+  const tooltipId = useId()
+
+  if (variant === 'detail') {
+    return (
+      <span className="group relative">
+        <span
+          aria-describedby={description ? tooltipId : undefined}
+          className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"
+          tabIndex={description ? 0 : undefined}
+        >
+          {value}
+        </span>
+        {description ? (
+          <span
+            className="ui-chart-tooltip pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 text-xs font-normal leading-5 group-hover:block group-focus-within:block"
+            id={tooltipId}
+            role="tooltip"
+          >
+            {description}
+          </span>
+        ) : null}
+      </span>
+    )
+  }
+
+  return (
+    <span
+      aria-label={description ? `${value}: ${description}` : undefined}
+      className="book-table-badge rounded px-2 py-1 text-xs"
+      title={description ?? undefined}
+    >
+      {value}
+    </span>
   )
 }
 

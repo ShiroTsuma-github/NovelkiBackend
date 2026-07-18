@@ -3,14 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
 import { api } from '@/api/client'
-import { books, genres } from '@/test/fixtures'
+import { books } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { BookDetailsPage, getProgressHistoryWithDeltas } from './BookDetailsPage'
 
 vi.mock('@/api/client', () => ({
   api: {
     getBook: vi.fn(),
-    getGenres: vi.fn(),
     deleteBook: vi.fn(),
     refreshBookCover: vi.fn(),
   },
@@ -85,7 +84,6 @@ describe('BookDetailsPage', () => {
   })
 
   it('renders positive and negative deltas in the changelog header', async () => {
-    vi.mocked(api.getGenres).mockResolvedValue({ skip: 0, take: 100, total: genres.length, data: genres })
     vi.mocked(api.getBook).mockResolvedValue({
       ...books[0],
       progressHistory: [
@@ -122,7 +120,6 @@ describe('BookDetailsPage', () => {
   })
 
   it('uses the shared dialog surface and readable title hierarchy', async () => {
-    vi.mocked(api.getGenres).mockResolvedValue({ skip: 0, take: 100, total: genres.length, data: genres })
     vi.mocked(api.getBook).mockResolvedValue(books[0])
     const user = userEvent.setup()
 
@@ -145,7 +142,6 @@ describe('BookDetailsPage', () => {
   })
 
   it('replaces a technical cover download error with a helpful generic message', async () => {
-    vi.mocked(api.getGenres).mockResolvedValue({ skip: 0, take: 100, total: genres.length, data: genres })
     vi.mocked(api.getBook).mockResolvedValue({
       ...books[0],
       cover: {
@@ -164,5 +160,22 @@ describe('BookDetailsPage', () => {
 
     expect(await screen.findByText(/A cover was found, but the image could not be downloaded/)).toBeInTheDocument()
     expect(screen.queryByText(/301 \(Moved Permanently\)/)).not.toBeInTheDocument()
+  })
+
+  it('shows tag descriptions through the shared metadata component', async () => {
+    vi.mocked(api.getBook).mockResolvedValue(books[0])
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    const tag = await screen.findByText('favorite')
+    const tooltipId = tag.getAttribute('aria-describedby')
+
+    expect(tooltipId).toBeTruthy()
+    expect(document.getElementById(tooltipId!)).toHaveTextContent('A personal favorite.')
   })
 })
