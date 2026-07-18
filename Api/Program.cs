@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Security.Claims;
 using Api;
 using Api.Health;
 using Api.Observability;
@@ -5,6 +7,7 @@ using Application;
 using Infrastructure;
 using Infrastructure.Middleware;
 using Serilog.Events;
+using DependencyInjection = Api.DependencyInjection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -43,9 +46,9 @@ app.UseSerilogRequestLogging(options =>
         diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
         diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
         diagnosticContext.Set("RequestId", httpContext.TraceIdentifier);
-        diagnosticContext.Set("TraceId", System.Diagnostics.Activity.Current?.TraceId.ToString() ?? string.Empty);
-        diagnosticContext.Set("SpanId", System.Diagnostics.Activity.Current?.SpanId.ToString() ?? string.Empty);
-        var userId = httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        diagnosticContext.Set("TraceId", Activity.Current?.TraceId.ToString() ?? string.Empty);
+        diagnosticContext.Set("SpanId", Activity.Current?.SpanId.ToString() ?? string.Empty);
+        var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!string.IsNullOrWhiteSpace(userId))
         {
             diagnosticContext.Set("UserId", userId);
@@ -71,9 +74,10 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
-app.UseCors(Api.DependencyInjection.FrontendCorsPolicy);
+app.UseCors(DependencyInjection.FrontendCorsPolicy);
 
 app.UseAuthentication();
+app.UseAccountBlock();
 app.UseRateLimiter();
 app.UseAuthorization();
 

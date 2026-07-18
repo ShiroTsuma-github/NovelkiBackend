@@ -1,32 +1,33 @@
 ﻿namespace Infrastructure.Identity;
 
-using Application.Common;
+using System.Security.Cryptography;
+using System.Text;
 using Application.Common.DTOs.User;
 using Application.Common.Models;
 using Authentication;
-using Microsoft.EntityFrameworkCore;
-using System.Security.Cryptography;
-using System.Text;
-using Contexts;
+using Services;
 
 public class IdentityService : IIdentityService
 {
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
-    private readonly UserManager<User> _userManager;
-    private readonly SignInManager<User> _signInManager;
-    private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly AccountAbuseGuard _accountAbuseGuard;
     private readonly ApplicationDbContext _context;
+    private readonly IJwtTokenGenerator _jwtTokenGenerator;
+    private readonly SignInManager<User> _signInManager;
+    private readonly UserManager<User> _userManager;
 
     public IdentityService(
         UserManager<User> userManager,
         SignInManager<User> signInManager,
         IJwtTokenGenerator jwtTokenGenerator,
-        ApplicationDbContext context)
+        ApplicationDbContext context,
+        AccountAbuseGuard accountAbuseGuard)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _jwtTokenGenerator = jwtTokenGenerator;
         _context = context;
+        _accountAbuseGuard = accountAbuseGuard;
     }
 
     public async Task<TokenResponse> LoginUser(LoginDto login, CancellationToken cancellation)
@@ -46,6 +47,7 @@ public class IdentityService : IIdentityService
             throw new WrongPasswordException();
         }
 
+        var roles = await _userManager.GetRolesAsync(user);
         var authUser = new AuthUser
         {
             Username = user.UserName,
@@ -53,9 +55,10 @@ public class IdentityService : IIdentityService
             Id = user.Id,
             CreatedAt = user.CreatedAt,
             IsAuthenticated = true,
-            Roles = await _userManager.GetRolesAsync(user),
+            Roles = roles,
             Valid = true
         };
+        await _accountAbuseGuard.ThrowIfBlockedAsync(authUser, cancellation);
 
         var tokenResponse = _jwtTokenGenerator.GenerateToken(authUser);
         if (tokenResponse == null)
@@ -110,6 +113,19 @@ public class IdentityService : IIdentityService
         var user = await _userManager.FindByIdAsync(storedToken.UserId.ToString())
                    ?? throw new UnauthorizedAccessException("Refresh token user no longer exists.");
 
+        var roles = await _userManager.GetRolesAsync(user);
+        var authUser = new AuthUser
+        {
+            Username = user.UserName,
+            Email = user.Email,
+            Id = user.Id,
+            CreatedAt = user.CreatedAt,
+            IsAuthenticated = true,
+            Roles = roles,
+            Valid = true
+        };
+        await _accountAbuseGuard.ThrowIfBlockedAsync(authUser, cancellationToken);
+
         storedToken.RevokedAt = DateTimeOffset.UtcNow;
         storedToken.ReasonRevoked = "Rotated";
 
@@ -119,17 +135,6 @@ public class IdentityService : IIdentityService
         {
             UserId = user.Id, TokenHash = storedToken.ReplacedByTokenHash, ExpiresAt = nextRefreshToken.ExpiresAt
         });
-
-        var authUser = new AuthUser
-        {
-            Username = user.UserName,
-            Email = user.Email,
-            Id = user.Id,
-            CreatedAt = user.CreatedAt,
-            IsAuthenticated = true,
-            Roles = await _userManager.GetRolesAsync(user),
-            Valid = true
-        };
 
         var accessToken = _jwtTokenGenerator.GenerateToken(authUser)
                           ?? throw new TokenGeneratorFailedException();

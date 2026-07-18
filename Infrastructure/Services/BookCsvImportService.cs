@@ -40,6 +40,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
         BookCsvColumns.ProgressHistory
     ];
 
+    private readonly AccountAbuseGuard _abuseGuard;
+
     private readonly IBookCoverQueue _bookCoverQueue;
     private readonly IBookCoverStorage _bookCoverStorage;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
@@ -58,6 +60,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         IUser user,
         BookImportSessionStore sessionStore,
         BookImportConcurrencyGate concurrencyGate,
+        AccountAbuseGuard abuseGuard,
         IOptions<BookImportSecurityOptions> securityOptions)
     {
         _context = context;
@@ -67,6 +70,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
         _user = user;
         _sessionStore = sessionStore;
         _concurrencyGate = concurrencyGate;
+        _abuseGuard = abuseGuard;
         _securityOptions = securityOptions.Value;
     }
 
@@ -89,6 +93,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
     public async Task<BookImportSessionDto> CreateFullSessionAsync(Stream archiveStream, string fileName,
         CancellationToken cancellationToken)
     {
+        await _abuseGuard.ThrowIfBlockedAsync(_user, cancellationToken);
         using var operationLease = _concurrencyGate.TryAcquire();
         using var sessionReservation = _sessionStore.ReserveFullSession(_user.RequiredId);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -96,6 +101,16 @@ public sealed class BookCsvImportService : IBookCsvImportService
         try
         {
             return await CreateFullSessionCoreAsync(archiveStream, fileName, sessionReservation, timeout.Token);
+        }
+        catch (SuspiciousBookImportException exception)
+        {
+            if (AccountAbuseGuard.IsAdmin(_user))
+            {
+                throw new ValidationException(exception.Message);
+            }
+
+            var blockedUntil = await _abuseGuard.BlockAsync(_user, exception.ReasonCode, CancellationToken.None);
+            throw new AccountTemporarilyBlockedException(blockedUntil);
         }
         catch (InvalidDataException)
         {
@@ -869,29 +884,90 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
         long declaredTotal = 0;
+        long compressedTotal = 0;
+        string? excessiveCompressionEntry = null;
         foreach (var entry in archive.Entries)
         {
+            if (IsTraversalOrRootAttempt(entry.FullName))
+            {
+                throw new SuspiciousBookImportException("archive-path-traversal",
+                    "Full backup contains an archive path that attempts to escape its allowed directory.");
+            }
+
+            if (IsLinkOrReparseEntry(entry))
+            {
+                throw new SuspiciousBookImportException("archive-link-entry",
+                    "Full backup contains a link or reparse-point archive entry.");
+            }
+
             if (!IsSafeArchiveEntryName(entry.FullName) || !entries.TryAdd(entry.FullName, entry))
             {
                 throw new ValidationException($"Full backup contains an unsafe or duplicate entry '{entry.FullName}'.");
             }
 
-            if (entry.Length < 0 || entry.CompressedLength < 0 ||
-                entry.Length > _securityOptions.MaxUncompressedArchiveBytes - declaredTotal)
+            if (entry.Length < 0 || entry.CompressedLength < 0)
             {
+                throw new ValidationException("Full backup archive contains invalid size metadata.");
+            }
+
+            if (entry.Length > 0)
+            {
+                var compressionRatio = entry.CompressedLength == 0
+                    ? double.PositiveInfinity
+                    : entry.Length / (double)entry.CompressedLength;
+                if (entry.Length >= _securityOptions.SuspiciousCompressionMinimumBytes &&
+                    compressionRatio > _securityOptions.SuspiciousCompressionRatio)
+                {
+                    throw new SuspiciousBookImportException("extreme-compression-ratio",
+                        "Full backup contains an entry with an extreme compression ratio.");
+                }
+
+                if (compressionRatio > _securityOptions.MaxCompressionRatio)
+                {
+                    excessiveCompressionEntry ??= entry.FullName;
+                }
+            }
+
+            if (entry.CompressedLength > long.MaxValue - compressedTotal)
+            {
+                throw new ValidationException("Full backup archive contains invalid size metadata.");
+            }
+
+            if (entry.Length > _securityOptions.MaxUncompressedArchiveBytes - declaredTotal)
+            {
+                var projectedDeclaredTotal = declaredTotal + (double)entry.Length;
+                var projectedCompressedTotal = compressedTotal + (double)entry.CompressedLength;
+                var projectedRatio = projectedCompressedTotal == 0
+                    ? double.PositiveInfinity
+                    : projectedDeclaredTotal / projectedCompressedTotal;
+                if (projectedDeclaredTotal >= _securityOptions.SuspiciousCompressionMinimumBytes &&
+                    projectedRatio > _securityOptions.SuspiciousCompressionRatio)
+                {
+                    throw new SuspiciousBookImportException("extreme-archive-compression-ratio",
+                        "Full backup has an extreme overall compression ratio.");
+                }
+
                 throw new ValidationException("Full backup archive is too large.");
             }
 
             declaredTotal += entry.Length;
-            if (entry.Length > 0)
-            {
-                if (entry.CompressedLength == 0 ||
-                    entry.Length / (double)entry.CompressedLength > _securityOptions.MaxCompressionRatio)
-                {
-                    throw new ValidationException(
-                        $"Full backup entry '{entry.FullName}' has a suspicious compression ratio.");
-                }
-            }
+            compressedTotal += entry.CompressedLength;
+        }
+
+        var archiveCompressionRatio = compressedTotal == 0
+            ? double.PositiveInfinity
+            : declaredTotal / (double)compressedTotal;
+        if (declaredTotal >= _securityOptions.SuspiciousCompressionMinimumBytes &&
+            archiveCompressionRatio > _securityOptions.SuspiciousCompressionRatio)
+        {
+            throw new SuspiciousBookImportException("extreme-archive-compression-ratio",
+                "Full backup has an extreme overall compression ratio.");
+        }
+
+        if (excessiveCompressionEntry != null)
+        {
+            throw new ValidationException(
+                $"Full backup entry '{excessiveCompressionEntry}' has a suspicious compression ratio.");
         }
 
         return entries;
@@ -915,6 +991,12 @@ public sealed class BookCsvImportService : IBookCsvImportService
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
+        }
+
+        if (IsTraversalOrRootAttempt(path))
+        {
+            throw new SuspiciousBookImportException("manifest-path-traversal",
+                "Full backup manifest contains a cover path that attempts to escape its allowed directory.");
         }
 
         if (!IsSafeCoverEntryName(path) || !referencedCoverPaths.Add(path))
@@ -955,6 +1037,32 @@ public sealed class BookCsvImportService : IBookCsvImportService
 
         var segments = name.Split('/');
         return segments.All(segment => segment.Length > 0 && segment is not "." and not "..");
+    }
+
+    private static bool IsTraversalOrRootAttempt(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+        {
+            return false;
+        }
+
+        if (name.Any(char.IsControl) || name.StartsWith('/') || name.StartsWith('\\') ||
+            (name.Length >= 2 && char.IsAsciiLetter(name[0]) && name[1] == ':'))
+        {
+            return true;
+        }
+
+        var normalized = name.Replace('\\', '/');
+        return normalized.Split('/').Any(segment => segment == "..");
+    }
+
+    private static bool IsLinkOrReparseEntry(ZipArchiveEntry entry)
+    {
+        const int unixFileTypeMask = 0xF000;
+        const int unixSymbolicLink = 0xA000;
+        const int windowsReparsePoint = 0x0400;
+        var unixFileType = (entry.ExternalAttributes >> 16) & unixFileTypeMask;
+        return unixFileType == unixSymbolicLink || (entry.ExternalAttributes & windowsReparsePoint) != 0;
     }
 
     private static bool IsSafeCoverEntryName(string name)
@@ -1003,7 +1111,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
     {
         await using var source = entry.Open();
         using var destination = new MemoryStream((int)Math.Min(entry.Length, maximumBytes));
-        await CopyBoundedAsync(source, destination, maximumBytes, entry.FullName, budget, cancellationToken);
+        await CopyBoundedAsync(source, destination, maximumBytes, entry.Length, entry.FullName, budget,
+            cancellationToken);
         return destination.ToArray();
     }
 
@@ -1017,7 +1126,8 @@ public sealed class BookCsvImportService : IBookCsvImportService
                              FileShare.None, 64 * 1024,
                              FileOptions.Asynchronous | FileOptions.SequentialScan))
             {
-                await CopyBoundedAsync(source, destination, maximumBytes, entry.FullName, budget, cancellationToken);
+                await CopyBoundedAsync(source, destination, maximumBytes, entry.Length, entry.FullName, budget,
+                    cancellationToken);
             }
 
             var mimeType = await DetectCoverMimeTypeAsync(destinationPath, cancellationToken)
@@ -1039,11 +1149,12 @@ public sealed class BookCsvImportService : IBookCsvImportService
         CancellationToken cancellationToken)
     {
         await using var source = entry.Open();
-        await CopyBoundedAsync(source, Stream.Null, maximumBytes, entry.FullName, budget, cancellationToken);
+        await CopyBoundedAsync(source, Stream.Null, maximumBytes, entry.Length, entry.FullName, budget,
+            cancellationToken);
     }
 
-    private static async Task CopyBoundedAsync(Stream source, Stream destination, long maximumBytes, string entryName,
-        ArchiveReadBudget budget, CancellationToken cancellationToken)
+    private static async Task CopyBoundedAsync(Stream source, Stream destination, long maximumBytes,
+        long declaredLength, string entryName, ArchiveReadBudget budget, CancellationToken cancellationToken)
     {
         var buffer = new byte[64 * 1024];
         long entryBytes = 0;
@@ -1056,6 +1167,12 @@ public sealed class BookCsvImportService : IBookCsvImportService
             }
 
             entryBytes += read;
+            if (entryBytes > declaredLength)
+            {
+                throw new SuspiciousBookImportException("forged-uncompressed-size",
+                    "Full backup contains an entry whose decompressed size exceeds its declared size.");
+            }
+
             if (entryBytes > maximumBytes)
             {
                 throw new ValidationException($"Full backup entry '{entryName}' is too large after decompression.");

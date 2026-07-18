@@ -125,6 +125,23 @@ public class ErrorHandlingMiddleware
                     context.TraceIdentifier);
                 break;
 
+            case AccountTemporarilyBlockedException blockedException:
+                statusCode = HttpStatusCode.TooManyRequests;
+                title = "Account Temporarily Blocked";
+                detail = blockedException.Message;
+                errors = new Dictionary<string, IReadOnlyCollection<string>>
+                {
+                    ["General"] = new[] { blockedException.Message }
+                };
+                var remainingSeconds = Math.Max(1,
+                    (long)Math.Ceiling((blockedException.BlockedUntilUtc - DateTimeOffset.UtcNow).TotalSeconds));
+                context.Response.Headers.RetryAfter = remainingSeconds.ToString();
+                _logger.LogWarning(
+                    "Blocked account request rejected for {Method} {Path}. BlockedUntilUtc={BlockedUntilUtc} TraceId={TraceId}",
+                    context.Request.Method, context.Request.Path, blockedException.BlockedUntilUtc,
+                    context.TraceIdentifier);
+                break;
+
             case FullImportCapacityExceededException:
                 statusCode = HttpStatusCode.TooManyRequests;
                 title = "Full Import Capacity Reached";

@@ -11,6 +11,9 @@ using Domain.Entities;
 using Domain.Models;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Persistence;
 using Services;
@@ -454,10 +457,14 @@ public class BookCsvImportServiceTests
             "covers/../escape.jpg",
             [0xFF, 0xD8, 0xFF, 0x00]);
 
-        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+        var exception = await Assert.ThrowsAsync<AccountTemporarilyBlockedException>(() =>
             service.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None));
 
-        Assert.Contains("unsafe", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(exception.BlockedUntilUtc > DateTimeOffset.UtcNow.AddHours(23));
+
+        using var validArchive = CreateValidFullBackup("Blocked Attempt");
+        await Assert.ThrowsAsync<AccountTemporarilyBlockedException>(() =>
+            service.CreateFullSessionAsync(validArchive, "valid.zip", CancellationToken.None));
     }
 
     [Fact]
@@ -465,7 +472,8 @@ public class BookCsvImportServiceTests
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());
         await using var context = database.CreateContext();
-        var service = CreateService(context, database.UserId);
+        var options = Options.Create(new BookImportSecurityOptions { SuspiciousCompressionMinimumBytes = 128 * 1024 });
+        var service = CreateService(context, database.UserId, securityOptions: options);
         var oversizedTitle = new string('A', 500_000);
         using var archive = CreateFullBackup(
             $"primaryTitle,contentType,status\n{oversizedTitle},Novel,Reading\n",
@@ -473,10 +481,98 @@ public class BookCsvImportServiceTests
             "covers/000001/original.jpg",
             [0xFF, 0xD8, 0xFF, 0x00]);
 
-        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+        var exception = await Assert.ThrowsAsync<AccountTemporarilyBlockedException>(() =>
             service.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None));
 
+        Assert.True(exception.BlockedUntilUtc > DateTimeOffset.UtcNow.AddHours(23));
+    }
+
+    [Fact]
+    public async Task FullImport_SmallHighlyCompressibleEntry_ShouldBeRejectedWithoutApplyingBlock()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        var repetitiveTitle = new string('A', 500_000);
+        using var archive = CreateFullBackup(
+            $"primaryTitle,contentType,status\n{repetitiveTitle},Novel,Reading\n",
+            new BookFullBackupManifest(),
+            "covers/000001/original.jpg",
+            [0xFF, 0xD8, 0xFF, 0x00]);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateFullSessionAsync(archive, "compressed.zip", CancellationToken.None));
         Assert.Contains("compression ratio", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        using var validArchive = CreateValidFullBackup("Allowed After Small Compressed Entry");
+        var session = await service.CreateFullSessionAsync(validArchive, "valid.zip", CancellationToken.None);
+        await service.CancelAsync(session.SessionId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task FullImport_SymbolicLinkEntry_ShouldApplyBlock()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        using var archive = CreateValidFullBackup("Link Attempt", zip =>
+        {
+            var entry = zip.CreateEntry("covers/link");
+            entry.ExternalAttributes = unchecked((int)0xA0000000);
+            using var stream = entry.Open();
+            stream.WriteByte(1);
+        });
+
+        await Assert.ThrowsAsync<AccountTemporarilyBlockedException>(() =>
+            service.CreateFullSessionAsync(archive, "link.zip", CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task FullImport_MissingManifest_ShouldNotBlockLaterValidImport()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var service = CreateService(context, database.UserId);
+        using var archive = new MemoryStream();
+        using (var zip = new ZipArchive(archive, ZipArchiveMode.Create, true))
+        {
+            var csvEntry = zip.CreateEntry("books.csv", CompressionLevel.NoCompression);
+            using var writer = new StreamWriter(csvEntry.Open(), Encoding.UTF8);
+            writer.Write("primaryTitle,contentType,status\nMissing Manifest,Novel,Reading\n");
+        }
+
+        archive.Position = 0;
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateFullSessionAsync(archive, "missing-manifest.zip", CancellationToken.None));
+        Assert.Contains("manifest.json", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        using var validArchive = CreateValidFullBackup("Allowed After Ordinary Error");
+        var session = await service.CreateFullSessionAsync(validArchive, "valid.zip", CancellationToken.None);
+        await service.CancelAsync(session.SessionId, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task FullImport_Admin_ShouldRejectSuspiciousArchiveWithoutApplyingBlock()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var options = Options.Create(new BookImportSecurityOptions { SuspiciousCompressionMinimumBytes = 128 * 1024 });
+        var service = CreateService(context, database.UserId, securityOptions: options,
+            roles: [AuthorizationRoles.Admin]);
+        var oversizedTitle = new string('A', 500_000);
+        using var suspiciousArchive = CreateFullBackup(
+            $"primaryTitle,contentType,status\n{oversizedTitle},Novel,Reading\n",
+            new BookFullBackupManifest(),
+            "covers/000001/original.jpg",
+            [0xFF, 0xD8, 0xFF, 0x00]);
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            service.CreateFullSessionAsync(suspiciousArchive, "suspicious.zip", CancellationToken.None));
+        Assert.Contains("extreme compression ratio", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+        using var validArchive = CreateValidFullBackup("Admin Still Allowed");
+        var session = await service.CreateFullSessionAsync(validArchive, "valid.zip", CancellationToken.None);
+        await service.CancelAsync(session.SessionId, CancellationToken.None);
     }
 
     [Fact]
@@ -760,17 +856,24 @@ public class BookCsvImportServiceTests
         IBookCoverStorage? coverStorage = null,
         IOptions<BookImportSecurityOptions>? securityOptions = null,
         BookImportSessionStore? sessionStore = null,
-        BookImportConcurrencyGate? concurrencyGate = null)
+        BookImportConcurrencyGate? concurrencyGate = null,
+        AccountAbuseGuard? abuseGuard = null,
+        IEnumerable<string>? roles = null)
     {
         var effectiveOptions = securityOptions ?? ImportSecurityOptions;
+        var effectiveAbuseGuard = abuseGuard ?? new AccountAbuseGuard(
+            new MemoryDistributedCache(Options.Create(new MemoryDistributedCacheOptions())),
+            effectiveOptions,
+            NullLogger<AccountAbuseGuard>.Instance);
         return new BookCsvImportService(
             context,
             queue ?? new TrackingBookCoverQueue(),
             coverStorage ?? new StubBookCoverStorage(),
             cacheInvalidator ?? new TrackingCacheInvalidator(),
-            new TestUser(ownerId),
+            new TestUser(ownerId, roles),
             sessionStore ?? ImportSessionStore,
             concurrencyGate ?? ImportConcurrencyGate,
+            effectiveAbuseGuard,
             effectiveOptions);
     }
 
@@ -890,16 +993,18 @@ public class BookCsvImportServiceTests
 
     private sealed class TestUser : IUser
     {
-        public TestUser(Guid id)
+        public TestUser(Guid id, IEnumerable<string>? roles = null)
         {
             Id = id;
+            Roles = roles ?? [];
         }
 
         public Guid? Id { get; }
         public Guid RequiredId => Id!.Value;
         public string? Email => "reader@example.com";
         public string? Username => "reader";
-        public IEnumerable<string> Roles => Array.Empty<string>();
+        public IEnumerable<string> Roles { get; }
+
         public bool IsAuthenticated => true;
         public bool Valid => true;
     }
