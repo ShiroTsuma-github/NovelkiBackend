@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { renderWithProviders } from '@/test/render'
+import { bookListItems, paginated } from '@/test/fixtures'
 import { ManagePage } from './ManagePage'
 
 vi.mock('@/api/client', () => ({
@@ -16,6 +17,11 @@ vi.mock('@/api/client', () => ({
     updateAuthor: vi.fn(),
     updateAuthorVisibility: vi.fn(),
     deleteAuthor: vi.fn(),
+    getBooks: vi.fn(),
+    searchPublicBooks: vi.fn(),
+    publishBook: vi.fn(),
+    refreshPublishedBook: vi.fn(),
+    unlistPublishedBook: vi.fn(),
   },
 }))
 
@@ -41,6 +47,22 @@ const author = {
   isPublic: false,
 }
 
+const publishedBook = {
+  id: 'snapshot-1',
+  sourceBookId: bookListItems[0].id,
+  primaryTitle: bookListItems[0].primaryTitle,
+  description: 'A snapshot',
+  alternativeTitles: ['LOTM'],
+  author: 'Cuttlefish',
+  authorOtherNames: ['Cuttlefish That Loves Diving'],
+  contentType: 'Novel',
+  genres: [{ name: 'Fantasy', description: 'Magic' }],
+  tags: [{ name: 'mystery', description: 'Secrets' }],
+  coverUrl: null,
+  snapshotAt: '2026-07-18T12:00:00Z',
+  isOwner: true,
+}
+
 describe('ManagePage', () => {
   beforeEach(() => {
     vi.mocked(api.searchTags).mockReset().mockResolvedValue([tag])
@@ -52,6 +74,11 @@ describe('ManagePage', () => {
     vi.mocked(api.updateAuthor).mockReset().mockResolvedValue(author)
     vi.mocked(api.updateAuthorVisibility).mockReset().mockResolvedValue(author)
     vi.mocked(api.deleteAuthor).mockReset().mockResolvedValue(undefined)
+    vi.mocked(api.getBooks).mockReset().mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.searchPublicBooks).mockReset().mockResolvedValue(paginated([publishedBook]))
+    vi.mocked(api.publishBook).mockReset().mockResolvedValue(publishedBook)
+    vi.mocked(api.refreshPublishedBook).mockReset().mockResolvedValue(publishedBook)
+    vi.mocked(api.unlistPublishedBook).mockReset().mockResolvedValue(undefined)
   })
 
   it('opens a tag on double click and saves its description', async () => {
@@ -145,5 +172,20 @@ describe('ManagePage', () => {
     await user.click(screen.getByRole('button', { name: 'Make public' }))
 
     await waitFor(() => expect(api.updateAuthorVisibility).toHaveBeenCalledWith(author.id, true))
+  })
+
+  it('lists, refreshes, and unlists books from the books section', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Books' }))
+    await user.click(await screen.findByRole('button', { name: `Refresh listing ${bookListItems[0].primaryTitle}` }))
+    await waitFor(() => expect(api.refreshPublishedBook).toHaveBeenCalledWith(publishedBook.id))
+
+    await user.click(screen.getByRole('button', { name: `Unlist ${bookListItems[0].primaryTitle}` }))
+    await waitFor(() => expect(api.unlistPublishedBook).toHaveBeenCalledWith(publishedBook.id))
+
+    await user.click(screen.getByRole('button', { name: `List ${bookListItems[1].primaryTitle}` }))
+    await waitFor(() => expect(api.publishBook).toHaveBeenCalledWith(bookListItems[1].id))
   })
 })

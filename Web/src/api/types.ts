@@ -68,6 +68,31 @@ export type BookDto = {
   links: BookLinkDto[]
 }
 
+export type PublicBookMetadataDto = {
+  name: string
+  description?: string | null
+}
+
+export type PublicBookSnapshotDto = {
+  id: string
+  sourceBookId: string
+  primaryTitle: string
+  description?: string | null
+  alternativeTitles: string[]
+  author?: string | null
+  authorOtherNames: string[]
+  contentType: string
+  genres: PublicBookMetadataDto[]
+  tags: PublicBookMetadataDto[]
+  coverUrl?: string | null
+  snapshotAt: string
+  isOwner: boolean
+}
+
+export type CopyPublicBookResult = {
+  bookId: string
+}
+
 export type BookListItemDto = {
   id: string
   created: string
