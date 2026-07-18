@@ -1,0 +1,1 @@
+jak podam type:manga w analytics i wyszukam i potem klikne np. rating 8, to przenosi mnie na default page z 8, a nie type:manga rating:8
