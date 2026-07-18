@@ -18,6 +18,8 @@ vi.mock('@/api/client', () => ({
     getTypes: vi.fn(),
     getGenres: vi.fn(),
     searchAdminGlobalTags: vi.fn(),
+    getAdminUsers: vi.fn(),
+    deleteAdminUser: vi.fn(),
   },
 }))
 
@@ -32,6 +34,7 @@ describe('AdminPage', () => {
   beforeEach(() => {
     vi.mocked(api.getAdminBooks).mockReset()
     vi.mocked(api.getStatuses).mockResolvedValue({ skip: 0, take: 100, total: 0, data: [] })
+    vi.mocked(api.getAdminUsers).mockResolvedValue({ skip: 0, take: 100, total: 0, data: [] })
   })
 
   it('filters admin books using the normalized query string', async () => {

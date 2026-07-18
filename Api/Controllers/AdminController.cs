@@ -7,6 +7,7 @@ using Application.Features.GenreFeatures.Commands;
 using Application.Features.StatusFeatures.Commands;
 using Application.Features.TypeFeatures.Commands;
 using Application.Features.TagFeatures.Commands;
+using Application.Features.AccountFeatures;
 using Observability;
 
 [ApiController]
@@ -154,6 +155,23 @@ public class AdminController : ControllerBase
             result.DeletedBooks,
             result.DeletedAuthors,
             result.DeletedTags);
+        return Ok(result);
+    }
+
+    [HttpGet("users")]
+    public async Task<IActionResult> GetUsers([FromQuery] GetAdminUsersQuery query,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _mediator.Send(query, cancellationToken));
+    }
+
+    [HttpDelete("users/{userId:guid}")]
+    public async Task<IActionResult> DeleteUser(Guid userId, CancellationToken cancellationToken)
+    {
+        var result = await _mediator.Send(new DeleteAdminUserCommand(userId), cancellationToken);
+        _logger.LogInformation(
+            "Admin deleted account. UserId={UserId} DeletedBooks={DeletedBooks} DeletedAuthors={DeletedAuthors} DeletedTags={DeletedTags}",
+            result.UserId, result.DeletedBooks, result.DeletedAuthors, result.DeletedTags);
         return Ok(result);
     }
 }

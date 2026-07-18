@@ -460,6 +460,23 @@ export type TagDto = {
   isGlobal: boolean
 }
 
+export type AdminUserDto = {
+  id: string
+  username?: string | null
+  email?: string | null
+  createdAt: string
+  booksCount: number
+  tagsCount: number
+  authorsCreatedCount: number
+}
+
+export type AdminAccountDeleteResult = {
+  userId: string
+  deletedBooks: number
+  deletedAuthors: number
+  deletedTags: number
+}
+
 export type CreateTagRequest = {
   name: string
   description?: string | null

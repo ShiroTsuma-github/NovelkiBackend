@@ -142,6 +142,20 @@ public class ErrorHandlingMiddleware
                     context.TraceIdentifier);
                 break;
 
+            case EntityNotFoundException<User, Guid>:
+                statusCode = HttpStatusCode.NotFound;
+                title = NotFoundTitle;
+                detail = exception.Message;
+                _logger.LogWarning("Admin account target was not found");
+                break;
+
+            case CannotDeleteCurrentAccountException:
+                statusCode = HttpStatusCode.Conflict;
+                title = ConflictTitle;
+                detail = exception.Message;
+                _logger.LogWarning("Administrator attempted to delete the active account");
+                break;
+
             case FullImportCapacityExceededException:
                 statusCode = HttpStatusCode.TooManyRequests;
                 title = "Full Import Capacity Reached";
