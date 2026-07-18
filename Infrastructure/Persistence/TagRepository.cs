@@ -13,30 +13,33 @@ public class TagRepository : ITagRepository
     {
         return await _context.Tags
             .Include(t => t.BookTags)
-            .FirstOrDefaultAsync(t => t.OwnerId == ownerId && t.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(t => !t.IsGlobal && t.OwnerId == ownerId && t.Id == id, cancellationToken);
     }
 
     public async Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
-        return await _context.Tags.FirstOrDefaultAsync(
-            t => t.OwnerId == ownerId && t.NormalizedName == normalizedName,
-            cancellationToken);
+        return await _context.Tags
+            .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && t.NormalizedName == normalizedName)
+            .OrderByDescending(t => t.IsGlobal)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,
         CancellationToken cancellationToken)
     {
         var normalizedNames = names.Select(MappingExtensions.NormalizeName).Distinct().ToList();
-        return await _context.Tags
-            .Where(t => t.OwnerId == ownerId && normalizedNames.Contains(t.NormalizedName))
+        var matches = await _context.Tags
+            .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && normalizedNames.Contains(t.NormalizedName))
+            .OrderByDescending(t => t.IsGlobal)
             .ToListAsync(cancellationToken);
+        return matches.GroupBy(t => t.NormalizedName).Select(group => group.First()).ToList();
     }
 
     public async Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,
         CancellationToken cancellationToken)
     {
-        var query = _context.Tags.Where(t => t.OwnerId == ownerId);
+        var query = _context.Tags.Where(t => t.IsGlobal || t.OwnerId == ownerId);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var normalizedSearch = MappingExtensions.NormalizeName(search);

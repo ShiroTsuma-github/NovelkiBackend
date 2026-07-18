@@ -254,6 +254,13 @@ public class ErrorHandlingMiddleware
                 _logger.LogWarning("Author alias already exists. ExistingId={ExistingId}", authorConflict.ExistingId);
                 break;
 
+            case EntityAlreadyExistsException<Tag, Guid> tagConflict:
+                statusCode = HttpStatusCode.Conflict;
+                title = ConflictTitle;
+                detail = $"The tag name '{tagConflict.Name}' already exists.";
+                _logger.LogWarning("Tag already exists. ExistingId={ExistingId}", tagConflict.ExistingId);
+                break;
+
             case EntityInUseException<Tag>:
             case EntityInUseException<Author>:
                 statusCode = HttpStatusCode.Conflict;

@@ -22,6 +22,14 @@ public class AuthorController : ControllerBase
         return Ok(authors);
     }
 
+    [HttpPost]
+    [Authorize]
+    public async Task<IActionResult> Create(CreateAuthorCommand command)
+    {
+        var author = await _mediator.Send(command);
+        return Created($"/{ApiRoutes.Author}/{author.Id}", author);
+    }
+
     [HttpPut(ApiRouteTemplates.Id)]
     [Authorize]
     public async Task<IActionResult> Update(Guid id, UpdateAuthorCommand command)

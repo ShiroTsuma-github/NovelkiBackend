@@ -941,13 +941,13 @@ public class BookFeatureTests
         {
             var normalized = names.Select(MappingExtensions.NormalizeName).ToList();
             return Task.FromResult<IEnumerable<Tag>>(_tags
-                .Where(t => t.OwnerId == ownerId && normalized.Contains(t.NormalizedName)).ToList());
+                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && normalized.Contains(t.NormalizedName)).ToList());
         }
 
         public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
             return Task.FromResult(_tags.FirstOrDefault(t =>
-                t.OwnerId == ownerId && t.NormalizedName == MappingExtensions.NormalizeName(name)));
+                (t.IsGlobal || t.OwnerId == ownerId) && t.NormalizedName == MappingExtensions.NormalizeName(name)));
         }
 
         public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,

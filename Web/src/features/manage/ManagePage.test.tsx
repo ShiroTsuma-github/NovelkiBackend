@@ -9,6 +9,8 @@ vi.mock('@/api/client', () => ({
   api: {
     searchTags: vi.fn(),
     searchAuthors: vi.fn(),
+    createTag: vi.fn(),
+    createAuthor: vi.fn(),
     updateTag: vi.fn(),
     deleteTag: vi.fn(),
     updateAuthor: vi.fn(),
@@ -28,6 +30,7 @@ const tag = {
   name: 'favorite',
   description: 'The best ones',
   color: null,
+  isGlobal: false,
 }
 
 const author = {
@@ -40,6 +43,8 @@ describe('ManagePage', () => {
   beforeEach(() => {
     vi.mocked(api.searchTags).mockReset().mockResolvedValue([tag])
     vi.mocked(api.searchAuthors).mockReset().mockResolvedValue([author])
+    vi.mocked(api.createTag).mockReset().mockResolvedValue(tag)
+    vi.mocked(api.createAuthor).mockReset().mockResolvedValue(author)
     vi.mocked(api.updateTag).mockReset().mockResolvedValue(tag)
     vi.mocked(api.deleteTag).mockReset().mockResolvedValue(undefined)
     vi.mocked(api.updateAuthor).mockReset().mockResolvedValue(author)
@@ -92,5 +97,38 @@ describe('ManagePage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Confirm delete' }))
     await waitFor(() => expect(api.deleteTag).toHaveBeenCalledWith(tag.id))
+  })
+
+  it('creates tags and authors from the active section', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(await screen.findByRole('button', { name: 'Add tag' }))
+    await user.type(screen.getByLabelText('Tag name'), 'to review')
+    await user.type(screen.getByLabelText('Description'), 'Needs another look')
+    await user.click(screen.getByRole('button', { name: 'Create tag' }))
+    await waitFor(() => expect(api.createTag).toHaveBeenCalledWith({
+      name: 'to review',
+      description: 'Needs another look',
+    }))
+
+    await user.click(screen.getByRole('tab', { name: 'Authors' }))
+    await user.click(await screen.findByRole('button', { name: 'Add author' }))
+    await user.type(screen.getByLabelText('Primary name'), 'New Author')
+    await user.type(screen.getByLabelText('Alternative names'), 'Pen Name')
+    await user.click(screen.getByRole('button', { name: 'Create author' }))
+    await waitFor(() => expect(api.createAuthor).toHaveBeenCalledWith({
+      primaryName: 'New Author',
+      otherNames: ['Pen Name'],
+    }))
+  })
+
+  it('shows global tags as read-only', async () => {
+    vi.mocked(api.searchTags).mockResolvedValue([{ ...tag, id: 'global-tag', name: 'official', isGlobal: true }])
+    renderWithProviders(<ManagePage />)
+
+    expect(await screen.findByText('Global')).toBeInTheDocument()
+    expect(screen.getByText('Managed by admin')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit tag official' })).not.toBeInTheDocument()
   })
 })

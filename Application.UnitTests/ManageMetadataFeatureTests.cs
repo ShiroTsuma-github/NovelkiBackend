@@ -29,6 +29,34 @@ public class ManageMetadataFeatureTests
     }
 
     [Fact]
+    public async Task CreateTag_ShouldCreatePrivateTagButRejectGlobalName()
+    {
+        var global = CreateTag(null, "official");
+        global.IsGlobal = true;
+        var repository = new FakeTagRepository(global);
+        var handler = new CreateTagCommandHandler(repository, new FakeUser());
+
+        var created = await handler.Handle(new CreateTagCommand("to review", " Later "), CancellationToken.None);
+        Assert.False(created.IsGlobal);
+        Assert.Equal("Later", created.Description);
+
+        await Assert.ThrowsAsync<EntityAlreadyExistsException<Tag, Guid>>(() =>
+            handler.Handle(new CreateTagCommand("official"), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task CreateAuthor_ShouldCreatePrimaryAndAlternativeNames()
+    {
+        var repository = new FakeAuthorRepository();
+        var handler = new CreateAuthorCommandHandler(repository);
+
+        var created = await handler.Handle(new CreateAuthorCommand("New Author", ["Pen Name"]), CancellationToken.None);
+
+        Assert.Equal("New Author", created.PrimaryName);
+        Assert.Equal(["Pen Name"], created.OtherNames);
+    }
+
+    [Fact]
     public async Task DeleteTag_ShouldRejectTagStillUsedByBook()
     {
         var tag = CreateTag(OwnerId, "favorite");
@@ -100,7 +128,7 @@ public class ManageMetadataFeatureTests
         Assert.False(repository.Deleted);
     }
 
-    private static Tag CreateTag(Guid ownerId, string name)
+    private static Tag CreateTag(Guid? ownerId, string name)
     {
         return new Tag { OwnerId = ownerId, Name = name, NormalizedName = MappingExtensions.NormalizeName(name) };
     }
@@ -152,7 +180,7 @@ public class ManageMetadataFeatureTests
 
         public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
-            return Task.FromResult(_tags.FirstOrDefault(tag => tag.OwnerId == ownerId &&
+            return Task.FromResult(_tags.FirstOrDefault(tag => (tag.IsGlobal || tag.OwnerId == ownerId) &&
                                                                tag.NormalizedName ==
                                                                MappingExtensions.NormalizeName(name)));
         }

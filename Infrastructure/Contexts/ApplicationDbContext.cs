@@ -240,13 +240,17 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         modelBuilder.Entity<Tag>(entity =>
         {
             entity.HasIndex(t => new { t.OwnerId, t.NormalizedName }).IsUnique();
+            entity.HasIndex(t => t.NormalizedName)
+                .IsUnique()
+                .HasFilter("\"IsGlobal\" = TRUE");
             entity.Property(t => t.Name).HasMaxLength(100);
             entity.Property(t => t.NormalizedName).HasMaxLength(100);
             entity.Property(t => t.Color).HasMaxLength(32);
             entity.HasOne<User>()
                 .WithMany(u => u.OwnedTags)
                 .HasForeignKey(t => t.OwnerId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Cascade)
+                .IsRequired(false);
         });
     }
 

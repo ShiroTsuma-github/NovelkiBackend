@@ -24,6 +24,8 @@ import type {
   UpdateProgressRequest,
   UpdateAuthorRequest,
   UpdateTagRequest,
+  CreateAuthorRequest,
+  CreateTagRequest,
 } from './types'
 
 export const api = {
@@ -114,12 +116,16 @@ export const api = {
     apiRequest<AuthorDto[]>(
       `/author${toQueryString({ search, take, mineOnly: mineOnly || undefined })}`,
     ),
+  createAuthor: (request: CreateAuthorRequest) =>
+    apiRequest<AuthorDto>('/author', { method: 'POST', body: request }),
   updateAuthor: (id: string, request: UpdateAuthorRequest) =>
     apiRequest<AuthorDto>(`/author/${id}`, { method: 'PUT', body: request }),
   deleteAuthor: (id: string) =>
     apiRequest<void>(`/author/${id}`, { method: 'DELETE' }),
   searchTags: (search: string, take = 10) =>
     apiRequest<TagDto[]>(`/tag${toQueryString({ search, take })}`),
+  createTag: (request: CreateTagRequest) =>
+    apiRequest<TagDto>('/tag', { method: 'POST', body: request }),
   updateTag: (id: string, request: UpdateTagRequest) =>
     apiRequest<TagDto>(`/tag/${id}`, { method: 'PUT', body: request }),
   deleteTag: (id: string) =>
