@@ -78,6 +78,7 @@ app.UseCors(DependencyInjection.FrontendCorsPolicy);
 
 app.UseAuthentication();
 app.UseAccountBlock();
+app.UseSuspiciousRequestDetection();
 app.UseRateLimiter();
 app.UseAuthorization();
 
