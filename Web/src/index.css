@@ -1385,6 +1385,8 @@ select.ui-control {
 }
 
 .book-card {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   transition: border-color 120ms ease, background-color 120ms ease;
 }

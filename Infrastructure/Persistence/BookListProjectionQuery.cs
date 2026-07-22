@@ -107,11 +107,7 @@ public sealed class BookListProjectionQuery
                 LastModified = book.LastModified,
                 OwnerId = book.OwnerId,
                 PrimaryTitle = book.PrimaryTitle,
-                Description = book.Description == null
-                    ? null
-                    : book.Description.Length > 80
-                        ? book.Description.Substring(0, 77) + "..."
-                        : book.Description,
+                Description = book.Description,
                 AlternativeTitles = book.Titles
                     .Where(title => !title.IsPrimary)
                     .OrderBy(title => title.Id)
@@ -134,11 +130,7 @@ public sealed class BookListProjectionQuery
                 TotalChapters = book.TotalChapters,
                 Rating = book.Rating,
                 Priority = book.Priority,
-                Notes = book.Notes == null
-                    ? null
-                    : book.Notes.Length > 80
-                        ? book.Notes.Substring(0, 77) + "..."
-                        : book.Notes,
+                Notes = book.Notes,
                 Genres = book.BookGenres
                     .OrderBy(bookGenre => bookGenre.Genre.Name)
                     .Select(bookGenre => bookGenre.Genre.Name)

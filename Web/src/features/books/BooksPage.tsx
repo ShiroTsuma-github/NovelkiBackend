@@ -69,11 +69,11 @@ const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', widthClass: 'w-20', render: (book) => book.priority ?? '-' },
   { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', widthClass: 'w-40', render: (book) => formatDate(book.created) },
   { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-40', render: (book) => formatDate(book.lastModified || book.created) },
-  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-40', render: (book) => <DescribedMetadataPills descriptions={book.genreDescriptions} values={book.genres} /> },
-  { id: 'tags', label: 'Tags', defaultVisible: true, widthClass: 'w-40', render: (book) => <DescribedMetadataPills descriptions={book.tagDescriptions} values={book.tags} /> },
+  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-40', render: (book) => <DescribedMetadataPills descriptions={book.genreDescriptions} totalCount={book.genresCount} values={book.genres} /> },
+  { id: 'tags', label: 'Tags', defaultVisible: true, widthClass: 'w-40', render: (book) => <DescribedMetadataPills descriptions={book.tagDescriptions} totalCount={book.tagsCount} values={book.tags} /> },
   { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.linksCount },
-  { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-56', render: (book) => truncate(book.notes) },
-  { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-56', render: (book) => truncate(book.description) },
+  { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-56', render: (book) => <TruncatedCellText value={book.notes} /> },
+  { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-56', render: (book) => <TruncatedCellText value={book.description} /> },
 ]
 
 const bookCardFields: ColumnDefinition<BookListItemDto>[] = [
@@ -711,13 +711,13 @@ function BookCardGrid({
   })
 
   return (
-    <div className={`grid gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
+    <div className={`grid min-w-0 gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
-        <Surface as="article" className="book-card" key={book.id} tone="muted">
-          <Link className="grid" to={`/books/${book.id}`}>
-            <div className="relative">
+        <Surface as="article" className="book-card min-w-0 w-full max-w-full" key={book.id} tone="muted">
+          <Link className="grid min-w-0 w-full max-w-full overflow-hidden" to={`/books/${book.id}`}>
+            <div className="relative min-w-0 max-w-full overflow-hidden">
               <BookCoverArtwork
-                className="book-card__cover w-full"
+                className="book-card__cover min-w-0 w-full max-w-full"
                 cover={book.cover}
                 emptyLabel="No cover"
                 preferredVariant="thumbnail"
@@ -731,37 +731,37 @@ function BookCardGrid({
                 </span>
               ) : null}
               {hasCardField(fields, 'status') ? (
-                <span className={`absolute bottom-3 right-3 inline-flex max-w-[calc(100%-1.5rem)] items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(book.status)}`}>
-                  <span className="truncate">{book.status}</span>
+                <span className={`absolute bottom-3 right-3 inline-flex min-w-0 max-w-[calc(100%-1.5rem)] items-center overflow-hidden rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(book.status)}`}>
+                  <span className="min-w-0 max-w-full truncate" title={book.status}>{book.status}</span>
                 </span>
               ) : null}
             </div>
-            <div className={`grid gap-1 p-3 ${cardDetailsClass}`}>
+            <div className={`grid min-w-0 max-w-full gap-1 overflow-hidden p-3 ${cardDetailsClass}`}>
               {showTitle ? (
-                <div className="min-h-10">
-                  <h2 className={`line-clamp-2 font-semibold text-slate-950 ${cardText.title}`}>{book.primaryTitle}</h2>
+                <div className="min-w-0 max-w-full overflow-hidden min-h-10">
+                  <h2 className={`min-w-0 max-w-full line-clamp-2 break-words font-semibold text-slate-950 ${cardText.title}`} title={book.primaryTitle}>{book.primaryTitle}</h2>
                 </div>
               ) : null}
               {showAlternativeTitles ? (
-                <div className="min-h-10">
-                  <p className={`line-clamp-2 text-slate-500 ${cardText.meta}`}>{formatList(book.alternativeTitles)}</p>
+                <div className="min-w-0 max-w-full overflow-hidden min-h-10">
+                  <p className={`min-w-0 max-w-full line-clamp-2 break-words text-slate-500 ${cardText.meta}`} title={formatListTooltip(book.alternativeTitles, book.alternativeTitlesCount)}>{formatList(book.alternativeTitles)}</p>
                 </div>
               ) : null}
               {showAuthor ? (
-                <div className={cardRowMinHeights.author}>
-                  <p className={`truncate text-slate-500 ${cardText.meta}`}>{book.author ?? 'Unknown author'}</p>
+                <div className={`min-w-0 max-w-full overflow-hidden ${cardRowMinHeights.author}`}>
+                  <p className={`min-w-0 max-w-full truncate text-slate-500 ${cardText.meta}`} title={book.author ?? 'Unknown author'}>{book.author ?? 'Unknown author'}</p>
                 </div>
               ) : null}
               {showProgress || showType ? (
-                <div className={`flex items-end justify-between gap-3 ${cardRowMinHeights.progress}`}>
+                <div className={`flex min-w-0 max-w-full items-end justify-between gap-3 overflow-hidden ${cardRowMinHeights.progress}`}>
                   <div className="min-w-0 flex-1">
                     {showProgress ? (
-                      <p className={`truncate font-medium text-slate-700 ${cardText.meta}`}>{formatProgress(book)}</p>
+                      <p className={`truncate font-medium text-slate-700 ${cardText.meta}`} title={formatProgress(book)}>{formatProgress(book)}</p>
                     ) : null}
                   </div>
-                  <div className="shrink-0 text-right">
+                  <div className="min-w-0 max-w-[50%] flex-1 text-right">
                     {showType ? (
-                      <p className={`font-semibold italic tracking-wide text-slate-700 ${cardText.meta}`}>{book.contentType}</p>
+                      <p className={`min-w-0 max-w-full truncate font-semibold italic tracking-wide text-slate-700 ${cardText.meta}`} title={book.contentType}>{book.contentType}</p>
                     ) : null}
                   </div>
                 </div>
@@ -1032,12 +1032,20 @@ function formatList(values: string[]) {
   return values.length ? values.slice(0, 3).join(', ') : '-'
 }
 
-function truncate(value?: string | null) {
-  if (!value) {
+function formatListTooltip(values: string[], totalCount = values.length) {
+  if (!values.length) {
     return '-'
   }
 
-  return value.length > 80 ? `${value.slice(0, 77)}...` : value
+  const unlistedCount = Math.max(0, totalCount - values.length)
+  return [...values, unlistedCount ? `+${unlistedCount} more` : null]
+    .filter((line): line is string => Boolean(line))
+    .join('\n')
+}
+
+function TruncatedCellText({ value }: { value?: string | null }) {
+  const text = value || '-'
+  return <span className="block truncate" title={value ?? undefined}>{text}</span>
 }
 
 function buildAnalyticsHref(query: string) {

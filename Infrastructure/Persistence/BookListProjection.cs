@@ -76,7 +76,7 @@ internal static class BookListProjectionMapper
             });
     }
 
-    private static BookCoverDto? MapCoverProjection(BookListProjection projection)
+    private static BookCoverSummaryDto? MapCoverProjection(BookListProjection projection)
     {
         if (!projection.CoverStatus.HasValue)
         {
@@ -88,7 +88,7 @@ internal static class BookListProjectionMapper
                       ?? projection.CoverCreated
                       ?? DateTimeOffset.UnixEpoch;
 
-        return new BookCoverDto
+        return new BookCoverSummaryDto
         {
             Status = projection.CoverStatus.Value.ToString(),
             Source = projection.CoverSource?.ToString(),
