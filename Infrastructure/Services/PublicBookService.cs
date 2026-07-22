@@ -1,9 +1,12 @@
 namespace Infrastructure.Services;
 
 using System.Text.Json;
+using System.Linq.Expressions;
 using Application.Common.DTOs.Book;
 using Application.Common.Models;
 using Domain.Associations;
+using Domain.Repositories;
+using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Storage;
 
 public sealed class PublicBookService(
@@ -26,11 +29,7 @@ public sealed class PublicBookService(
         if (mineOnly) query = query.Where(snapshot => snapshot.OwnerId == user.RequiredId);
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var normalized = MappingExtensions.NormalizeName(search);
-            query = query.Where(snapshot => snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
-                                            snapshot.AlternativeTitlesJson.ToUpper().Contains(normalized) ||
-                                            (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)) ||
-                                            snapshot.AuthorOtherNamesJson.ToUpper().Contains(normalized));
+            query = ApplySearch(query, BookSearchQueryParser.Parse(search));
         }
 
         var total = await query.CountAsync(cancellationToken);
@@ -66,6 +65,7 @@ public sealed class PublicBookService(
                 }
 
                 var book = await LoadOwnedBookAsync(bookId, user.RequiredId, cancellationToken);
+                EnsurePublishable(book);
                 var snapshot = new PublicBookSnapshot
                 {
                     Id = Guid.NewGuid(),
@@ -128,6 +128,7 @@ public sealed class PublicBookService(
                 oldCoverPath = snapshot.CoverStoragePath;
                 oldThumbnailPath = snapshot.CoverThumbnailStoragePath;
                 var book = await LoadOwnedBookAsync(snapshot.SourceBookId, user.RequiredId, cancellationToken);
+                EnsurePublishable(book);
 
                 await ApplySnapshotAsync(snapshot, book, cancellationToken);
                 storedCover = await StoreSnapshotCoverAsync(snapshot, book.Cover, cancellationToken);
@@ -267,7 +268,8 @@ public sealed class PublicBookService(
                     ContentType = type,
                     StatusId = status.Id,
                     Status = status,
-                    CurrentChapterNumber = 0
+                    CurrentChapterNumber = 0,
+                    TotalChapters = snapshot.TotalChapters
                 };
                 book.Titles.Add(snapshot.PrimaryTitle.ToPrimaryTitle());
                 foreach (var title in Deserialize<string[]>(snapshot.AlternativeTitlesJson)
@@ -364,6 +366,7 @@ public sealed class PublicBookService(
             .Select(name => name.Name) ?? []);
         snapshot.PublicAuthorId = await PublishAuthorAsync(book.Author, cancellationToken);
         snapshot.ContentType = book.ContentType.Name;
+        snapshot.TotalChapters = book.TotalChapters;
         snapshot.GenresJson = Serialize(book.BookGenres.Select(link =>
             new PublicBookMetadataDto(link.Genre.Name, link.Genre.Description)));
         var tags = book.BookTags.Select(link => link.Tag).ToList();
@@ -640,6 +643,97 @@ public sealed class PublicBookService(
             .FirstOrDefaultAsync(book => book.Id == bookId && book.OwnerId == ownerId, cancellationToken)
         ?? throw new EntityNotFoundException<Book, Guid>(bookId);
 
+    private static void EnsurePublishable(Book book)
+    {
+        var missing = new List<string>();
+        if (string.IsNullOrWhiteSpace(book.Description)) missing.Add("description");
+        if (book.Author is null) missing.Add("author");
+        if (book.BookGenres.Count == 0) missing.Add("genre");
+        if (book.BookTags.Count == 0) missing.Add("tag");
+        if (book.Cover is null ||
+            book.Cover.Status is not (BookCoverStatus.Found or BookCoverStatus.Uploaded) ||
+            string.IsNullOrWhiteSpace(book.Cover.StoragePath))
+        {
+            missing.Add("stored cover");
+        }
+
+        if (missing.Count > 0)
+        {
+            throw new ValidationException(
+                $"The book cannot be listed publicly. Add: {string.Join(", ", missing)}.");
+        }
+    }
+
+    private static IQueryable<PublicBookSnapshot> ApplySearch(
+        IQueryable<PublicBookSnapshot> query,
+        BookSearchCriteria criteria)
+    {
+        if (criteria.Missing.Count > 0 || criteria.Dates.Count > 0 ||
+            criteria.Fields.Any(filter => filter.Field == BookSearchField.Status) ||
+            criteria.Numbers.Any(filter => filter.Field != BookSearchNumberField.TotalChapters) ||
+            criteria.Terms.Any(term => term.Contains(':', StringComparison.Ordinal)))
+        {
+            throw new ValidationException(
+                "Discover search supports title, author, description, genre, tag, type, and totalChapters. " +
+                "Missing metadata, rating, current chapter, label, status, priority, and date filters are private and unavailable.");
+        }
+
+        var predicates = criteria.Terms.Select(BuildGeneralSearchPredicate)
+            .Concat(criteria.Fields.Select(BuildFieldSearchPredicate))
+            .Concat(criteria.Numbers.Select(BuildNumberSearchPredicate));
+        var predicate = PredicateExpression.AndAll(predicates);
+        return predicate is null ? query : query.Where(predicate);
+    }
+
+    private static Expression<Func<PublicBookSnapshot, bool>> BuildGeneralSearchPredicate(string value)
+    {
+        var normalized = MappingExtensions.NormalizeName(value);
+        return snapshot => snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
+                           snapshot.AlternativeTitlesJson.ToUpper().Contains(normalized) ||
+                           (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)) ||
+                           snapshot.AuthorOtherNamesJson.ToUpper().Contains(normalized) ||
+                           (snapshot.Description != null && snapshot.Description.ToUpper().Contains(normalized)) ||
+                           snapshot.ContentType.ToUpper().Contains(normalized) ||
+                           snapshot.GenresJson.ToUpper().Contains(normalized) ||
+                           snapshot.TagsJson.ToUpper().Contains(normalized);
+    }
+
+    private static Expression<Func<PublicBookSnapshot, bool>> BuildFieldSearchPredicate(BookSearchFieldFilter filter)
+    {
+        return PredicateExpression.OrAll(filter.Values.Select(value =>
+        {
+            var normalized = MappingExtensions.NormalizeName(value);
+            return filter.Field switch
+            {
+                BookSearchField.Title =>
+                    (Expression<Func<PublicBookSnapshot, bool>>)(snapshot =>
+                        snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
+                        snapshot.AlternativeTitlesJson.ToUpper().Contains(normalized)),
+                BookSearchField.Author => snapshot =>
+                    (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)) ||
+                    snapshot.AuthorOtherNamesJson.ToUpper().Contains(normalized),
+                BookSearchField.Description => snapshot =>
+                    snapshot.Description != null && snapshot.Description.ToUpper().Contains(normalized),
+                BookSearchField.Genre => snapshot => snapshot.GenresJson.ToUpper().Contains(normalized),
+                BookSearchField.Tag => snapshot => snapshot.TagsJson.ToUpper().Contains(normalized),
+                BookSearchField.Type => snapshot => snapshot.ContentType.ToUpper().Contains(normalized),
+                _ => snapshot => false
+            };
+        })) ?? (_ => false);
+    }
+
+    private static Expression<Func<PublicBookSnapshot, bool>> BuildNumberSearchPredicate(BookSearchNumberFilter filter)
+    {
+        return filter.Operator switch
+        {
+            BookSearchOperator.GreaterThan => snapshot => snapshot.TotalChapters > filter.Value,
+            BookSearchOperator.GreaterThanOrEqual => snapshot => snapshot.TotalChapters >= filter.Value,
+            BookSearchOperator.LessThan => snapshot => snapshot.TotalChapters < filter.Value,
+            BookSearchOperator.LessThanOrEqual => snapshot => snapshot.TotalChapters <= filter.Value,
+            _ => snapshot => snapshot.TotalChapters == filter.Value
+        };
+    }
+
     private async Task<PublicBookSnapshot> GetOwnedSnapshotAsync(Guid id, CancellationToken cancellationToken) =>
         await context.PublicBookSnapshots.FirstOrDefaultAsync(item => item.Id == id && item.OwnerId == user.RequiredId,
             cancellationToken) ?? throw new EntityNotFoundException<PublicBookSnapshot, Guid>(id);
@@ -659,6 +753,7 @@ public sealed class PublicBookService(
         Author = snapshot.AuthorName,
         AuthorOtherNames = Deserialize<string[]>(snapshot.AuthorOtherNamesJson),
         ContentType = snapshot.ContentType,
+        TotalChapters = snapshot.TotalChapters,
         Genres = Deserialize<PublicBookMetadataDto[]>(snapshot.GenresJson),
         Tags = Deserialize<PublicBookMetadataDto[]>(snapshot.TagsJson),
         SnapshotAt = snapshot.SnapshotAt,

@@ -13,6 +13,7 @@ public sealed class PublicBookSnapshot : BaseAuditableEntity
     public required string AuthorOtherNamesJson { get; set; }
     public Guid? PublicAuthorId { get; set; }
     public required string ContentType { get; set; }
+    public decimal? TotalChapters { get; set; }
     public required string GenresJson { get; set; }
     public required string TagsJson { get; set; }
     public required string PublicTagIdsJson { get; set; }

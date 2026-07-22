@@ -208,11 +208,20 @@ function ManagedBooks({ books, published, actionId, loading, error, search, onPu
   }
 
   const snapshotByBookId = new Map(published.map((snapshot) => [snapshot.sourceBookId, snapshot]))
+  const sortedBooks = [...books].sort((left, right) => {
+    const listingOrder = Number(snapshotByBookId.has(right.id)) - Number(snapshotByBookId.has(left.id))
+    return listingOrder || left.primaryTitle.localeCompare(right.primaryTitle, undefined, {
+      sensitivity: 'base',
+      numeric: true,
+    })
+  })
   return (
-    <div className="manage-list" aria-label="Books">
-      {books.map((book) => {
+    <div className="manage-list" aria-label="Books" tabIndex={0}>
+      {sortedBooks.map((book) => {
         const snapshot = snapshotByBookId.get(book.id)
         const busy = actionId === book.id
+        const missingRequirements = getMissingListingRequirements(book)
+        const canPublish = missingRequirements.length === 0
         return (
           <div className="manage-item" key={book.id}>
             <span className="manage-item__icon"><BookOpen className="h-4 w-4" /></span>
@@ -226,8 +235,9 @@ function ManagedBooks({ books, published, actionId, loading, error, search, onPu
                 <button
                   aria-label={`Refresh listing ${book.primaryTitle}`}
                   className={buttonVariants.secondary}
-                  disabled={busy}
+                  disabled={busy || !canPublish}
                   type="button"
+                  title={canPublish ? undefined : `Required before refreshing: ${missingRequirements.join(', ')}`}
                   onClick={() => onRefresh(snapshot)}
                 >
                   <RefreshCw className="h-4 w-4" />
@@ -248,8 +258,9 @@ function ManagedBooks({ books, published, actionId, loading, error, search, onPu
               <button
                 aria-label={`List ${book.primaryTitle}`}
                 className={buttonVariants.primary}
-                disabled={busy}
+                disabled={busy || !canPublish}
                 type="button"
+                title={canPublish ? undefined : `Required before listing: ${missingRequirements.join(', ')}`}
                 onClick={() => onPublish(book)}
               >
                 <Globe2 className="h-4 w-4" />
@@ -264,9 +275,13 @@ function ManagedBooks({ books, published, actionId, loading, error, search, onPu
 }
 
 function TagList({ tags, onEdit }: { tags: TagDto[]; onEdit: (tag: TagDto) => void }) {
+  const sortedTags = [...tags].sort((left, right) => left.name.localeCompare(right.name, undefined, {
+    sensitivity: 'base',
+    numeric: true,
+  }))
   return (
-    <div className="manage-list" aria-label="Tags">
-      {tags.map((tag) => (
+    <div className="manage-list" aria-label="Tags" tabIndex={0}>
+      {sortedTags.map((tag) => (
         <ManageRow editable={!tag.isGlobal} key={tag.id} label={`Edit tag ${tag.name}`} onEdit={() => onEdit(tag)}>
           <span className="manage-item__icon"><Tags className="h-4 w-4" /></span>
           <span className="manage-item__body">
@@ -281,9 +296,13 @@ function TagList({ tags, onEdit }: { tags: TagDto[]; onEdit: (tag: TagDto) => vo
 }
 
 function AuthorList({ authors, onEdit }: { authors: AuthorDto[]; onEdit: (author: AuthorDto) => void }) {
+  const sortedAuthors = [...authors].sort((left, right) => left.primaryName.localeCompare(right.primaryName, undefined, {
+    sensitivity: 'base',
+    numeric: true,
+  }))
   return (
-    <div className="manage-list" aria-label="Authors">
-      {authors.map((author) => (
+    <div className="manage-list" aria-label="Authors" tabIndex={0}>
+      {sortedAuthors.map((author) => (
         <ManageRow key={author.id} label={`Edit author ${author.primaryName}`} onEdit={() => onEdit(author)}>
           <span className="manage-item__icon"><Users className="h-4 w-4" /></span>
           <span className="manage-item__body">
@@ -296,6 +315,18 @@ function AuthorList({ authors, onEdit }: { authors: AuthorDto[]; onEdit: (author
       ))}
     </div>
   )
+}
+
+function getMissingListingRequirements(book: BookListItemDto) {
+  const missing: string[] = []
+  if (!book.description?.trim()) missing.push('description')
+  if (!book.author?.trim()) missing.push('author')
+  if (book.genresCount === 0) missing.push('genre')
+  if (book.tagsCount === 0) missing.push('tag')
+  if (!book.cover || !['Found', 'Uploaded'].includes(book.cover.status) || !book.cover.imageUrl) {
+    missing.push('stored cover')
+  }
+  return missing
 }
 
 function ManageRow({ children, editable = true, label, onEdit }: { children: React.ReactNode; editable?: boolean; label: string; onEdit: () => void }) {

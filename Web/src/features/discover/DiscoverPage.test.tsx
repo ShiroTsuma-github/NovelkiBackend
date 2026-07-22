@@ -29,6 +29,7 @@ const snapshot = {
   author: 'Cuttlefish',
   authorOtherNames: ['Cuttlefish That Loves Diving'],
   contentType: 'Novel',
+  totalChapters: 1432,
   genres: [{ name: 'Fantasy', description: 'Magic and the impossible' }],
   tags: [{ name: 'Mystery', description: 'Secrets and investigations' }],
   coverUrl: null,
@@ -47,15 +48,16 @@ describe('DiscoverPage', () => {
     renderWithProviders(<DiscoverPage />)
 
     expect(await screen.findByText('Lord of Mysteries')).toBeInTheDocument()
+    expect(screen.getByText('1432')).toBeInTheDocument()
     expect(screen.getByText('Mystery')).toHaveAttribute('tabindex', '0')
     expect(screen.getByLabelText('2 alternative titles')).toHaveAttribute(
       'title',
       'Alternative titles:\nLOTM\nGuimi Zhi Zhu',
     )
 
-    await user.type(screen.getByPlaceholderText('Search by title or author…'), 'Cuttlefish')
+    await user.type(screen.getByPlaceholderText('Search title, author, genre, tag, type, or chapters…'), 'author:Cuttlefish')
     await waitFor(() => expect(api.searchPublicBooks).toHaveBeenCalledWith({
-      search: 'Cuttlefish',
+      search: 'author:Cuttlefish',
       skip: 0,
       take: 40,
     }))

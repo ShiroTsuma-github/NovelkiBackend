@@ -47,6 +47,7 @@ public sealed class PublicBookServiceTests
         });
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+        TestData.MakePublishable(book);
         context.AddRange(author, tag, genre, book);
         await context.SaveChangesAsync();
 
@@ -113,6 +114,7 @@ public sealed class PublicBookServiceTests
         tag.IsGlobal = true;
         var book = TestData.Book(database.UserId, "Public Metadata Book", author);
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+        TestData.MakePublishable(book);
         context.AddRange(author, tag, book);
         await context.SaveChangesAsync();
 
@@ -141,6 +143,7 @@ public sealed class PublicBookServiceTests
         var tag = TestData.Tag(targetId, "Shared by snapshot");
         var sourceBook = TestData.Book(targetId, "Account deletion snapshot", author);
         sourceBook.BookTags.Add(new BookTag { Book = sourceBook, Tag = tag });
+        TestData.MakePublishable(sourceBook);
         context.AddRange(author, tag, sourceBook);
         await context.SaveChangesAsync();
 
@@ -197,10 +200,12 @@ public sealed class PublicBookServiceTests
     private sealed class NoopStorage : IBookCoverStorage
     {
         public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
-            string? contentType, CancellationToken cancellationToken) => throw new NotSupportedException();
+            string? contentType, CancellationToken cancellationToken) => Task.FromResult(new BookCoverStoredFiles(
+                new BookCoverStoredVariant($"{ownerId:N}/{bookId:N}.jpg", "image/jpeg", 1, 10, 20),
+                new BookCoverStoredVariant($"{ownerId:N}/{bookId:N}.thumb.jpg", "image/jpeg", 1, 5, 10)));
 
         public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult<Stream>(new MemoryStream([1], false));
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken) =>
             Task.CompletedTask;

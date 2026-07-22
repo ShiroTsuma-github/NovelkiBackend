@@ -45,6 +45,7 @@ public enum BookSearchField
 {
     Title,
     Author,
+    Description,
     Tag,
     Genre,
     Status,

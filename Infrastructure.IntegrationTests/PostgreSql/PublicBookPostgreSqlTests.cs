@@ -94,6 +94,8 @@ public sealed class PublicBookPostgreSqlTests(PostgreSqlFixture fixture) : IAsyn
             var secondBook = TestData.Book(secondOwner, "Second race", secondAuthor);
             firstBook.BookTags.Add(new BookTag { Book = firstBook, Tag = firstTag });
             secondBook.BookTags.Add(new BookTag { Book = secondBook, Tag = secondTag });
+            TestData.MakePublishable(firstBook);
+            TestData.MakePublishable(secondBook);
             seed.AddRange(firstBook, secondBook);
             await seed.SaveChangesAsync();
             firstBookId = firstBook.Id;
@@ -129,6 +131,7 @@ public sealed class PublicBookPostgreSqlTests(PostgreSqlFixture fixture) : IAsyn
         {
             seed.Users.AddRange(User(OwnerId, "source"), User(targetOwner, "target"));
             var book = TestData.Book(OwnerId, "Copy race");
+            TestData.MakePublishable(book);
             seed.Books.Add(book);
             await seed.SaveChangesAsync();
             snapshotId = (await CreateService(seed, OwnerId).PublishAsync(book.Id, CancellationToken.None)).Id;
@@ -155,6 +158,7 @@ public sealed class PublicBookPostgreSqlTests(PostgreSqlFixture fixture) : IAsyn
         {
             seed.Users.Add(User(OwnerId, "owner"));
             var book = TestData.Book(OwnerId, "Double unlist");
+            TestData.MakePublishable(book);
             seed.Books.Add(book);
             await seed.SaveChangesAsync();
             bookId = book.Id;
@@ -206,6 +210,7 @@ public sealed class PublicBookPostgreSqlTests(PostgreSqlFixture fixture) : IAsyn
             var tag = TestData.Tag(OwnerId, "rollback-pg");
             var book = TestData.Book(OwnerId, "Rollback PG Book", author);
             book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+            TestData.MakePublishable(book);
             seed.Books.Add(book);
             await seed.SaveChangesAsync();
             bookId = book.Id;
@@ -229,6 +234,7 @@ public sealed class PublicBookPostgreSqlTests(PostgreSqlFixture fixture) : IAsyn
     {
         context.Users.Add(User(ownerId, title.Replace(' ', '-').ToLowerInvariant()));
         var book = TestData.Book(ownerId, title);
+        TestData.MakePublishable(book);
         context.Books.Add(book);
         await context.SaveChangesAsync();
         return book;
@@ -310,10 +316,12 @@ public sealed class PublicBookPostgreSqlTests(PostgreSqlFixture fixture) : IAsyn
     private sealed class NoopStorage : IBookCoverStorage
     {
         public Task<BookCoverStoredFiles> SaveAsync(Guid ownerId, Guid bookId, Stream content, string fileName,
-            string? contentType, CancellationToken cancellationToken) => throw new NotSupportedException();
+            string? contentType, CancellationToken cancellationToken) => Task.FromResult(new BookCoverStoredFiles(
+                new BookCoverStoredVariant($"{ownerId:N}/{bookId:N}.jpg", "image/jpeg", 1, 10, 20),
+                new BookCoverStoredVariant($"{ownerId:N}/{bookId:N}.thumb.jpg", "image/jpeg", 1, 5, 10)));
 
         public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
+            Task.FromResult<Stream>(new MemoryStream([1], false));
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken) =>
             Task.CompletedTask;
