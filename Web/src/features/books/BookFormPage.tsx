@@ -273,15 +273,6 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       const request = toBookMutationRequest(resolvedValues)
 
       if (mode === 'create') {
-        const duplicateQuery = await api.getBooks({
-          take: 10,
-          skip: 0,
-          query: `title:"${resolvedValues.primaryTitle.replaceAll('"', '')}"`,
-        })
-        if (duplicateQuery.total > 0) {
-          throw new Error('A book with this title already exists.')
-        }
-
         const created = await api.createBook(request)
         let coverError: string | null = null
         try {

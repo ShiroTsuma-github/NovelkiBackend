@@ -92,6 +92,25 @@ describe('BookFormPage', () => {
     expect(vi.mocked(api.createBook).mock.calls[0][0].currentChapterNumber).toBe(0)
   })
 
+  it('does not treat a title substring search result as an exact duplicate', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue({
+      skip: 0,
+      take: 10,
+      total: 1,
+      data: [{ ...books[0], primaryTitle: "History's Greatest Husband" }],
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.type(screen.getByLabelText('Primary title'), 'test')
+    await user.type(screen.getByLabelText('Current chapter'), '0')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.createBook).toHaveBeenCalled())
+    expect(api.getBooks).not.toHaveBeenCalled()
+  })
+
   it('requires current chapter and only accepts digits', async () => {
     const user = userEvent.setup()
     renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
