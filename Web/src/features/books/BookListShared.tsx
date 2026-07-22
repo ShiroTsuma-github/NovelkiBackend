@@ -293,7 +293,7 @@ export function ScrollShortcutButtons({
       {showBackToTop ? (
         <button
           aria-label="Back to top"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+          className="ui-icon-button--round inline-flex h-11 w-11 items-center justify-center border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
           type="button"
           onClick={onBackToTop}
         >
@@ -303,7 +303,7 @@ export function ScrollShortcutButtons({
       {showGoDown ? (
         <button
           aria-label="Go to bottom"
-          className="inline-flex h-11 w-11 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
+          className="ui-icon-button--round inline-flex h-11 w-11 items-center justify-center border border-slate-300 bg-white text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 hover:text-slate-950"
           type="button"
           onClick={onGoDown}
         >

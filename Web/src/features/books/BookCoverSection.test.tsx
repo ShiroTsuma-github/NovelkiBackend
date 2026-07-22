@@ -169,6 +169,28 @@ describe('BookCoverSection', () => {
     expect(screen.getByRole('img', { name: 'Book cover' })).toHaveAttribute('src', 'blob:cover-1')
   })
 
+  it('uses the circular icon-button variant for removing a cover', async () => {
+    const { container } = render(
+      <BookCoverArtwork
+        cover={{
+          ...baseCover,
+          imageUrl: '/api/v1/book/book-round/cover/file?v=round',
+          thumbnailImageUrl: '/api/v1/book/book-round/cover/thumbnail?v=round',
+        }}
+        interactive
+        title="Book cover"
+        onRemove={vi.fn()}
+      />,
+    )
+
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(container.querySelector('.ui-icon-button')).toHaveClass('ui-icon-button--round')
+  })
+
   it('prunes older cached variants even when existing cache keys are relative urls', async () => {
     cacheEntries.set('/api/v1/book/book-1/cover/file?v=old', new Response(new Blob(['old']), { status: 200 }))
 

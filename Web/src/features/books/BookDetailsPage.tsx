@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Edit, ExternalLink, Star, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { BookDto, BookLinkDto, BookProgressHistoryDto } from '@/api/types'
@@ -10,12 +10,15 @@ import { Badge, buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
+import { getBookListReturnTo } from './bookListNavigation'
 import { DescribedMetadataPills } from './MetadataBadges'
 import { ProgressDialog } from './ProgressDialog'
 
 export function BookDetailsPage() {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const navigate = useNavigate()
+  const bookListReturnTo = getBookListReturnTo(location.state)
   const queryClient = useQueryClient()
   const [previewOpen, setPreviewOpen] = useState(false)
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
@@ -33,7 +36,7 @@ export function BookDetailsPage() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['books'] })
       toast.success('Book deleted.')
-      navigate('/books', { replace: true })
+      navigate(bookListReturnTo, { replace: true })
     },
     onError: (error) => {
       toast.error(error instanceof HttpError ? error.apiError.detail : 'Failed to delete the book.')
@@ -111,7 +114,7 @@ export function BookDetailsPage() {
     <>
       <div className="mx-auto grid w-full max-w-7xl gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <Link className={secondaryButtonClass} to="/books">
+          <Link className={secondaryButtonClass} to={bookListReturnTo}>
             <ArrowLeft className="h-4 w-4" />
             List
           </Link>

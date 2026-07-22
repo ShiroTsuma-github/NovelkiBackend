@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Upload } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
+import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
@@ -16,6 +16,7 @@ import { PageHeader, Surface } from '@/components/app/DesignSystem'
 import { BookDataTable } from './BookDataTable'
 import { BookCoverArtwork } from './BookCoverSection'
 import { formatProgress } from './bookProgress'
+import { saveBookListScrollPosition, takeBookListScrollPosition } from './bookListNavigation'
 import {
   ColumnSettingsPopup,
   getVisibleColumns,
@@ -89,6 +90,8 @@ const bookCardFields: ColumnDefinition<BookListItemDto>[] = [
 
 export function BooksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const restoredScrollPosition = useRef(false)
   const queryClient = useQueryClient()
   const [columnPreferences, setColumnPreferences] = useColumnPreferences(bookColumnsStorageKey, bookColumns)
   const [cardFieldPreferences, setCardFieldPreferences] = useColumnPreferences(bookCardFieldsStorageKey, bookCardFields)
@@ -163,6 +166,18 @@ export function BooksPage() {
       toast.error(error instanceof HttpError ? error.apiError.detail : 'Could not export books.')
     },
   })
+
+  useEffect(() => {
+    if (restoredScrollPosition.current || !booksQuery.data) {
+      return
+    }
+
+    restoredScrollPosition.current = true
+    const scrollY = takeBookListScrollPosition(`${location.pathname}${location.search}`)
+    if (scrollY !== null) {
+      window.scrollTo({ top: scrollY, behavior: 'auto' })
+    }
+  }, [booksQuery.data, location.pathname, location.search])
   const fullExportMutation = useMutation({
     mutationFn: () => api.downloadBooksFullExport({ query: requestQuery, sortBy, sortDirection }),
     onSuccess: (blob) => {
@@ -390,7 +405,7 @@ export function BooksPage() {
             items={booksQuery.data?.data ?? []}
             renderActions={(book) => (
               <div className="flex justify-end gap-2">
-                <Link aria-label={`View ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}`}><Eye className="h-4 w-4" /></Link>
+                <BookDetailsLink ariaLabel={`View ${book.primaryTitle}`} bookId={book.id} className={`${secondaryButtonClass} ui-icon-button`}><Eye className="h-4 w-4" /></BookDetailsLink>
                 <Link aria-label={`Edit ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
               </div>
             )}
@@ -715,7 +730,7 @@ function BookCardGrid({
     <div className={`grid min-w-0 gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
         <Surface as="article" className="book-card min-w-0 w-full max-w-full" key={book.id} tone="muted">
-          <Link className="grid min-w-0 w-full max-w-full overflow-hidden" to={`/books/${book.id}`}>
+          <BookDetailsLink bookId={book.id} className="grid min-w-0 w-full max-w-full overflow-hidden">
             <div className="relative min-w-0 max-w-full overflow-hidden">
               <BookCoverArtwork
                 className="book-card__cover min-w-0 w-full max-w-full"
@@ -768,7 +783,7 @@ function BookCardGrid({
                 </div>
               ) : null}
             </div>
-          </Link>
+          </BookDetailsLink>
         </Surface>
       ))}
     </div>
@@ -914,6 +929,41 @@ function TitleCell({ book }: { book: BookListItemDto }) {
       primaryClassName="block min-w-0 truncate font-medium text-slate-950"
       totalCount={alternativeCount}
     />
+  )
+}
+
+function BookDetailsLink({
+  ariaLabel,
+  bookId,
+  children,
+  className,
+}: {
+  ariaLabel?: string
+  bookId: string
+  children: ReactNode
+  className: string
+}) {
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}`
+
+  function rememberScrollPosition(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return
+    }
+
+    saveBookListScrollPosition(returnTo, window.scrollY)
+  }
+
+  return (
+    <Link
+      aria-label={ariaLabel}
+      className={className}
+      state={{ bookListReturnTo: returnTo }}
+      to={`/books/${bookId}`}
+      onClick={rememberScrollPosition}
+    >
+      {children}
+    </Link>
   )
 }
 

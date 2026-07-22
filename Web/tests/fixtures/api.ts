@@ -20,7 +20,11 @@ export const layoutBooks = [
     notes: 'Private note',
     progressHistory: [],
     genres: ['Fantasy'],
+    genresCount: 1,
+    genreDescriptions: { Fantasy: 'Magic, strange worlds, and supernatural stories.' },
     tags: ['favorite', 'mystery'],
+    tagsCount: 2,
+    tagDescriptions: { favorite: 'Worth rereading', mystery: null },
     links: [],
   },
   {
