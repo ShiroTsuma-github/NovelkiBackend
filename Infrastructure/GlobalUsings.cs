@@ -10,7 +10,6 @@ global using Domain.Common;
 global using Infrastructure.Identity;
 global using Domain.Exceptions;
 global using Domain.Repositories;
-global using Microsoft.EntityFrameworkCore;
 global using System.Collections.Concurrent;
 global using System.Globalization;
 global using FluentValidation;
