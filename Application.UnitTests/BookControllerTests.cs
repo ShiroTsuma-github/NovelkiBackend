@@ -10,6 +10,7 @@ using Common.Models;
 using Domain.Entities;
 using Domain.Repositories;
 using Features.BookFeatures.Commands;
+using Features.BookFeatures.Queries;
 using Features.BookFeatures.Queries.GetBook;
 using MediatR;
 using Microsoft.AspNetCore.Http;
@@ -59,6 +60,47 @@ public class BookControllerTests
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);
+    }
+
+    [Fact]
+    public async Task ParseHtml_ShouldReturnResolvedDraftWithoutPersistingAnything()
+    {
+        var query = new ParseBookHtmlQuery("<html>NovelUpdates</html>");
+        var expected = new BookHtmlParseResult(
+            "NovelUpdates",
+            "Book",
+            "Author",
+            null,
+            [],
+            [],
+            [],
+            null,
+            null,
+            null,
+            []);
+        var mediator = new Mock<IMediator>();
+        mediator.Setup(mock => mock.Send(query, It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.ParseHtml(query, CancellationToken.None);
+
+        Assert.Same(expected, Assert.IsType<OkObjectResult>(result).Value);
+        mediator.Verify(mock => mock.Send(query, CancellationToken.None), Times.Once);
+    }
+
+    [Fact]
+    public async Task ParseHtml_ShouldReturnPayloadTooLargeBeforeParsingOversizedInput()
+    {
+        var query = new ParseBookHtmlQuery(new string('x', ParseBookHtmlQueryValidator.MaxHtmlCharacters + 1));
+        var mediator = new Mock<IMediator>();
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.ParseHtml(query, CancellationToken.None);
+
+        var response = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, response.StatusCode);
+        Assert.Equal(StatusCodes.Status413PayloadTooLarge, Assert.IsType<ProblemDetails>(response.Value).Status);
+        mediator.Verify(mock => mock.Send(It.IsAny<ParseBookHtmlQuery>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

@@ -225,6 +225,28 @@ export async function installLayoutApiMocks(page: Page) {
       return
     }
 
+    if (path === 'book/parse-html') {
+      await route.fulfill({
+        json: {
+          source: 'NovelUpdates',
+          primaryTitle: 'A Layout-Test Novel With a Deliberately Long Resolved Title',
+          authorName: 'Resolved Author',
+          contentType: { id: dictionaries.type[0].id, name: dictionaries.type[0].name },
+          alternativeTitles: ['Alternative One', 'Alternative Two'],
+          genres: [
+            { id: dictionaries.genre[0].id, name: dictionaries.genre[0].name },
+            { id: null, name: 'Unmapped Genre With a Long Name' },
+          ],
+          tags: ['Chinese', 'Slow Romance', 'Long Form Adventure'],
+          description: 'A resolved description long enough to exercise the clamped preview without expanding the dialog beyond the viewport.',
+          canonicalUrl: 'https://www.novelupdates.com/series/layout-test-novel/',
+          coverUrl: 'https://cdn.example.com/layout-test-cover.jpg',
+          warnings: ["Genre 'Unmapped Genre With a Long Name' is not present in the library and will be skipped."],
+        },
+      })
+      return
+    }
+
     if (path === 'book') {
       await route.fulfill({ json: { skip: 0, take: 20, total: layoutBooks.length, data: layoutBooks } })
       return

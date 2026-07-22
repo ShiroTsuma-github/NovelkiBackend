@@ -4,6 +4,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Authentication;
 using BookCovers;
+using BookMetadata;
 using Caching;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
@@ -68,6 +69,11 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBookListCache>(provider => provider.GetRequiredService<BookListCache>());
         builder.Services.AddScoped<IBookListCacheInvalidator>(provider => provider.GetRequiredService<BookListCache>());
         builder.Services.AddScoped<IBookCsvImportService, BookCsvImportService>();
+        builder.Services.AddScoped<IBookHtmlParser, BookHtmlParser>();
+        builder.Services.AddScoped<IBookHtmlResolver, NovelUpdatesHtmlResolver>();
+        builder.Services.AddScoped<IBookHtmlResolver, RoyalRoadHtmlResolver>();
+        builder.Services.AddScoped<IBookHtmlResolver, ScribbleHubHtmlResolver>();
+        builder.Services.AddScoped<IBookHtmlResolver, WebNovelHtmlResolver>();
         builder.Services.AddOptions<BookImportSecurityOptions>()
             .Bind(builder.Configuration.GetSection(BookImportSecurityOptions.SectionName))
             .Validate(options => options.MaxArchiveEntries > 0 &&

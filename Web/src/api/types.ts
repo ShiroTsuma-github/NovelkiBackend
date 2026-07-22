@@ -384,6 +384,25 @@ export type BookMutationRequest = {
   links: BookLinkInput[]
 }
 
+export type BookHtmlDictionaryMatch = {
+  id?: string | null
+  name: string
+}
+
+export type BookHtmlParseResult = {
+  source: string
+  primaryTitle?: string | null
+  authorName?: string | null
+  contentType?: BookHtmlDictionaryMatch | null
+  alternativeTitles: string[]
+  genres: BookHtmlDictionaryMatch[]
+  tags: string[]
+  description?: string | null
+  canonicalUrl?: string | null
+  coverUrl?: string | null
+  warnings: string[]
+}
+
 export type BookProgressHistoryDto = {
   id: string
   changedAt: string

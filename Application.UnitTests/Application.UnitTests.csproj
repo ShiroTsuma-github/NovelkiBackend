@@ -28,4 +28,10 @@
         <Using Include="Xunit"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <None Include="..\royalroad.html" Link="Fixtures\royalroad.html" CopyToOutputDirectory="PreserveNewest"/>
+        <None Include="..\scribblehub.html" Link="Fixtures\scribblehub.html" CopyToOutputDirectory="PreserveNewest"/>
+        <None Include="..\webnovel.html" Link="Fixtures\webnovel.html" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+
 </Project>

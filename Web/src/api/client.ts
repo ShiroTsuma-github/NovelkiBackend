@@ -14,6 +14,7 @@ import type {
   BookImportRowUpdateRequest,
   BookImportSessionDto,
   BookMutationRequest,
+  BookHtmlParseResult,
   DictionaryMutationRequest,
   DictionaryDto,
   BookSummaryDto,
@@ -69,6 +70,8 @@ export const api = {
   getAdminBook: (id: string) => apiRequest<AdminBookDto>(`/admin/books/${id}`),
   createBook: (request: BookMutationRequest) =>
     apiRequest<{ id: string }>('/book', { method: 'POST', body: request }),
+  parseBookHtml: (html: string) =>
+    apiRequest<BookHtmlParseResult>('/book/parse-html', { method: 'POST', body: { html } }),
   updateBook: (id: string, request: BookMutationRequest) =>
     apiRequest<void>(`/book/${id}`, { method: 'PUT', body: request }),
   createBookImportSession: (file: File) => {
