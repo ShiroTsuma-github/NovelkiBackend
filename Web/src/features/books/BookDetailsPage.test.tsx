@@ -178,4 +178,20 @@ describe('BookDetailsPage', () => {
     expect(tooltipId).toBeTruthy()
     expect(document.getElementById(tooltipId!)).toHaveTextContent('A personal favorite.')
   })
+
+  it('keeps genres aligned to the top when the tags column is taller', async () => {
+    vi.mocked(api.getBook).mockResolvedValue({
+      ...books[0],
+      tags: ['one', 'two', 'three', 'four', 'five', 'six'],
+    })
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    expect((await screen.findByText('Genres')).parentElement).toHaveClass('content-start', 'self-start')
+  })
 })

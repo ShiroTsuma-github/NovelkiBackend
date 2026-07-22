@@ -1,6 +1,7 @@
 using Application.Common;
 using Domain.Associations;
 using Domain.Entities;
+using Domain.Models;
 
 namespace Application.UnitTests;
 
@@ -9,6 +10,34 @@ using Common.DTOs.Book;
 
 public class MappingExtensionTests
 {
+    [Fact]
+    public void AnalyticsToDto_ShouldExposeSharesAsPercentages()
+    {
+        var snapshot = new BookAnalyticsSnapshot(
+            DateTimeOffset.UtcNow,
+            new BookAnalyticsScopeSnapshot(null, new DateOnly(2026, 1, 1), new DateOnly(2026, 2, 1), "month"),
+            new BookAnalyticsOverviewSnapshot(174, 0, 174, null, 0, 0, 174),
+            new BookAnalyticsCompositionSnapshot([], [new BookAnalyticsRelationCountSnapshot("Fantasy", 87, 0.5)], []),
+            BookAnalyticsRatingsSnapshot.Empty,
+            BookAnalyticsPlanningSnapshot.Empty,
+            BookAnalyticsProgressSnapshot.Empty,
+            BookAnalyticsActivitySnapshot.Empty,
+            BookAnalyticsLibraryGrowthSnapshot.Empty,
+            new BookAnalyticsQualitySnapshot(
+                [new BookAnalyticsFieldCompletenessSnapshot("author", 174, 1)],
+                [new BookAnalyticsLinkSourceSnapshot("Manual", 87, 87, 0.5)],
+                [new BookAnalyticsCoverStatusSnapshot("Found", 87, 0.5)],
+                [new BookAnalyticsCoverSourceSnapshot("Manual", 87, 0.5)]));
+
+        var dto = snapshot.ToDto();
+
+        Assert.Equal(100, dto.Quality.FieldCompleteness.Single().ShareOfBooks);
+        Assert.Equal(50, dto.Composition.Genres.Single().ShareOfBooks);
+        Assert.Equal(50, dto.Quality.LinkSources.Single().ShareOfBooks);
+        Assert.Equal(50, dto.Quality.CoverStatuses.Single().ShareOfBooks);
+        Assert.Equal(50, dto.Quality.CoverSources.Single().ShareOfBooks);
+    }
+
     [Fact]
     public void NormalizeName_ShouldTrimCollapseWhitespaceAndUppercase()
     {

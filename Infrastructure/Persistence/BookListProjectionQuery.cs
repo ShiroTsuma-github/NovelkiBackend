@@ -112,7 +112,6 @@ public sealed class BookListProjectionQuery
                     .Where(title => !title.IsPrimary)
                     .OrderBy(title => title.Id)
                     .Select(title => title.Title)
-                    .Take(4)
                     .ToList(),
                 AlternativeTitlesCount = book.Titles.Count(title => !title.IsPrimary),
                 Author = book.Author != null ? book.Author.PrimaryName : null,
@@ -134,23 +133,19 @@ public sealed class BookListProjectionQuery
                 Genres = book.BookGenres
                     .OrderBy(bookGenre => bookGenre.Genre.Name)
                     .Select(bookGenre => bookGenre.Genre.Name)
-                    .Take(4)
                     .ToList(),
                 GenreDescriptions = book.BookGenres
                     .OrderBy(bookGenre => bookGenre.Genre.Name)
                     .Select(bookGenre => bookGenre.Genre.Description)
-                    .Take(4)
                     .ToList(),
                 GenresCount = book.BookGenres.Count(),
                 Tags = book.BookTags
                     .OrderBy(bookTag => bookTag.Tag.Name)
                     .Select(bookTag => bookTag.Tag.Name)
-                    .Take(4)
                     .ToList(),
                 TagDescriptions = book.BookTags
                     .OrderBy(bookTag => bookTag.Tag.Name)
                     .Select(bookTag => bookTag.Tag.Description)
-                    .Take(4)
                     .ToList(),
                 TagsCount = book.BookTags.Count(),
                 LinksCount = book.Links.Count(),

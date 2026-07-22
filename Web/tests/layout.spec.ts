@@ -215,11 +215,21 @@ test('cards layout constrains long titles and shows active toggle styles', async
 
 test('discover metadata tooltips can extend beyond their card', async ({ page }) => {
   await page.goto('/discover')
+  const grid = page.locator('.discover-grid')
   const card = page.locator('.discover-card').first()
   const mystery = page.getByText('Mystery', { exact: true })
 
+  const viewportWidth = page.viewportSize()!.width
+  const columnCount = await grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+  expect(columnCount).toBe(viewportWidth >= 1200 ? 3 : viewportWidth >= 768 ? 2 : 1)
   await expect(card).toBeVisible()
   await expect(card).toHaveCSS('overflow', 'visible')
+  if (viewportWidth >= 768) {
+    const cardBox = await requiredBox(card)
+    const coverBox = await requiredBox(card.locator('.discover-card__cover'))
+    expect(coverBox.width / cardBox.width).toBeGreaterThan(0.37)
+    expect(coverBox.width / cardBox.width).toBeLessThan(0.43)
+  }
   await mystery.focus()
   await expect(page.getByRole('tooltip')).toBeVisible()
 })

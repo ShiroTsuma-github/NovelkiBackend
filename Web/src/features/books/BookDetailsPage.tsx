@@ -190,7 +190,7 @@ export function BookDetailsPage() {
                         </div>
                       </div>
                       <div className="grid gap-4 border-t border-slate-200 pt-4 md:grid-cols-2">
-                        <div className="grid gap-2">
+                        <div className="grid content-start gap-2 self-start">
                           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Genres</div>
                           <DescribedMetadataPills
                             descriptions={book.genreDescriptions}
@@ -200,7 +200,7 @@ export function BookDetailsPage() {
                             variant="detail"
                           />
                         </div>
-                        <div className="grid gap-2">
+                        <div className="grid content-start gap-2 self-start">
                           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tags</div>
                           <DescribedMetadataPills
                             descriptions={book.tagDescriptions}
