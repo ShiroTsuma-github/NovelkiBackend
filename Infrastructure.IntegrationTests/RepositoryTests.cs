@@ -134,8 +134,25 @@ public class RepositoryTests
         var tag = TestData.Tag(database.UserId, "projection-tag");
         tag.Description = "Tag description";
         var book = TestData.Book(database.UserId, "Metadata projection", author);
+        for (var index = 1; index <= 6; index++)
+        {
+            book.Titles.Add(new BookTitle
+            {
+                Title = $"Alternative title {index}",
+                NormalizedTitle = MappingExtensions.NormalizeName($"Alternative title {index}")
+            });
+        }
         book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+        for (var index = 1; index <= 5; index++)
+        {
+            book.BookGenres.Add(new BookGenre { Book = book, Genre = TestData.Genre($"Projection Genre {index}") });
+            book.BookTags.Add(new BookTag
+            {
+                Book = book,
+                Tag = TestData.Tag(database.UserId, $"projection-tag-{index}")
+            });
+        }
         context.Books.Add(book);
         await context.SaveChangesAsync();
         var queryService = CreateReadQueryService(context);
@@ -144,6 +161,9 @@ public class RepositoryTests
             CancellationToken.None)).Single();
 
         Assert.Equal(["Alternative Author"], result.AuthorOtherNames);
+        Assert.Equal(6, result.AlternativeTitles.Count);
+        Assert.Equal(6, result.Genres.Count);
+        Assert.Equal(6, result.Tags.Count);
         Assert.Equal("Genre description", result.GenreDescriptions["Projection Genre"]);
         Assert.Equal("Tag description", result.TagDescriptions["projection-tag"]);
     }

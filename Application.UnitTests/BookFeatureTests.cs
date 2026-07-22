@@ -52,6 +52,29 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task CreateBook_ShouldUseCurrentChapterAsTotalWhenCompletedTotalIsMissing()
+    {
+        var completed = new Status { Id = StatusId, Name = "Completed", Slug = "completed" };
+        var fixture = CreateFixture(completed);
+
+        await fixture.Handler.Handle(ValidCreateCommand(currentChapterNumber: 42), CancellationToken.None);
+
+        Assert.Equal(42, fixture.BookRepository.LastBook!.TotalChapters);
+    }
+
+    [Fact]
+    public async Task CreateBook_ShouldKeepExplicitTotalWhenCompleted()
+    {
+        var completed = new Status { Id = StatusId, Name = "Completed", Slug = "completed" };
+        var fixture = CreateFixture(completed);
+        var command = ValidCreateCommand(currentChapterNumber: 42) with { TotalChapters = 50 };
+
+        await fixture.Handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal(50, fixture.BookRepository.LastBook!.TotalChapters);
+    }
+
+    [Fact]
     public async Task CreateBook_ShouldStoreLinksTagsAndInitialProgressHistory()
     {
         var fixture = CreateFixture();
@@ -169,6 +192,40 @@ public class BookFeatureTests
         Assert.Single(book.ProgressHistory);
         Assert.Equal(20, book.ProgressHistory.First().ChapterNumber);
         Assert.True(fixture.BookRepository.Saved);
+    }
+
+    [Fact]
+    public async Task UpdateBook_ShouldUseCurrentChapterAsTotalWhenChangedToCompleted()
+    {
+        var fixture = CreateFixture();
+        var book = new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "Finishing Book",
+            NormalizedPrimaryTitle = "FINISHING BOOK",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId,
+            CurrentChapterNumber = 20
+        };
+        fixture.BookRepository.Seed(book);
+        var completed = new Status { Id = StatusId, Name = "Completed", Slug = "completed" };
+        var handler = new UpdateBookHandler(
+            fixture.BookRepository,
+            fixture.AuthorRepository,
+            new FakeTypeRepository(),
+            new FakeStatusRepository(completed),
+            new FakeGenreRepository(),
+            new FakeTagRepository(),
+            new FakeBookListCacheInvalidator(),
+            new FakeUser());
+        var command = new UpdateBookCommand(
+            book.Id, "Finishing Book", ContentTypeId, StatusId, null, null, null, null, null,
+            null, 24, "24", null, null, null, null, null, null);
+
+        await handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal(24, book.TotalChapters);
     }
 
     [Fact]
@@ -523,12 +580,12 @@ public class BookFeatureTests
         Assert.Equal(9, result.RatingCounts[1].Rating);
     }
 
-    private static Fixture CreateFixture()
+    private static Fixture CreateFixture(Status? status = null)
     {
         var bookRepository = new FakeBookRepository();
         var authorRepository = new FakeAuthorRepository();
         var typeRepository = new FakeTypeRepository();
-        var statusRepository = new FakeStatusRepository();
+        var statusRepository = new FakeStatusRepository(status);
         var genreRepository = new FakeGenreRepository();
         var tagRepository = new FakeTagRepository();
         var user = new FakeUser();
@@ -865,7 +922,12 @@ public class BookFeatureTests
 
     private sealed class FakeStatusRepository : IStatusRepository
     {
-        private readonly Status _status = new() { Id = StatusId, Name = "Reading", Slug = "reading" };
+        private readonly Status _status;
+
+        public FakeStatusRepository(Status? status = null)
+        {
+            _status = status ?? new Status { Id = StatusId, Name = "Reading", Slug = "reading" };
+        }
 
         public Task AddAsync(Status status, CancellationToken cancellationToken)
         {

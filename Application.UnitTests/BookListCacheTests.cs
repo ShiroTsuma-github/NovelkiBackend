@@ -83,7 +83,7 @@ public class BookListCacheTests
         Assert.Null(oldLookup);
         Assert.NotNull(newLookup);
         Assert.Equal("New Result", newLookup.Data[0].PrimaryTitle);
-        Assert.Contains(storage.StringEntries, pair => pair.Key == $"books:v2:{ownerId}:version" && pair.Value == "2");
+        Assert.Contains(storage.StringEntries, pair => pair.Key == $"books:v3:{ownerId}:version" && pair.Value == "2");
     }
 
     [Fact]
@@ -91,12 +91,12 @@ public class BookListCacheTests
     {
         var ownerId = Guid.NewGuid();
         var storage = new FakeDistributedCache();
-        storage.SetString($"books:v2:{ownerId}:version", "7");
+        storage.SetString($"books:v3:{ownerId}:version", "7");
         var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
 
         await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
 
-        Assert.Equal("7", storage.StringEntries[$"books:v2:{ownerId}:version"]);
+        Assert.Equal("7", storage.StringEntries[$"books:v3:{ownerId}:version"]);
     }
 
     [Fact]
@@ -104,12 +104,12 @@ public class BookListCacheTests
     {
         var ownerId = Guid.NewGuid();
         var storage = new FakeDistributedCache();
-        storage.SetString($"books:v2:{ownerId}:version", "0");
+        storage.SetString($"books:v3:{ownerId}:version", "0");
         var cache = new BookListCache(storage, NullLogger<BookListCache>.Instance);
 
         await cache.GetBooksAsync(ownerId, 0, 10, null, null, null, CancellationToken.None);
 
-        Assert.Equal("1", storage.StringEntries[$"books:v2:{ownerId}:version"]);
+        Assert.Equal("1", storage.StringEntries[$"books:v3:{ownerId}:version"]);
     }
 
     [Fact]

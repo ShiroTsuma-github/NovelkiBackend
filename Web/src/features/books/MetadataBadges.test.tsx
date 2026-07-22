@@ -36,6 +36,21 @@ describe('MetadataSummary', () => {
 })
 
 describe('DescribedMetadataPills', () => {
+  it('lists every hidden metadata value in the count tooltip when the API returns them', () => {
+    render(
+      <DescribedMetadataPills
+        maxVisible={3}
+        totalCount={6}
+        values={['one', 'two', 'three', 'four', 'five', 'six']}
+      />,
+    )
+
+    expect(screen.getByLabelText('3 more: four, five, six')).toHaveAttribute(
+      'title',
+      'four\nfive\nsix',
+    )
+  })
+
   it('uses the API total to count metadata values omitted from the list projection', () => {
     render(
       <DescribedMetadataPills

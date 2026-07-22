@@ -781,15 +781,27 @@ select.ui-control {
 
 .discover-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 25rem), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+}
+
+@media (max-width: 1199px) {
+  .discover-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 767px) {
+  .discover-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .discover-card {
   position: relative;
   display: grid;
-  min-height: 21rem;
-  grid-template-columns: 9.5rem minmax(0, 1fr);
+  min-height: 24rem;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
   overflow: visible;
   transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
@@ -811,7 +823,7 @@ select.ui-control {
 
 .discover-card__cover .book-cover-artwork {
   height: 100%;
-  min-height: 21rem;
+  min-height: 24rem;
 }
 
 .discover-card__body {
@@ -1193,6 +1205,7 @@ select.ui-control {
   }
 
   .discover-card {
+    min-height: 19rem;
     grid-template-columns: 7rem minmax(0, 1fr);
   }
 

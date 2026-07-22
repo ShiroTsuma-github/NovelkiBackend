@@ -856,6 +856,8 @@ describe('AnalyticsPage', () => {
     expect(screen.getByTitle('Open books filtered by created:>=2026-01-01 created:<2026-02-01 cover:none')).toBeInTheDocument()
     expect(screen.getByText(/Unknown status bucket: 2 books/i)).toBeInTheDocument()
     expect(screen.getByText(/Very Long Source Name/i)).toBeInTheDocument()
+    const authorCompleteness = screen.getByLabelText('Author completeness 100%')
+    expect(authorCompleteness.firstElementChild).toHaveStyle({ width: '100%' })
 
     const analyticsLinks = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
     expect(analyticsLinks.some((link) => link.href.includes('description%3Anone'))).toBe(true)

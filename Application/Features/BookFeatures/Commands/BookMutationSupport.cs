@@ -5,6 +5,23 @@ using Domain.Associations;
 
 internal static class BookMutationSupport
 {
+    public static decimal? ResolveTotalChapters(Status status, decimal? totalChapters,
+        decimal? currentChapterNumber)
+    {
+        if (totalChapters.HasValue)
+        {
+            return totalChapters;
+        }
+
+        return IsCompleted(status) && currentChapterNumber > 0 ? currentChapterNumber : null;
+    }
+
+    private static bool IsCompleted(Status status)
+    {
+        return string.Equals(status.Slug, "completed", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(status.Name, "Completed", StringComparison.OrdinalIgnoreCase);
+    }
+
     public static async Task EnsureBookDoesNotExistAsync(
         IBookRepository bookRepository,
         Guid ownerId,

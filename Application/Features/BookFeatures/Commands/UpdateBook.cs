@@ -100,7 +100,8 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
         book.ContentType = contentType;
         book.StatusId = status.Id;
         book.Status = status;
-        book.TotalChapters = request.TotalChapters;
+        book.TotalChapters = BookMutationSupport.ResolveTotalChapters(status, request.TotalChapters,
+            request.CurrentChapterNumber);
         book.CurrentChapterNumber = request.CurrentChapterNumber;
         book.CurrentChapterLabel = currentChapterLabel;
         book.Rating = request.Rating;
