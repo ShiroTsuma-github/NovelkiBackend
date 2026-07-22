@@ -93,6 +93,25 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task CreateBook_ShouldAllowTitleThatOnlyMatchesInsideAnotherTitle()
+    {
+        var fixture = CreateFixture();
+        fixture.BookRepository.Seed(new Book
+        {
+            Id = Guid.NewGuid(),
+            OwnerId = OwnerId,
+            PrimaryTitle = "History's Greatest Husband",
+            NormalizedPrimaryTitle = "HISTORY'S GREATEST HUSBAND",
+            ContentTypeId = ContentTypeId,
+            StatusId = StatusId
+        });
+
+        await fixture.Handler.Handle(ValidCreateCommand() with { PrimaryTitle = "test" }, CancellationToken.None);
+
+        Assert.Equal("test", fixture.BookRepository.LastBook!.PrimaryTitle);
+    }
+
+    [Fact]
     public async Task UpdateBook_ShouldReplaceEditableDetailsAndAppendProgressHistory()
     {
         var fixture = CreateFixture();
