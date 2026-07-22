@@ -6,4 +6,5 @@ public record AuthorDto
     public required string PrimaryName { get; set; }
     public IReadOnlyCollection<string> OtherNames { get; set; } = Array.Empty<string>();
     public bool IsPublic { get; set; }
+    public bool IsOwned { get; set; }
 }

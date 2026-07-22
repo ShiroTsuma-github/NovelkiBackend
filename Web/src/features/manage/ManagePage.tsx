@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BookOpen, EyeOff, Globe2, Plus, RefreshCw, Search, Tags, Trash2, Users, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { toast } from 'sonner'
@@ -29,25 +29,42 @@ export function ManagePage() {
     queryKey: ['manage-metadata', section, debouncedSearch],
     queryFn: () => section === 'tags'
       ? api.searchTags(debouncedSearch, 50)
-      : api.searchAuthors(debouncedSearch, 50, true),
+      : api.searchAuthors(debouncedSearch, 50),
     enabled: section !== 'books',
   })
 
-  const libraryBooks = useQuery({
+  const libraryBooks = useInfiniteQuery({
     queryKey: ['manage-books', debouncedSearch],
-    queryFn: () => api.getBooks({
-      skip: 0,
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => api.getBooks({
+      skip: pageParam,
       take: 50,
       query: buildBookQuery({ ...emptyFilters, text: debouncedSearch }) || undefined,
     }),
+    getNextPageParam: (lastPage) => {
+      const nextSkip = lastPage.skip + lastPage.data.length
+      return nextSkip < lastPage.total ? nextSkip : undefined
+    },
     enabled: section === 'books',
   })
 
-  const publishedBooks = useQuery({
+  const publishedBooks = useInfiniteQuery({
     queryKey: ['public-books', 'mine'],
-    queryFn: () => api.searchPublicBooks({ skip: 0, take: 50, mineOnly: true }),
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => api.searchPublicBooks({ skip: pageParam, take: 50, mineOnly: true }),
+    getNextPageParam: (lastPage) => {
+      const nextSkip = lastPage.skip + lastPage.data.length
+      return nextSkip < lastPage.total ? nextSkip : undefined
+    },
     enabled: section === 'books',
   })
+
+  useEffect(() => {
+    if (section === 'books' && publishedBooks.hasNextPage && !publishedBooks.isFetchingNextPage) {
+      void publishedBooks.fetchNextPage()
+    }
+  }, [publishedBooks.data?.pages.length, publishedBooks.fetchNextPage, publishedBooks.hasNextPage,
+    publishedBooks.isFetchingNextPage, section])
 
   function changeSection(next: ManageSection) {
     setSection(next)
@@ -55,7 +72,11 @@ export function ManagePage() {
     setDebouncedSearch('')
   }
 
-  const itemCount = section === 'books' ? libraryBooks.data?.total ?? 0 : results.data?.length ?? 0
+  const libraryBookPages = libraryBooks.data?.pages ?? []
+  const publishedBookPages = publishedBooks.data?.pages ?? []
+  const libraryBookItems = libraryBookPages.flatMap((page) => page.data)
+  const publishedBookItems = publishedBookPages.flatMap((page) => page.data)
+  const itemCount = section === 'books' ? libraryBookPages[0]?.total ?? 0 : results.data?.length ?? 0
 
   async function runBookAction(bookId: string, action: () => Promise<unknown>, success: string) {
     setBookActionId(bookId)
@@ -154,11 +175,14 @@ export function ManagePage() {
           {section === 'books' ? (
             <ManagedBooks
               actionId={bookActionId}
-              books={libraryBooks.data?.data ?? []}
+              books={libraryBookItems}
               error={libraryBooks.isError || publishedBooks.isError}
+              hasMore={libraryBooks.hasNextPage}
               loading={libraryBooks.isPending || publishedBooks.isPending}
-              published={publishedBooks.data?.data ?? []}
+              loadingMore={libraryBooks.isFetchingNextPage}
+              published={publishedBookItems}
               search={search}
+              onLoadMore={() => void libraryBooks.fetchNextPage()}
               onPublish={(book) => runBookAction(book.id, () => api.publishBook(book.id), `“${book.primaryTitle}” is now listed.`)}
               onRefresh={(snapshot) => runBookAction(snapshot.sourceBookId, () => api.refreshPublishedBook(snapshot.id), `“${snapshot.primaryTitle}” snapshot refreshed.`)}
               onUnlist={(snapshot) => runBookAction(snapshot.sourceBookId, () => api.unlistPublishedBook(snapshot.id), `“${snapshot.primaryTitle}” was unlisted.`)}
@@ -185,13 +209,16 @@ export function ManagePage() {
   )
 }
 
-function ManagedBooks({ books, published, actionId, loading, error, search, onPublish, onRefresh, onUnlist }: {
+function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMore, error, search, onLoadMore, onPublish, onRefresh, onUnlist }: {
   books: BookListItemDto[]
   published: PublicBookSnapshotDto[]
   actionId: string | null
   loading: boolean
+  loadingMore: boolean
+  hasMore: boolean
   error: boolean
   search: string
+  onLoadMore: () => void
   onPublish: (book: BookListItemDto) => void
   onRefresh: (snapshot: PublicBookSnapshotDto) => void
   onUnlist: (snapshot: PublicBookSnapshotDto) => void
@@ -216,7 +243,18 @@ function ManagedBooks({ books, published, actionId, loading, error, search, onPu
     })
   })
   return (
-    <div className="manage-list" aria-label="Books" tabIndex={0}>
+    <div
+      aria-busy={loadingMore}
+      aria-label="Books"
+      className="manage-list"
+      tabIndex={0}
+      onScroll={(event) => {
+        const list = event.currentTarget
+        if (hasMore && !loadingMore && list.scrollHeight - list.scrollTop - list.clientHeight < 96) {
+          onLoadMore()
+        }
+      }}
+    >
       {sortedBooks.map((book) => {
         const snapshot = snapshotByBookId.get(book.id)
         const busy = actionId === book.id
@@ -270,6 +308,7 @@ function ManagedBooks({ books, published, actionId, loading, error, search, onPu
           </div>
         )
       })}
+      {loadingMore ? <div className="manage-list__loading">Loading more books…</div> : null}
     </div>
   )
 }
@@ -303,13 +342,14 @@ function AuthorList({ authors, onEdit }: { authors: AuthorDto[]; onEdit: (author
   return (
     <div className="manage-list" aria-label="Authors" tabIndex={0}>
       {sortedAuthors.map((author) => (
-        <ManageRow key={author.id} label={`Edit author ${author.primaryName}`} onEdit={() => onEdit(author)}>
+        <ManageRow editable={author.isOwned} key={author.id} label={`Edit author ${author.primaryName}`} onEdit={() => onEdit(author)} readOnlyLabel="Global identity">
           <span className="manage-item__icon"><Users className="h-4 w-4" /></span>
           <span className="manage-item__body">
             <strong>{author.primaryName}</strong>
             <small>{author.otherNames.length > 0 ? author.otherNames.join(' · ') : 'No alternative names'}</small>
           </span>
-          <Badge tone={author.isPublic ? 'accent' : 'neutral'}>{author.isPublic ? 'Public' : 'Private'}</Badge>
+          <Badge tone={author.isOwned ? 'neutral' : 'accent'}>{author.isOwned ? 'Yours' : 'Global'}</Badge>
+          {author.isOwned && author.isPublic ? <Badge tone="accent">Public</Badge> : null}
           <Badge tone={author.otherNames.length > 0 ? 'accent' : 'neutral'}>{author.otherNames.length} aliases</Badge>
         </ManageRow>
       ))}
@@ -323,13 +363,13 @@ function getMissingListingRequirements(book: BookListItemDto) {
   if (!book.author?.trim()) missing.push('author')
   if (book.genresCount === 0) missing.push('genre')
   if (book.tagsCount === 0) missing.push('tag')
-  if (!book.cover || !['Found', 'Uploaded'].includes(book.cover.status) || !book.cover.imageUrl) {
+  if (!book.cover?.imageUrl) {
     missing.push('stored cover')
   }
   return missing
 }
 
-function ManageRow({ children, editable = true, label, onEdit }: { children: React.ReactNode; editable?: boolean; label: string; onEdit: () => void }) {
+function ManageRow({ children, editable = true, label, readOnlyLabel = 'Managed by admin', onEdit }: { children: React.ReactNode; editable?: boolean; label: string; readOnlyLabel?: string; onEdit: () => void }) {
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
     if (editable && event.key === 'Enter') {
       onEdit()
@@ -339,7 +379,7 @@ function ManageRow({ children, editable = true, label, onEdit }: { children: Rea
   return (
     <div className="manage-item" role="group" tabIndex={editable ? 0 : -1} onDoubleClick={editable ? onEdit : undefined} onKeyDown={handleKeyDown}>
       {children}
-      {editable ? <button aria-label={label} className={buttonVariants.ghost} type="button" onClick={onEdit}>Edit</button> : <span className="text-xs text-[var(--qs-subtle)]">Managed by admin</span>}
+      {editable ? <button aria-label={label} className={buttonVariants.ghost} type="button" onClick={onEdit}>Edit</button> : <span className="text-xs text-[var(--qs-subtle)]">{readOnlyLabel}</span>}
     </div>
   )
 }

@@ -28,6 +28,7 @@ vi.mock('sonner', () => ({
 
 describe('BooksPage', () => {
   beforeEach(() => {
+    window.localStorage.removeItem('novelki.books.page-size.v1')
     vi.mocked(api.getBooks).mockReset()
     vi.mocked(api.getBooksSummary).mockReset()
   })
@@ -170,6 +171,20 @@ describe('BooksPage', () => {
       'title',
       'A Very Long Book Title That Should Stay Inside Its Card Container Without Pushing Actions Away',
     )
+  })
+
+  it('restores the selected page size after leaving and returning to the list', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const firstVisit = renderWithProviders(<BooksPage />, { route: '/books?take=50' })
+    await screen.findByText('Lord of Mysteries')
+    expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({ take: 50 }))
+    firstVisit.unmount()
+    vi.mocked(api.getBooks).mockClear()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({ take: 50 }))
   })
 
   it('shows the actual number of metadata values omitted by the list projection', async () => {

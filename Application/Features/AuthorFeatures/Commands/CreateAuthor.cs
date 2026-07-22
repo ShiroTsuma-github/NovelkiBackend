@@ -49,6 +49,6 @@ public sealed class CreateAuthorCommandHandler(IAuthorRepository authorRepositor
         }
 
         await authorRepository.AddAsync(author, cancellationToken);
-        return author.ToDto();
+        return author.ToDto(user.RequiredId);
     }
 }

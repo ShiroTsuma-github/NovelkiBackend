@@ -19,6 +19,6 @@ public sealed class UpdateAuthorVisibilityCommandHandler(IAuthorLifecycleService
             user.Roles.Contains(AuthorizationRoles.Admin, StringComparer.OrdinalIgnoreCase),
             request.IsPublic,
             cancellationToken);
-        return author.ToDto();
+        return author.ToDto(user.RequiredId);
     }
 }

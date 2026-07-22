@@ -786,20 +786,25 @@ select.ui-control {
 }
 
 .discover-card {
+  position: relative;
   display: grid;
   min-height: 21rem;
   grid-template-columns: 9.5rem minmax(0, 1fr);
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
-.discover-card:hover {
+.discover-card:hover,
+.discover-card:focus-within {
+  z-index: 10;
   border-color: var(--qs-border-strong);
   transform: translateY(-2px);
   box-shadow: var(--qs-shadow-raised);
 }
 
 .discover-card__cover {
+  overflow: hidden;
+  border-radius: var(--qs-panel-radius) 0 0 var(--qs-panel-radius);
   border-right: 1px solid var(--qs-border);
   background: var(--qs-surface-muted);
 }
@@ -1012,6 +1017,13 @@ select.ui-control {
   border-radius: 0.35rem;
   outline: 2px solid var(--qs-accent);
   outline-offset: 3px;
+}
+
+.manage-list__loading {
+  padding: 0.85rem;
+  color: var(--qs-subtle);
+  font-size: 0.75rem;
+  text-align: center;
 }
 
 .manage-item {

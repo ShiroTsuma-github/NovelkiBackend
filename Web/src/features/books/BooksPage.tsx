@@ -56,6 +56,7 @@ const bookColumnsStorageKey = 'novelki.books.columns.v1'
 const bookCardFieldsStorageKey = 'novelki.books.card-fields.v1'
 const bookLayoutStorageKey = 'novelki.books.layout.v1'
 const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
+const pageSizeStorageKey = 'novelki.books.page-size.v1'
 const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
 
 const bookColumns: ColumnDefinition<BookListItemDto>[] = [
@@ -109,7 +110,7 @@ export function BooksPage() {
     sortBy,
     sortDirection,
     updateQuery,
-  } = useBookListUrlState(searchParams, setSearchParams)
+  } = useBookListUrlState(searchParams, setSearchParams, { pageSizeStorageKey })
   const visibleColumns = getVisibleColumns(bookColumns, columnPreferences)
   const visibleCardFields = getVisibleColumns(bookCardFields, cardFieldPreferences)
   const booksQuery = useQuery({

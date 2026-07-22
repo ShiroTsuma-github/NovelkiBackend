@@ -20,14 +20,15 @@ public static partial class MappingExtensions
         };
     }
 
-    public static AuthorDto ToDto(this Author source)
+    public static AuthorDto ToDto(this Author source, Guid? currentUserId = null)
     {
         return new AuthorDto
         {
             Id = source.Id,
             PrimaryName = source.PrimaryName,
             OtherNames = source.Names.Where(n => !n.IsPrimary).OrderBy(n => n.Name).Select(n => n.Name).ToList(),
-            IsPublic = source.IsPublic
+            IsPublic = source.IsPublic,
+            IsOwned = currentUserId.HasValue && source.OwnerId == currentUserId
         };
     }
 

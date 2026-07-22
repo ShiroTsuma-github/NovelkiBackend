@@ -213,6 +213,17 @@ test('cards layout constrains long titles and shows active toggle styles', async
   await expectNoHorizontalOverflow(page)
 })
 
+test('discover metadata tooltips can extend beyond their card', async ({ page }) => {
+  await page.goto('/discover')
+  const card = page.locator('.discover-card').first()
+  const mystery = page.getByText('Mystery', { exact: true })
+
+  await expect(card).toBeVisible()
+  await expect(card).toHaveCSS('overflow', 'visible')
+  await mystery.focus()
+  await expect(page.getByRole('tooltip')).toBeVisible()
+})
+
 test('search and compact selects reserve space for their icons', async ({ page }) => {
   await page.goto('/books')
 

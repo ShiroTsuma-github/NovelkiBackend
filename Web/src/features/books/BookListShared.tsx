@@ -21,16 +21,23 @@ export function useBookListUrlState(
   options: {
     defaultSortBy?: string
     defaultSortDirection?: string
+    pageSizeStorageKey?: string
   } = {},
 ) {
   const defaultSortBy = options.defaultSortBy ?? 'lastModified'
   const defaultSortDirection = options.defaultSortDirection ?? 'desc'
   const skip = Number(searchParams.get('skip') ?? 0)
-  const pageSize = readBookListPageSize(searchParams)
+  const pageSize = readBookListPageSize(searchParams, options.pageSizeStorageKey)
   const sortBy = searchParams.get('sortBy') ?? defaultSortBy
   const sortDirection = searchParams.get('sortDirection') ?? defaultSortDirection
   const query = searchParams.get('query') ?? ''
   const requestQuery = query.trim()
+
+  useEffect(() => {
+    if (options.pageSizeStorageKey) {
+      window.localStorage.setItem(options.pageSizeStorageKey, String(pageSize))
+    }
+  }, [options.pageSizeStorageKey, pageSize])
 
   function updateQuery(value: string) {
     const next = new URLSearchParams(searchParams)
@@ -50,6 +57,9 @@ export function useBookListUrlState(
   }
 
   function setPageSize(nextPageSize: string) {
+    if (options.pageSizeStorageKey) {
+      window.localStorage.setItem(options.pageSizeStorageKey, nextPageSize)
+    }
     const next = new URLSearchParams(searchParams)
     next.set('take', nextPageSize)
     next.delete('skip')
@@ -420,8 +430,9 @@ function PageGapJump({
   )
 }
 
-function readBookListPageSize(searchParams: URLSearchParams) {
-  const value = Number(searchParams.get('take') ?? 20)
+function readBookListPageSize(searchParams: URLSearchParams, storageKey?: string) {
+  const parameter = searchParams.get('take')
+  const value = Number(parameter ?? (storageKey ? window.localStorage.getItem(storageKey) : null) ?? 20)
   return bookListPageSizeOptions.includes(value) ? value : 20
 }
 

@@ -72,6 +72,7 @@ public sealed class PublicBookServiceTests
         var copiedBeforeUnlist = await context.Books.AsNoTracking()
             .Include(item => item.Titles)
             .SingleAsync(item => item.Id == copyResult.BookId);
+        Assert.Equal(author.Id, copiedBeforeUnlist.AuthorId);
         Assert.Equal("A snapshot description", copiedBeforeUnlist.Description);
         Assert.Contains(copiedBeforeUnlist.Titles, title => title.Title == "Guimi Zhi Zhu");
 

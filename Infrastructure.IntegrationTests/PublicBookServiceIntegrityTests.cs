@@ -124,7 +124,7 @@ public sealed class PublicBookServiceIntegrityTests
     }
 
     [Fact]
-    public async Task Publish_ShouldRejectFailedCoverEvenWhenItHasAStoragePath()
+    public async Task Publish_ShouldAcceptReadableStoredCoverDespiteStaleFailedStatus()
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
@@ -134,12 +134,11 @@ public sealed class PublicBookServiceIntegrityTests
         context.Books.Add(book);
         await context.SaveChangesAsync();
 
-        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
-            CreateService(context, database.UserId, new MemoryStorage())
-                .PublishAsync(book.Id, CancellationToken.None));
+        var published = await CreateService(context, database.UserId, new MemoryStorage())
+            .PublishAsync(book.Id, CancellationToken.None);
 
-        Assert.Contains("stored cover", exception.Message);
-        Assert.False(await context.PublicBookSnapshots.AnyAsync());
+        Assert.NotNull(published.CoverUrl);
+        Assert.True(await context.PublicBookSnapshots.AnyAsync());
     }
 
     [Fact]
