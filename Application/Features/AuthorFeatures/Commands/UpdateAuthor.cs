@@ -63,6 +63,6 @@ public sealed class UpdateAuthorCommandHandler(IAuthorRepository authorRepositor
         }
 
         await authorRepository.SaveAsync(cancellationToken);
-        return author.ToDto();
+        return author.ToDto(user.RequiredId);
     }
 }

@@ -64,8 +64,8 @@ const managedTags = [
 ]
 
 const managedAuthors = [
-  { id: '50000000-0000-0000-0000-000000000001', primaryName: 'Cuttlefish', otherNames: ['Cuttlefish That Loves Diving'], isPublic: true },
-  { id: '50000000-0000-0000-0000-000000000002', primaryName: 'Toika', otherNames: [], isPublic: false },
+  { id: '50000000-0000-0000-0000-000000000001', primaryName: 'Cuttlefish', otherNames: ['Cuttlefish That Loves Diving'], isPublic: true, isOwned: false },
+  { id: '50000000-0000-0000-0000-000000000002', primaryName: 'Toika', otherNames: [], isPublic: false, isOwned: true },
 ]
 
 export const invalidImportSession = {
@@ -233,6 +233,33 @@ export async function installLayoutApiMocks(page: Page) {
 
     if (path === 'author') {
       await route.fulfill({ json: managedAuthors })
+      return
+    }
+
+    if (path === 'public-book') {
+      await route.fulfill({
+        json: {
+          skip: 0,
+          take: 40,
+          total: 1,
+          data: [{
+            id: 'snapshot-layout',
+            sourceBookId: layoutBooks[0].id,
+            primaryTitle: 'Lord of Mysteries',
+            description: 'A shared mystery with enough metadata to exercise the card tooltips.',
+            alternativeTitles: ['LOTM'],
+            author: 'Cuttlefish',
+            authorOtherNames: [],
+            contentType: 'Novel',
+            totalChapters: 1432,
+            genres: [{ name: 'Fantasy', description: 'Magic, strange worlds, and supernatural stories.' }],
+            tags: [{ name: 'Mystery', description: 'Secrets and investigations that may extend beyond the card.' }],
+            coverUrl: null,
+            snapshotAt: '2026-07-18T12:00:00Z',
+            isOwner: false,
+          }],
+        },
+      })
       return
     }
 

@@ -183,6 +183,7 @@ describe('BookFormPage', () => {
       primaryName: 'Er Gen',
       otherNames: ['Ergen'],
       isPublic: true,
+      isOwned: false,
     }])
     renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
 
@@ -241,5 +242,30 @@ describe('BookFormPage', () => {
     await user.type(screen.getByPlaceholderText('Start typing a tag'), 'cult')
 
     expect(await screen.findByText('Progression through spiritual realms and techniques.')).toBeInTheDocument()
+  })
+
+  it('accepts active genre and tag suggestions with Tab without losing focus', async () => {
+    vi.mocked(api.searchTags).mockResolvedValue([{
+      id: 'tag-1',
+      name: 'cultivation',
+      description: 'Progression fantasy',
+      isGlobal: true,
+    }])
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    const genreInput = screen.getByPlaceholderText('Start typing a genre')
+    await user.type(genreInput, 'Fan')
+    await user.keyboard('{Tab}')
+    expect(screen.getByText('Fantasy')).toBeInTheDocument()
+    expect(genreInput).toHaveFocus()
+
+    const tagInput = screen.getByPlaceholderText('Start typing a tag')
+    await user.type(tagInput, 'cult')
+    expect(await screen.findByRole('option', { name: /cultivation/i })).toBeInTheDocument()
+    await user.keyboard('{Tab}')
+    expect(screen.getByText('cultivation')).toBeInTheDocument()
+    expect(tagInput).toHaveFocus()
   })
 })

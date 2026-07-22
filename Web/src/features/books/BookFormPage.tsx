@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Link2, Save, Star, Upload, X } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -828,15 +828,41 @@ function ChipBox({
 }) {
   const trimmed = input.trim()
   const canCreate = Boolean(onCreate && trimmed && !suggestions.some((item) => item.label.toLocaleLowerCase() === trimmed.toLocaleLowerCase()))
+  const [activeIndex, setActiveIndex] = useState(0)
+  const listboxId = useId()
+  const choiceCount = suggestions.length + (canCreate ? 1 : 0)
+
+  useEffect(() => {
+    setActiveIndex(0)
+  }, [input, suggestions.map((item) => item.key).join('|'), canCreate])
+
+  function pickActiveChoice() {
+    if (activeIndex < suggestions.length) {
+      onPick(suggestions[activeIndex].key)
+      return
+    }
+    if (canCreate) {
+      onCreate?.(trimmed)
+    }
+  }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
-    if (event.key === 'Enter' && trimmed) {
+    if ((event.key === 'Enter' || event.key === 'Tab') && trimmed && choiceCount > 0) {
       event.preventDefault()
-      if (suggestions[0]) {
-        onPick(suggestions[0].key)
-      } else {
-        onCreate?.(trimmed)
-      }
+      pickActiveChoice()
+      return
+    }
+
+    if (event.key === 'ArrowDown' && choiceCount > 0) {
+      event.preventDefault()
+      setActiveIndex((current) => (current + 1) % choiceCount)
+      return
+    }
+
+    if (event.key === 'ArrowUp' && choiceCount > 0) {
+      event.preventDefault()
+      setActiveIndex((current) => (current - 1 + choiceCount) % choiceCount)
+      return
     }
 
     if (event.key === 'Backspace' && !input && selected.length) {
@@ -870,19 +896,27 @@ function ChipBox({
           </span>
         ))}
         <input
+          aria-activedescendant={trimmed && choiceCount > 0 ? `${listboxId}-option-${activeIndex}` : undefined}
+          aria-autocomplete="list"
+          aria-controls={trimmed ? listboxId : undefined}
+          aria-expanded={Boolean(trimmed)}
           className="min-w-40 flex-1 border-0 bg-transparent text-sm outline-none"
           placeholder={selected.length ? '' : placeholder}
+          role="combobox"
           value={input}
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={handleKeyDown}
         />
       </div>
       {trimmed ? (
-        <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto">
-          {suggestions.map((item) => (
+        <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto" id={listboxId} role="listbox">
+          {suggestions.map((item, index) => (
             <button
-              className="w-full px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+              aria-selected={activeIndex === index}
+              className={`w-full px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800 ${activeIndex === index ? 'bg-slate-800' : ''}`}
+              id={`${listboxId}-option-${index}`}
               key={item.key}
+              role="option"
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onPick(item.key)}
@@ -893,7 +927,10 @@ function ChipBox({
           ))}
           {canCreate ? (
             <button
-              className="w-full px-3 py-2 text-left text-sm text-[var(--qs-accent-strong)] hover:bg-slate-800"
+              aria-selected={activeIndex === suggestions.length}
+              className={`w-full px-3 py-2 text-left text-sm text-[var(--qs-accent-strong)] hover:bg-slate-800 ${activeIndex === suggestions.length ? 'bg-slate-800' : ''}`}
+              id={`${listboxId}-option-${suggestions.length}`}
+              role="option"
               type="button"
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => onCreate?.(trimmed)}

@@ -15,7 +15,7 @@ public class AutocompleteFeatureTests
     public async Task SearchAuthors_ShouldReturnAuthorMatchedByAlias()
     {
         var repository = new FakeAuthorRepository();
-        var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
+        var author = new Author { OwnerId = OwnerId, PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
         author.Names.Add(new AuthorName { Name = "耳根", NormalizedName = "耳根", IsPrimary = false });
         await repository.AddAsync(author, CancellationToken.None);
         var handler = new SearchAuthorsQueryHandler(repository, new FakeUser());
@@ -25,6 +25,27 @@ public class AutocompleteFeatureTests
 
         Assert.Single(result);
         Assert.Equal("Er Gen", result.First().PrimaryName);
+        Assert.True(result.First().IsOwned);
+    }
+
+    [Fact]
+    public async Task SearchAuthors_ShouldMarkAnotherUsersPublicAuthorAsNotOwned()
+    {
+        var repository = new FakeAuthorRepository();
+        await repository.AddAsync(new Author
+        {
+            OwnerId = Guid.NewGuid(),
+            IsPublic = true,
+            PrimaryName = "Global Author",
+            NormalizedPrimaryName = "GLOBAL AUTHOR"
+        }, CancellationToken.None);
+        var handler = new SearchAuthorsQueryHandler(repository, new FakeUser());
+
+        var result = await handler.Handle(new SearchAuthorsQuery("Global", 10), CancellationToken.None);
+
+        Assert.Single(result);
+        Assert.True(result.First().IsPublic);
+        Assert.False(result.First().IsOwned);
     }
 
     [Fact]

@@ -55,6 +55,7 @@ public class ManageMetadataFeatureTests
         Assert.Equal("New Author", created.PrimaryName);
         Assert.Equal(["Pen Name"], created.OtherNames);
         Assert.False(created.IsPublic);
+        Assert.True(created.IsOwned);
     }
 
     [Fact]
@@ -84,6 +85,7 @@ public class ManageMetadataFeatureTests
 
         Assert.Equal("Er Gen", author.PrimaryName);
         Assert.Equal(["Ergen", "耳根"], result.OtherNames);
+        Assert.True(result.IsOwned);
         Assert.Single(author.Names, name => name.IsPrimary);
         Assert.Equal(1, repository.SaveCount);
     }

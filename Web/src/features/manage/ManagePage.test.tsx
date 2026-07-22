@@ -45,6 +45,7 @@ const author = {
   primaryName: 'Er Gen',
   otherNames: ['耳根'],
   isPublic: false,
+  isOwned: true,
 }
 
 const publishedBook = {
@@ -124,7 +125,7 @@ describe('ManagePage', () => {
     await user.click(screen.getByRole('tab', { name: 'Authors' }))
     const search = screen.getByPlaceholderText('Search authors or aliases…')
     await user.type(search, 'Cuttlefish')
-    await waitFor(() => expect(api.searchAuthors).toHaveBeenCalledWith('Cuttlefish', 50, true))
+    await waitFor(() => expect(api.searchAuthors).toHaveBeenCalledWith('Cuttlefish', 50))
 
     await user.click(await screen.findByRole('button', { name: 'Edit author Er Gen' }))
     const aliases = screen.getByLabelText('Alternative names')
@@ -187,11 +188,35 @@ describe('ManagePage', () => {
     renderWithProviders(<ManagePage />)
 
     await user.click(screen.getByRole('tab', { name: 'Authors' }))
-    expect(await screen.findByText('Private')).toBeInTheDocument()
+    expect(await screen.findByText('Yours')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Edit author Er Gen' }))
     await user.click(screen.getByRole('button', { name: 'Make public' }))
 
     await waitFor(() => expect(api.updateAuthorVisibility).toHaveBeenCalledWith(author.id, true))
+  })
+
+  it('shows cloned global author identities as read-only known authors', async () => {
+    vi.mocked(api.searchAuthors).mockResolvedValue([{ ...author, id: 'global-author', isPublic: true, isOwned: false }])
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Authors' }))
+
+    expect(await screen.findByText('Global')).toBeInTheDocument()
+    expect(screen.getByText('Global identity')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Edit author Er Gen' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the current users public authors editable', async () => {
+    vi.mocked(api.searchAuthors).mockResolvedValue([{ ...author, isPublic: true, isOwned: true }])
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Authors' }))
+
+    expect(await screen.findByText('Yours')).toBeInTheDocument()
+    expect(screen.getByText('Public')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit author Er Gen' })).toBeInTheDocument()
   })
 
   it('lists, refreshes, and unlists books from the books section', async () => {
@@ -233,5 +258,63 @@ describe('ManagePage', () => {
       'title',
       expect.stringContaining('description'),
     )
+  })
+
+  it('allows listing when a legacy cover has a stored image despite a stale NotFound status', async () => {
+    const legacyCoverBook = {
+      ...managedBooks[1],
+      id: 'legacy-cover-book',
+      primaryTitle: 'Legacy cover book',
+      cover: {
+        status: 'NotFound' as const,
+        source: 'ManualUpload',
+        imageUrl: '/api/book/legacy/cover/file',
+        thumbnailImageUrl: '/api/book/legacy/cover/thumbnail',
+      },
+    }
+    vi.mocked(api.getBooks).mockResolvedValue(paginated([legacyCoverBook]))
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Books' }))
+    const listButton = await screen.findByRole('button', { name: 'List Legacy cover book' })
+    expect(listButton).toBeEnabled()
+    await user.click(listButton)
+    await waitFor(() => expect(api.publishBook).toHaveBeenCalledWith(legacyCoverBook.id))
+  })
+
+  it('fetches further library books on scroll and all listing pages automatically', async () => {
+    const laterBook = { ...managedBooks[1], id: 'later-book', primaryTitle: 'Later book' }
+    const firstLibraryPage = Array.from({ length: 50 }, (_, index) => ({
+      ...managedBooks[index % managedBooks.length],
+      id: `book-${index}`,
+      primaryTitle: `Book ${index.toString().padStart(2, '0')}`,
+    }))
+    vi.mocked(api.getBooks).mockImplementation(async ({ skip = 0 }) => skip === 0
+      ? { skip: 0, take: 50, total: 51, data: firstLibraryPage }
+      : { skip: 50, take: 50, total: 51, data: [laterBook] })
+    const firstListingPage = Array.from({ length: 50 }, (_, index) => ({
+      ...publishedBook,
+      id: `snapshot-${index}`,
+      sourceBookId: `source-${index}`,
+    }))
+    vi.mocked(api.searchPublicBooks).mockImplementation(async ({ skip = 0 }) => skip === 0
+      ? { skip: 0, take: 50, total: 51, data: firstListingPage }
+      : { skip: 50, take: 50, total: 51, data: [publishedBook] })
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Books' }))
+    const list = await screen.findByLabelText('Books')
+    Object.defineProperties(list, {
+      clientHeight: { configurable: true, value: 300 },
+      scrollHeight: { configurable: true, value: 900 },
+      scrollTop: { configurable: true, value: 560 },
+    })
+    fireEvent.scroll(list)
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({ skip: 50, take: 50 })))
+    expect(await screen.findByText('Later book')).toBeInTheDocument()
+    await waitFor(() => expect(api.searchPublicBooks).toHaveBeenCalledWith({ skip: 50, take: 50, mineOnly: true }))
   })
 })

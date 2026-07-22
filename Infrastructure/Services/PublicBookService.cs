@@ -650,9 +650,7 @@ public sealed class PublicBookService(
         if (book.Author is null) missing.Add("author");
         if (book.BookGenres.Count == 0) missing.Add("genre");
         if (book.BookTags.Count == 0) missing.Add("tag");
-        if (book.Cover is null ||
-            book.Cover.Status is not (BookCoverStatus.Found or BookCoverStatus.Uploaded) ||
-            string.IsNullOrWhiteSpace(book.Cover.StoragePath))
+        if (book.Cover is null || string.IsNullOrWhiteSpace(book.Cover.StoragePath))
         {
             missing.Add("stored cover");
         }

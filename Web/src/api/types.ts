@@ -485,6 +485,7 @@ export type AuthorDto = {
   primaryName: string
   otherNames: string[]
   isPublic: boolean
+  isOwned: boolean
 }
 
 export type TagDto = {
