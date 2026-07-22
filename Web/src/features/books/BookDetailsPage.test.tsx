@@ -162,6 +162,22 @@ describe('BookDetailsPage', () => {
     expect(panel).toHaveClass('ui-dialog-panel')
   })
 
+  it('renders the book status as a high-contrast labeled indicator', async () => {
+    vi.mocked(api.getBook).mockResolvedValue(books[0])
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    const status = await screen.findByLabelText('Book status: Reading')
+    expect(status).toHaveClass('book-details-status', 'book-details-status--reading')
+    expect(status).toHaveTextContent('StatusReading')
+    expect(status.querySelector('.book-details-status__dot')).toBeInTheDocument()
+  })
+
   it('replaces a technical cover download error with a helpful generic message', async () => {
     vi.mocked(api.getBook).mockResolvedValue({
       ...books[0],

@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Upload } from 'lucide-react'
+import { ChevronDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Star, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -729,7 +729,12 @@ function BookCardGrid({
   return (
     <div className={`grid min-w-0 gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
-        <Surface as="article" className="book-card min-w-0 w-full max-w-full" key={book.id} tone="muted">
+        <Surface
+          as="article"
+          className={`book-card min-w-0 w-full max-w-full ${isCompletedStatus(book.status) ? 'book-card--completed' : ''}`}
+          key={book.id}
+          tone="muted"
+        >
           <BookDetailsLink bookId={book.id} className="grid min-w-0 w-full max-w-full overflow-hidden">
             <div className="relative min-w-0 max-w-full overflow-hidden">
               <BookCoverArtwork
@@ -741,9 +746,12 @@ function BookCardGrid({
               />
               {hasCardField(fields, 'rating') && book.rating != null ? (
                 <span
-                  className={`absolute right-3 top-3 inline-flex min-h-10 min-w-10 items-center justify-center rounded-full px-3 text-sm font-bold ${getRatingBadgeClass(book.rating)}`}
+                  aria-label={`Rating ${book.rating} out of 10`}
+                  className="book-card-rating absolute right-3 top-3"
                 >
-                  {book.rating}
+                  <Star aria-hidden="true" className="book-card-rating__star h-3.5 w-3.5" />
+                  <span className="book-card-rating__value">{book.rating}</span>
+                  <span aria-hidden="true" className="book-card-rating__scale">/10</span>
                 </span>
               ) : null}
               {hasCardField(fields, 'status') ? (
@@ -1018,29 +1026,13 @@ function getDesktopCardsPerRowClass(cardsPerRow: number) {
   return classMap[normalized]
 }
 
-function getRatingBadgeClass(rating: number) {
-  if (rating <= 2) {
-    return 'bg-rose-600/95 text-white'
-  }
-  if (rating <= 4) {
-    return 'bg-orange-500/95 text-white'
-  }
-  if (rating <= 6) {
-    return 'bg-amber-400/95 text-slate-950'
-  }
-  if (rating <= 8) {
-    return 'bg-lime-500/95 text-slate-950'
-  }
-  return 'bg-emerald-500/95 text-white'
-}
-
 function getStatusBadgeClass(status: string) {
   const normalized = status.trim().toLowerCase()
   if (normalized === 'reading') {
     return 'border-indigo-900/80 bg-indigo-600/95 text-white'
   }
   if (normalized === 'completed') {
-    return 'border-emerald-900/80 bg-emerald-600/95 text-white'
+    return 'book-card-status--completed'
   }
   if (normalized === 'plan to read') {
     return 'border-amber-900/80 bg-amber-400/95 text-slate-950'
@@ -1081,6 +1073,10 @@ export function formatDate(value?: string | null) {
 
 function formatList(values: string[]) {
   return values.length ? values.slice(0, 3).join(', ') : '-'
+}
+
+function isCompletedStatus(status: string) {
+  return status.trim().toLowerCase() === 'completed'
 }
 
 function formatListTooltip(values: string[], totalCount = values.length) {
