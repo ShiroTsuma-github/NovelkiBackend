@@ -210,7 +210,24 @@ test('cards layout constrains long titles and shows active toggle styles', async
     expect(Math.abs(coverWidth - cardWidth)).toBeLessThanOrEqual(2)
     expect(cardRight).toBeLessThanOrEqual(page.viewportSize()!.width + 1)
   })
+  const completedCard = page.locator('.book-card--completed')
+  await expect(completedCard).toHaveCSS('border-top-color', 'rgba(216, 184, 95, 0.72)')
+  await expect(completedCard).not.toHaveCSS('box-shadow', 'none')
+
+  const ratingBadge = page.getByLabel('Rating 9 out of 10')
+  await expect(ratingBadge).toHaveCSS('background-color', 'rgba(8, 12, 19, 0.9)')
+  await expect(ratingBadge).toHaveCSS('border-radius', '999px')
   await expectNoHorizontalOverflow(page)
+})
+
+test('book details status uses the readable semantic treatment', async ({ page }) => {
+  await page.goto('/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
+
+  const status = page.getByLabel('Book status: Reading')
+  await expect(status).toContainText('Status')
+  await expect(status).toContainText('Reading')
+  await expect(status).toHaveCSS('color', 'rgb(201, 244, 223)')
+  await expect(status).toHaveCSS('background-color', 'rgb(23, 54, 41)')
 })
 
 test('discover metadata tooltips can extend beyond their card', async ({ page }) => {

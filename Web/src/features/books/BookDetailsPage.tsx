@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { api } from '@/api/client'
 import type { BookDto, BookLinkDto, BookProgressHistoryDto } from '@/api/types'
 import { HttpError } from '@/api/http'
-import { Badge, buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
+import { buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
@@ -381,21 +381,26 @@ function RatingSummary({ rating }: { rating?: number | null }) {
 function StatusPill({ status }: { status: string }) {
   const normalized = status.trim().toLowerCase()
   const tone = normalized === 'reading'
-    ? 'success'
+    ? 'reading'
     : normalized === 'completed'
-      ? 'accent'
-    : normalized === 'plan to read'
-        ? 'warning'
-      : normalized === 'on hold'
-          ? 'warning'
-        : normalized === 'dropped'
-            ? 'danger'
+      ? 'completed'
+      : normalized === 'plan to read'
+        ? 'planned'
+        : normalized === 'on hold'
+          ? 'paused'
+          : normalized === 'dropped'
+            ? 'dropped'
             : 'neutral'
 
   return (
-    <Badge className="min-h-10 self-center px-4 py-1.5 text-sm uppercase tracking-wide" tone={tone}>
-      {status}
-    </Badge>
+    <span
+      aria-label={`Book status: ${status}`}
+      className={`book-details-status book-details-status--${tone} self-center`}
+    >
+      <span aria-hidden="true" className="book-details-status__dot" />
+      <span aria-hidden="true" className="book-details-status__label">Status</span>
+      <span className="book-details-status__value">{status}</span>
+    </span>
   )
 }
 

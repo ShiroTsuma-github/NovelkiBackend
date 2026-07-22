@@ -479,8 +479,10 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
-    const ratingBadge = screen.getAllByText('9')[0]
-    expect(ratingBadge).toHaveClass('min-h-10', 'min-w-10', 'bg-emerald-500/95')
+    const ratingBadge = screen.getByLabelText('Rating 9 out of 10')
+    expect(ratingBadge).toHaveClass('book-card-rating')
+    expect(ratingBadge.querySelector('.book-card-rating__star')).toBeInTheDocument()
+    expect(ratingBadge).toHaveTextContent('9/10')
   })
 
   it('shows status overlays on cards with status-specific colors', async () => {
@@ -493,7 +495,21 @@ describe('BooksPage', () => {
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
     expect(screen.getAllByText('Reading')[0].parentElement).toHaveClass('bg-indigo-600/95', 'text-white')
-    expect(screen.getAllByText('Completed')[0].parentElement).toHaveClass('bg-emerald-600/95', 'text-white')
+    expect(screen.getAllByText('Completed')[0].parentElement).toHaveClass('book-card-status--completed')
+  })
+
+  it('gives completed cards a dedicated golden glow treatment', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+
+    const cards = Array.from(container.querySelectorAll('.book-card'))
+    expect(cards[0]).not.toHaveClass('book-card--completed')
+    expect(cards[1]).toHaveClass('book-card--completed')
   })
 
   it('shows card-specific field options in the columns popup for cards view', async () => {
