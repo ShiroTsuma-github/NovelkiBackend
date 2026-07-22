@@ -142,6 +142,7 @@ public class RepositoryTests
                 NormalizedTitle = MappingExtensions.NormalizeName($"Alternative title {index}")
             });
         }
+
         book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         for (var index = 1; index <= 5; index++)
@@ -149,10 +150,10 @@ public class RepositoryTests
             book.BookGenres.Add(new BookGenre { Book = book, Genre = TestData.Genre($"Projection Genre {index}") });
             book.BookTags.Add(new BookTag
             {
-                Book = book,
-                Tag = TestData.Tag(database.UserId, $"projection-tag-{index}")
+                Book = book, Tag = TestData.Tag(database.UserId, $"projection-tag-{index}")
             });
         }
+
         context.Books.Add(book);
         await context.SaveChangesAsync();
         var queryService = CreateReadQueryService(context);
@@ -1802,9 +1803,7 @@ public class RepositoryTests
         var publicOwnerId = Guid.Parse("55555555-5555-5555-5555-555555555555");
         context.Users.Add(new User
         {
-            Id = publicOwnerId,
-            UserName = "public-author-owner",
-            NormalizedUserName = "PUBLIC-AUTHOR-OWNER"
+            Id = publicOwnerId, UserName = "public-author-owner", NormalizedUserName = "PUBLIC-AUTHOR-OWNER"
         });
         var privateAuthor = TestData.Author("Local Pen Name", database.UserId, false);
         privateAuthor.Names.Add(new AuthorName
@@ -1853,6 +1852,24 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task TagRepository_ShouldMatchSeparatorAndSmallDistanceVariants()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var tag = TestData.Tag(database.UserId, "Slice Of Life");
+        context.Tags.Add(tag);
+        await context.SaveChangesAsync();
+        var repository = new TagRepository(context);
+
+        var separatorResult = await repository.GetByNameAsync(database.UserId, "SLICE-OF-LIFE", CancellationToken.None);
+        var distanceResult = await repository.GetByNameAsync(database.UserId, "SLICEOFLIFEE", CancellationToken.None);
+
+        Assert.Equal(tag.Id, separatorResult?.Id);
+        Assert.Equal(tag.Id, distanceResult?.Id);
+        Assert.Equal("Slice Of Life", distanceResult?.Name);
+    }
+
+    [Fact]
     public async Task GenreRepository_ShouldPageAndCount()
     {
         using var database = new SqliteTestDatabase();
@@ -1866,6 +1883,24 @@ public class RepositoryTests
 
         Assert.Single(page);
         Assert.Equal(3, count);
+    }
+
+    [Fact]
+    public async Task GenreRepository_ShouldMatchSeparatorAndSmallDistanceVariants()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var genre = TestData.Genre("Slice Of Life");
+        context.Genres.Add(genre);
+        await context.SaveChangesAsync();
+        var repository = new GenreRepository(context);
+
+        var separatorResult = await repository.GetByNameAsync("SLICE-OF-LIFE", CancellationToken.None);
+        var distanceResult = await repository.GetByNameAsync("SLICEOFLIFEE", CancellationToken.None);
+
+        Assert.Equal(genre.Id, separatorResult?.Id);
+        Assert.Equal(genre.Id, distanceResult?.Id);
+        Assert.Equal("Slice Of Life", distanceResult?.Name);
     }
 
     private static async Task SeedAnalyticsPerformanceDatasetAsync(

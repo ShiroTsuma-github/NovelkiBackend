@@ -1,16 +1,23 @@
 namespace Application.Common;
 
-using Application.Common.DTOs.Book;
+using DTOs.Book;
 
 public static partial class MappingExtensions
 {
     public static BookCoverDto ToDto(this BookCover source, Guid bookId)
     {
         var version = GetCoverVersion(source).ToUnixTimeMilliseconds();
+        var hasStoredCover = !string.IsNullOrWhiteSpace(source.StoragePath) ||
+                             !string.IsNullOrWhiteSpace(source.ThumbnailStoragePath);
+        var effectiveStatus = hasStoredCover && source.Status is not (BookCoverStatus.Found or BookCoverStatus.Uploaded)
+            ? source.Source is BookCoverSource.ManualUpload or BookCoverSource.ManualUrl
+                ? BookCoverStatus.Uploaded
+                : BookCoverStatus.Found
+            : source.Status;
         return new BookCoverDto
         {
             Id = source.Id,
-            Status = source.Status.ToString(),
+            Status = effectiveStatus.ToString(),
             Source = source.Source?.ToString(),
             ImageUrl = source.StoragePath == null ? null : ApiRoutes.BookCoverFile(bookId, version),
             ThumbnailImageUrl =
@@ -24,7 +31,7 @@ public static partial class MappingExtensions
             ThumbnailSizeBytes = source.ThumbnailSizeBytes,
             ThumbnailWidth = source.ThumbnailWidth,
             ThumbnailHeight = source.ThumbnailHeight,
-            FailureReason = source.FailureReason,
+            FailureReason = hasStoredCover ? null : source.FailureReason,
             LastAttemptAt = source.LastAttemptAt
         };
     }

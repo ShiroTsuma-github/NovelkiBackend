@@ -1,6 +1,7 @@
 namespace Api;
 
 using Infrastructure.Contexts;
+using Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 
 public static class DatabaseMigrationExtensions
@@ -15,5 +16,7 @@ public static class DatabaseMigrationExtensions
         using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         await dbContext.Database.MigrateAsync();
+        var metadataReconciler = scope.ServiceProvider.GetRequiredService<MetadataSimilarityReconciler>();
+        await metadataReconciler.ReconcileAsync();
     }
 }

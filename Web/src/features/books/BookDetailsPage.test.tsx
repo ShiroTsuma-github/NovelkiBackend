@@ -33,6 +33,22 @@ vi.mock('./ProgressDialog', () => ({
 }))
 
 describe('BookDetailsPage', () => {
+  it('preserves parsed line breaks in the description', async () => {
+    vi.mocked(api.getBook).mockResolvedValue({
+      ...books[0],
+      description: 'First paragraph.\nSecond paragraph.',
+    })
+
+    renderWithProviders(
+      <Routes><Route element={<BookDetailsPage />} path="/books/:id" /></Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    expect(await screen.findByText((_, element) =>
+      element?.tagName === 'P' && element.textContent === 'First paragraph.\nSecond paragraph.',
+    )).toHaveClass('whitespace-pre-line')
+  })
+
   it('returns to the exact filtered book list url stored by the list page', async () => {
     vi.mocked(api.getBook).mockResolvedValue(books[0])
 

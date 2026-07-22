@@ -1,12 +1,8 @@
 namespace Infrastructure.Services;
 
 using System.Text.Json;
-using System.Linq.Expressions;
 using Application.Common.DTOs.Book;
 using Application.Common.Models;
-using Domain.Associations;
-using Domain.Repositories;
-using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore.Storage;
 
 public sealed class PublicBookService(
@@ -340,7 +336,8 @@ public sealed class PublicBookService(
     public async Task<(Stream Content, string MimeType)> OpenCoverAsync(Guid snapshotId,
         CancellationToken cancellationToken)
     {
-        var snapshot = await context.PublicBookSnapshots.AsNoTracking().FirstOrDefaultAsync(item => item.Id == snapshotId,
+        var snapshot = await context.PublicBookSnapshots.AsNoTracking().FirstOrDefaultAsync(
+                           item => item.Id == snapshotId,
                            cancellationToken)
                        ?? throw new EntityNotFoundException<PublicBookSnapshot, Guid>(snapshotId);
         if (string.IsNullOrWhiteSpace(snapshot.CoverStoragePath))
@@ -382,7 +379,8 @@ public sealed class PublicBookService(
         var names = author.Names.Select(name => name.NormalizedName).Append(author.NormalizedPrimaryName).Distinct()
             .ToArray();
         var existing = await context.Authors.Include(item => item.Names).FirstOrDefaultAsync(item => item.IsPublic &&
-            (names.Contains(item.NormalizedPrimaryName) || item.Names.Any(name => names.Contains(name.NormalizedName))),
+                (names.Contains(item.NormalizedPrimaryName) ||
+                 item.Names.Any(name => names.Contains(name.NormalizedName))),
             cancellationToken);
         if (existing is not null) return existing.Id;
         author.IsPublic = true;
@@ -401,8 +399,10 @@ public sealed class PublicBookService(
                 continue;
             }
 
-            var existing = await context.Tags.FirstOrDefaultAsync(
-                item => item.IsGlobal && item.NormalizedName == tag.NormalizedName, cancellationToken);
+            var existing = (await context.Tags.Where(item => item.IsGlobal).ToListAsync(cancellationToken))
+                .Where(item => MetadataNameSimilarity.IsPracticalMatch(item.Name, tag.Name))
+                .OrderBy(item => MetadataNameSimilarity.MatchDistance(item.Name, tag.Name))
+                .FirstOrDefault();
             if (existing is not null)
             {
                 ids.Add(existing.Id);
@@ -427,9 +427,7 @@ public sealed class PublicBookService(
 
         var promotions = snapshots.Select(snapshot => new
         {
-            snapshot.PublicAuthorId,
-            TagIds = Deserialize<Guid[]>(snapshot.PublicTagIdsJson),
-            snapshot.OwnerId
+            snapshot.PublicAuthorId, TagIds = Deserialize<Guid[]>(snapshot.PublicTagIdsJson), snapshot.OwnerId
         }).ToList();
         var storagePaths = snapshots.SelectMany(snapshot =>
                 new[] { snapshot.CoverStoragePath, snapshot.CoverThumbnailStoragePath })
@@ -442,6 +440,7 @@ public sealed class PublicBookService(
             await CleanupPromotionsAsync(promotion.PublicAuthorId, promotion.TagIds, promotion.OwnerId,
                 cancellationToken);
         }
+
         await cleanupQueue.EnqueueAsync(storagePaths, cancellationToken);
     }
 
@@ -488,7 +487,8 @@ public sealed class PublicBookService(
                      .GroupBy(link => link.Book.OwnerId).ToList())
         {
             var local = await context.Tags.FirstOrDefaultAsync(item => !item.IsGlobal && item.OwnerId == group.Key &&
-                item.NormalizedName == tag.NormalizedName, cancellationToken);
+                                                                       item.NormalizedName == tag.NormalizedName,
+                cancellationToken);
             if (local is null)
             {
                 local = new Tag
@@ -582,10 +582,7 @@ public sealed class PublicBookService(
 
                 author.Names.Add(new AuthorName
                 {
-                    Name = alias,
-                    NormalizedName = normalizedAlias,
-                    IsPrimary = false,
-                    Source = "Public snapshot"
+                    Name = alias, NormalizedName = normalizedAlias, IsPrimary = false, Source = "Public snapshot"
                 });
             }
 
@@ -598,38 +595,51 @@ public sealed class PublicBookService(
     private async Task AttachGenresAsync(Book book, IEnumerable<PublicBookMetadataDto> genres,
         CancellationToken cancellationToken)
     {
-        var names = genres.Select(item => MappingExtensions.NormalizeName(item.Name)).ToArray();
-        var entities = await context.Genres.Where(item => names.Contains(item.NormalizedName))
-            .ToListAsync(cancellationToken);
-        foreach (var genre in entities)
+        var availableGenres = await context.Genres.ToListAsync(cancellationToken);
+        foreach (var item in genres)
         {
-            book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+            var genre = availableGenres
+                .Where(candidate => MetadataNameSimilarity.IsPracticalMatch(candidate.Name, item.Name))
+                .OrderBy(candidate => MetadataNameSimilarity.MatchDistance(candidate.Name, item.Name))
+                .FirstOrDefault();
+            if (genre != null && book.BookGenres.All(link => link.GenreId != genre.Id))
+            {
+                book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+            }
         }
     }
 
     private async Task AttachTagsAsync(Book book, IEnumerable<PublicBookMetadataDto> tags,
         CancellationToken cancellationToken)
     {
+        var availableTags = await context.Tags
+            .Where(entity => entity.IsGlobal || entity.OwnerId == user.RequiredId)
+            .ToListAsync(cancellationToken);
         foreach (var item in tags)
         {
-            var normalized = MappingExtensions.NormalizeName(item.Name);
-            var tag = await context.Tags.Where(entity => entity.IsGlobal || entity.OwnerId == user.RequiredId)
-                .OrderBy(entity => entity.IsGlobal)
-                .FirstOrDefaultAsync(entity => entity.NormalizedName == normalized, cancellationToken);
+            var tag = availableTags
+                .Where(entity => MetadataNameSimilarity.IsPracticalMatch(entity.Name, item.Name))
+                .OrderBy(entity => MetadataNameSimilarity.MatchDistance(entity.Name, item.Name))
+                .ThenBy(entity => entity.IsGlobal)
+                .FirstOrDefault();
             if (tag is null)
             {
                 tag = new Tag
                 {
                     OwnerId = user.RequiredId,
                     Name = item.Name,
-                    NormalizedName = normalized,
+                    NormalizedName = MappingExtensions.NormalizeName(item.Name),
                     Description = item.Description,
                     IsGlobal = false
                 };
                 context.Tags.Add(tag);
+                availableTags.Add(tag);
             }
 
-            book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+            if (book.BookTags.All(link => link.TagId != tag.Id))
+            {
+                book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+            }
         }
     }
 
@@ -738,7 +748,9 @@ public sealed class PublicBookService(
 
     private Task<bool> HasDuplicateBookAsync(PublicBookSnapshot snapshot, Guid contentTypeId,
         CancellationToken cancellationToken) => context.Books.AnyAsync(book => book.OwnerId == user.RequiredId &&
-        book.NormalizedPrimaryTitle == snapshot.NormalizedPrimaryTitle && book.ContentTypeId == contentTypeId,
+                                                                               book.NormalizedPrimaryTitle ==
+                                                                               snapshot.NormalizedPrimaryTitle &&
+                                                                               book.ContentTypeId == contentTypeId,
         cancellationToken);
 
     private PublicBookSnapshotDto ToDto(PublicBookSnapshot snapshot) => new()

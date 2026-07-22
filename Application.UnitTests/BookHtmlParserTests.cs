@@ -1,5 +1,7 @@
 namespace Application.UnitTests;
 
+using Common;
+using Common.Interfaces;
 using Domain.Entities;
 using Domain.Repositories;
 using FluentValidation;
@@ -171,6 +173,62 @@ public sealed class BookHtmlParserTests
         Assert.Equal("https://book-pic.webnovel.com/example.jpg", result.CoverUrl);
     }
 
+    [Fact]
+    public async Task ParseAsync_ShouldMatchGenreCandidateByConservativeEditDistance()
+    {
+        var parser = CreateParserWithKnownGenres("Slice Of Life");
+        const string html = """
+                            <html><head><link rel="canonical" href="https://www.webnovel.com/book/123"></head><body>
+                              <div class="det-hd"><h1>Example</h1><a class="c_primary" title="Author">Author</a></div>
+                              <div class="j_tagWrap"><p class="m-tag"><a># SLICEOFLIFEE</a></p></div>
+                            </body></html>
+                            """;
+
+        var result = await parser.ParseAsync(html, CancellationToken.None);
+
+        var genre = Assert.Single(result.Genres);
+        Assert.NotNull(genre.Id);
+        Assert.Equal("Slice Of Life", genre.Name);
+        Assert.DoesNotContain("SLICEOFLIFEE", result.Tags);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ShouldUseExistingTagCasingWhenOnlySpacesDiffer()
+    {
+        var ownerId = Guid.NewGuid();
+        var types = new Mock<ITypeRepository>();
+        var genres = new Mock<IGenreRepository>();
+        var tags = new Mock<ITagRepository>();
+        tags.Setup(repository => repository.GetByNamesAsync(
+                ownerId,
+                It.IsAny<IEnumerable<string>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync([
+                new Tag
+                {
+                    OwnerId = ownerId,
+                    Name = "Slice Of Life",
+                    NormalizedName = MappingExtensions.NormalizeName("Slice Of Life")
+                }
+            ]);
+        var user = new Mock<IUser>();
+        user.SetupGet(current => current.Id).Returns(ownerId);
+        var parser = new BookHtmlParser(
+            [new NovelUpdatesHtmlResolver()],
+            genres.Object,
+            types.Object,
+            tags.Object,
+            user.Object);
+        const string html = """
+                            <html><head><link rel="canonical" href="https://www.novelupdates.com/series/example/"></head>
+                              <body><h1 class="seriestitlenu">Example</h1><div id="showtags"><a class="genre">SLICEOFLIFEE</a></div></body></html>
+                            """;
+
+        var result = await parser.ParseAsync(html, CancellationToken.None);
+
+        Assert.Equal(["Slice Of Life"], result.Tags);
+    }
+
     private static BookHtmlParser CreateParser()
     {
         var types = new Mock<ITypeRepository>();
@@ -187,12 +245,15 @@ public sealed class BookHtmlParserTests
         var types = new Mock<ITypeRepository>();
         types.Setup(repository => repository.GetByNameAsync("Novel", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContentType { Id = Guid.NewGuid(), Name = "Novel", Slug = "novel" });
-        var known = names.ToDictionary(name => name,
+        var known = names.ToDictionary(MappingExtensions.NormalizeNameIgnoringSpaces,
             name => new Genre { Id = Guid.NewGuid(), Name = name, NormalizedName = name.ToUpperInvariant() },
-            StringComparer.OrdinalIgnoreCase);
+            StringComparer.Ordinal);
         var genres = new Mock<IGenreRepository>();
         genres.Setup(repository => repository.GetByNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string name, CancellationToken _) => known.GetValueOrDefault(name));
+            .ReturnsAsync((string name, CancellationToken _) => known.Values
+                .Where(genre => MetadataNameSimilarity.IsPracticalMatch(genre.Name, name))
+                .OrderBy(genre => MetadataNameSimilarity.MatchDistance(genre.Name, name))
+                .FirstOrDefault());
         return new BookHtmlParser(
             [
                 new NovelUpdatesHtmlResolver(), new RoyalRoadHtmlResolver(), new ScribbleHubHtmlResolver(),

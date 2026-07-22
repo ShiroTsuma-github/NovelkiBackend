@@ -1,7 +1,6 @@
 namespace Application.Features.BookFeatures.Commands;
 
-using Application.Common.DTOs.Book;
-using Domain.Associations;
+using Common.DTOs.Book;
 
 internal static class BookMutationSupport
 {
@@ -101,16 +100,17 @@ internal static class BookMutationSupport
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         var existingTags = (await tagRepository.GetByNamesAsync(ownerId, names, cancellationToken)).ToList();
-        var existingNormalized = existingTags.Select(tag => tag.NormalizedName).ToHashSet();
         foreach (var name in names)
         {
-            var normalized = MappingExtensions.NormalizeName(name);
-            if (existingNormalized.Contains(normalized))
+            if (existingTags.Any(tag => MetadataNameSimilarity.IsPracticalMatch(tag.Name, name)))
             {
                 continue;
             }
 
-            var tag = new Tag { OwnerId = ownerId, Name = name, NormalizedName = normalized };
+            var tag = new Tag
+            {
+                OwnerId = ownerId, Name = name, NormalizedName = MappingExtensions.NormalizeName(name)
+            };
             await tagRepository.AddAsync(tag, cancellationToken);
             existingTags.Add(tag);
         }

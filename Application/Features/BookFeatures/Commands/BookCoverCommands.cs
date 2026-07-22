@@ -16,6 +16,7 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
     private readonly IBookRepository _bookRepository;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
+    private readonly IBookCoverOperationGate _operationGate;
     private readonly IBookCoverStorage _storage;
     private readonly IUser _user;
 
@@ -24,17 +25,20 @@ public class UploadBookCoverHandler : IRequestHandler<UploadBookCoverCommand, Bo
         IBookCoverRepository coverRepository,
         IBookCoverStorage storage,
         IBookListCacheInvalidator cacheInvalidator,
-        IUser user)
+        IUser user,
+        IBookCoverOperationGate? operationGate = null)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
         _storage = storage;
         _cacheInvalidator = cacheInvalidator;
         _user = user;
+        _operationGate = operationGate ?? NoopBookCoverOperationGate.Instance;
     }
 
     public async Task<BookCoverDto> Handle(UploadBookCoverCommand request, CancellationToken cancellationToken)
     {
+        await using var operation = await _operationGate.EnterAsync(request.BookId, cancellationToken);
         if (request.Length is <= 0)
         {
             throw new ValidationException(BookCoverValidationMessages.EmptyFile);
@@ -61,6 +65,7 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
     private readonly IBookRepository _bookRepository;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
+    private readonly IBookCoverOperationGate _operationGate;
     private readonly IBookCoverRemoteImageService _remoteImageService;
     private readonly IBookCoverStorage _storage;
     private readonly IUser _user;
@@ -71,7 +76,8 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
         IBookCoverStorage storage,
         IBookCoverRemoteImageService remoteImageService,
         IBookListCacheInvalidator cacheInvalidator,
-        IUser user)
+        IUser user,
+        IBookCoverOperationGate? operationGate = null)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
@@ -79,10 +85,12 @@ public class SetBookCoverFromUrlHandler : IRequestHandler<SetBookCoverFromUrlCom
         _remoteImageService = remoteImageService;
         _cacheInvalidator = cacheInvalidator;
         _user = user;
+        _operationGate = operationGate ?? NoopBookCoverOperationGate.Instance;
     }
 
     public async Task<BookCoverDto> Handle(SetBookCoverFromUrlCommand request, CancellationToken cancellationToken)
     {
+        await using var operation = await _operationGate.EnterAsync(request.BookId, cancellationToken);
         if (!Uri.TryCreate(request.ImageUrl, UriKind.Absolute, out var imageUri) ||
             !imageUri.IsHttpOrHttps())
         {
@@ -113,6 +121,7 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
     private readonly IBookRepository _bookRepository;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
+    private readonly IBookCoverOperationGate _operationGate;
     private readonly IBookCoverQueue _queue;
     private readonly IBookCoverStorage _storage;
     private readonly IUser _user;
@@ -123,7 +132,8 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
         IBookCoverQueue queue,
         IBookCoverStorage storage,
         IBookListCacheInvalidator cacheInvalidator,
-        IUser user)
+        IUser user,
+        IBookCoverOperationGate? operationGate = null)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
@@ -131,10 +141,12 @@ public class RefreshBookCoverHandler : IRequestHandler<RefreshBookCoverCommand, 
         _storage = storage;
         _cacheInvalidator = cacheInvalidator;
         _user = user;
+        _operationGate = operationGate ?? NoopBookCoverOperationGate.Instance;
     }
 
     public async Task<BookCoverDto> Handle(RefreshBookCoverCommand request, CancellationToken cancellationToken)
     {
+        await using var operation = await _operationGate.EnterAsync(request.BookId, cancellationToken);
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
         var change = BookCoverMutationSupport.ApplyPendingRefresh(book);
@@ -155,6 +167,7 @@ public class DeleteBookCoverHandler : IRequestHandler<DeleteBookCoverCommand>
     private readonly IBookRepository _bookRepository;
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
+    private readonly IBookCoverOperationGate _operationGate;
     private readonly IBookCoverStorage _storage;
     private readonly IUser _user;
 
@@ -163,17 +176,20 @@ public class DeleteBookCoverHandler : IRequestHandler<DeleteBookCoverCommand>
         IBookCoverRepository coverRepository,
         IBookCoverStorage storage,
         IBookListCacheInvalidator cacheInvalidator,
-        IUser user)
+        IUser user,
+        IBookCoverOperationGate? operationGate = null)
     {
         _bookRepository = bookRepository;
         _coverRepository = coverRepository;
         _storage = storage;
         _cacheInvalidator = cacheInvalidator;
         _user = user;
+        _operationGate = operationGate ?? NoopBookCoverOperationGate.Instance;
     }
 
     public async Task Handle(DeleteBookCoverCommand request, CancellationToken cancellationToken)
     {
+        await using var operation = await _operationGate.EnterAsync(request.BookId, cancellationToken);
         var book = await _bookRepository.GetByIdAsync(request.BookId, _user.RequiredId, cancellationToken)
                    ?? throw new EntityNotFoundException<Book, Guid>(request.BookId);
         var cover = book.Cover;

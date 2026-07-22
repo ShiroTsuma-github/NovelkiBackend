@@ -1,18 +1,31 @@
-using Application.Common.Interfaces;
+namespace Application.UnitTests;
+
+using System.Net;
+using System.Text.Json;
+using Common.Interfaces;
 using Domain.Entities;
 using Domain.Repositories;
 using FluentValidation;
 using Infrastructure.BookCovers;
 using Microsoft.Extensions.Logging.Abstractions;
-using System.Net;
-using System.Text.Json;
-
-namespace Application.UnitTests;
 
 public class BookCoverProcessorTests
 {
     private static readonly Guid OwnerId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid BookId = Guid.Parse("22222222-2222-2222-2222-222222222222");
+
+    [Fact]
+    public async Task OperationGate_ShouldSerializeCoverWorkForTheSameBook()
+    {
+        var gate = new BookCoverOperationGate();
+        await using var first = await gate.EnterAsync(BookId, CancellationToken.None);
+
+        var secondTask = gate.EnterAsync(BookId, CancellationToken.None);
+        Assert.False(secondTask.IsCompleted);
+
+        await first.DisposeAsync();
+        await using var second = await secondTask.WaitAsync(TimeSpan.FromSeconds(1));
+    }
 
     [Fact]
     public async Task ProcessAsync_ShouldReturnWhenCoverIsMissing()
