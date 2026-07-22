@@ -1623,6 +1623,8 @@ public class RepositoryTests
         Assert.Equal(userItem.PrimaryTitle, adminItem.PrimaryTitle);
         Assert.Equal(userItem.Description, adminItem.Description);
         Assert.Equal(userItem.Notes, adminItem.Notes);
+        Assert.Equal(100, userItem.Description!.Length);
+        Assert.Equal(100, userItem.Notes!.Length);
         Assert.Equal(userItem.AlternativeTitles, adminItem.AlternativeTitles);
         Assert.Equal(userItem.Genres, adminItem.Genres);
         Assert.Equal(userItem.Tags, adminItem.Tags);

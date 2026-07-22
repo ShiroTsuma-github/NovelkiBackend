@@ -166,7 +166,23 @@ describe('BooksPage', () => {
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
     expect(window.localStorage.getItem('novelki.books.layout.v1')).toBe('cards')
-    expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /A Very Long Book Title/ })).toHaveAttribute(
+      'title',
+      'A Very Long Book Title That Should Stay Inside Its Card Container Without Pushing Actions Away',
+    )
+  })
+
+  it('shows the actual number of metadata values omitted by the list projection', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated([{
+      ...bookListItems[0],
+      tags: ['visible-one', 'visible-two', 'visible-three', 'known-hidden'],
+      tagDescriptions: {},
+      tagsCount: 26,
+    }]))
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    expect(await screen.findByLabelText('23 more: known-hidden')).toHaveTextContent('+23 more')
   })
 
   it('keeps top action buttons with balanced icon spacing', async () => {
@@ -388,6 +404,25 @@ describe('BooksPage', () => {
 
     expect(window.localStorage.getItem('novelki.books.cards-per-row.v1')).toBe('6')
     expect(container.querySelector('.lg\\:grid-cols-6')).toBeTruthy()
+  })
+
+  it('keeps every dense card constrained to its grid track', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
+    const user = userEvent.setup()
+
+    const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+    await user.selectOptions(screen.getByRole('combobox', { name: /cards per row/i }), '8')
+
+    const cards = Array.from(container.querySelectorAll('.book-card'))
+    expect(cards).toHaveLength(books.length)
+    cards.forEach((card) => {
+      expect(card).toHaveClass('book-card', 'min-w-0', 'w-full', 'max-w-full')
+      expect(card.querySelector('a')).toHaveClass('min-w-0', 'w-full', 'max-w-full', 'overflow-hidden')
+      expect(card.querySelector('.book-card__cover')).toHaveClass('min-w-0', 'w-full', 'max-w-full')
+    })
   })
 
   it('shows rating overlays only on cards with a rating', async () => {

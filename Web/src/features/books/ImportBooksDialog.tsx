@@ -795,7 +795,7 @@ function SummaryCard({ label, value, tone = 'neutral' }: { label: string; value:
   return (
     <Surface as="div" className="grid gap-0.5 px-3 py-1.5" tone={surfaceTone}>
       <div className="text-[0.68rem] font-semibold uppercase tracking-wide">{label}</div>
-      <div className="truncate text-sm font-semibold">{value}</div>
+      <div className="truncate text-sm font-semibold" title={value}>{value}</div>
     </Surface>
   )
 }

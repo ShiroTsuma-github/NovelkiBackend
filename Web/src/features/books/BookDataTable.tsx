@@ -61,13 +61,20 @@ export function BookDataTable<T extends { id: string }>({
           ) : null}
           {items.map((item) => (
             <tr className="book-table-row group border-t border-slate-100" data-testid={`book-table-row-${item.id}`} key={item.id}>
-              {columns.map((column) => (
-                <td className="book-table-cell px-3 py-3 text-slate-600" data-testid={`book-table-cell-${item.id}-${column.id}`} key={column.id}>
-                  <div className="overflow-hidden">
-                    {column.render(item)}
-                  </div>
-                </td>
-              ))}
+              {columns.map((column) => {
+                const content = column.render(item)
+                const title = typeof content === 'string' || typeof content === 'number'
+                  ? String(content)
+                  : undefined
+
+                return (
+                  <td className="book-table-cell px-3 py-3 text-slate-600" data-testid={`book-table-cell-${item.id}-${column.id}`} key={column.id}>
+                    <div className="overflow-hidden" title={title}>
+                      {content}
+                    </div>
+                  </td>
+                )
+              })}
               <td className="book-table-actions-cell sticky right-0 z-10 border-l border-slate-200 bg-white px-3 py-3" data-testid={`book-table-actions-cell-${item.id}`}>
                 <div className="flex justify-end gap-2 whitespace-nowrap">
                   {renderActions(item)}

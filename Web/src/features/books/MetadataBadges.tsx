@@ -19,7 +19,7 @@ export function MetadataSummary({
 
   return (
     <div className="flex min-w-0 items-center gap-2">
-      <span className={primaryClassName}>{primary}</span>
+      <span className={primaryClassName} title={primary}>{primary}</span>
       {totalCount > 0 ? (
         <span
           aria-label={`${totalCount} ${pluralize(countNoun, totalCount)}`}
@@ -37,12 +37,14 @@ export function DescribedMetadataPills({
   values,
   descriptions = {},
   maxVisible = 3,
+  totalCount,
   empty = '-',
   variant = 'table',
 }: {
   values: string[]
   descriptions?: Record<string, string | null | undefined>
   maxVisible?: number
+  totalCount?: number
   empty?: ReactNode
   variant?: 'table' | 'detail'
 }) {
@@ -52,6 +54,13 @@ export function DescribedMetadataPills({
 
   const visibleValues = values.slice(0, maxVisible)
   const hiddenValues = values.slice(maxVisible)
+  const resolvedTotalCount = Math.max(totalCount ?? values.length, values.length)
+  const hiddenCount = Math.max(0, resolvedTotalCount - visibleValues.length)
+  const unlistedCount = Math.max(0, hiddenCount - hiddenValues.length)
+  const hiddenTooltip = [
+    ...hiddenValues,
+    unlistedCount > 0 ? `+${unlistedCount} more` : null,
+  ].filter((line): line is string => Boolean(line)).join('\n')
 
   return (
     <div className={`flex flex-wrap ${variant === 'detail' ? 'gap-2' : 'gap-1'}`}>
@@ -63,15 +72,15 @@ export function DescribedMetadataPills({
           variant={variant}
         />
       ))}
-      {hiddenValues.length > 0 ? (
+      {hiddenCount > 0 ? (
         <span
-          aria-label={`${hiddenValues.length} more: ${hiddenValues.join(', ')}`}
+          aria-label={`${hiddenCount} more${hiddenValues.length ? `: ${hiddenValues.join(', ')}` : ''}`}
           className={variant === 'detail'
             ? 'rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700'
             : 'book-table-badge rounded px-2 py-1 text-xs font-medium'}
-          title={hiddenValues.join('\n')}
+          title={hiddenTooltip}
         >
-          +{hiddenValues.length} more
+          +{hiddenCount} more
         </span>
       ) : null}
     </div>

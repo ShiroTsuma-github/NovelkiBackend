@@ -52,7 +52,7 @@ public record BookListItemDto
     public int? Rating { get; set; }
     public int? Priority { get; set; }
     public string? Notes { get; set; }
-    public BookCoverDto? Cover { get; set; }
+    public BookCoverSummaryDto? Cover { get; set; }
     public IReadOnlyCollection<string> Genres { get; set; } = Array.Empty<string>();
     public IReadOnlyDictionary<string, string?> GenreDescriptions { get; set; } =
         new Dictionary<string, string?>();
@@ -86,13 +86,19 @@ public record BookLinkDto
     public bool LastReadHere { get; set; }
 }
 
-public record BookCoverDto
+public record BookCoverSummaryDto
 {
-    public Guid Id { get; set; }
     public required string Status { get; set; }
     public string? Source { get; set; }
     public string? ImageUrl { get; set; }
     public string? ThumbnailImageUrl { get; set; }
+    public string? FailureReason { get; set; }
+    public DateTimeOffset? LastAttemptAt { get; set; }
+}
+
+public record BookCoverDto : BookCoverSummaryDto
+{
+    public Guid Id { get; set; }
     public string? OriginalImageUrl { get; set; }
     public string? MimeType { get; set; }
     public long? SizeBytes { get; set; }
@@ -102,8 +108,6 @@ public record BookCoverDto
     public long? ThumbnailSizeBytes { get; set; }
     public int? ThumbnailWidth { get; set; }
     public int? ThumbnailHeight { get; set; }
-    public string? FailureReason { get; set; }
-    public DateTimeOffset? LastAttemptAt { get; set; }
 }
 
 public record BookTitleInput(string Title, string? Language = null, string? Source = null);

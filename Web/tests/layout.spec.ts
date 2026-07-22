@@ -170,8 +170,10 @@ async function waitForVisualReady(page: import('@playwright/test').Page) {
 }
 
 test('cards layout constrains long titles and shows active toggle styles', async ({ page }) => {
+  test.skip(page.viewportSize()!.width < 1024, 'Dense card track coverage requires the desktop grid')
   await page.goto('/books')
   await page.getByRole('button', { name: /cards/i }).click()
+  await page.getByLabel('Cards per row').selectOption('8')
 
   const cardsButton = page.getByRole('button', { name: /cards/i })
   const tableButton = page.getByRole('button', { name: /table/i })
@@ -192,6 +194,22 @@ test('cards layout constrains long titles and shows active toggle styles', async
   expect(Math.abs(coverBox.x - cardBox.x)).toBeLessThanOrEqual(1)
   expect(Math.abs(coverBox.y - cardBox.y)).toBeLessThanOrEqual(1)
   expect(Math.abs(coverBox.width - cardBox.width)).toBeLessThanOrEqual(2)
+
+  const cardBoxes = await page.locator('.book-card').evaluateAll((cards) => cards.map((card) => {
+    const cardRect = card.getBoundingClientRect()
+    const coverRect = card.querySelector('.book-card__cover')!.getBoundingClientRect()
+    return {
+      cardRight: cardRect.right,
+      cardWidth: cardRect.width,
+      coverWidth: coverRect.width,
+    }
+  }))
+  const expectedWidth = cardBoxes[0].cardWidth
+  cardBoxes.forEach(({ cardRight, cardWidth, coverWidth }) => {
+    expect(Math.abs(cardWidth - expectedWidth)).toBeLessThanOrEqual(1)
+    expect(Math.abs(coverWidth - cardWidth)).toBeLessThanOrEqual(2)
+    expect(cardRight).toBeLessThanOrEqual(page.viewportSize()!.width + 1)
+  })
   await expectNoHorizontalOverflow(page)
 })
 

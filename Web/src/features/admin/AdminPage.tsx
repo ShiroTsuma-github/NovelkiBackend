@@ -8,6 +8,7 @@ import { secondaryButtonClass } from '@/components/app/FormField'
 import { AdminMetadataManager } from './AdminMetadataManager'
 import { AdminAccountsManager } from './AdminAccountsManager'
 import { BookDataTable } from '@/features/books/BookDataTable'
+import { DescribedMetadataPills } from '@/features/books/MetadataBadges'
 import {
   ColumnSettingsPopup,
   getVisibleColumns,
@@ -32,12 +33,12 @@ import {
 const adminColumnsStorageKey = 'novelki.adminBooks.columns.v1'
 
 const adminBookColumns: ColumnDefinition<AdminBookListItemDto>[] = [
-  { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="font-mono text-xs">{book.id}</span> },
-  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-[24%]', render: (book) => <span className="block truncate font-medium text-slate-950">{book.primaryTitle}</span> },
-  { id: 'ownerId', label: 'OwnerId', defaultVisible: true, sortBy: 'owner', widthClass: 'w-[15%]', render: (book) => <span className="font-mono text-xs">{book.ownerId}</span> },
-  { id: 'ownerUsername', label: 'Username', defaultVisible: false, widthClass: 'w-[12%]', render: (book) => <span className="block truncate">{book.ownerUsername ?? '-'}</span> },
-  { id: 'ownerEmail', label: 'Email', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => <span className="block truncate">{book.ownerEmail ?? '-'}</span> },
-  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-[11%]', render: (book) => <span className="block truncate">{book.author ?? '-'}</span> },
+  { id: 'id', label: 'Id', defaultVisible: false, widthClass: 'w-36', render: (book) => <span className="block truncate font-mono text-xs" title={book.id}>{book.id}</span> },
+  { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-[24%]', render: (book) => <span className="block truncate font-medium text-slate-950" title={book.primaryTitle}>{book.primaryTitle}</span> },
+  { id: 'ownerId', label: 'OwnerId', defaultVisible: true, sortBy: 'owner', widthClass: 'w-[15%]', render: (book) => <span className="block truncate font-mono text-xs" title={book.ownerId}>{book.ownerId}</span> },
+  { id: 'ownerUsername', label: 'Username', defaultVisible: false, widthClass: 'w-[12%]', render: (book) => <TruncatedCellText value={book.ownerUsername} /> },
+  { id: 'ownerEmail', label: 'Email', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => <TruncatedCellText value={book.ownerEmail} /> },
+  { id: 'author', label: 'Author', defaultVisible: true, sortBy: 'author', widthClass: 'w-[11%]', render: (book) => <TruncatedCellText value={book.author} /> },
   { id: 'status', label: 'Status', defaultVisible: true, sortBy: 'status', widthClass: 'w-20', render: (book) => book.status },
   { id: 'type', label: 'Type', defaultVisible: true, sortBy: 'type', widthClass: 'w-20', render: (book) => book.contentType },
   { id: 'progress', label: 'Progress', defaultVisible: true, sortBy: 'progress', widthClass: 'w-24', render: formatProgress },
@@ -46,11 +47,11 @@ const adminBookColumns: ColumnDefinition<AdminBookListItemDto>[] = [
   { id: 'priority', label: 'Priority', defaultVisible: false, sortBy: 'priority', widthClass: 'w-20', render: (book) => book.priority ?? '-' },
   { id: 'created', label: 'Created', defaultVisible: false, sortBy: 'created', widthClass: 'w-36', render: (book) => formatDate(book.created) },
   { id: 'lastModified', label: 'Updated', defaultVisible: true, sortBy: 'lastModified', widthClass: 'w-32', render: (book) => formatDate(book.lastModified || book.created) },
-  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => formatList(book.genres) },
-  { id: 'tags', label: 'Tags', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => formatList(book.tags) },
+  { id: 'genres', label: 'Genres', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => <DescribedMetadataPills descriptions={book.genreDescriptions} totalCount={book.genresCount} values={book.genres} /> },
+  { id: 'tags', label: 'Tags', defaultVisible: false, widthClass: 'w-[10%]', render: (book) => <DescribedMetadataPills descriptions={book.tagDescriptions} totalCount={book.tagsCount} values={book.tags} /> },
   { id: 'links', label: 'Links', defaultVisible: false, widthClass: 'w-16', render: (book) => book.linksCount },
-  { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => truncate(book.notes) },
-  { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => truncate(book.description) },
+  { id: 'notes', label: 'Notes', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => <TruncatedCellText value={book.notes} /> },
+  { id: 'description', label: 'Description', defaultVisible: false, widthClass: 'w-[16%]', render: (book) => <TruncatedCellText value={book.description} /> },
 ]
 
 export function AdminPage() {
@@ -148,14 +149,7 @@ export function AdminPage() {
   )
 }
 
-function formatList(values: string[]) {
-  return values.length ? values.slice(0, 3).join(', ') : '-'
-}
-
-function truncate(value?: string | null) {
-  if (!value) {
-    return '-'
-  }
-
-  return value.length > 80 ? `${value.slice(0, 77)}...` : value
+function TruncatedCellText({ value }: { value?: string | null }) {
+  const text = value || '-'
+  return <span className="block truncate" title={value ?? undefined}>{text}</span>
 }

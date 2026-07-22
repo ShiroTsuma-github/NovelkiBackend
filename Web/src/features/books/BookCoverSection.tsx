@@ -1,12 +1,12 @@
 import { X, ZoomIn } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import type { BookCoverDto } from '@/api/types'
+import type { BookCoverSummaryDto } from '@/api/types'
 import { buttonVariants, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { loadCoverBlobUrl } from './coverCache'
 
 type BookCoverArtworkProps = {
   title: string
-  cover?: BookCoverDto | null
+  cover?: BookCoverSummaryDto | null
   imageUrl?: string | null
   preferredVariant?: 'full' | 'thumbnail'
   interactive?: boolean
@@ -40,7 +40,7 @@ type CoverCacheEntry = {
 
 const coverImageCache = new Map<string, CoverCacheEntry>()
 
-export function useResolvedCoverImage(cover?: BookCoverDto | null, variant: 'full' | 'thumbnail' = 'full') {
+export function useResolvedCoverImage(cover?: BookCoverSummaryDto | null, variant: 'full' | 'thumbnail' = 'full') {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export function useResolvedCoverImage(cover?: BookCoverDto | null, variant: 'ful
   return blobUrl
 }
 
-function getCoverCacheKey(cover: BookCoverDto | null | undefined, variant: 'full' | 'thumbnail') {
+function getCoverCacheKey(cover: BookCoverSummaryDto | null | undefined, variant: 'full' | 'thumbnail') {
   const targetUrl = variant === 'thumbnail'
     ? cover?.thumbnailImageUrl ?? cover?.imageUrl
     : cover?.imageUrl

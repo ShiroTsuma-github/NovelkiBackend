@@ -124,7 +124,7 @@ function StatusByTypeTooltip({ active, label, payload }: StatusByTypeTooltipProp
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3" key={row.status}>
             <span className="flex min-w-0 items-center gap-2">
               <span aria-hidden="true" className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
-              <span className="truncate text-slate-200">{row.status}</span>
+              <span className="min-w-0 whitespace-normal break-words text-slate-200">{row.status}</span>
             </span>
             <span className="whitespace-nowrap font-semibold text-slate-50">
               {formatPercent(row.percent)} ({formatCount(row.count)} books)

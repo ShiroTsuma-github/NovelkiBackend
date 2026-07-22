@@ -111,7 +111,7 @@ export type BookListItemDto = {
   rating?: number | null
   priority?: number | null
   notes?: string | null
-  cover?: BookCoverDto | null
+  cover?: BookCoverSummaryDto | null
   genres: string[]
   genreDescriptions: Record<string, string | null>
   genresCount: number
@@ -327,12 +327,17 @@ export type BookLinkDto = {
   lastReadHere: boolean
 }
 
-export type BookCoverDto = {
-  id: string
+export type BookCoverSummaryDto = {
   status: string
   source?: string | null
   imageUrl?: string | null
   thumbnailImageUrl?: string | null
+  failureReason?: string | null
+  lastAttemptAt?: string | null
+}
+
+export type BookCoverDto = BookCoverSummaryDto & {
+  id: string
   originalImageUrl?: string | null
   mimeType?: string | null
   sizeBytes?: number | null
@@ -342,8 +347,6 @@ export type BookCoverDto = {
   thumbnailSizeBytes?: number | null
   thumbnailWidth?: number | null
   thumbnailHeight?: number | null
-  failureReason?: string | null
-  lastAttemptAt?: string | null
 }
 
 export type BookTitleInput = {
