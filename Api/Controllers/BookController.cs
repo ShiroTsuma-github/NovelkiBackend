@@ -1,12 +1,12 @@
 ﻿namespace Api.Controllers;
 
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Features.BookFeatures.Commands;
+using Application.Features.BookFeatures.Queries;
 using Application.Features.BookFeatures.Queries.GetBook;
 using Domain.Repositories;
 using Microsoft.AspNetCore.RateLimiting;
@@ -68,6 +68,36 @@ public partial class BookController : ControllerBase
         activity?.SetTag(NovelkiTelemetryTags.BookResultCount, books.Data.Count);
 
         return Ok(books);
+    }
+
+    [HttpPost("parse-html")]
+    [Authorize]
+    [RequestSizeLimit(10L * 1024 * 1024)]
+    [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]
+    public async Task<IActionResult> ParseHtml([FromBody] ParseBookHtmlQuery query, CancellationToken cancellationToken)
+    {
+        var inputCharacters = query.Html?.Length ?? 0;
+        if (inputCharacters > ParseBookHtmlQueryValidator.MaxHtmlCharacters)
+        {
+            return StatusCode(StatusCodes.Status413PayloadTooLarge,
+                new ProblemDetails
+                {
+                    Type = "PayloadTooLarge",
+                    Title = "Payload Too Large",
+                    Status = StatusCodes.Status413PayloadTooLarge,
+                    Detail = $"HTML cannot exceed {ParseBookHtmlQueryValidator.MaxHtmlCharacters} characters.",
+                    Instance = HttpContext.Request.Path
+                });
+        }
+
+        var startedAt = Stopwatch.GetTimestamp();
+        var result = await _mediator.Send(query, cancellationToken);
+        _logger.LogInformation(
+            "Book HTML parsed. Source={Source} InputCharacters={InputCharacters} ElapsedMs={ElapsedMs}",
+            result.Source,
+            inputCharacters,
+            Stopwatch.GetElapsedTime(startedAt).TotalMilliseconds);
+        return Ok(result);
     }
 
     [HttpGet("summary")]

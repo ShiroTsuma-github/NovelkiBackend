@@ -422,6 +422,18 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
   if (page.viewportSize()!.width < 1280) {
     await expectInViewport(saveButton)
   }
+
+  await page.getByRole('button', { name: 'Parse HTML' }).click()
+  const parserDialog = page.getByRole('dialog', { name: 'Parse page HTML' })
+  await expect(parserDialog).toBeVisible()
+  await parserDialog.getByLabel('Full page HTML').fill('<html>layout fixture</html>')
+  await parserDialog.getByRole('button', { name: 'Parse HTML' }).click()
+  await expect(parserDialog.getByText('NovelUpdates', { exact: true })).toBeVisible()
+  await expect(parserDialog.getByText(/Unmapped Genre With a Long Name/)).toBeVisible()
+  await expectFitsViewportWidth(parserDialog)
+  const parserDialogBox = await requiredBox(parserDialog)
+  expect(parserDialogBox.y + parserDialogBox.height).toBeLessThanOrEqual(page.viewportSize()!.height + 8)
+  await expectNoHorizontalOverflow(page)
 })
 
 test('csv import invalid rows panel keeps usable height in the browser layout', async ({ page }) => {

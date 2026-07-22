@@ -1,18 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Link2, Save, Star, Upload, X } from 'lucide-react'
+import { ArrowLeft, FileCode2, Link2, Save, Star, Upload, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
-import type { AuthorDto, BookCoverDto, BookMutationRequest } from '@/api/types'
+import type { AuthorDto, BookCoverDto, BookHtmlParseResult, BookMutationRequest } from '@/api/types'
 import { buttonVariants, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
+import { BookHtmlParseDialog, type BookHtmlParseField } from './BookHtmlParseDialog'
 
 type BookFormPageProps = {
   mode: 'create' | 'edit'
@@ -58,6 +59,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const [coverDialogView, setCoverDialogView] = useState<'choice' | 'url'>('choice')
   const [coverUrlInput, setCoverUrlInput] = useState('')
   const [coverPreviewOpen, setCoverPreviewOpen] = useState(false)
+  const [htmlParseDialogOpen, setHtmlParseDialogOpen] = useState(false)
   const [draftCover, setDraftCover] = useState<DraftCoverState>(null)
   const [existingCoverChange, setExistingCoverChange] = useState<ExistingCoverChange>({ kind: 'keep' })
   const bookQueryKey = [admin ? 'adminBook' : 'book', id] as const
@@ -267,6 +269,57 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
     closeCoverDialog()
     toast.success('Cover URL ready. It will be saved with the book.')
   }
+
+  function applyParsedHtml(result: BookHtmlParseResult, selected: ReadonlySet<BookHtmlParseField>) {
+    if (selected.has('primaryTitle') && result.primaryTitle) {
+      form.setValue('primaryTitle', result.primaryTitle, { shouldDirty: true, shouldValidate: true })
+    }
+    if (selected.has('authorName') && result.authorName) {
+      form.setValue('authorName', result.authorName, { shouldDirty: true, shouldValidate: true })
+      form.setValue('authorId', '', { shouldDirty: true, shouldValidate: true })
+      setSelectedAuthorDisplay(null)
+    }
+    if (selected.has('contentType') && result.contentType?.id) {
+      form.setValue('contentTypeId', result.contentType.id, { shouldDirty: true, shouldValidate: true })
+    }
+    if (selected.has('alternativeTitles')) {
+      form.setValue(
+        'alternativeTitlesText',
+        mergeLines(form.getValues('alternativeTitlesText'), result.alternativeTitles),
+        { shouldDirty: true, shouldValidate: true },
+      )
+    }
+    if (selected.has('genres')) {
+      form.setValue(
+        'genreIds',
+        mergeValues(form.getValues('genreIds'), result.genres.flatMap((genre) => genre.id ? [genre.id] : [])),
+        { shouldDirty: true, shouldValidate: true },
+      )
+    }
+    if (selected.has('tags')) {
+      form.setValue(
+        'tagsText',
+        mergeValues(splitComma(form.getValues('tagsText')), result.tags).join(', '),
+        { shouldDirty: true, shouldValidate: true },
+      )
+    }
+    if (selected.has('description') && result.description) {
+      form.setValue('description', result.description, { shouldDirty: true, shouldValidate: true })
+    }
+    if (selected.has('canonicalUrl') && result.canonicalUrl) {
+      form.setValue(
+        'linksText',
+        mergeLines(form.getValues('linksText'), [result.canonicalUrl]),
+        { shouldDirty: true, shouldValidate: true },
+      )
+    }
+    if (selected.has('coverUrl') && result.coverUrl) {
+      setExistingCoverChange({ kind: 'keep' })
+      replaceDraftCover({ kind: 'url', imageUrl: result.coverUrl, previewUrl: result.coverUrl })
+    }
+    toast.success(`Applied metadata from ${result.source}.`)
+  }
+
   const mutation = useMutation({
     mutationFn: async (values: BookFormValues): Promise<SaveResult> => {
       const resolvedValues = await resolveAuthor(values)
@@ -373,6 +426,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
         onSubmit={form.handleSubmit((values) => mutation.mutate(values))}
       >
         <PageHeader
+          actions={mode === 'create' && !admin ? (
+            <button className={secondaryButtonClass} type="button" onClick={() => setHtmlParseDialogOpen(true)}>
+              <FileCode2 className="h-4 w-4" />
+              Parse HTML
+            </button>
+          ) : undefined}
           description={pageDescription}
           eyebrow={admin ? 'Administration' : 'Library editor'}
           title={admin ? 'Admin edit' : mode === 'create' ? 'Add book' : 'Edit book'}
@@ -614,11 +673,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <FormField error={errors.description?.message} label="Description">
-                  <textarea className={`${inputClass} book-form-textarea--description resize-y`} {...form.register('description')} />
+                  <textarea aria-label="Description" className={`${inputClass} book-form-textarea--description resize-y`} {...form.register('description')} />
                 </FormField>
               </div>
               <FormField error={errors.alternativeTitlesText?.message} label="Alternative titles">
                 <textarea
+                  aria-label="Alternative titles"
                   className={`${inputClass} book-form-textarea--list resize-y`}
                   placeholder="One title per line"
                   {...form.register('alternativeTitlesText')}
@@ -626,6 +686,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
               </FormField>
               <FormField error={errors.linksText?.message} label="Links">
                 <textarea
+                  aria-label="Links"
                   className={`${inputClass} book-form-textarea--list resize-y`}
                   placeholder="One URL per line"
                   {...form.register('linksText')}
@@ -662,6 +723,15 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
           storeDraftUrl(trimmed)
         }}
       />
+      {mode === 'create' && !admin ? (
+        <BookHtmlParseDialog
+          currentValues={form.getValues()}
+          hasDraftCover={Boolean(draftCover)}
+          open={htmlParseDialogOpen}
+          onApply={applyParsedHtml}
+          onClose={() => setHtmlParseDialogOpen(false)}
+        />
+      ) : null}
       <CoverLightbox
         emptyLabel="No cover has been saved for this book yet."
         imageUrl={visibleCoverUrl}
@@ -1066,6 +1136,27 @@ function appendUniqueLine(value: string, nextLine: string) {
   }
 
   return lines.length ? `${lines.join('\n')}\n${trimmedLine}` : trimmedLine
+}
+
+function mergeLines(existing: string, incoming: readonly string[]) {
+  return mergeValues(
+    existing.split('\n').map((item) => item.trim()).filter(Boolean),
+    incoming,
+  ).join('\n')
+}
+
+function mergeValues(existing: readonly string[], incoming: readonly string[]) {
+  const result = [...existing]
+  const known = new Set(existing.map((value) => value.trim().toLocaleLowerCase()))
+  incoming.forEach((value) => {
+    const clean = value.trim()
+    const key = clean.toLocaleLowerCase()
+    if (clean && !known.has(key)) {
+      result.push(clean)
+      known.add(key)
+    }
+  })
+  return result
 }
 
 function appendCoverSourceLink(request: BookMutationRequest, cover?: BookCoverDto | null) {

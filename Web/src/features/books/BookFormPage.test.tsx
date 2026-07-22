@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { Route, Routes } from 'react-router-dom'
@@ -18,6 +18,7 @@ vi.mock('@/api/client', () => ({
     searchTags: vi.fn(),
     getBooks: vi.fn(),
     createBook: vi.fn(),
+    parseBookHtml: vi.fn(),
     updateBook: vi.fn(),
     updateAdminBook: vi.fn(),
     uploadBookCover: vi.fn(),
@@ -90,6 +91,119 @@ describe('BookFormPage', () => {
     await waitFor(() => expect(api.createBook).toHaveBeenCalled())
     expect(vi.mocked(api.createBook).mock.calls[0][0].totalChapters).toBeNull()
     expect(vi.mocked(api.createBook).mock.calls[0][0].currentChapterNumber).toBe(0)
+  })
+
+  it('parses pasted HTML, previews every resolved field, and applies it to the create draft', async () => {
+    vi.mocked(api.parseBookHtml).mockResolvedValue({
+      source: 'NovelUpdates',
+      primaryTitle: 'Parsed Novel',
+      authorName: 'Primary Author',
+      contentType: { id: dictionaries[0].id, name: dictionaries[0].name },
+      alternativeTitles: ['Alternate Name'],
+      genres: [
+        { id: genres[0].id, name: genres[0].name },
+        { id: null, name: 'Unmapped Genre' },
+      ],
+      tags: ['Chinese', 'Slow Romance'],
+      description: 'Parsed description.',
+      canonicalUrl: 'https://www.novelupdates.com/series/parsed-novel/',
+      coverUrl: 'https://cdn.example.com/parsed-cover.jpg',
+      warnings: ["Genre 'Unmapped Genre' is not present in the library and will be skipped."],
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.click(screen.getByRole('button', { name: 'Parse HTML' }))
+    const dialog = screen.getByRole('dialog', { name: 'Parse page HTML' })
+    fireEvent.change(within(dialog).getByLabelText('Full page HTML'), { target: { value: '<html>source</html>' } })
+    await user.click(within(dialog).getByRole('button', { name: 'Parse HTML' }))
+
+    expect(await within(dialog).findByText('NovelUpdates')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Unmapped Genre/)).toBeInTheDocument()
+    within(dialog).getAllByRole('checkbox').forEach((checkbox) => expect(checkbox).toBeChecked())
+    await user.click(within(dialog).getByRole('button', { name: 'Apply selected' }))
+
+    expect(screen.getByLabelText('Primary title')).toHaveValue('Parsed Novel')
+    expect(screen.getByLabelText('Author')).toHaveValue('Primary Author')
+    expect(screen.getByLabelText('Description')).toHaveValue('Parsed description.')
+    expect(screen.getByLabelText('Alternative titles')).toHaveValue('Alternate Name')
+    expect(screen.getByLabelText('Links')).toHaveValue('https://www.novelupdates.com/series/parsed-novel/')
+
+    await user.type(screen.getByLabelText('Current chapter'), '0')
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.createBook).toHaveBeenCalled())
+    const request = vi.mocked(api.createBook).mock.calls[0][0]
+    expect(request).toMatchObject({
+      primaryTitle: 'Parsed Novel',
+      authorName: 'Primary Author',
+      contentTypeId: dictionaries[0].id,
+      genreIds: [genres[0].id],
+      tags: ['Chinese', 'Slow Romance'],
+      description: 'Parsed description.',
+    })
+    expect(request.alternativeTitles.map((title) => title.title)).toEqual(['Alternate Name'])
+    expect(request.links.map((link) => link.url)).toContain('https://www.novelupdates.com/series/parsed-novel/')
+    expect(api.setBookCoverFromUrl).toHaveBeenCalledWith('book-1', 'https://cdn.example.com/parsed-cover.jpg')
+  })
+
+  it('keeps an existing field when the user deselects it in the HTML preview', async () => {
+    vi.mocked(api.parseBookHtml).mockResolvedValue({
+      source: 'NovelUpdates',
+      primaryTitle: 'Resolved title',
+      authorName: null,
+      contentType: null,
+      alternativeTitles: [],
+      genres: [],
+      tags: [],
+      description: 'Resolved description.',
+      canonicalUrl: null,
+      coverUrl: null,
+      warnings: [],
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.type(screen.getByLabelText('Primary title'), 'Manual title')
+    await user.click(screen.getByRole('button', { name: 'Parse HTML' }))
+    const dialog = screen.getByRole('dialog', { name: 'Parse page HTML' })
+    fireEvent.change(within(dialog).getByLabelText('Full page HTML'), { target: { value: '<html>source</html>' } })
+    await user.click(within(dialog).getByRole('button', { name: 'Parse HTML' }))
+    await within(dialog).findByText('Resolved title')
+
+    await user.click(within(dialog).getByRole('checkbox', { name: /Primary title/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Apply selected' }))
+
+    expect(screen.getByLabelText('Primary title')).toHaveValue('Manual title')
+    expect(screen.getByLabelText('Description')).toHaveValue('Resolved description.')
+  })
+
+  it.each(['RoyalRoad', 'ScribbleHub', 'WebNovel'])('shows the detected %s resolver source', async (source) => {
+    vi.mocked(api.parseBookHtml).mockResolvedValue({
+      source,
+      primaryTitle: 'Resolved title',
+      authorName: null,
+      contentType: null,
+      alternativeTitles: [],
+      genres: [],
+      tags: [],
+      description: null,
+      canonicalUrl: null,
+      coverUrl: null,
+      warnings: [],
+    })
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.click(screen.getByRole('button', { name: 'Parse HTML' }))
+    const dialog = screen.getByRole('dialog', { name: 'Parse page HTML' })
+    fireEvent.change(within(dialog).getByLabelText('Full page HTML'), { target: { value: '<html>source</html>' } })
+    await user.click(within(dialog).getByRole('button', { name: 'Parse HTML' }))
+
+    expect(await within(dialog).findByText(source)).toBeInTheDocument()
   })
 
   it('does not treat a title substring search result as an exact duplicate', async () => {
