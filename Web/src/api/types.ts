@@ -82,6 +82,7 @@ export type PublicBookSnapshotDto = {
   author?: string | null
   authorOtherNames: string[]
   contentType: string
+  totalChapters?: number | null
   genres: PublicBookMetadataDto[]
   tags: PublicBookMetadataDto[]
   coverUrl?: string | null

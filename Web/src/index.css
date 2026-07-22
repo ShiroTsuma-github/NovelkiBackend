@@ -1001,7 +1001,17 @@ select.ui-control {
 
 .manage-list {
   display: grid;
+  max-height: min(34rem, 58vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border-top: 1px solid var(--qs-border);
+}
+
+.manage-list:focus-visible {
+  border-radius: 0.35rem;
+  outline: 2px solid var(--qs-accent);
+  outline-offset: 3px;
 }
 
 .manage-item {

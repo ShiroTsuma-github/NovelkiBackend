@@ -110,7 +110,7 @@ test('books table hover highlight reaches the sticky actions cell', async ({ pag
 
   const titleBackground = await backgroundColor(page.getByTestId('book-table-cell-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa-title'))
   const actionsBackground = await backgroundColor(page.getByTestId('book-table-actions-cell-aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'))
-  const alternativeBadgeBackground = await backgroundColor(page.getByLabel('1 alternative titles'))
+  const alternativeBadgeBackground = await backgroundColor(page.getByLabel('1 alternative title'))
 
   expect(actionsBackground).toBe(titleBackground)
   expect(actionsBackground).toBe('rgb(23, 31, 45)')

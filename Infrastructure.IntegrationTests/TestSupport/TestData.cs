@@ -52,6 +52,37 @@ public static class TestData
         return book;
     }
 
+    public static void MakePublishable(Book book)
+    {
+        var suffix = book.Id.ToString("N");
+        book.Description ??= "Publishable test description";
+        if (book.Author is null)
+        {
+            book.Author = Author($"Test Author {suffix}", book.OwnerId, false);
+            book.AuthorId = book.Author.Id;
+        }
+        if (book.BookGenres.Count == 0)
+        {
+            var genre = Genre($"Test Genre {suffix}");
+            book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+        }
+        if (book.BookTags.Count == 0)
+        {
+            var tag = Tag(book.OwnerId, $"test-tag-{suffix}");
+            book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+        }
+
+        book.Cover ??= new BookCover
+        {
+            Book = book,
+            BookId = book.Id,
+            StoragePath = $"source/{suffix}.jpg",
+            MimeType = "image/jpeg"
+        };
+        book.Cover.Status = BookCoverStatus.Found;
+        book.Cover.StoragePath ??= $"source/{suffix}.jpg";
+    }
+
     public static async Task<Book> AddBookAsync(ApplicationDbContext context, Guid ownerId, string title,
         Author? author = null)
     {

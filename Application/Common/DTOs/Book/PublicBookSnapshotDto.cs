@@ -12,6 +12,7 @@ public sealed record PublicBookSnapshotDto
     public string? Author { get; init; }
     public IReadOnlyCollection<string> AuthorOtherNames { get; init; } = [];
     public required string ContentType { get; init; }
+    public decimal? TotalChapters { get; init; }
     public IReadOnlyCollection<PublicBookMetadataDto> Genres { get; init; } = [];
     public IReadOnlyCollection<PublicBookMetadataDto> Tags { get; init; } = [];
     public string? CoverUrl { get; init; }

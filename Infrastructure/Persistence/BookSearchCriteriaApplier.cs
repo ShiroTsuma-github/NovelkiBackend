@@ -54,6 +54,7 @@ public sealed class BookSearchCriteriaApplier
         {
             BookSearchField.Title => MatchAny(filter.Values, BuildTitlePredicate),
             BookSearchField.Author => MatchAny(filter.Values, BuildAuthorPredicate),
+            BookSearchField.Description => MatchAny(filter.Values, BuildDescriptionPredicate),
             BookSearchField.Tag => MatchAny(filter.Values, BuildTagPredicate),
             BookSearchField.Genre => MatchAny(filter.Values, BuildGenrePredicate),
             BookSearchField.Status => MatchAny(filter.Values, BuildStatusPredicate),
@@ -144,6 +145,16 @@ public sealed class BookSearchCriteriaApplier
                     name => name.Name,
                     name => name.NormalizedName,
                     search)));
+    }
+
+    private Expression<Func<Book, bool>> BuildDescriptionPredicate(string search)
+    {
+        return PredicateExpression.And<Book>(
+            book => book.Description != null,
+            _textSearch.Match<Book>(
+                book => book.Description!,
+                book => book.Description!.ToUpper(),
+                search));
     }
 
     private Expression<Func<Book, bool>> BuildTagPredicate(string search)

@@ -55,7 +55,7 @@ export function DiscoverPage() {
           <span className="sr-only">Search shared books</span>
           <input
             autoComplete="off"
-            placeholder="Search by title or author…"
+            placeholder="Search title, author, genre, tag, type, or chapters…"
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -76,7 +76,7 @@ export function DiscoverPage() {
         <Surface className="discover-state">
           <Sparkles className="mx-auto h-6 w-6" />
           <strong>No shared books found</strong>
-          <span>{search.trim() ? 'Try a broader title or author search.' : 'Shared books will appear here when readers list them.'}</span>
+          <span>{search.trim() ? 'Try a broader public-metadata search.' : 'Shared books will appear here when readers list them.'}</span>
         </Surface>
       ) : (
         <div className="discover-grid">
@@ -140,6 +140,13 @@ function PublicBookCard({ snapshot, copying, onCopy }: {
         </div>
 
         <p className="discover-card__description">{snapshot.description || 'No description was included in this snapshot.'}</p>
+
+        {snapshot.totalChapters != null ? (
+          <div className="discover-card__metadata">
+            <span>Chapters</span>
+            <strong>{snapshot.totalChapters.toLocaleString()}</strong>
+          </div>
+        ) : null}
 
         <MetadataGroup label="Genres" values={snapshot.genres} />
         <MetadataGroup label="Tags" values={snapshot.tags} />

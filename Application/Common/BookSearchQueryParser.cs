@@ -9,8 +9,11 @@ public static class BookSearchQueryParser
     {
         ["title"] = BookSearchField.Title,
         ["author"] = BookSearchField.Author,
+        ["description"] = BookSearchField.Description,
         ["tag"] = BookSearchField.Tag,
+        ["tags"] = BookSearchField.Tag,
         ["genre"] = BookSearchField.Genre,
+        ["genres"] = BookSearchField.Genre,
         ["status"] = BookSearchField.Status,
         ["type"] = BookSearchField.Type,
         ["contentType"] = BookSearchField.Type

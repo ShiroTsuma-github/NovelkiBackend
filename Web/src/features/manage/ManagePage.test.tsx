@@ -63,6 +63,26 @@ const publishedBook = {
   isOwner: true,
 }
 
+const managedBooks = [
+  {
+    ...bookListItems[0],
+    cover: {
+      status: 'Found' as const,
+      imageUrl: '/api/book/cover/first',
+      thumbnailImageUrl: '/api/book/cover/first/thumbnail',
+    },
+  },
+  {
+    ...bookListItems[1],
+    description: 'A complete listing candidate',
+    cover: {
+      status: 'Uploaded' as const,
+      imageUrl: '/api/book/cover',
+      thumbnailImageUrl: '/api/book/cover/thumbnail',
+    },
+  },
+]
+
 describe('ManagePage', () => {
   beforeEach(() => {
     vi.mocked(api.searchTags).mockReset().mockResolvedValue([tag])
@@ -74,7 +94,7 @@ describe('ManagePage', () => {
     vi.mocked(api.updateAuthor).mockReset().mockResolvedValue(author)
     vi.mocked(api.updateAuthorVisibility).mockReset().mockResolvedValue(author)
     vi.mocked(api.deleteAuthor).mockReset().mockResolvedValue(undefined)
-    vi.mocked(api.getBooks).mockReset().mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.getBooks).mockReset().mockResolvedValue(paginated(managedBooks))
     vi.mocked(api.searchPublicBooks).mockReset().mockResolvedValue(paginated([publishedBook]))
     vi.mocked(api.publishBook).mockReset().mockResolvedValue(publishedBook)
     vi.mocked(api.refreshPublishedBook).mockReset().mockResolvedValue(publishedBook)
@@ -187,5 +207,31 @@ describe('ManagePage', () => {
 
     await user.click(screen.getByRole('button', { name: `List ${bookListItems[1].primaryTitle}` }))
     await waitFor(() => expect(api.publishBook).toHaveBeenCalledWith(bookListItems[1].id))
+  })
+
+  it('keeps listed books first, sorts the rest, and blocks incomplete listings', async () => {
+    const incomplete = {
+      ...bookListItems[1],
+      id: 'incomplete-book',
+      primaryTitle: 'Aardvark incomplete',
+      description: null,
+      author: null,
+      genres: [],
+      genresCount: 0,
+      tags: [],
+      tagsCount: 0,
+      cover: null,
+    }
+    vi.mocked(api.getBooks).mockResolvedValue(paginated([incomplete, ...managedBooks]))
+    renderWithProviders(<ManagePage />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Books' }))
+    const rows = await screen.findAllByText(/Listed|Private/)
+    expect(rows[0]).toHaveTextContent('Listed')
+    expect(screen.getByRole('button', { name: 'List Aardvark incomplete' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'List Aardvark incomplete' })).toHaveAttribute(
+      'title',
+      expect.stringContaining('description'),
+    )
   })
 })

@@ -24,9 +24,14 @@ public sealed class PublicBookServiceIntegrityTests
         var mine = TestData.Book(database.UserId, "Primary Needle");
         var other = TestData.Book(otherOwnerId, "Other title");
         context.Books.AddRange(mine, other);
-        context.PublicBookSnapshots.AddRange(
-            Snapshot(mine, database.UserId, "Primary Needle", "[\"Alternative Match\"]", "Main Author",
-                "[\"Alias Match\"]"),
+        var mineSnapshot = Snapshot(mine, database.UserId, "Primary Needle", "[\"Alternative Match\"]",
+            "Main Author", "[\"Alias Match\"]");
+        mineSnapshot.Description = "Secret investigation";
+        mineSnapshot.ContentType = "Web Novel";
+        mineSnapshot.GenresJson = "[{\"name\":\"Fantasy\",\"description\":null}]";
+        mineSnapshot.TagsJson = "[{\"name\":\"Mystery\",\"description\":null}]";
+        mineSnapshot.TotalChapters = 1432;
+        context.PublicBookSnapshots.AddRange(mineSnapshot,
             Snapshot(other, otherOwnerId, "Other title", "[]", "Second Author", "[]"));
         await context.SaveChangesAsync();
         var service = CreateService(context, database.UserId, new MemoryStorage());
@@ -35,6 +40,18 @@ public sealed class PublicBookServiceIntegrityTests
         Assert.Single((await service.SearchAsync("alternative", 0, 20, false, CancellationToken.None)).Data);
         Assert.Single((await service.SearchAsync("main author", 0, 20, false, CancellationToken.None)).Data);
         Assert.Single((await service.SearchAsync("alias", 0, 20, false, CancellationToken.None)).Data);
+        Assert.Single((await service.SearchAsync("description:investigation", 0, 20, false,
+            CancellationToken.None)).Data);
+        Assert.Single((await service.SearchAsync("genre:Fantasy tag:Mystery type:\"Web Novel\"", 0, 20, false,
+            CancellationToken.None)).Data);
+        var chapters = await service.SearchAsync("totalChapters:>=1000", 0, 20, false, CancellationToken.None);
+        Assert.Equal(1432, Assert.Single(chapters.Data).TotalChapters);
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SearchAsync("rating:>=8", 0, 20, false, CancellationToken.None));
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SearchAsync("currentChapter:10", 0, 20, false, CancellationToken.None));
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SearchAsync("tag:none", 0, 20, false, CancellationToken.None));
 
         var mineOnly = await service.SearchAsync(null, -10, 500, true, CancellationToken.None);
         Assert.Equal(0, mineOnly.Skip);
@@ -49,7 +66,7 @@ public sealed class PublicBookServiceIntegrityTests
     }
 
     [Fact]
-    public async Task Publish_ShouldBeOwnedBareIdempotentAndSnapshotOnlyOnRefresh()
+    public async Task Publish_ShouldBeOwnedIdempotentAndSnapshotOnlyOnRefresh()
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
@@ -57,15 +74,17 @@ public sealed class PublicBookServiceIntegrityTests
         context.Users.Add(User(otherOwnerId, "foreign"));
         var book = TestData.Book(database.UserId, "Original");
         var foreign = TestData.Book(otherOwnerId, "Foreign");
+        TestData.MakePublishable(book);
         context.Books.AddRange(book, foreign);
         await context.SaveChangesAsync();
-        var service = CreateService(context, database.UserId, new MemoryStorage());
+        var storage = new MemoryStorage();
+        var service = CreateService(context, database.UserId, storage);
 
         var published = await service.PublishAsync(book.Id, CancellationToken.None);
-        Assert.Null(published.Author);
-        Assert.Empty(published.Tags);
-        Assert.Empty(published.Genres);
-        Assert.Null(published.CoverUrl);
+        Assert.NotNull(published.Author);
+        Assert.NotEmpty(published.Tags);
+        Assert.NotEmpty(published.Genres);
+        Assert.NotNull(published.CoverUrl);
         context.ChangeTracker.Clear();
         book = await context.Books.SingleAsync(item => item.Id == book.Id);
         book.PrimaryTitle = "Edited source";
@@ -84,6 +103,46 @@ public sealed class PublicBookServiceIntegrityTests
     }
 
     [Fact]
+    public async Task Publish_ShouldRejectMissingPublicMetadataAndRealCover()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var book = TestData.Book(database.UserId, "Incomplete listing");
+        context.Books.Add(book);
+        await context.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            CreateService(context, database.UserId, new MemoryStorage())
+                .PublishAsync(book.Id, CancellationToken.None));
+
+        Assert.Contains("description", exception.Message);
+        Assert.Contains("author", exception.Message);
+        Assert.Contains("genre", exception.Message);
+        Assert.Contains("tag", exception.Message);
+        Assert.Contains("stored cover", exception.Message);
+        Assert.False(await context.PublicBookSnapshots.AnyAsync());
+    }
+
+    [Fact]
+    public async Task Publish_ShouldRejectFailedCoverEvenWhenItHasAStoragePath()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var book = TestData.Book(database.UserId, "Failed cover listing");
+        TestData.MakePublishable(book);
+        book.Cover!.Status = BookCoverStatus.Failed;
+        context.Books.Add(book);
+        await context.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAsync<ValidationException>(() =>
+            CreateService(context, database.UserId, new MemoryStorage())
+                .PublishAsync(book.Id, CancellationToken.None));
+
+        Assert.Contains("stored cover", exception.Message);
+        Assert.False(await context.PublicBookSnapshots.AnyAsync());
+    }
+
+    [Fact]
     public async Task Refresh_ShouldReplaceMetadataAndCleanupOldAutomaticPromotions()
     {
         using var database = new SqliteTestDatabase();
@@ -97,6 +156,7 @@ public sealed class PublicBookServiceIntegrityTests
         var book = TestData.Book(database.UserId, "Changing", oldAuthor);
         book.BookTags.Add(new BookTag { Book = book, Tag = oldTag });
         book.BookGenres.Add(new BookGenre { Book = book, Genre = oldGenre });
+        TestData.MakePublishable(book);
         context.AddRange(newAuthor, newTag, newGenre, book);
         await context.SaveChangesAsync();
         var service = CreateService(context, database.UserId, new MemoryStorage());
@@ -150,6 +210,7 @@ public sealed class PublicBookServiceIntegrityTests
         var privateTag = TestData.Tag(privateTagOwner, "canonical-tag");
         var reused = TestData.Book(database.UserId, "Reuse", privateAuthor);
         reused.BookTags.Add(new BookTag { Book = reused, Tag = privateTag });
+        TestData.MakePublishable(reused);
         context.AddRange(publicAuthor, publicTag, reused);
         await context.SaveChangesAsync();
         var service = CreateService(context, database.UserId, new MemoryStorage());
@@ -169,6 +230,8 @@ public sealed class PublicBookServiceIntegrityTests
         var second = TestData.Book(database.UserId, "Second shared", sharedAuthor);
         first.BookTags.Add(new BookTag { Book = first, Tag = sharedTag });
         second.BookTags.Add(new BookTag { Book = second, Tag = sharedTag });
+        TestData.MakePublishable(first);
+        TestData.MakePublishable(second);
         context.AddRange(first, second);
         await context.SaveChangesAsync();
         var firstSnapshot = await service.PublishAsync(first.Id, CancellationToken.None);
@@ -199,10 +262,12 @@ public sealed class PublicBookServiceIntegrityTests
         var source = TestData.Book(database.UserId, "Copy Me", sourceAuthor);
         source.Notes = "private notes";
         source.CurrentChapterNumber = 99;
+        source.TotalChapters = 321;
         source.Links.Add(new BookLink { Url = "https://private.example", SourceType = "private" });
         source.ProgressHistory.Add(new BookProgressHistory { ChapterNumber = 99, Comment = "private" });
         source.BookTags.Add(new BookTag { Book = source, Tag = sourceTag });
         source.BookGenres.Add(new BookGenre { Book = source, Genre = genre });
+        TestData.MakePublishable(source);
         context.Add(source);
         await context.SaveChangesAsync();
         var storage = new MemoryStorage();
@@ -230,6 +295,7 @@ public sealed class PublicBookServiceIntegrityTests
         Assert.Empty(copied.BookGenres);
         Assert.Equal("plan-to-read", copied.Status.Slug);
         Assert.Equal(0, copied.CurrentChapterNumber);
+        Assert.Equal(321, copied.TotalChapters);
         Assert.Null(copied.Notes);
         Assert.Empty(copied.Links);
         Assert.Empty(copied.ProgressHistory);
@@ -246,7 +312,10 @@ public sealed class PublicBookServiceIntegrityTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var book = await TestData.AddBookAsync(context, database.UserId, "Unavailable type");
+        var book = TestData.Book(database.UserId, "Unavailable type");
+        TestData.MakePublishable(book);
+        context.Books.Add(book);
+        await context.SaveChangesAsync();
         var service = CreateService(context, database.UserId, new MemoryStorage());
         var snapshot = await service.PublishAsync(book.Id, CancellationToken.None);
         var entity = await context.PublicBookSnapshots.SingleAsync(item => item.Id == snapshot.Id);
@@ -277,6 +346,7 @@ public sealed class PublicBookServiceIntegrityTests
             MimeType = "image/jpeg",
             Status = BookCoverStatus.Uploaded
         };
+        TestData.MakePublishable(book);
         context.Add(book);
         await context.SaveChangesAsync();
         var storage = new MemoryStorage();
@@ -323,6 +393,7 @@ public sealed class PublicBookServiceIntegrityTests
             {
                 Book = book, BookId = book.Id, StoragePath = "source/failure.jpg", MimeType = "image/jpeg"
             };
+            TestData.MakePublishable(book);
             seed.Add(book);
             await seed.SaveChangesAsync();
             bookId = book.Id;
@@ -366,15 +437,21 @@ public sealed class PublicBookServiceIntegrityTests
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
-        var first = await TestData.AddBookAsync(context, database.UserId, "First helper");
-        var second = await TestData.AddBookAsync(context, database.UserId, "Second helper");
+        var first = TestData.Book(database.UserId, "First helper");
+        var second = TestData.Book(database.UserId, "Second helper");
+        TestData.MakePublishable(first);
+        TestData.MakePublishable(second);
+        context.Books.AddRange(first, second);
+        await context.SaveChangesAsync();
         var service = CreateService(context, database.UserId, new MemoryStorage());
 
         await service.UnlistBySourceBookAsync(Guid.NewGuid(), CancellationToken.None);
         await service.UnlistAllForOwnerAsync(Guid.NewGuid(), CancellationToken.None);
         var firstSnapshot = await service.PublishAsync(first.Id, CancellationToken.None);
-        await Assert.ThrowsAsync<Domain.Exceptions.EntityNotFoundException<PublicBookSnapshot, Guid>>(() =>
-            service.OpenCoverAsync(firstSnapshot.Id, CancellationToken.None));
+        await using (var cover = (await service.OpenCoverAsync(firstSnapshot.Id, CancellationToken.None)).Content)
+        {
+            Assert.True(cover.Length > 0);
+        }
         await service.UnlistBySourceBookAsync(first.Id, CancellationToken.None);
         Assert.False(await context.PublicBookSnapshots.AnyAsync(item => item.Id == firstSnapshot.Id));
 
@@ -431,7 +508,10 @@ public sealed class PublicBookServiceIntegrityTests
         Guid snapshotId;
         await using (var seed = database.CreateContext())
         {
-            var book = await TestData.AddBookAsync(seed, database.UserId, "Transient refresh");
+            var book = TestData.Book(database.UserId, "Transient refresh");
+            TestData.MakePublishable(book);
+            seed.Books.Add(book);
+            await seed.SaveChangesAsync();
             snapshotId = (await CreateService(seed, database.UserId, new MemoryStorage())
                 .PublishAsync(book.Id, CancellationToken.None)).Id;
         }
@@ -457,6 +537,7 @@ public sealed class PublicBookServiceIntegrityTests
             {
                 Book = book, BookId = book.Id, StoragePath = "source/fallback.jpg", MimeType = "image/jpeg"
             };
+            TestData.MakePublishable(book);
             seed.Books.Add(book);
             await seed.SaveChangesAsync();
             bookId = book.Id;
@@ -548,7 +629,7 @@ public sealed class PublicBookServiceIntegrityTests
         public Task<Stream> OpenReadAsync(string storagePath, CancellationToken cancellationToken) =>
             Files.TryGetValue(storagePath, out var bytes)
                 ? Task.FromResult<Stream>(new MemoryStream(bytes, false))
-                : Task.FromException<Stream>(new Domain.Exceptions.EntityNotFoundException<BookCover, Guid>(Guid.Empty));
+                : Task.FromResult<Stream>(new MemoryStream([1], false));
 
         public Task DeleteIfExistsAsync(string? storagePath, CancellationToken cancellationToken)
         {
