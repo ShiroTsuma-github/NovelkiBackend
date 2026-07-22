@@ -52,6 +52,36 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task CreateBook_ShouldPreserveDescriptionLineBreaks()
+    {
+        var fixture = CreateFixture();
+        var command = ValidCreateCommand() with { Description = "First paragraph.\n\nSecond paragraph." };
+
+        await fixture.Handler.Handle(command, CancellationToken.None);
+
+        Assert.Equal("First paragraph.\n\nSecond paragraph.", fixture.BookRepository.LastBook!.Description);
+    }
+
+    [Fact]
+    public async Task ResolveTags_ShouldReuseExistingTagForNearIdenticalImportedName()
+    {
+        var fixture = CreateFixture();
+        var existing = new Tag
+        {
+            OwnerId = OwnerId,
+            Name = "Slice Of Life",
+            NormalizedName = MappingExtensions.NormalizeName("Slice Of Life")
+        };
+        await fixture.TagRepository.AddAsync(existing, CancellationToken.None);
+
+        await fixture.Handler.Handle(
+            ValidCreateCommand(tags: ["SLICEOFLIFEE"]),
+            CancellationToken.None);
+
+        Assert.Same(existing, Assert.Single(fixture.BookRepository.LastBook!.BookTags).Tag);
+    }
+
+    [Fact]
     public async Task CreateBook_ShouldUseCurrentChapterAsTotalWhenCompletedTotalIsMissing()
     {
         var completed = new Status { Id = StatusId, Name = "Completed", Slug = "completed" };
@@ -600,7 +630,7 @@ public class BookFeatureTests
             bookCoverQueue,
             new FakeBookListCacheInvalidator(),
             user);
-        return new Fixture(bookRepository, authorRepository, bookCoverQueue, handler);
+        return new Fixture(bookRepository, authorRepository, tagRepository, bookCoverQueue, handler);
     }
 
     private static CreateBookCommand ValidCreateCommand(
@@ -634,6 +664,7 @@ public class BookFeatureTests
     private sealed record Fixture(
         FakeBookRepository BookRepository,
         FakeAuthorRepository AuthorRepository,
+        FakeTagRepository TagRepository,
         FakeBookCoverQueue BookCoverQueue,
         CreateBookHandler Handler);
 
@@ -1032,15 +1063,17 @@ public class BookFeatureTests
         public Task<IEnumerable<Tag>> GetByNamesAsync(Guid ownerId, IEnumerable<string> names,
             CancellationToken cancellationToken)
         {
-            var normalized = names.Select(MappingExtensions.NormalizeName).ToList();
+            var requested = names.ToList();
             return Task.FromResult<IEnumerable<Tag>>(_tags
-                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) && normalized.Contains(t.NormalizedName)).ToList());
+                .Where(t => (t.IsGlobal || t.OwnerId == ownerId) &&
+                            requested.Any(name => MetadataNameSimilarity.IsPracticalMatch(t.Name, name))).ToList());
         }
 
         public Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
         {
             return Task.FromResult(_tags.FirstOrDefault(t =>
-                (t.IsGlobal || t.OwnerId == ownerId) && t.NormalizedName == MappingExtensions.NormalizeName(name)));
+                (t.IsGlobal || t.OwnerId == ownerId) &&
+                MetadataNameSimilarity.IsPracticalMatch(t.Name, name)));
         }
 
         public Task<IEnumerable<Tag>> SearchAsync(Guid ownerId, string? search, int take,

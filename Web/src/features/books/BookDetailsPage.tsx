@@ -219,7 +219,7 @@ export function BookDetailsPage() {
                       <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Description</div>
                       {book.description ? (
                         <div className="grid gap-2">
-                          <p className="max-w-4xl text-sm leading-6 text-slate-600" ref={descriptionRef} style={descriptionStyle}>{book.description}</p>
+                          <p className="max-w-4xl whitespace-pre-line text-sm leading-6 text-slate-600" ref={descriptionRef} style={descriptionStyle}>{book.description}</p>
                           {descriptionOverflowing ? (
                             <button
                               className="ui-inline-link w-fit text-sm"

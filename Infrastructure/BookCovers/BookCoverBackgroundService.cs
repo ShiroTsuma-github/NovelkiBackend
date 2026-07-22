@@ -93,6 +93,7 @@ public sealed class BookCoverProcessor
     private readonly IBookCoverRepository _coverRepository;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BookCoverProcessor> _logger;
+    private readonly IBookCoverOperationGate _operationGate;
     private readonly BookCoverResolver _resolver;
     private readonly IBookCoverStorage _storage;
 
@@ -102,7 +103,8 @@ public sealed class BookCoverProcessor
         BookCoverResolver resolver,
         IBookListCacheInvalidator cacheInvalidator,
         IHttpClientFactory httpClientFactory,
-        ILogger<BookCoverProcessor> logger)
+        ILogger<BookCoverProcessor> logger,
+        IBookCoverOperationGate? operationGate = null)
     {
         _coverRepository = coverRepository;
         _storage = storage;
@@ -110,10 +112,12 @@ public sealed class BookCoverProcessor
         _cacheInvalidator = cacheInvalidator;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _operationGate = operationGate ?? NoopBookCoverOperationGate.Instance;
     }
 
     public async Task ProcessAsync(Guid bookId, CancellationToken cancellationToken)
     {
+        await using var operation = await _operationGate.EnterAsync(bookId, cancellationToken);
         var cover = await _coverRepository.GetByBookIdAsync(bookId, cancellationToken);
         if (cover == null || cover.Status != BookCoverStatus.Pending)
         {

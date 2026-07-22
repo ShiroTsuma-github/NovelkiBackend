@@ -20,8 +20,7 @@ public sealed class GlobalTagService(
     public async Task<Tag> CreateAsync(string name, string? description, CancellationToken cancellationToken)
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
-        var existing = await context.Tags.FirstOrDefaultAsync(
-            tag => tag.IsGlobal && tag.NormalizedName == normalizedName, cancellationToken);
+        var existing = await FindSimilarGlobalAsync(name, null, cancellationToken);
         if (existing is not null)
         {
             throw new EntityAlreadyExistsException<Tag, Guid>(name, existing.Id);
@@ -50,8 +49,7 @@ public sealed class GlobalTagService(
                   ?? throw new EntityNotFoundException<Tag, Guid>(id);
         var affectedOwners = await GetLinkedOwnerIdsAsync(tag.Id, cancellationToken);
         var normalizedName = MappingExtensions.NormalizeName(name);
-        var conflict = await context.Tags.FirstOrDefaultAsync(
-            item => item.IsGlobal && item.Id != id && item.NormalizedName == normalizedName, cancellationToken);
+        var conflict = await FindSimilarGlobalAsync(name, id, cancellationToken);
         if (conflict is not null)
         {
             throw new EntityAlreadyExistsException<Tag, Guid>(name, conflict.Id);
@@ -81,8 +79,11 @@ public sealed class GlobalTagService(
     {
         var privateTags = await context.Tags
             .Include(tag => tag.BookTags)
-            .Where(tag => !tag.IsGlobal && tag.NormalizedName == globalTag.NormalizedName)
+            .Where(tag => !tag.IsGlobal)
             .ToListAsync(cancellationToken);
+        privateTags = privateTags
+            .Where(tag => MetadataNameSimilarity.IsPracticalMatch(tag.Name, globalTag.Name))
+            .ToList();
         if (privateTags.Count == 0)
         {
             return [];
@@ -133,5 +134,16 @@ public sealed class GlobalTagService(
     private static string? TrimToNull(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private async Task<Tag?> FindSimilarGlobalAsync(string name, Guid? excludedId,
+        CancellationToken cancellationToken)
+    {
+        return (await context.Tags.Where(tag => tag.IsGlobal && (!excludedId.HasValue || tag.Id != excludedId.Value))
+                .ToListAsync(cancellationToken))
+            .Where(tag => MetadataNameSimilarity.IsPracticalMatch(tag.Name, name))
+            .OrderBy(tag => MetadataNameSimilarity.MatchDistance(tag.Name, name))
+            .ThenBy(tag => tag.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault();
     }
 }

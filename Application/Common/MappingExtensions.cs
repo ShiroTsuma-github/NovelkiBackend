@@ -7,6 +7,11 @@ public static partial class MappingExtensions
         return CollapseWhitespace(value).ToUpperInvariant();
     }
 
+    public static string NormalizeNameIgnoringSpaces(string value)
+    {
+        return NormalizeName(value).Replace(" ", string.Empty, StringComparison.Ordinal);
+    }
+
     public static string CollapseWhitespace(string value)
     {
         return string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

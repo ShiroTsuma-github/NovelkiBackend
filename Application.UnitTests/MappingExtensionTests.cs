@@ -1,12 +1,9 @@
-using Application.Common;
+namespace Application.UnitTests;
+
+using Common;
 using Domain.Associations;
 using Domain.Entities;
 using Domain.Models;
-
-namespace Application.UnitTests;
-
-using Common.DTOs.Author;
-using Common.DTOs.Book;
 
 public class MappingExtensionTests
 {
@@ -52,6 +49,32 @@ public class MappingExtensionTests
         var result = MappingExtensions.CollapseWhitespace("  Lord   of\tMysteries  ");
 
         Assert.Equal("Lord of Mysteries", result);
+    }
+
+    [Fact]
+    public void NormalizeNameIgnoringSpaces_ShouldCreateTheSameComparisonKey()
+    {
+        Assert.Equal(
+            MappingExtensions.NormalizeNameIgnoringSpaces("Slice Of Life"),
+            MappingExtensions.NormalizeNameIgnoringSpaces("  SLICEOFLIFE  "));
+    }
+
+    [Theory]
+    [InlineData("R-18", "R18")]
+    [InlineData("Anti Hero", "ANTIHERO")]
+    [InlineData("Slice Of Life", "Slice Of Lifee")]
+    public void MetadataNameSimilarity_ShouldMatchEquivalentOrNearIdenticalNames(string left, string right)
+    {
+        Assert.True(MetadataNameSimilarity.IsPracticalMatch(left, right));
+    }
+
+    [Theory]
+    [InlineData("Action", "Faction")]
+    [InlineData("Male Lead", "Female Lead")]
+    [InlineData("Romance", "Roman")]
+    public void MetadataNameSimilarity_ShouldNotMergeDifferentMeanings(string left, string right)
+    {
+        Assert.False(MetadataNameSimilarity.IsPracticalMatch(left, right));
     }
 
     [Fact]
@@ -139,6 +162,27 @@ public class MappingExtensionTests
             dto.Cover.ImageUrl);
         Assert.Equal($"/api/v1/book/{book.Id}/cover/thumbnail?v={coverVersion.ToUnixTimeMilliseconds()}",
             dto.Cover.ThumbnailImageUrl);
+    }
+
+    [Fact]
+    public void CoverToDto_ShouldPreferStoredManualCoverOverStaleFailureStatus()
+    {
+        var cover = new BookCover
+        {
+            Status = BookCoverStatus.NotFound,
+            Source = BookCoverSource.ManualUrl,
+            StoragePath = "owner/book.jpg",
+            ThumbnailStoragePath = "owner/book.thumb.jpg",
+            FailureReason = "No cover found in configured providers."
+        };
+
+        var dto = cover.ToDto(Guid.NewGuid());
+
+        Assert.Equal("Uploaded", dto.Status);
+        Assert.Equal("ManualUrl", dto.Source);
+        Assert.Null(dto.FailureReason);
+        Assert.NotNull(dto.ImageUrl);
+        Assert.NotNull(dto.ThumbnailImageUrl);
     }
 
     [Fact]

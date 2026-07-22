@@ -12,16 +12,22 @@ internal sealed class BookHtmlParser : IBookHtmlParser
     private const int MaxTagLength = 100;
     private readonly IGenreRepository _genreRepository;
     private readonly IReadOnlyCollection<IBookHtmlResolver> _resolvers;
+    private readonly ITagRepository? _tagRepository;
     private readonly ITypeRepository _typeRepository;
+    private readonly IUser? _user;
 
     public BookHtmlParser(
         IEnumerable<IBookHtmlResolver> resolvers,
         IGenreRepository genreRepository,
-        ITypeRepository typeRepository)
+        ITypeRepository typeRepository,
+        ITagRepository? tagRepository = null,
+        IUser? user = null)
     {
         _resolvers = resolvers.ToArray();
         _genreRepository = genreRepository;
         _typeRepository = typeRepository;
+        _tagRepository = tagRepository;
+        _user = user;
     }
 
     public async Task<BookHtmlParseResult> ParseAsync(string html, CancellationToken cancellationToken)
@@ -72,7 +78,7 @@ internal sealed class BookHtmlParser : IBookHtmlParser
         foreach (var name in metadata.Genres)
         {
             var genre = await _genreRepository.GetByNameAsync(name, cancellationToken);
-            genres.Add(new BookHtmlDictionaryMatch(genre?.Id, name));
+            genres.Add(new BookHtmlDictionaryMatch(genre?.Id, genre?.Name ?? name));
             if (genre != null)
             {
                 matchedGenreNames.Add(name);
@@ -105,6 +111,7 @@ internal sealed class BookHtmlParser : IBookHtmlParser
             MaxTagLength,
             "tag",
             warnings);
+        safeTags = await UseExistingTagNamesAsync(safeTags, cancellationToken);
 
         return new BookHtmlParseResult(
             metadata.Source,
@@ -118,6 +125,27 @@ internal sealed class BookHtmlParser : IBookHtmlParser
             KeepWithinLimit(metadata.CanonicalUrl, 2000, "Canonical URL", warnings),
             KeepWithinLimit(metadata.CoverUrl, 2000, "Cover URL", warnings),
             warnings);
+    }
+
+    private async Task<IReadOnlyCollection<string>> UseExistingTagNamesAsync(
+        IReadOnlyCollection<string> tags,
+        CancellationToken cancellationToken)
+    {
+        if (_tagRepository == null || _user?.Id is not { } ownerId || tags.Count == 0)
+        {
+            return tags;
+        }
+
+        var existing = await _tagRepository.GetByNamesAsync(ownerId, tags, cancellationToken);
+        var existingTags = existing.ToArray();
+        return tags
+            .Select(tag => existingTags
+                .Where(existingTag => MetadataNameSimilarity.IsPracticalMatch(existingTag.Name, tag))
+                .OrderBy(existingTag => MetadataNameSimilarity.MatchDistance(existingTag.Name, tag))
+                .Select(existingTag => existingTag.Name)
+                .FirstOrDefault() ?? tag)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 
     private static string? KeepWithinLimit(string? value, int limit, string label, ICollection<string> warnings)

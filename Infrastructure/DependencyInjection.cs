@@ -109,6 +109,7 @@ public static class DependencyInjection
         builder.Services.AddHostedService<BookImportSessionCleanupService>();
         builder.Services.AddScoped<IAdminLibraryService, AdminLibraryService>();
         builder.Services.AddScoped<IGlobalTagService, GlobalTagService>();
+        builder.Services.AddScoped<MetadataSimilarityReconciler>();
         builder.Services.AddScoped<IPublicBookService, PublicBookService>();
         builder.Services.AddScoped<IStorageCleanupQueue, StorageCleanupQueue>();
         builder.Services.AddScoped<StorageCleanupQueueProcessor>();
@@ -150,6 +151,7 @@ public static class DependencyInjection
         }
 
         builder.Services.AddScoped<IBookCoverRemoteImageService, BookCoverRemoteImageService>();
+        builder.Services.AddSingleton<IBookCoverOperationGate, BookCoverOperationGate>();
         builder.Services.AddSingleton<InMemoryBookCoverQueue>();
         builder.Services.AddSingleton<IBookCoverQueue>(provider =>
             provider.GetRequiredService<InMemoryBookCoverQueue>());
