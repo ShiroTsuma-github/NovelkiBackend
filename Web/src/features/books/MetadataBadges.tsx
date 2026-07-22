@@ -1,4 +1,5 @@
-import { useId, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 type MetadataSummaryProps = {
   primary: string
@@ -21,13 +22,13 @@ export function MetadataSummary({
     <div className="flex min-w-0 items-center gap-2">
       <span className={primaryClassName} title={primary}>{primary}</span>
       {totalCount > 0 ? (
-        <span
-          aria-label={`${totalCount} ${pluralize(countNoun, totalCount)}`}
-          className="book-table-badge shrink-0 rounded px-2 py-1 text-xs font-medium"
-          title={tooltip}
+        <MetadataTooltip
+          ariaLabel={`${totalCount} ${pluralize(countNoun, totalCount)}`}
+          content={tooltip}
+          triggerClassName="book-table-badge shrink-0 rounded px-2 py-1 text-xs font-medium"
         >
           +{totalCount}
-        </span>
+        </MetadataTooltip>
       ) : null}
     </div>
   )
@@ -73,15 +74,15 @@ export function DescribedMetadataPills({
         />
       ))}
       {hiddenCount > 0 ? (
-        <span
-          aria-label={`${hiddenCount} more${hiddenValues.length ? `: ${hiddenValues.join(', ')}` : ''}`}
-          className={variant === 'detail'
+        <MetadataTooltip
+          ariaLabel={`${hiddenCount} more${hiddenValues.length ? `: ${hiddenValues.join(', ')}` : ''}`}
+          content={hiddenTooltip}
+          triggerClassName={variant === 'detail'
             ? 'rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700'
             : 'book-table-badge rounded px-2 py-1 text-xs font-medium'}
-          title={hiddenTooltip}
         >
           +{hiddenCount} more
-        </span>
+        </MetadataTooltip>
       ) : null}
     </div>
   )
@@ -96,39 +97,121 @@ function DescribedMetadataPill({
   description?: string | null
   variant: 'table' | 'detail'
 }) {
-  const tooltipId = useId()
+  const triggerClassName = variant === 'detail'
+    ? 'rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700'
+    : 'book-table-badge rounded px-2 py-1 text-xs'
 
-  if (variant === 'detail') {
-    return (
-      <span className="group relative">
-        <span
-          aria-describedby={description ? tooltipId : undefined}
-          className="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700"
-          tabIndex={description ? 0 : undefined}
-        >
-          {value}
-        </span>
-        {description ? (
-          <span
-            className="ui-chart-tooltip pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 hidden w-56 -translate-x-1/2 text-xs font-normal leading-5 group-hover:block group-focus-within:block"
-            id={tooltipId}
-            role="tooltip"
-          >
-            {description}
-          </span>
-        ) : null}
-      </span>
-    )
+  if (!description) {
+    const plainPill = <span className={triggerClassName}>{value}</span>
+    return variant === 'detail'
+      ? <span className="group relative">{plainPill}</span>
+      : plainPill
   }
 
-  return (
-    <span
-      aria-label={description ? `${value}: ${description}` : undefined}
-      className="book-table-badge rounded px-2 py-1 text-xs"
-      title={description ?? undefined}
+  const pill = (
+    <MetadataTooltip
+      ariaLabel={`${value}: ${description}`}
+      content={description}
+      triggerClassName={triggerClassName}
     >
       {value}
-    </span>
+    </MetadataTooltip>
+  )
+
+  return variant === 'detail'
+    ? <span className="group relative">{pill}</span>
+    : pill
+}
+
+function MetadataTooltip({
+  ariaLabel,
+  children,
+  content,
+  triggerClassName,
+}: {
+  ariaLabel: string
+  children: ReactNode
+  content: string
+  triggerClassName: string
+}) {
+  const tooltipId = useId()
+  const triggerRef = useRef<HTMLSpanElement | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
+  const [position, setPosition] = useState({ left: 0, top: 0, below: false })
+
+  function updatePosition() {
+    const trigger = triggerRef.current
+    if (!trigger) {
+      return
+    }
+
+    const bounds = trigger.getBoundingClientRect()
+    const availableWidth = Math.max(0, window.innerWidth - 24)
+    const halfTooltipWidth = Math.min(144, availableWidth / 2)
+    const centeredLeft = bounds.left + bounds.width / 2
+    const left = Math.min(
+      window.innerWidth - 12 - halfTooltipWidth,
+      Math.max(12 + halfTooltipWidth, centeredLeft),
+    )
+
+    setPosition({
+      left,
+      top: bounds.top < 140 ? bounds.bottom : bounds.top,
+      below: bounds.top < 140,
+    })
+  }
+
+  function showTooltip() {
+    updatePosition()
+    setIsOpen(true)
+  }
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [isOpen])
+
+  return (
+    <>
+      <span
+        aria-describedby={isOpen ? tooltipId : undefined}
+        aria-label={ariaLabel}
+        className={triggerClassName}
+        ref={triggerRef}
+        tabIndex={0}
+        onBlur={() => setIsOpen(false)}
+        onFocus={showTooltip}
+        onMouseEnter={showTooltip}
+        onMouseLeave={() => setIsOpen(false)}
+      >
+        {children}
+      </span>
+      {isOpen && typeof document !== 'undefined' ? createPortal(
+        <span
+          className="metadata-tooltip ui-chart-tooltip pointer-events-none fixed z-[80] w-72 max-w-[calc(100vw-1.5rem)] whitespace-pre-line text-xs font-normal leading-5 shadow-lg"
+          id={tooltipId}
+          role="tooltip"
+          style={{
+            left: position.left,
+            top: position.top,
+            transform: position.below
+              ? 'translate(-50%, 0.5rem)'
+              : 'translate(-50%, calc(-100% - 0.5rem))',
+          }}
+        >
+          {content}
+        </span>,
+        document.body,
+      ) : null}
+    </>
   )
 }
 

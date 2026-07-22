@@ -29,22 +29,24 @@ vi.mock('sonner', () => ({
 describe('BooksPage', () => {
   beforeEach(() => {
     window.localStorage.removeItem('novelki.books.page-size.v1')
+    window.sessionStorage.clear()
     vi.mocked(api.getBooks).mockReset()
     vi.mocked(api.getBooksSummary).mockReset()
   })
 
   it('renders books in table view and fetches with default list params', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
     expect(await screen.findByText('Lord of Mysteries')).toBeInTheDocument()
     expect(screen.getByText('Cuttlefish')).toBeInTheDocument()
-    expect(screen.getByLabelText('1 alternative name')).toHaveAttribute(
-      'title',
-      'Alternative name:\nCuttlefish That Loves Diving',
-    )
-    expect(screen.getByText('favorite')).toHaveAttribute('title', 'A personal favorite.')
+    await user.hover(screen.getByLabelText('1 alternative name'))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Alternative name: Cuttlefish That Loves Diving')
+    await user.unhover(screen.getByLabelText('1 alternative name'))
+    await user.hover(screen.getByText('favorite'))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('A personal favorite.')
     expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({
       skip: 0,
       take: 20,
@@ -87,6 +89,7 @@ describe('BooksPage', () => {
       { id: 'description', visible: true },
     ]))
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
 
     const { container } = renderWithProviders(<BooksPage />, { route: '/books' })
 
@@ -102,10 +105,8 @@ describe('BooksPage', () => {
     expect(section).toHaveClass('min-w-0', 'overflow-hidden')
     expect(screen.queryByRole('columnheader', { name: /^id$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: /alternative titles/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Fantasy')).toHaveAttribute(
-      'title',
-      'Magic, strange worlds, and supernatural stories.',
-    )
+    await user.hover(screen.getByText('Fantasy'))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Magic, strange worlds, and supernatural stories.')
   })
 
   it('shows the colon-based rating operator syntax in advanced search help', async () => {
@@ -171,6 +172,35 @@ describe('BooksPage', () => {
       'title',
       'A Very Long Book Title That Should Stay Inside Its Card Container Without Pushing Actions Away',
     )
+  })
+
+  it('remembers the exact scroll position and filtered list url before opening details', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 731 })
+
+    renderWithProviders(<BooksPage />, { route: '/books?take=50&query=Fantasy' })
+
+    await user.click(await screen.findByLabelText('View Lord of Mysteries'))
+
+    expect(window.sessionStorage.getItem(
+      'novelki.books.scroll-position.v1:/books?take=50&query=Fantasy',
+    )).toBe('731')
+  })
+
+  it('restores and consumes the saved scroll position after the book list loads', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    const storageKey = 'novelki.books.scroll-position.v1:/books?take=50'
+    window.sessionStorage.setItem(storageKey, '684')
+
+    renderWithProviders(<BooksPage />, { route: '/books?take=50' })
+
+    await waitFor(() => {
+      expect(scrollTo).toHaveBeenCalledWith({ top: 684, behavior: 'auto' })
+    })
+    expect(window.sessionStorage.getItem(storageKey)).toBeNull()
+    scrollTo.mockRestore()
   })
 
   it('restores the selected page size after leaving and returning to the list', async () => {
@@ -856,6 +886,8 @@ describe('BooksPage', () => {
 
     const backToTopButton = await screen.findByRole('button', { name: /back to top/i })
     const goToBottomButton = screen.getByRole('button', { name: /go to bottom/i })
+    expect(backToTopButton).toHaveClass('ui-icon-button--round')
+    expect(goToBottomButton).toHaveClass('ui-icon-button--round')
     await user.click(backToTopButton)
     await user.click(goToBottomButton)
 

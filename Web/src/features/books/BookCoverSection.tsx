@@ -187,7 +187,7 @@ export function BookCoverArtwork({
         {resolvedImageUrl && onRemove ? (
           <button
             aria-label={removeLabel}
-            className={`${buttonVariants.destructive} ui-icon-button absolute left-3 top-3 opacity-0 group-hover:opacity-100`}
+            className={`${buttonVariants.destructive} ui-icon-button ui-icon-button--round absolute left-3 top-3 opacity-0 group-hover:opacity-100`}
             type="button"
             onClick={onRemove}
           >
@@ -210,7 +210,7 @@ export function BookCoverArtwork({
             onRemove()
           }}
         >
-          <span className={`${buttonVariants.destructive} ui-icon-button opacity-0 group-hover:opacity-100`}>
+          <span className={`${buttonVariants.destructive} ui-icon-button ui-icon-button--round opacity-0 group-hover:opacity-100`}>
             <X className="h-4 w-4" />
           </span>
         </span>

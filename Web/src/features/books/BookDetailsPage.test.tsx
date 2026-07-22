@@ -33,6 +33,27 @@ vi.mock('./ProgressDialog', () => ({
 }))
 
 describe('BookDetailsPage', () => {
+  it('returns to the exact filtered book list url stored by the list page', async () => {
+    vi.mocked(api.getBook).mockResolvedValue(books[0])
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      {
+        route: {
+          pathname: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+          state: { bookListReturnTo: '/books?take=50&query=Fantasy' },
+        },
+      },
+    )
+
+    expect(await screen.findByRole('link', { name: /list/i })).toHaveAttribute(
+      'href',
+      '/books?take=50&query=Fantasy',
+    )
+  })
+
   it('computes chapter deltas from sorted progress history entries', () => {
     expect(getProgressHistoryWithDeltas([
       {
@@ -164,6 +185,7 @@ describe('BookDetailsPage', () => {
 
   it('shows tag descriptions through the shared metadata component', async () => {
     vi.mocked(api.getBook).mockResolvedValue(books[0])
+    const user = userEvent.setup()
 
     renderWithProviders(
       <Routes>
@@ -173,10 +195,8 @@ describe('BookDetailsPage', () => {
     )
 
     const tag = await screen.findByText('favorite')
-    const tooltipId = tag.getAttribute('aria-describedby')
-
-    expect(tooltipId).toBeTruthy()
-    expect(document.getElementById(tooltipId!)).toHaveTextContent('A personal favorite.')
+    await user.hover(tag)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('A personal favorite.')
   })
 
   it('keeps genres aligned to the top when the tags column is taller', async () => {

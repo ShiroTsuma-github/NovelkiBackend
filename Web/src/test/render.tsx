@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, type RenderOptions } from '@testing-library/react'
-import type { ReactElement, ReactNode } from 'react'
+import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import { MemoryRouter } from 'react-router-dom'
+
+type InitialEntry = NonNullable<ComponentProps<typeof MemoryRouter>['initialEntries']>[number]
 
 export function createTestQueryClient() {
   return new QueryClient({
@@ -19,7 +21,7 @@ export function createTestQueryClient() {
 
 export function renderWithProviders(
   ui: ReactElement,
-  options: RenderOptions & { route?: string } = {},
+  options: RenderOptions & { route?: InitialEntry } = {},
 ) {
   const { route = '/', ...renderOptions } = options
   const queryClient = createTestQueryClient()

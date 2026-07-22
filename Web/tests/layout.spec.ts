@@ -234,6 +234,20 @@ test('discover metadata tooltips can extend beyond their card', async ({ page })
   await expect(page.getByRole('tooltip')).toBeVisible()
 })
 
+test('book list metadata tooltips escape the scrolling table surface', async ({ page }) => {
+  await page.goto('/books')
+  const favorite = page.getByText('favorite', { exact: true }).first()
+
+  await favorite.focus()
+  const tooltip = page.getByRole('tooltip')
+  await expect(tooltip).toBeVisible()
+  expect(await tooltip.evaluate((element) => element.parentElement === document.body)).toBe(true)
+
+  const tooltipBox = await requiredBox(tooltip)
+  expect(tooltipBox.x).toBeGreaterThanOrEqual(0)
+  expect(tooltipBox.x + tooltipBox.width).toBeLessThanOrEqual(page.viewportSize()!.width)
+})
+
 test('search and compact selects reserve space for their icons', async ({ page }) => {
   await page.goto('/books')
 
@@ -267,10 +281,13 @@ test('page numbers are round and borderless while direction controls remain stru
     })
   })
   await page.goto('/books')
+  const viewport = page.viewportSize()!
+  await page.setViewportSize({ ...viewport, height: 100 })
 
   const currentPage = page.getByRole('button', { name: '1', exact: true })
   const nextPage = page.getByRole('button', { name: '2', exact: true })
   const nextDirection = page.getByRole('button', { name: /next page/i })
+  const goToBottom = page.getByRole('button', { name: /go to bottom/i })
 
   await expect(currentPage).toHaveCSS('border-radius', '999px')
   await expect(currentPage).toHaveCSS('border-top-width', '0px')
@@ -278,6 +295,7 @@ test('page numbers are round and borderless while direction controls remain stru
   await expect(nextPage).toHaveCSS('border-top-width', '0px')
   await expect(nextPage).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
   await expect(nextDirection).toHaveCSS('border-top-width', '1px')
+  await expect(goToBottom).toHaveCSS('border-radius', '9999px')
 })
 
 test('analytics layout exposes chart structure without page overflow', async ({ page }) => {

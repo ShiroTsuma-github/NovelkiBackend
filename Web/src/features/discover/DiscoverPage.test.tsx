@@ -50,10 +50,8 @@ describe('DiscoverPage', () => {
     expect(await screen.findByText('Lord of Mysteries')).toBeInTheDocument()
     expect(screen.getByText('1432')).toBeInTheDocument()
     expect(screen.getByText('Mystery')).toHaveAttribute('tabindex', '0')
-    expect(screen.getByLabelText('2 alternative titles')).toHaveAttribute(
-      'title',
-      'Alternative titles:\nLOTM\nGuimi Zhi Zhu',
-    )
+    await user.hover(screen.getByLabelText('2 alternative titles'))
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Alternative titles: LOTM Guimi Zhi Zhu')
 
     await user.type(screen.getByPlaceholderText('Search title, author, genre, tag, type, or chapters…'), 'author:Cuttlefish')
     await waitFor(() => expect(api.searchPublicBooks).toHaveBeenCalledWith({
