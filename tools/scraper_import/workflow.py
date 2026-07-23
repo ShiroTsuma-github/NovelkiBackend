@@ -5,10 +5,20 @@ from decimal import Decimal
 from typing import Any, Callable
 
 from .api import ApiError, NovelkiApi
-from .models import AuthorRecord, BookRecord, Catalog, MetadataRecord, ReviewIssue, normalized
+from .models import (
+    AuthorRecord,
+    BookRecord,
+    Catalog,
+    MetadataRecord,
+    ReviewIssue,
+    metadata_match_distance,
+    metadata_names_match,
+    normalized,
+)
 
 
 Progress = Callable[[str], None]
+MANGA_CONTENT_TYPES = {"manga", "manhwa", "manhua"}
 
 
 @dataclass
@@ -37,15 +47,13 @@ def run_import(
     statistics = ImportStatistics()
     api.ensure_admin()
 
-    progress(f"[1/4] Global tags: {len(catalog.tags)}")
-    available_tags = _create_metadata(
-        api.create_global_tag, catalog.tags, catalog, statistics, "tag", progress
-    )
-    progress(f"[2/4] Global genres: {len(catalog.genres)}")
+    progress("[1/4] Fetching genres and classifying metadata")
+    genre_ids = _resolve_genre_candidates(api, catalog, statistics)
+    tag_candidates = _tag_candidates(catalog, genre_ids)
+    progress(f"[2/4] Global tags: {len(tag_candidates)}")
     _create_metadata(
-        api.create_genre, catalog.genres, catalog, statistics, "genre", progress
+        api.create_global_tag, tag_candidates, catalog, statistics, "tag", progress
     )
-    genre_ids = _resolve_genres(api, catalog, statistics)
 
     progress(f"[3/4] Authors: {len(catalog.authors)}")
     author_ids = _create_authors(api, catalog, statistics, progress)
@@ -62,7 +70,6 @@ def run_import(
             book,
             author_ids,
             genre_ids,
-            available_tags,
             dictionary_ids,
             skip_covers,
             overwrite_covers,
@@ -98,15 +105,65 @@ def _create_metadata(
     return available
 
 
-def _resolve_genres(api: NovelkiApi, catalog: Catalog, statistics: ImportStatistics) -> dict[str, str]:
-    result: dict[str, str] = {}
-    for key, genre in catalog.genres.items():
-        try:
-            response = api.genre_by_name(genre.name)
-            result[key] = str(response["id"])
-        except (ApiError, KeyError) as error:
-            _problem(catalog, statistics, "genre", None, genre.name, "genreId", genre.name, str(error))
+def _metadata_candidates(catalog: Catalog) -> dict[str, MetadataRecord]:
+    result: dict[str, MetadataRecord] = {}
+    for records in (catalog.genres, catalog.tags):
+        for key, record in records.items():
+            existing = result.get(key)
+            if existing is None:
+                result[key] = record
+            elif not existing.description and record.description:
+                result[key] = MetadataRecord(existing.name, record.description)
+            elif existing.description and record.description and len(record.description) > len(existing.description):
+                result[key] = MetadataRecord(existing.name, record.description)
+    for book in catalog.books:
+        for name in (*book.genres, *book.tags):
+            key = normalized(name)
+            result.setdefault(key, MetadataRecord(name, None))
     return result
+
+
+def _resolve_genre_candidates(
+    api: NovelkiApi,
+    catalog: Catalog,
+    statistics: ImportStatistics,
+) -> dict[str, str]:
+    available = [
+        (str(item.get("id") or ""), str(item.get("name") or "").strip())
+        for item in api.genres()
+        if item.get("id") and str(item.get("name") or "").strip()
+    ]
+    result: dict[str, str] = {}
+    for key, candidate in _metadata_candidates(catalog).items():
+        match = next(
+            (
+                item
+                for item in sorted(
+                    available,
+                    key=lambda item: (
+                        metadata_match_distance(candidate.name, item[1]),
+                        item[1].casefold(),
+                    ),
+                )
+                if metadata_names_match(candidate.name, item[1])
+            ),
+            None,
+        )
+        if match is not None:
+            result[key] = match[0]
+    statistics.genres_existing = len(set(result.values()))
+    return result
+
+
+def _tag_candidates(
+    catalog: Catalog,
+    genre_ids: dict[str, str],
+) -> dict[str, MetadataRecord]:
+    return {
+        key: record
+        for key, record in _metadata_candidates(catalog).items()
+        if key not in genre_ids
+    }
 
 
 def _create_authors(
@@ -207,18 +264,29 @@ def _import_book(
     book: BookRecord,
     author_ids: dict[str, str],
     genre_ids: dict[str, str],
-    available_tags: set[str],
     dictionary_ids: dict[tuple[str, str], str],
     skip_covers: bool,
     overwrite_covers: bool,
 ) -> None:
+    metadata_source = (
+        "Anime-Planet"
+        if normalized(book.content_type) in MANGA_CONTENT_TYPES
+        else "NovelUpdates"
+    )
     author_id = author_ids.get(book.author_key) if book.author_key else None
-    missing_genres = [name for name in book.genres if normalized(name) not in genre_ids]
-    missing_tags = [name for name in book.tags if normalized(name) not in available_tags]
+    metadata_candidates = _unique([*book.genres, *book.tags], excluded=())
+    matched_genre_ids = list(
+        dict.fromkeys(
+            genre_ids[normalized(name)]
+            for name in metadata_candidates
+            if normalized(name) in genre_ids
+        )
+    )
+    tags = [name for name in metadata_candidates if normalized(name) not in genre_ids]
     content_type_id = dictionary_ids.get(("type", normalized(book.content_type)))
     status_id = dictionary_ids.get(("status", normalized(book.status)))
-    if (book.author_key and not author_id) or missing_genres or missing_tags or not content_type_id or not status_id:
-        reason = f"unresolved dependencies: author={bool(book.author_key and not author_id)}, genres={missing_genres}, tags={missing_tags}, type={not content_type_id}, status={not status_id}"
+    if (book.author_key and not author_id) or not content_type_id or not status_id:
+        reason = f"unresolved dependencies: author={bool(book.author_key and not author_id)}, type={not content_type_id}, status={not status_id}"
         _problem(catalog, statistics, book.source, book.row_number, book.primary_title, "dependencies", None, reason)
         return
 
@@ -229,11 +297,11 @@ def _import_book(
         "authorId": author_id,
         "authorName": None,
         "alternativeTitles": [
-            {"title": title, "language": None, "source": "NovelUpdates"}
+            {"title": title, "language": None, "source": metadata_source}
             for title in book.alternative_titles
         ],
-        "genreIds": [genre_ids[normalized(name)] for name in book.genres],
-        "tags": list(book.tags),
+        "genreIds": matched_genre_ids,
+        "tags": tags,
         "totalChapters": _number(book.total_chapters),
         "currentChapterNumber": _number(book.current_chapter_number),
         "currentChapterLabel": book.current_chapter_label,
@@ -242,7 +310,7 @@ def _import_book(
         "description": book.description,
         "notes": book.notes,
         "rawImportedLine": book.raw_imported_line,
-        "links": ([{"url": book.requested_url, "label": "NovelUpdates", "sourceType": "NovelUpdates", "isPrimary": True, "lastReadHere": False}] if book.requested_url else []),
+        "links": ([{"url": book.requested_url, "label": metadata_source, "sourceType": metadata_source, "isPrimary": True, "lastReadHere": False}] if book.requested_url else []),
     }
     created = True
     existing: dict[str, Any] | None = None

@@ -10,12 +10,16 @@ from tools.novelupdates_scraper import (
     backfill_content_types,
     backfill_language_tags,
     create_single_page_job,
+    details_match_row_title,
+    extract_anime_planet_details_from_html,
     extract_languages_from_html,
     find_skipped_artifacts,
     is_skipped_status,
     normalize_language_tags,
+    ordered_scrape_jobs,
     prepare_links,
     read_rows,
+    resolve_artifact_directory,
     wait_for_manual_page_correction,
     write_rows_atomic,
 )
@@ -198,6 +202,102 @@ class NovelUpdatesScraperTests(unittest.TestCase):
         self.assertEqual("https://www.anime-planet.com/manga/a-manga", urls[1])
         self.assertEqual("NovelUpdates", json.loads(rows[0]["links"])[0]["SourceType"])
         self.assertEqual("Anime-Planet", json.loads(rows[1]["links"])[0]["SourceType"])
+
+    def test_scrape_jobs_filter_novel_and_manga_modes(self) -> None:
+        rows = [
+            {"primaryTitle": "A Manhua", "contentType": "Manhua", "links": ""},
+            {"primaryTitle": "A Novel", "contentType": "Novel", "links": ""},
+            {"primaryTitle": "A Manhwa", "contentType": "Manhwa", "links": ""},
+            {"primaryTitle": "A Manga", "contentType": "Manga", "links": ""},
+        ]
+        urls = prepare_links(rows)
+
+        novel_jobs = ordered_scrape_jobs(rows, urls, "novel")
+        manga_jobs = ordered_scrape_jobs(rows, urls, "manga")
+
+        self.assertEqual(["Novel"], [row["contentType"] for _, row, _ in novel_jobs])
+        self.assertEqual(
+            ["Manga", "Manhwa", "Manhua"],
+            [row["contentType"] for _, row, _ in manga_jobs],
+        )
+
+    def test_artifact_checkpoint_survives_canonical_url_change(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            artifacts = Path(directory)
+            original = artifacts / "00224-title-oldhash"
+            original.mkdir()
+            (original / "details.json").write_text(
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "requestedUrl": "https://www.anime-planet.com/manga/old-slug",
+                        "canonicalUrl": "https://www.anime-planet.com/manga/canonical-slug",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            resolved = resolve_artifact_directory(
+                artifacts,
+                224,
+                "Title",
+                "https://www.anime-planet.com/manga/canonical-slug",
+            )
+
+            self.assertEqual(original, resolved)
+
+    def test_anime_planet_fixture_extracts_only_primary_entry_metadata(self) -> None:
+        fixture = Path(__file__).resolve().parents[1] / "animeplanet.html"
+
+        details = extract_anime_planet_details_from_html(
+            fixture.read_text(encoding="utf-8"),
+            "https://www.anime-planet.com/manga/solo-leveling",
+            "https://www.anime-planet.com/manga/solo-leveling",
+            "Manhwa",
+        )
+
+        self.assertEqual("Solo Leveling", details["title"])
+        self.assertEqual("Manhwa", details["contentType"])
+        self.assertEqual("Chugong", details["authors"][0])
+        self.assertIn("Na Honjaman Level-Up", details["associatedTitles"])
+        self.assertIn("나 혼자만 레벨업", details["associatedTitles"])
+        self.assertIn("Action", [genre["name"] for genre in details["genres"]])
+        self.assertIn("Dungeon", [tag["name"] for tag in details["tags"]])
+        self.assertNotIn("Isekai", [tag["name"] for tag in details["tags"]])
+        self.assertTrue(details["coverSourceUrl"].endswith("solo-leveling-1.jpg?t=1625826980"))
+        self.assertIn("E-class hunter Jinwoo Sung", details["description"])
+
+    def test_title_match_accepts_formatting_typo_and_csv_alias(self) -> None:
+        formatting_row = {
+            "primaryTitle": "R-18 Hero Academy",
+            "alternativeTitles": "",
+        }
+        typo_details = {
+            "title": "R18 Hero Academyy",
+            "associatedTitles": [],
+        }
+        alias_row = {
+            "primaryTitle": "Miss Komi is Bad at Communication",
+            "alternativeTitles": json.dumps(
+                [{"Title": "Komi Can't Communicate"}]
+            ),
+        }
+        alias_details = {
+            "title": "Komi Can't Communicate",
+            "associatedTitles": [],
+        }
+
+        self.assertTrue(details_match_row_title(formatting_row, 1, typo_details))
+        self.assertTrue(details_match_row_title(alias_row, 1, alias_details))
+
+    def test_title_match_rejects_unrelated_valid_page(self) -> None:
+        row = {"primaryTitle": "Expected Manga", "alternativeTitles": ""}
+        details = {
+            "title": "Completely Different Series",
+            "associatedTitles": ["Another Name"],
+        }
+
+        self.assertFalse(details_match_row_title(row, 1, details))
 
     def test_apply_details_merges_metadata_and_uses_canonical_url(self) -> None:
         row = {

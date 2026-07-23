@@ -61,6 +61,24 @@ class NovelkiApi:
         encoded = urllib.parse.quote(name, safe="")
         return self.request("GET", f"/api/v1/genre/by-name/{encoded}")
 
+    def genres(self) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        skip = 0
+        take = 100
+        while True:
+            query = urllib.parse.urlencode({"skip": skip, "take": take})
+            response = self.request("GET", f"/api/v1/genre?{query}")
+            if not isinstance(response, dict):
+                raise ApiError(None, "genre list response is not an object")
+            page = response.get("data")
+            if not isinstance(page, list):
+                raise ApiError(None, "genre list response does not contain data")
+            result.extend(item for item in page if isinstance(item, dict))
+            total = int(response.get("total") or len(result))
+            if len(result) >= total or not page:
+                return result
+            skip += len(page)
+
     def dictionary_by_name(self, dictionary: str, name: str) -> dict[str, Any]:
         encoded = urllib.parse.quote(name, safe="")
         return self.request("GET", f"/api/v1/{dictionary}/by-name/{encoded}")

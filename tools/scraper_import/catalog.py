@@ -19,9 +19,15 @@ from .models import (
 
 
 ROW_DIRECTORY = re.compile(r"^(?P<row>\d{5})-")
+MANGA_CONTENT_TYPES = {"manga", "manhwa", "manhua"}
 
 
-def load_catalog(storage_dir: Path, corrected_csv: Path) -> Catalog:
+def load_catalog(
+    storage_dir: Path,
+    corrected_csv: Path,
+    *,
+    manga_only: bool = False,
+) -> Catalog:
     rows = _read_corrected_rows(corrected_csv)
     catalog = Catalog()
     author_rows: list[tuple[str, ...]] = []
@@ -37,6 +43,10 @@ def load_catalog(storage_dir: Path, corrected_csv: Path) -> Catalog:
             continue
 
         if details.get("status") != "ok":
+            catalog.skipped += 1
+            continue
+
+        if manga_only and normalized(_clean(details.get("contentType")) or "") not in MANGA_CONTENT_TYPES:
             catalog.skipped += 1
             continue
 
@@ -146,7 +156,8 @@ def _make_book(
     details: dict[str, Any],
     artifact_dir: Path,
 ) -> BookRecord | None:
-    primary_title = _clean(row.get("primaryTitle"))
+    csv_primary_title = _clean(row.get("primaryTitle"))
+    primary_title = _clean(details.get("title")) or csv_primary_title
     content_type = _clean(row.get("contentType")) or _clean(details.get("contentType"))
     status = _clean(row.get("status"))
     if not primary_title or not content_type or not status:
@@ -161,7 +172,7 @@ def _make_book(
 
     author_names = _clean_strings(details.get("authors") or [])
     alternative_titles = _dedupe(
-        [details.get("title"), *(details.get("associatedTitles") or [])],
+        [csv_primary_title, *(details.get("associatedTitles") or [])],
         excluded=(primary_title,),
     )
     genres = _dedupe(raw.get("name") for raw in details.get("genres") or [] if isinstance(raw, dict))

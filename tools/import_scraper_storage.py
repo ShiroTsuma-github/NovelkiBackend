@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Import completed NovelUpdates scraper artifacts into Novelki. "
+            "Import completed scraper artifacts into Novelki. "
             "The order is global tags, global genres, authors, then books and covers."
         )
     )
@@ -45,6 +45,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--token", default=os.getenv("NOVELKI_ADMIN_TOKEN"))
     parser.add_argument("--email", default=os.getenv("NOVELKI_ADMIN_EMAIL"))
     parser.add_argument("--username", default=os.getenv("NOVELKI_ADMIN_USERNAME"))
+    parser.add_argument(
+        "--manga",
+        action="store_true",
+        help="Import only Manga, Manhwa and Manhua artifacts; exclude Novel records.",
+    )
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -113,7 +118,7 @@ def main() -> int:
     corrected_csv = arguments.corrected_csv.expanduser().resolve()
     review_output = arguments.review_output.expanduser().resolve()
     try:
-        catalog = load_catalog(storage_dir, corrected_csv)
+        catalog = load_catalog(storage_dir, corrected_csv, manga_only=arguments.manga)
     except (OSError, UnicodeError, ValueError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1

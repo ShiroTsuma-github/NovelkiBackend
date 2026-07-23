@@ -1,4 +1,4 @@
-"""Enrich a Novelki CSV with details collected in a visible Chrome session.
+"""Enrich a Novelki CSV with metadata collected in a visible Chrome session.
 
 The helper intentionally attaches Playwright to a separately launched, installed
 Chrome/Edge process over CDP. The browser uses a persistent profile, remains
@@ -20,13 +20,15 @@ import socket
 import subprocess
 import sys
 import time
+import unicodedata
 import urllib.error
 import urllib.request
+from collections import deque
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Iterable
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urljoin, urlparse, urlunparse
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +39,26 @@ from t import make_details_link  # noqa: E402
 
 
 NOVELUPDATES_HOST = "www.novelupdates.com"
+ANIME_PLANET_HOST = "www.anime-planet.com"
 NOVEL_CONTENT_TYPE = "Novel"
+PAGE_RECOGNITION_TIMEOUT_SECONDS = 10
+COMIC_CONTENT_TYPES = ("Manga", "Manhwa", "Manhua")
+CONTENT_TYPE_ORDER = (NOVEL_CONTENT_TYPE, *COMIC_CONTENT_TYPES)
+ANIME_PLANET_GENRES = {
+    "action",
+    "adventure",
+    "comedy",
+    "drama",
+    "fantasy",
+    "horror",
+    "mystery",
+    "romance",
+    "sci fi",
+    "slice of life",
+    "sports",
+    "supernatural",
+    "thriller",
+}
 MAX_COVER_BYTES = 20 * 1024 * 1024
 CHALLENGE_TITLE_MARKERS = (
     "just a moment",
@@ -69,7 +90,7 @@ DETAIL_FIELDS = (
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Add details links to a Novelki CSV and collect NovelUpdates metadata "
+            "Add details links to a Novelki CSV and collect NovelUpdates or Anime-Planet metadata "
             "with a visible, persistent Chrome session."
         )
     )
@@ -97,6 +118,16 @@ def parse_arguments() -> argparse.Namespace:
         help="Attach to an already running Chromium CDP endpoint instead of launching Chrome.",
     )
     parser.add_argument("--prepare-only", action="store_true", help="Only add links; do not open a browser.")
+    parser.add_argument(
+        "--mode",
+        choices=("novel", "manga"),
+        default="novel",
+        help=(
+            "Rows to scrape: 'novel' processes only Novel via NovelUpdates; "
+            "'manga' processes Manga, Manhwa and Manhua via Anime-Planet. "
+            "Defaults to novel."
+        ),
+    )
     parser.add_argument(
         "--list-skipped",
         action="store_true",
@@ -133,7 +164,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--force", action="store_true", help="Scrape rows that already have successful artifacts.")
     parser.add_argument("--overwrite-existing", action="store_true", help="Replace existing author/description values.")
     parser.add_argument("--start-row", type=int, default=1, help="First one-based data row to scrape.")
-    parser.add_argument("--limit", type=int, help="Maximum number of NovelUpdates rows to visit.")
+    parser.add_argument("--limit", type=int, help="Maximum number of uncached rows to visit.")
     parser.add_argument("--delay-min", type=float, default=2.0, help="Minimum delay between pages in seconds.")
     parser.add_argument("--delay-max", type=float, default=5.0, help="Maximum delay between pages in seconds.")
     parser.add_argument(
@@ -245,7 +276,38 @@ def is_host(url: str, expected_host: str) -> bool:
 def source_for_url(url: str) -> tuple[str, str]:
     if is_host(url, NOVELUPDATES_HOST):
         return "NovelUpdates", "NovelUpdates"
-    return "Anime-Planet", "Anime-Planet"
+    if is_host(url, ANIME_PLANET_HOST):
+        return "Anime-Planet", "Anime-Planet"
+    raise ValueError(f"Unsupported details URL host: {url}")
+
+
+def is_supported_details_url(url: str) -> bool:
+    return is_host(url, NOVELUPDATES_HOST) or is_host(url, ANIME_PLANET_HOST)
+
+
+def ordered_scrape_jobs(
+    rows: list[dict[str, str]], urls: list[str], mode: str = "novel"
+) -> list[tuple[int, dict[str, str], str]]:
+    """Return stable jobs for one CLI mode in content-type order."""
+    allowed_types = (
+        {NOVEL_CONTENT_TYPE.casefold()}
+        if mode == "novel"
+        else {content_type.casefold() for content_type in COMIC_CONTENT_TYPES}
+    )
+    priority = {name.casefold(): index for index, name in enumerate(CONTENT_TYPE_ORDER)}
+    jobs = [
+        (row_number, row, details_url)
+        for row_number, (row, details_url) in enumerate(zip(rows, urls, strict=True), start=1)
+        if is_supported_details_url(details_url)
+        and row.get("contentType", "").strip().casefold() in allowed_types
+    ]
+    return sorted(
+        jobs,
+        key=lambda job: (
+            priority.get(job[1].get("contentType", "").strip().casefold(), len(priority)),
+            job[0],
+        ),
+    )
 
 
 def upsert_details_link(
@@ -329,6 +391,34 @@ def safe_directory_name(row_number: int, title: str, url: str) -> str:
     clean = "-".join(part for part in clean.split("-") if part)[:80] or "untitled"
     digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:10]
     return f"{row_number:05d}-{clean}-{digest}"
+
+
+def resolve_artifact_directory(
+    artifacts_dir: Path,
+    row_number: int,
+    title: str,
+    url: str,
+) -> Path:
+    """Keep a row checkpoint stable even when a scrape discovers a canonical URL."""
+    candidates = list(artifacts_dir.glob(f"{row_number:05d}-*"))
+    ranked: list[tuple[int, float, Path]] = []
+    for candidate in candidates:
+        if not candidate.is_dir():
+            continue
+        details_path = candidate / "details.json"
+        rank = 2
+        if details_path.is_file():
+            rank = 1
+            try:
+                details = json.loads(details_path.read_text(encoding="utf-8"))
+                if details.get("status") == "ok" or is_skipped_status(details.get("status")):
+                    rank = 0
+            except (OSError, json.JSONDecodeError):
+                pass
+        ranked.append((rank, -candidate.stat().st_mtime, candidate))
+    if ranked:
+        return min(ranked)[2]
+    return artifacts_dir / safe_directory_name(row_number, title, url)
 
 
 def find_browser_executable(explicit_path: Path | None) -> Path:
@@ -438,6 +528,14 @@ def has_series_content(page: Any) -> bool:
     )
 
 
+def has_anime_planet_content(page: Any) -> bool:
+    return (
+        page.locator("#entry[data-content='manga']").count() > 0
+        and page.locator("h1[itemprop='name']").count() > 0
+        and page.locator("#entry .synopsisManga").count() > 0
+    )
+
+
 def is_page_not_found(page: Any) -> bool:
     try:
         heading = page.locator("xpath=/html/body/div/div/h1").first
@@ -448,7 +546,11 @@ def is_page_not_found(page: Any) -> bool:
         return False
 
 
-def wait_for_series_page(page: Any, timeout_seconds: float) -> str:
+def wait_for_series_page(
+    page: Any,
+    timeout_seconds: float,
+    expected_host: str = NOVELUPDATES_HOST,
+) -> str:
     deadline = time.monotonic() + timeout_seconds
     challenge_announced = False
     stable_non_challenge_checks = 0
@@ -457,13 +559,19 @@ def wait_for_series_page(page: Any, timeout_seconds: float) -> str:
         if challenge and not challenge_announced:
             print("  Challenge detected. Solve it in the visible browser; the script is waiting.")
             challenge_announced = True
-        if not challenge and has_series_content(page):
+        has_content = (
+            has_anime_planet_content(page)
+            if expected_host.casefold().removeprefix("www.")
+            == ANIME_PLANET_HOST.casefold().removeprefix("www.")
+            else has_series_content(page)
+        )
+        if not challenge and has_content:
             return "ready"
         if not challenge and is_page_not_found(page):
             return "not-found"
         if not challenge:
             stable_non_challenge_checks += 1
-            if stable_non_challenge_checks >= 30:
+            if stable_non_challenge_checks >= PAGE_RECOGNITION_TIMEOUT_SECONDS:
                 return "unrecognized"
         else:
             stable_non_challenge_checks = 0
@@ -471,30 +579,53 @@ def wait_for_series_page(page: Any, timeout_seconds: float) -> str:
     raise TimeoutError("Timed out while waiting for the challenge or series page.")
 
 
-def wait_for_manual_page_correction(page: Any, timeout_seconds: float) -> bool:
+def wait_for_manual_page_correction(
+    page: Any,
+    timeout_seconds: float,
+    expected_host: str = NOVELUPDATES_HOST,
+) -> bool:
     while True:
         print(
-            "  Page not found. Open the correct series page in the visible browser, "
-            "then type 'r' to retry or 'c' to skip this book."
+            "  The details page was not recognized. You may open the correct page in the "
+            "visible browser, then choose 'r' to retry or 'c' to permanently skip it "
+            "and continue with the next book."
         )
         try:
             choice = input("  [r/c] > ").strip().casefold()
         except EOFError:
             choice = "c"
-        if choice == "c":
+        if choice in {"c", "continue"}:
             return False
-        if choice != "r":
-            print("  Unknown command. Use 'r' or 'c'.")
+        if choice not in {"r", "retry"}:
+            print("  Unknown command. Use 'r' (retry) or 'c' (continue).")
             continue
 
-        state = wait_for_series_page(page, timeout_seconds)
+        state = wait_for_series_page(page, timeout_seconds, expected_host)
         if state == "ready":
             print(f"  Using manually selected page: {page.url}")
             return True
-        if state == "not-found":
-            print("  The currently open page still says 'Page not found'.")
-        else:
-            print("  The currently open page is not recognized as a NovelUpdates series page.")
+        print(
+            "  The currently open page is still not recognized as a supported details page "
+            f"(state: {state})."
+        )
+
+
+def ask_retry_after_error(exception: Exception) -> bool:
+    print(f"  ERROR: {exception}")
+    print(
+        "  Choose 'r' to retry this book now or 'c' to permanently skip it "
+        "and continue with the next book."
+    )
+    while True:
+        try:
+            choice = input("  [r/c] > ").strip().casefold()
+        except EOFError:
+            choice = "c"
+        if choice in {"r", "retry"}:
+            return True
+        if choice in {"c", "continue"}:
+            return False
+        print("  Unknown command. Use 'r' (retry) or 'c' (continue).")
 
 
 def locator_texts(page: Any, selector: str) -> list[str]:
@@ -554,7 +685,246 @@ def split_lines(value: str | None) -> list[str]:
     return list(dict.fromkeys(line.strip() for line in value.splitlines() if line.strip()))
 
 
-def extract_details(page: Any, requested_url: str) -> dict[str, Any]:
+def split_comma_separated_titles(value: str) -> list[str]:
+    """Split Anime-Planet aliases without breaking commas inside brackets."""
+    result: list[str] = []
+    buffer: list[str] = []
+    depth = 0
+    closing = {"(": ")", "[": "]", "{": "}"}
+    opening = set(closing)
+    closing_characters = set(closing.values())
+    for character in value:
+        if character in opening:
+            depth += 1
+        elif character in closing_characters and depth > 0:
+            depth -= 1
+        if character == "," and depth == 0:
+            title = "".join(buffer).strip()
+            if title:
+                result.append(title)
+            buffer = []
+        else:
+            buffer.append(character)
+    title = "".join(buffer).strip()
+    if title:
+        result.append(title)
+    return list(dict.fromkeys(result))
+
+
+def anime_planet_author_role_priority(role: str) -> int | None:
+    normalized = role.casefold()
+    if "original creator" in normalized:
+        return 0
+    if any(name in normalized for name in ("author", "writer", "story")):
+        return 1
+    if "adaptation" in normalized:
+        return 2
+    if "artist" in normalized:
+        return 3
+    return None
+
+
+class AnimePlanetHtmlParser(HTMLParser):
+    """Parse only the primary Anime-Planet manga entry, excluding recommendations."""
+
+    _VOID_TAGS = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
+
+    def __init__(self, page_url: str) -> None:
+        super().__init__(convert_charrefs=True)
+        self.page_url = page_url
+        self.title: str | None = None
+        self.canonical_url: str | None = None
+        self.cover_url: str | None = None
+        self.alternative_titles: list[str] = []
+        self.description: str | None = None
+        self.tags: list[dict[str, str | None]] = []
+        self.staff: list[tuple[str, str]] = []
+        self._entry_depth = 0
+        self._tags_depth = 0
+        self._synopsis_depth = 0
+        self._staff_depth = 0
+        self._staff_card_depth = 0
+        self._capture: str | None = None
+        self._capture_tag: str | None = None
+        self._text: list[str] = []
+        self._synopsis_text: list[str] = []
+        self._tag_url: str | None = None
+        self._staff_name: str | None = None
+        self._staff_role: str | None = None
+
+    @staticmethod
+    def _classes(attributes: dict[str, str | None]) -> set[str]:
+        return set((attributes.get("class") or "").split())
+
+    def _begin_capture(self, kind: str, tag: str) -> None:
+        self._capture = kind
+        self._capture_tag = tag
+        self._text = []
+
+    def handle_starttag(self, tag: str, raw_attributes: list[tuple[str, str | None]]) -> None:
+        attributes = dict(raw_attributes)
+        classes = self._classes(attributes)
+        is_void = tag in self._VOID_TAGS
+
+        if self._entry_depth and not is_void:
+            self._entry_depth += 1
+        elif tag == "section" and attributes.get("id") == "entry":
+            self._entry_depth = 1
+
+        if self._staff_depth and not is_void:
+            self._staff_depth += 1
+        elif tag == "section" and "EntryPage__content__section__staff" in classes:
+            self._staff_depth = 1
+
+        if self._tags_depth and not is_void:
+            self._tags_depth += 1
+        elif self._entry_depth and tag == "div" and "tags" in classes:
+            self._tags_depth = 1
+
+        if self._synopsis_depth and not is_void:
+            self._synopsis_depth += 1
+        elif self._entry_depth and tag == "div" and "synopsisManga" in classes:
+            self._synopsis_depth = 1
+
+        if self._staff_card_depth and not is_void:
+            self._staff_card_depth += 1
+        elif self._staff_depth and tag == "a" and "CharacterCard" in classes:
+            self._staff_card_depth = 1
+            self._staff_name = None
+            self._staff_role = None
+
+        if tag == "link" and (attributes.get("rel") or "").casefold() == "canonical":
+            self.canonical_url = urljoin(self.page_url, attributes.get("href") or "") or None
+        elif tag == "meta" and (attributes.get("property") or "").casefold() == "og:image":
+            self.cover_url = urljoin(self.page_url, attributes.get("content") or "") or None
+        elif tag == "h1" and (attributes.get("itemprop") or "").casefold() == "name":
+            self._begin_capture("title", tag)
+        elif tag == "h2" and "aka" in classes:
+            self._begin_capture("aliases", tag)
+        elif self._tags_depth and tag == "a" and "/manga/tags/" in (attributes.get("href") or ""):
+            self._tag_url = urljoin(self.page_url, attributes.get("href") or "")
+            self._begin_capture("tag", tag)
+        elif self._staff_card_depth and tag == "strong" and "CharacterCard__title" in classes:
+            self._begin_capture("staff-name", tag)
+        elif self._staff_card_depth and tag == "div" and "CharacterCard__body" in classes:
+            self._begin_capture("staff-role", tag)
+        elif (
+            self._entry_depth
+            and tag == "img"
+            and (attributes.get("itemprop") or "").casefold() == "image"
+            and not self.cover_url
+        ):
+            self.cover_url = urljoin(
+                self.page_url, attributes.get("src") or attributes.get("data-src") or ""
+            ) or None
+
+    def handle_data(self, data: str) -> None:
+        if self._capture:
+            self._text.append(data)
+        if self._synopsis_depth:
+            clean = data.strip()
+            if clean:
+                self._synopsis_text.append(clean)
+
+    def handle_endtag(self, tag: str) -> None:
+        if self._capture and tag == self._capture_tag:
+            value = " ".join("".join(self._text).split())
+            if self._capture == "title" and value:
+                self.title = value
+            elif self._capture == "aliases" and value:
+                aliases = value.split(":", 1)[1] if ":" in value else value
+                self.alternative_titles = split_comma_separated_titles(aliases)
+            elif self._capture == "tag" and value:
+                if not any(str(item.get("name") or "").casefold() == value.casefold() for item in self.tags):
+                    self.tags.append({"name": value, "description": None, "url": self._tag_url})
+                self._tag_url = None
+            elif self._capture == "staff-name" and value:
+                self._staff_name = value
+            elif self._capture == "staff-role" and value:
+                self._staff_role = value
+            self._capture = None
+            self._capture_tag = None
+            self._text = []
+
+        if self._staff_card_depth == 1:
+            if self._staff_name and self._staff_role:
+                self.staff.append((self._staff_name, self._staff_role))
+            self._staff_name = None
+            self._staff_role = None
+        if self._synopsis_depth == 1:
+            value = " ".join(self._synopsis_text).strip()
+            self.description = value or None
+            self._synopsis_text = []
+
+        if self._staff_card_depth:
+            self._staff_card_depth -= 1
+        if self._synopsis_depth:
+            self._synopsis_depth -= 1
+        if self._tags_depth:
+            self._tags_depth -= 1
+        if self._staff_depth:
+            self._staff_depth -= 1
+        if self._entry_depth:
+            self._entry_depth -= 1
+
+
+def extract_anime_planet_details_from_html(
+    html: str,
+    requested_url: str,
+    page_url: str,
+    content_type: str,
+) -> dict[str, Any]:
+    parser = AnimePlanetHtmlParser(page_url)
+    parser.feed(html)
+    parser.close()
+    if not parser.title or not parser.description:
+        raise ValueError("Anime-Planet page is missing the primary manga title or synopsis.")
+
+    genres = [tag for tag in parser.tags if str(tag.get("name") or "").casefold() in ANIME_PLANET_GENRES]
+    tags = [tag for tag in parser.tags if str(tag.get("name") or "").casefold() not in ANIME_PLANET_GENRES]
+    creator_staff = [
+        (index, staff, anime_planet_author_role_priority(staff[1]))
+        for index, staff in enumerate(parser.staff)
+        if anime_planet_author_role_priority(staff[1]) is not None
+    ]
+    ordered_staff = sorted(
+        creator_staff,
+        key=lambda item: (
+            item[2],
+            item[0],
+        ),
+    )
+    authors = list(dict.fromkeys(name for _, (name, _), _ in ordered_staff))
+    return {
+        "status": "ok",
+        "source": "Anime-Planet",
+        "contentType": content_type,
+        "requestedUrl": requested_url,
+        "pageUrl": page_url,
+        "canonicalUrl": parser.canonical_url or page_url,
+        "title": parser.title,
+        "genres": genres,
+        "tags": tags,
+        "authors": authors,
+        "staff": [{"name": name, "role": role} for name, role in parser.staff],
+        "description": parser.description,
+        "associatedTitles": parser.alternative_titles,
+        "coverSourceUrl": parser.cover_url,
+        "scrapedAt": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def extract_details(
+    page: Any,
+    requested_url: str,
+    content_type: str = NOVEL_CONTENT_TYPE,
+    html: str | None = None,
+) -> dict[str, Any]:
+    if is_host(requested_url, ANIME_PLANET_HOST):
+        return extract_anime_planet_details_from_html(
+            html if html is not None else page.content(), requested_url, page.url, content_type
+        )
+
     canonical = page.locator("link[rel='canonical']").first
     canonical_url = canonical.get_attribute("href") if canonical.count() else None
     title = locator_text(page, ".seriestitlenu") or locator_text(page, "h1")
@@ -567,6 +937,7 @@ def extract_details(page: Any, requested_url: str) -> dict[str, Any]:
     )
     return {
         "status": "ok",
+        "source": "NovelUpdates",
         "contentType": NOVEL_CONTENT_TYPE,
         "requestedUrl": requested_url,
         "pageUrl": page.url,
@@ -601,11 +972,13 @@ def save_captured_cover(
     page: Any,
     artifact_dir: Path,
     image_responses: list[Any],
+    source_url: str | None = None,
+    image_selector: str = "div.seriesimg img",
 ) -> dict[str, Any] | None:
-    image = page.locator("div.seriesimg img").first
+    image = page.locator(image_selector).first
     if image.count() == 0:
         return None
-    source_url = image.evaluate("element => element.currentSrc || element.src")
+    source_url = source_url or image.evaluate("element => element.currentSrc || element.src")
     if not source_url:
         return None
 
@@ -615,7 +988,6 @@ def save_captured_cover(
         if normalize_url(response.url) != normalize_url(source_url):
             continue
         try:
-            response.finished()
             candidate = response.body()
             if detect_image_type(candidate):
                 image_bytes = candidate
@@ -629,7 +1001,6 @@ def save_captured_cover(
         try:
             response = image_page.goto(source_url, referer=page.url, wait_until="commit", timeout=60_000)
             if response is not None:
-                response.finished()
                 candidate = response.body()
                 if detect_image_type(candidate):
                     image_bytes = candidate
@@ -702,7 +1073,104 @@ def detail_names(values: Iterable[Any]) -> list[str]:
     return names
 
 
-def merge_alternative_titles(row: dict[str, str], titles: Iterable[str], row_number: int) -> None:
+def normalize_title_match_key(value: str) -> str:
+    decomposed = unicodedata.normalize("NFKD", value.casefold())
+    return "".join(
+        character
+        for character in decomposed
+        if not unicodedata.combining(character) and character.isalnum()
+    )
+
+
+def title_match_distance(left: str, right: str, cutoff: int) -> int:
+    if len(left) > len(right):
+        left, right = right, left
+    if len(right) - len(left) > cutoff:
+        return cutoff + 1
+    previous = list(range(len(left) + 1))
+    for right_index, right_character in enumerate(right, start=1):
+        current = [right_index]
+        row_minimum = right_index
+        for left_index, left_character in enumerate(left, start=1):
+            current.append(
+                min(
+                    current[-1] + 1,
+                    previous[left_index] + 1,
+                    previous[left_index - 1] + (left_character != right_character),
+                )
+            )
+            row_minimum = min(row_minimum, current[-1])
+        if row_minimum > cutoff:
+            return cutoff + 1
+        previous = current
+    return previous[-1]
+
+
+def title_values_match(left: str, right: str) -> bool:
+    left_key = normalize_title_match_key(left)
+    right_key = normalize_title_match_key(right)
+    if not left_key or not right_key:
+        return False
+    if left_key == right_key:
+        return True
+    minimum_length = min(len(left_key), len(right_key))
+    maximum_length = max(len(left_key), len(right_key))
+    if minimum_length < 8:
+        return False
+    maximum_distance = 2 if maximum_length >= 16 else 1
+    distance = title_match_distance(left_key, right_key, maximum_distance)
+    return distance <= maximum_distance and 1 - distance / maximum_length >= 0.9
+
+
+def row_title_candidates(row: dict[str, str], row_number: int) -> list[str]:
+    candidates = [row.get("primaryTitle", "")]
+    for alternative in parse_json_array(
+        row.get("alternativeTitles", ""), "alternativeTitles", row_number
+    ):
+        candidates.append(str(alternative.get("Title") or alternative.get("title") or ""))
+    return list(dict.fromkeys(value.strip() for value in candidates if value.strip()))
+
+
+def details_title_candidates(details: dict[str, Any]) -> list[str]:
+    candidates = [str(details.get("title") or "")]
+    candidates.extend(str(value) for value in details.get("associatedTitles") or [])
+    return list(dict.fromkeys(value.strip() for value in candidates if value.strip()))
+
+
+def details_match_row_title(
+    row: dict[str, str], row_number: int, details: dict[str, Any]
+) -> bool:
+    expected = row_title_candidates(row, row_number)
+    actual = details_title_candidates(details)
+    return any(title_values_match(left, right) for left in expected for right in actual)
+
+
+def ask_retry_title_mismatch(expected: Iterable[str], actual: Iterable[str]) -> bool:
+    print("  Title mismatch.")
+    print(f"  Expected: {' | '.join(expected) or '(missing)'}")
+    print(f"  Found:    {' | '.join(actual) or '(missing)'}")
+    print(
+        "  Open the correct page in the visible browser, then choose 'r' to retry, "
+        "or 'c' to permanently skip it and continue with the next book."
+    )
+    while True:
+        try:
+            choice = input("  [r/c] > ").strip().casefold()
+        except EOFError:
+            choice = "c"
+        if choice in {"r", "retry"}:
+            return True
+        if choice in {"c", "continue"}:
+            return False
+        print("  Unknown command. Use 'r' (retry) or 'c' (continue).")
+
+
+def merge_alternative_titles(
+    row: dict[str, str],
+    titles: Iterable[str],
+    row_number: int,
+    source: str = "NovelUpdates",
+) -> None:
     alternatives = parse_json_array(row.get("alternativeTitles", ""), "alternativeTitles", row_number)
     known = {
         str(item.get("Title", "")).strip().casefold()
@@ -713,7 +1181,7 @@ def merge_alternative_titles(row: dict[str, str], titles: Iterable[str], row_num
     for title in titles:
         clean = title.strip()
         if clean and clean.casefold() not in known and clean.casefold() != primary_title:
-            alternatives.append({"Title": clean, "Language": None, "Source": "NovelUpdates"})
+            alternatives.append({"Title": clean, "Language": None, "Source": source})
             known.add(clean.casefold())
     row["alternativeTitles"] = json.dumps(alternatives, ensure_ascii=False, separators=(",", ":"))
 
@@ -738,9 +1206,14 @@ def apply_details_to_row(
     row["tags"] = merge_semicolon_values(
         row.get("tags", ""), detail_names(details.get("tags", []))
     )
-    merge_alternative_titles(row, details.get("associatedTitles", []), row_number)
     canonical_url = details.get("canonicalUrl")
-    if isinstance(canonical_url, str) and is_host(canonical_url, NOVELUPDATES_HOST):
+    requested_url = str(details.get("requestedUrl") or "")
+    if not requested_url and isinstance(canonical_url, str) and is_supported_details_url(canonical_url):
+        requested_url = canonical_url
+    source = source_for_url(requested_url)[0] if is_supported_details_url(requested_url) else "Scraper"
+    merge_alternative_titles(row, details.get("associatedTitles", []), row_number, source)
+    expected_host = urlparse(requested_url).hostname or ""
+    if isinstance(canonical_url, str) and expected_host and is_host(canonical_url, expected_host):
         upsert_details_link(row, row_number, canonical_url, prefer_existing=False)
 
 
@@ -751,7 +1224,9 @@ def write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def is_skipped_status(value: Any) -> bool:
-    return isinstance(value, str) and "skipped" in value.casefold()
+    return isinstance(value, str) and any(
+        marker in value.casefold() for marker in ("skipped", "continued")
+    )
 
 
 def find_skipped_artifacts(artifacts_dir: Path) -> list[dict[str, Any]]:
@@ -1015,6 +1490,45 @@ def scrape_rows(
             "python -m pip install -r tools/requirements-novelupdates-scraper.txt"
         ) from exception
 
+    arguments.artifacts_dir.mkdir(parents=True, exist_ok=True)
+    pending_jobs: list[tuple[int, dict[str, str], str, Path]] = []
+    cached_count = 0
+    terminal_skip_count = 0
+    for row_number, row, details_url in ordered_scrape_jobs(rows, urls, arguments.mode):
+        if row_number < arguments.start_row:
+            continue
+        title = row.get("primaryTitle", "").strip() or f"row {row_number}"
+        artifact_dir = resolve_artifact_directory(
+            arguments.artifacts_dir, row_number, title, details_url
+        )
+        details_path = artifact_dir / "details.json"
+        if details_path.is_file():
+            try:
+                existing_details = json.loads(details_path.read_text(encoding="utf-8"))
+                if is_skipped_status(existing_details.get("status")):
+                    terminal_skip_count += 1
+                    continue
+                if existing_details.get("status") == "ok" and not arguments.force:
+                    apply_details_to_row(
+                        row, row_number, existing_details, arguments.overwrite_existing
+                    )
+                    cached_count += 1
+                    continue
+            except (OSError, json.JSONDecodeError, ValueError):
+                pass
+        pending_jobs.append((row_number, row, details_url, artifact_dir))
+
+    if cached_count:
+        write_rows_atomic(output_csv, rows, fieldnames, delimiter)
+    if arguments.limit is not None:
+        pending_jobs = pending_jobs[: arguments.limit]
+    print(
+        f"Checkpoints: cached={cached_count}, terminal-skipped={terminal_skip_count}, "
+        f"pending={len(pending_jobs)}"
+    )
+    if not pending_jobs:
+        return
+
     browser_process: subprocess.Popen[Any] | None = None
     endpoint = arguments.cdp_url
     if not endpoint:
@@ -1024,8 +1538,6 @@ def scrape_rows(
     else:
         wait_for_cdp(endpoint, None)
 
-    arguments.artifacts_dir.mkdir(parents=True, exist_ok=True)
-    visited = 0
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.connect_over_cdp(endpoint, timeout=30_000)
@@ -1043,53 +1555,44 @@ def scrape_rows(
                     pass
 
             page.on("response", remember_image_response)
-            for row_number, (row, details_url) in enumerate(zip(rows, urls, strict=True), start=1):
-                if row_number < arguments.start_row or not is_host(details_url, NOVELUPDATES_HOST):
-                    continue
+            job_queue = deque(pending_jobs)
+            while job_queue:
+                row_number, row, details_url, artifact_dir = job_queue.popleft()
                 title = row.get("primaryTitle", "").strip() or f"row {row_number}"
-                artifact_dir = arguments.artifacts_dir / safe_directory_name(row_number, title, details_url)
+                content_type = row.get("contentType", "").strip() or "Manga"
+                expected_host = urlparse(details_url).hostname or ""
+                source_name = source_for_url(details_url)[0]
                 artifact_dir.mkdir(parents=True, exist_ok=True)
                 details_path = artifact_dir / "details.json"
-                if details_path.is_file():
-                    try:
-                        existing_details = json.loads(details_path.read_text(encoding="utf-8"))
-                        if is_skipped_status(existing_details.get("status")):
-                            print(f"[{row_number}/{len(rows)}] Terminal skip: {title}")
-                            continue
-                        if existing_details.get("status") == "ok" and not arguments.force:
-                            apply_details_to_row(
-                                row, row_number, existing_details, arguments.overwrite_existing
-                            )
-                            write_rows_atomic(output_csv, rows, fieldnames, delimiter)
-                            print(f"[{row_number}/{len(rows)}] Resume: {title}")
-                            continue
-                    except (OSError, json.JSONDecodeError, ValueError):
-                        pass
-
-                if arguments.limit is not None and visited >= arguments.limit:
-                    break
-                visited += 1
-
-                print(f"[{row_number}/{len(rows)}] {title}\n  {details_url}")
+                print(f"[{row_number}/{len(rows)}] {content_type} · {title}\n  {details_url}")
                 image_responses.clear()
                 try:
+                    navigation_timed_out = False
                     try:
-                        page.goto(details_url, wait_until="domcontentloaded", timeout=60_000)
+                        page.goto(details_url, wait_until="commit", timeout=10_000)
                     except PlaywrightTimeoutError:
-                        print("  Navigation timed out; checking the visible page state.")
+                        navigation_timed_out = True
+                        print("  Navigation was not recognized within 10 seconds.")
 
-                    page_state = wait_for_series_page(page, arguments.challenge_timeout)
+                    page_state = (
+                        "unrecognized"
+                        if navigation_timed_out
+                        else wait_for_series_page(
+                            page, arguments.challenge_timeout, expected_host
+                        )
+                    )
                     manually_skipped = False
-                    if page_state == "not-found":
+                    if page_state != "ready":
                         manually_skipped = not wait_for_manual_page_correction(
-                            page, arguments.challenge_timeout
+                            page, arguments.challenge_timeout, expected_host
                         )
                         page_state = "ready" if not manually_skipped else "manually-skipped"
 
                     if page_state != "ready":
                         failure = {
                             "status": page_state,
-                            "contentType": NOVEL_CONTENT_TYPE,
+                            "contentType": content_type,
+                            "source": source_name,
                             "requestedUrl": details_url,
                             "pageUrl": page.url,
                             "title": title,
@@ -1097,13 +1600,13 @@ def scrape_rows(
                         }
                         write_json(details_path, failure)
                         if page_state == "manually-skipped":
-                            print("  Saved as a terminal skip; later runs will leave it untouched.")
+                            print("  Permanently skipped. Later runs will ignore this book.")
                         else:
-                            print("  No NovelUpdates series content found; saved failure details.")
+                            print(f"  No {source_name} details content found; saved failure details.")
                         if arguments.delay_max > 0:
                             delay = random.uniform(arguments.delay_min, arguments.delay_max)
                             print(f"  Waiting {delay:.1f}s")
-                            page.wait_for_timeout(round(delay * 1000))
+                            time.sleep(delay)
                         continue
 
                     try:
@@ -1112,11 +1615,82 @@ def scrape_rows(
                         pass
                     page.wait_for_timeout(750)
                     html = page.content()
+                    details = extract_details(page, details_url, content_type, html)
+                    continued_after_mismatch = False
+                    if not details_match_row_title(row, row_number, details):
+                        (artifact_dir / "mismatch.html").write_text(html, encoding="utf-8")
+                        retry = ask_retry_title_mismatch(
+                            row_title_candidates(row, row_number),
+                            details_title_candidates(details),
+                        )
+                        if not retry:
+                            write_json(
+                                details_path,
+                                {
+                                    "status": "skipped-title-mismatch",
+                                    "contentType": content_type,
+                                    "source": source_name,
+                                    "requestedUrl": details_url,
+                                    "pageUrl": page.url,
+                                    "title": title,
+                                    "expectedTitles": row_title_candidates(row, row_number),
+                                    "foundTitles": details_title_candidates(details),
+                                    "scrapedAt": datetime.now(timezone.utc).isoformat(),
+                                },
+                            )
+                            print("  Permanently skipped. Later runs will ignore this book.")
+                            continued_after_mismatch = True
+                        else:
+                            page_state = wait_for_series_page(
+                                page, arguments.challenge_timeout, expected_host
+                            )
+                            if page_state != "ready":
+                                corrected = wait_for_manual_page_correction(
+                                    page, arguments.challenge_timeout, expected_host
+                                )
+                                if not corrected:
+                                    write_json(
+                                        details_path,
+                                        {
+                                            "status": "skipped-title-mismatch",
+                                            "contentType": content_type,
+                                            "source": source_name,
+                                            "requestedUrl": details_url,
+                                            "pageUrl": page.url,
+                                            "title": title,
+                                            "scrapedAt": datetime.now(timezone.utc).isoformat(),
+                                        },
+                                    )
+                                    print("  Permanently skipped. Later runs will ignore this book.")
+                                    continued_after_mismatch = True
+                            if not continued_after_mismatch:
+                                html = page.content()
+                                details = extract_details(
+                                    page, details_url, content_type, html
+                                )
+                                print(
+                                    "  Manual selection accepted without title matching: "
+                                    f"{details.get('title') or page.url}"
+                                )
+
+                    if continued_after_mismatch:
+                        continue
+
                     (artifact_dir / "page.html").write_text(html, encoding="utf-8")
-                    details = extract_details(page, details_url)
                     cover = None
                     try:
-                        cover = save_captured_cover(context, page, artifact_dir, image_responses)
+                        cover = save_captured_cover(
+                            context,
+                            page,
+                            artifact_dir,
+                            image_responses,
+                            details.get("coverSourceUrl"),
+                            (
+                                "#entry .mainEntry img[itemprop='image']"
+                                if is_host(details_url, ANIME_PLANET_HOST)
+                                else "div.seriesimg img"
+                            ),
+                        )
                     except (PlaywrightError, OSError, ValueError) as cover_exception:
                         details["coverError"] = str(cover_exception)
                         print(f"  Cover capture failed: {cover_exception}")
@@ -1130,9 +1704,14 @@ def scrape_rows(
                         f"{len(details['authors'])} authors, cover={'yes' if cover else 'no'}"
                     )
                 except (PlaywrightError, OSError, ValueError, TimeoutError) as exception:
+                    if ask_retry_after_error(exception):
+                        job_queue.appendleft((row_number, row, details_url, artifact_dir))
+                        print("  Retrying now.")
+                        continue
                     failure = {
-                        "status": "error",
-                        "contentType": NOVEL_CONTENT_TYPE,
+                        "status": "manually-skipped-error",
+                        "contentType": content_type,
+                        "source": source_name,
                         "requestedUrl": details_url,
                         "pageUrl": page.url,
                         "title": title,
@@ -1140,12 +1719,12 @@ def scrape_rows(
                         "scrapedAt": datetime.now(timezone.utc).isoformat(),
                     }
                     write_json(details_path, failure)
-                    print(f"  ERROR: {exception}")
+                    print("  Permanently skipped. Later runs will ignore this book.")
 
                 if arguments.delay_max > 0:
                     delay = random.uniform(arguments.delay_min, arguments.delay_max)
                     print(f"  Waiting {delay:.1f}s")
-                    page.wait_for_timeout(round(delay * 1000))
+                    time.sleep(delay)
 
             browser.close()
     finally:
@@ -1246,9 +1825,18 @@ def main() -> int:
         rows, fieldnames, delimiter = read_rows(input_path)
         urls = prepare_links(rows)
         write_rows_atomic(output_csv, rows, fieldnames, delimiter)
-        novel_count = sum(is_host(url, NOVELUPDATES_HOST) for url in urls)
         print(f"Prepared {len(rows)} rows with details links: {output_csv}")
-        print(f"NovelUpdates rows to scrape: {novel_count}")
+        selected_types = (
+            (NOVEL_CONTENT_TYPE,) if arguments.mode == "novel" else COMIC_CONTENT_TYPES
+        )
+        for content_type in selected_types:
+            count = sum(
+                row.get("contentType", "").strip().casefold() == content_type.casefold()
+                for row in rows
+            )
+            if count:
+                source = "NovelUpdates" if content_type == NOVEL_CONTENT_TYPE else "Anime-Planet"
+                print(f"{source} {content_type} rows: {count}")
         if arguments.prepare_only:
             return 0
         scrape_rows(arguments, rows, urls, fieldnames, delimiter, output_csv)
