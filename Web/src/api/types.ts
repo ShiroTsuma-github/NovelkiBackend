@@ -122,6 +122,17 @@ export type BookListItemDto = {
   linksCount: number
 }
 
+export type ManagedBookListingDto = {
+  id: string
+  sourceBookId: string
+  snapshotAt: string
+}
+
+export type ManagedBookListItemDto = {
+  book: BookListItemDto
+  listing?: ManagedBookListingDto | null
+}
+
 export type BookSummaryDto = {
   totalBooks: number
   ratedBooks: number

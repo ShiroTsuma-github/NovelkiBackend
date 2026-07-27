@@ -17,8 +17,7 @@ vi.mock('@/api/client', () => ({
     updateAuthor: vi.fn(),
     updateAuthorVisibility: vi.fn(),
     deleteAuthor: vi.fn(),
-    getBooks: vi.fn(),
-    searchPublicBooks: vi.fn(),
+    getManagedBooks: vi.fn(),
     publishBook: vi.fn(),
     refreshPublishedBook: vi.fn(),
     unlistPublishedBook: vi.fn(),
@@ -84,6 +83,15 @@ const managedBooks = [
   },
 ]
 
+const managedBookRows = managedBooks.map((book, index) => ({
+  book,
+  listing: index === 0 ? {
+    id: publishedBook.id,
+    sourceBookId: book.id,
+    snapshotAt: publishedBook.snapshotAt,
+  } : null,
+}))
+
 describe('ManagePage', () => {
   beforeEach(() => {
     vi.mocked(api.searchTags).mockReset().mockResolvedValue([tag])
@@ -95,8 +103,7 @@ describe('ManagePage', () => {
     vi.mocked(api.updateAuthor).mockReset().mockResolvedValue(author)
     vi.mocked(api.updateAuthorVisibility).mockReset().mockResolvedValue(author)
     vi.mocked(api.deleteAuthor).mockReset().mockResolvedValue(undefined)
-    vi.mocked(api.getBooks).mockReset().mockResolvedValue(paginated(managedBooks))
-    vi.mocked(api.searchPublicBooks).mockReset().mockResolvedValue(paginated([publishedBook]))
+    vi.mocked(api.getManagedBooks).mockReset().mockResolvedValue(paginated(managedBookRows))
     vi.mocked(api.publishBook).mockReset().mockResolvedValue(publishedBook)
     vi.mocked(api.refreshPublishedBook).mockReset().mockResolvedValue(publishedBook)
     vi.mocked(api.unlistPublishedBook).mockReset().mockResolvedValue(undefined)
@@ -241,12 +248,12 @@ describe('ManagePage', () => {
     await user.click(screen.getByRole('tab', { name: 'Books' }))
     await user.type(screen.getByPlaceholderText(/-tag:dropped/i), '-rating:8 -genre:romance')
 
-    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({
+    await waitFor(() => expect(api.getManagedBooks).toHaveBeenLastCalledWith(expect.objectContaining({
       query: '-rating:8 -genre:romance',
     })))
   })
 
-  it('keeps listed books first, sorts the rest, and blocks incomplete listings', async () => {
+  it('renders the server order and blocks incomplete listings', async () => {
     const incomplete = {
       ...bookListItems[1],
       id: 'incomplete-book',
@@ -259,7 +266,11 @@ describe('ManagePage', () => {
       tagsCount: 0,
       cover: null,
     }
-    vi.mocked(api.getBooks).mockResolvedValue(paginated([incomplete, ...managedBooks]))
+    vi.mocked(api.getManagedBooks).mockResolvedValue(paginated([
+      managedBookRows[0],
+      { book: incomplete, listing: null },
+      managedBookRows[1],
+    ]))
     renderWithProviders(<ManagePage />)
 
     await userEvent.click(screen.getByRole('tab', { name: 'Books' }))
@@ -270,6 +281,26 @@ describe('ManagePage', () => {
       'title',
       expect.stringContaining('description'),
     )
+  })
+
+  it('preserves the listed-first alphabetical order returned by the backend', async () => {
+    const privateA = { ...managedBooks[0], id: 'private-a', primaryTitle: 'A private' }
+    const privateB = { ...managedBooks[0], id: 'private-b', primaryTitle: 'B private' }
+    const listedC = { ...managedBooks[0], id: 'listed-c', primaryTitle: 'C listed' }
+    const listedZ = { ...managedBooks[0], id: 'listed-z', primaryTitle: 'Z listed' }
+    vi.mocked(api.getManagedBooks).mockResolvedValue(paginated([
+      { book: listedC, listing: { id: 'snapshot-c', sourceBookId: listedC.id, snapshotAt: publishedBook.snapshotAt } },
+      { book: listedZ, listing: { id: 'snapshot-z', sourceBookId: listedZ.id, snapshotAt: publishedBook.snapshotAt } },
+      { book: privateA, listing: null },
+      { book: privateB, listing: null },
+    ]))
+    renderWithProviders(<ManagePage />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Books' }))
+    const list = await screen.findByLabelText('Books')
+    const titles = Array.from(list.querySelectorAll('.manage-item__body strong'), (title) => title.textContent)
+
+    expect(titles).toEqual(['C listed', 'Z listed', 'A private', 'B private'])
   })
 
   it('allows listing when a legacy cover has a stored image despite a stale NotFound status', async () => {
@@ -284,7 +315,7 @@ describe('ManagePage', () => {
         thumbnailImageUrl: '/api/book/legacy/cover/thumbnail',
       },
     }
-    vi.mocked(api.getBooks).mockResolvedValue(paginated([legacyCoverBook]))
+    vi.mocked(api.getManagedBooks).mockResolvedValue(paginated([{ book: legacyCoverBook, listing: null }]))
     const user = userEvent.setup()
     renderWithProviders(<ManagePage />)
 
@@ -295,38 +326,81 @@ describe('ManagePage', () => {
     await waitFor(() => expect(api.publishBook).toHaveBeenCalledWith(legacyCoverBook.id))
   })
 
-  it('fetches further library books on scroll and all listing pages automatically', async () => {
-    const laterBook = { ...managedBooks[1], id: 'later-book', primaryTitle: 'Later book' }
+  it('loads the next already-sorted manage page when the list reaches the bottom', async () => {
+    const laterBook = {
+      ...managedBooks[1],
+      id: publishedBook.sourceBookId,
+      primaryTitle: 'A later listed book',
+    }
     const firstLibraryPage = Array.from({ length: 50 }, (_, index) => ({
       ...managedBooks[index % managedBooks.length],
       id: `book-${index}`,
       primaryTitle: `Book ${index.toString().padStart(2, '0')}`,
     }))
-    vi.mocked(api.getBooks).mockImplementation(async ({ skip = 0 }) => skip === 0
-      ? { skip: 0, take: 50, total: 51, data: firstLibraryPage }
-      : { skip: 50, take: 50, total: 51, data: [laterBook] })
-    const firstListingPage = Array.from({ length: 50 }, (_, index) => ({
-      ...publishedBook,
-      id: `snapshot-${index}`,
-      sourceBookId: `source-${index}`,
-    }))
-    vi.mocked(api.searchPublicBooks).mockImplementation(async ({ skip = 0 }) => skip === 0
-      ? { skip: 0, take: 50, total: 51, data: firstListingPage }
-      : { skip: 50, take: 50, total: 51, data: [publishedBook] })
-    const user = userEvent.setup()
+    const nextPageResult = {
+      skip: 50,
+      take: 50,
+      total: 51,
+      data: [{
+        book: laterBook,
+        listing: {
+          id: publishedBook.id,
+          sourceBookId: laterBook.id,
+          snapshotAt: publishedBook.snapshotAt,
+        },
+      }],
+    }
+    let resolveNextPage!: (result: typeof nextPageResult) => void
+    const nextPage = new Promise<typeof nextPageResult>((resolve) => {
+      resolveNextPage = resolve
+    })
+    vi.mocked(api.getManagedBooks).mockImplementation(async ({ skip = 0 }) => skip === 0
+      ? { skip: 0, take: 50, total: 51, data: firstLibraryPage.map((book) => ({ book, listing: null })) }
+      : nextPage)
     renderWithProviders(<ManagePage />)
 
-    await user.click(screen.getByRole('tab', { name: 'Books' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Books' }))
     const list = await screen.findByLabelText('Books')
     Object.defineProperties(list, {
-      clientHeight: { configurable: true, value: 300 },
-      scrollHeight: { configurable: true, value: 900 },
-      scrollTop: { configurable: true, value: 560 },
+      scrollHeight: { configurable: true, value: 1000 },
+      scrollTop: { configurable: true, value: 850 },
+      clientHeight: { configurable: true, value: 100 },
+    })
+    fireEvent.scroll(list)
+    fireEvent.scroll(list)
+    fireEvent.scroll(list)
+
+    await waitFor(() => expect(api.getManagedBooks).toHaveBeenCalledWith({
+      skip: 50,
+      take: 50,
+      query: undefined,
+    }))
+    expect(api.getManagedBooks).toHaveBeenCalledTimes(2)
+    resolveNextPage(nextPageResult)
+    expect(await screen.findByText('A later listed book')).toBeInTheDocument()
+  })
+
+  it('does not render a book twice when adjacent pages overlap', async () => {
+    const repeated = managedBookRows[0]
+    vi.mocked(api.getManagedBooks).mockImplementation(async ({ skip = 0 }) => skip === 0
+      ? { skip: 0, take: 1, total: 2, data: [repeated] }
+      : { skip: 1, take: 1, total: 2, data: [repeated] })
+    renderWithProviders(<ManagePage />)
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Books' }))
+    const list = await screen.findByLabelText('Books')
+    Object.defineProperties(list, {
+      scrollHeight: { configurable: true, value: 1000 },
+      scrollTop: { configurable: true, value: 850 },
+      clientHeight: { configurable: true, value: 100 },
     })
     fireEvent.scroll(list)
 
-    await waitFor(() => expect(api.getBooks).toHaveBeenCalledWith(expect.objectContaining({ skip: 50, take: 50 })))
-    expect(await screen.findByText('Later book')).toBeInTheDocument()
-    await waitFor(() => expect(api.searchPublicBooks).toHaveBeenCalledWith({ skip: 50, take: 50, mineOnly: true }))
+    await waitFor(() => expect(api.getManagedBooks).toHaveBeenCalledWith({
+      skip: 1,
+      take: 50,
+      query: undefined,
+    }))
+    expect(screen.getAllByText(repeated.book.primaryTitle)).toHaveLength(1)
   })
 })

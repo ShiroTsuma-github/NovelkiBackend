@@ -16,6 +16,7 @@ import type {
   BookImportSessionDto,
   BookMutationRequest,
   BookHtmlParseResult,
+  ManagedBookListItemDto,
   DictionaryMutationRequest,
   DictionaryDto,
   BookSummaryDto,
@@ -61,6 +62,8 @@ export const api = {
     }),
   getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string; advanceCycle?: boolean }) =>
     apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(withFilteredQuery(params))}`),
+  getManagedBooks: (params: { skip?: number; take?: number; query?: string }) =>
+    apiRequest<PaginatedResult<ManagedBookListItemDto>>(`/book/manage${toQueryString(withFilteredQuery(params))}`),
   getBooksSummary: (params: { query?: string }) =>
     apiRequest<BookSummaryDto>(`/book/summary${toQueryString(withFilteredQuery(params))}`),
   getBookAnalytics: (params: { query?: string; from?: string; to?: string; bucket?: string }) =>
@@ -121,9 +124,10 @@ export const api = {
   deleteBook: (id: string) =>
     apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
   searchPublicBooks: (params: { search?: string; skip?: number; take?: number; mineOnly?: boolean }) =>
-    apiRequest<PaginatedResult<PublicBookSnapshotDto>>(
-      `/public-book${toQueryString({ ...params, search: withNsfwBookFilter(params.search) })}`,
-    ),
+    apiRequest<PaginatedResult<PublicBookSnapshotDto>>(`/public-book${toQueryString({
+      ...params,
+      search: withNsfwBookFilter(params.search),
+    })}`),
   publishBook: (bookId: string) =>
     apiRequest<PublicBookSnapshotDto>(`/public-book/source/${bookId}`, { method: 'POST' }),
   refreshPublishedBook: (snapshotId: string) =>

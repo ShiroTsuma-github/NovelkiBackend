@@ -15,6 +15,8 @@ import {
 import { PageHeader, Surface } from '@/components/app/DesignSystem'
 import { BookDataTable } from './BookDataTable'
 import { BookCoverArtwork } from './BookCoverSection'
+import { isLowRating } from './bookRating'
+import { BookStatusPill } from './BookStatusPill'
 import { formatProgress } from './bookProgress'
 import { saveBookListScrollPosition, takeBookListScrollPosition } from './bookListNavigation'
 import {
@@ -760,7 +762,7 @@ function BookCardGrid({
               {hasCardField(fields, 'rating') && book.rating != null ? (
                 <span
                   aria-label={`Rating ${book.rating} out of 10`}
-                  className="book-card-rating absolute right-3 top-3"
+                  className={`book-card-rating absolute right-3 top-3 ${isLowRating(book.rating) ? 'book-card-rating--low' : ''}`}
                 >
                   <Star aria-hidden="true" className="book-card-rating__star h-3.5 w-3.5" />
                   <span className="book-card-rating__value">{book.rating}</span>
@@ -768,9 +770,11 @@ function BookCardGrid({
                 </span>
               ) : null}
               {hasCardField(fields, 'status') ? (
-                <span className={`absolute bottom-3 right-3 inline-flex min-w-0 max-w-[calc(100%-1.5rem)] items-center overflow-hidden rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${getStatusBadgeClass(book.status)}`}>
-                  <span className="min-w-0 max-w-full truncate" title={book.status}>{book.status}</span>
-                </span>
+                <BookStatusPill
+                  className="absolute bottom-3 right-3 min-w-0 max-w-[calc(100%-1.5rem)]"
+                  status={book.status}
+                  variant="card"
+                />
               ) : null}
             </div>
             <div className={`grid min-w-0 max-w-full gap-1 overflow-hidden p-3 ${cardDetailsClass}`}>
@@ -1026,9 +1030,13 @@ function normalizeCardsPerRow(value: number) {
 
 export function getCardPageSizeOptions(cardsPerRow: number) {
   const normalizedCardsPerRow = normalizeCardsPerRow(cardsPerRow)
-  return [...new Set(bookListPageSizeOptions.map((pageSize) => (
-    Math.ceil(pageSize / normalizedCardsPerRow) * normalizedCardsPerRow
-  )))]
+  const maximumPageSize = Math.max(...bookListPageSizeOptions)
+  return [...new Set(bookListPageSizeOptions.map((pageSize) => {
+    const roundedUp = Math.ceil(pageSize / normalizedCardsPerRow) * normalizedCardsPerRow
+    return roundedUp <= maximumPageSize
+      ? roundedUp
+      : Math.floor(maximumPageSize / normalizedCardsPerRow) * normalizedCardsPerRow
+  }))]
 }
 
 export function getClosestPageSize(pageSize: number, options: readonly number[]) {
@@ -1050,27 +1058,6 @@ function getDesktopCardsPerRowClass(cardsPerRow: number) {
   }
 
   return classMap[normalized]
-}
-
-function getStatusBadgeClass(status: string) {
-  const normalized = status.trim().toLowerCase()
-  if (normalized === 'reading') {
-    return 'border-indigo-900/80 bg-indigo-600/95 text-white'
-  }
-  if (normalized === 'completed') {
-    return 'book-card-status--completed'
-  }
-  if (normalized === 'plan to read') {
-    return 'border-amber-900/80 bg-amber-400/95 text-slate-950'
-  }
-  if (normalized === 'on hold') {
-    return 'border-violet-900/80 bg-violet-600/95 text-white'
-  }
-  if (normalized === 'dropped') {
-    return 'border-rose-900/80 bg-rose-600/95 text-white'
-  }
-
-  return 'border-slate-700/80 bg-slate-300/95 text-slate-950'
 }
 
 export function formatAverageRating(value?: number | null) {

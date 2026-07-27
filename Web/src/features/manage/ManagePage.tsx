@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent 
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
-import type { AuthorDto, BookListItemDto, PublicBookSnapshotDto, TagDto } from '@/api/types'
+import type { AuthorDto, BookListItemDto, ManagedBookListItemDto, ManagedBookListingDto, TagDto } from '@/api/types'
 import { Badge, buttonVariants, controlClass, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { cn } from '@/lib/utils'
 
@@ -35,7 +35,7 @@ export function ManagePage() {
   const libraryBooks = useInfiniteQuery({
     queryKey: ['manage-books', debouncedSearch],
     initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.getBooks({
+    queryFn: ({ pageParam }) => api.getManagedBooks({
       skip: pageParam,
       take: 50,
       query: debouncedSearch || undefined,
@@ -47,24 +47,6 @@ export function ManagePage() {
     enabled: section === 'books',
   })
 
-  const publishedBooks = useInfiniteQuery({
-    queryKey: ['public-books', 'mine'],
-    initialPageParam: 0,
-    queryFn: ({ pageParam }) => api.searchPublicBooks({ skip: pageParam, take: 50, mineOnly: true }),
-    getNextPageParam: (lastPage) => {
-      const nextSkip = lastPage.skip + lastPage.data.length
-      return nextSkip < lastPage.total ? nextSkip : undefined
-    },
-    enabled: section === 'books',
-  })
-
-  useEffect(() => {
-    if (section === 'books' && publishedBooks.hasNextPage && !publishedBooks.isFetchingNextPage) {
-      void publishedBooks.fetchNextPage()
-    }
-  }, [publishedBooks.data?.pages.length, publishedBooks.fetchNextPage, publishedBooks.hasNextPage,
-    publishedBooks.isFetchingNextPage, section])
-
   function changeSection(next: ManageSection) {
     setSection(next)
     setSearch('')
@@ -72,9 +54,13 @@ export function ManagePage() {
   }
 
   const libraryBookPages = libraryBooks.data?.pages ?? []
-  const publishedBookPages = publishedBooks.data?.pages ?? []
-  const libraryBookItems = libraryBookPages.flatMap((page) => page.data)
-  const publishedBookItems = publishedBookPages.flatMap((page) => page.data)
+  const libraryBookItems = Array.from(
+    new Map(
+      libraryBookPages
+        .flatMap((page) => page.data)
+        .map((item) => [item.book.id, item] as const),
+    ).values(),
+  )
   const itemCount = section === 'books' ? libraryBookPages[0]?.total ?? 0 : results.data?.length ?? 0
 
   async function runBookAction(bookId: string, action: () => Promise<unknown>, success: string) {
@@ -83,8 +69,8 @@ export function ManagePage() {
       await action()
       toast.success(success)
       await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['manage-books'] }),
         queryClient.invalidateQueries({ queryKey: ['public-books'] }),
-        queryClient.invalidateQueries({ queryKey: ['manage-metadata'] }),
       ])
     } catch (error) {
       toast.error(getErrorMessage(error))
@@ -174,17 +160,16 @@ export function ManagePage() {
           {section === 'books' ? (
             <ManagedBooks
               actionId={bookActionId}
-              books={libraryBookItems}
-              error={libraryBooks.isError || publishedBooks.isError}
-              hasMore={libraryBooks.hasNextPage}
-              loading={libraryBooks.isPending || publishedBooks.isPending}
+              error={libraryBooks.isError}
+              hasMore={Boolean(libraryBooks.hasNextPage)}
+              items={libraryBookItems}
+              loading={libraryBooks.isPending}
               loadingMore={libraryBooks.isFetchingNextPage}
-              published={publishedBookItems}
               search={search}
-              onLoadMore={() => void libraryBooks.fetchNextPage()}
+              onLoadMore={() => void libraryBooks.fetchNextPage({ cancelRefetch: false })}
               onPublish={(book) => runBookAction(book.id, () => api.publishBook(book.id), `“${book.primaryTitle}” is now listed.`)}
-              onRefresh={(snapshot) => runBookAction(snapshot.sourceBookId, () => api.refreshPublishedBook(snapshot.id), `“${snapshot.primaryTitle}” snapshot refreshed.`)}
-              onUnlist={(snapshot) => runBookAction(snapshot.sourceBookId, () => api.unlistPublishedBook(snapshot.id), `“${snapshot.primaryTitle}” was unlisted.`)}
+              onRefresh={(listing, book) => runBookAction(book.id, () => api.refreshPublishedBook(listing.id), `“${book.primaryTitle}” snapshot refreshed.`)}
+              onUnlist={(listing, book) => runBookAction(book.id, () => api.unlistPublishedBook(listing.id), `“${book.primaryTitle}” was unlisted.`)}
             />
           ) : results.isError ? (
             <div className="manage-state manage-state--error">Could not load {section}. Try again.</div>
@@ -208,9 +193,8 @@ export function ManagePage() {
   )
 }
 
-function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMore, error, search, onLoadMore, onPublish, onRefresh, onUnlist }: {
-  books: BookListItemDto[]
-  published: PublicBookSnapshotDto[]
+function ManagedBooks({ items, actionId, loading, loadingMore, hasMore, error, search, onLoadMore, onPublish, onRefresh, onUnlist }: {
+  items: ManagedBookListItemDto[]
   actionId: string | null
   loading: boolean
   loadingMore: boolean
@@ -219,12 +203,12 @@ function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMor
   search: string
   onLoadMore: () => void
   onPublish: (book: BookListItemDto) => void
-  onRefresh: (snapshot: PublicBookSnapshotDto) => void
-  onUnlist: (snapshot: PublicBookSnapshotDto) => void
+  onRefresh: (listing: ManagedBookListingDto, book: BookListItemDto) => void
+  onUnlist: (listing: ManagedBookListingDto, book: BookListItemDto) => void
 }) {
   if (error) return <div className="manage-state manage-state--error">Could not load your book listings. Try again.</div>
   if (loading) return <div className="manage-state">Loading your books…</div>
-  if (books.length === 0) {
+  if (items.length === 0) {
     return (
       <div className="manage-state">
         <span>No books found.</span>
@@ -233,14 +217,6 @@ function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMor
     )
   }
 
-  const snapshotByBookId = new Map(published.map((snapshot) => [snapshot.sourceBookId, snapshot]))
-  const sortedBooks = [...books].sort((left, right) => {
-    const listingOrder = Number(snapshotByBookId.has(right.id)) - Number(snapshotByBookId.has(left.id))
-    return listingOrder || left.primaryTitle.localeCompare(right.primaryTitle, undefined, {
-      sensitivity: 'base',
-      numeric: true,
-    })
-  })
   return (
     <div
       aria-busy={loadingMore}
@@ -254,8 +230,7 @@ function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMor
         }
       }}
     >
-      {sortedBooks.map((book) => {
-        const snapshot = snapshotByBookId.get(book.id)
+      {items.map(({ book, listing }) => {
         const busy = actionId === book.id
         const missingRequirements = getMissingListingRequirements(book)
         const canPublish = missingRequirements.length === 0
@@ -264,10 +239,10 @@ function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMor
             <span className="manage-item__icon"><BookOpen className="h-4 w-4" /></span>
             <span className="manage-item__body">
               <strong>{book.primaryTitle}</strong>
-              <small>{book.author || 'Unknown author'} · {book.contentType}{snapshot ? ` · Snapshot ${new Date(snapshot.snapshotAt).toLocaleDateString()}` : ''}</small>
+              <small>{book.author || 'Unknown author'} · {book.contentType}{listing ? ` · Snapshot ${new Date(listing.snapshotAt).toLocaleDateString()}` : ''}</small>
             </span>
-            <Badge tone={snapshot ? 'success' : 'neutral'}>{snapshot ? 'Listed' : 'Private'}</Badge>
-            {snapshot ? (
+            <Badge tone={listing ? 'success' : 'neutral'}>{listing ? 'Listed' : 'Private'}</Badge>
+            {listing ? (
               <span className="manage-book-actions">
                 <button
                   aria-label={`Refresh listing ${book.primaryTitle}`}
@@ -275,7 +250,7 @@ function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMor
                   disabled={busy || !canPublish}
                   type="button"
                   title={canPublish ? undefined : `Required before refreshing: ${missingRequirements.join(', ')}`}
-                  onClick={() => onRefresh(snapshot)}
+                  onClick={() => onRefresh(listing, book)}
                 >
                   <RefreshCw className="h-4 w-4" />
                   Refresh
@@ -285,7 +260,7 @@ function ManagedBooks({ books, published, actionId, loading, loadingMore, hasMor
                   className={buttonVariants.ghost}
                   disabled={busy}
                   type="button"
-                  onClick={() => onUnlist(snapshot)}
+                  onClick={() => onUnlist(listing, book)}
                 >
                   <EyeOff className="h-4 w-4" />
                   Unlist

@@ -70,6 +70,16 @@ public partial class BookController : ControllerBase
         return Ok(books);
     }
 
+    [HttpGet("manage")]
+    [Authorize]
+    public async Task<IActionResult> GetManaged(
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50,
+        [FromQuery(Name = "query")] string? searchQuery = null)
+    {
+        return Ok(await _mediator.Send(new GetManagedBooksQuery(skip, take, searchQuery)));
+    }
+
     [HttpPost("parse-html")]
     [Authorize]
     [RequestSizeLimit(10L * 1024 * 1024)]

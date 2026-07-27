@@ -38,7 +38,7 @@ export const layoutBooks = [
     status: 'Completed',
     currentChapterNumber: 120,
     totalChapters: 120,
-    rating: null,
+    rating: 5,
     priority: 2,
     progressHistory: [],
     genres: ['Slice of Life'],

@@ -457,7 +457,7 @@ describe('BooksPage', () => {
     expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('24')
     expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('54')
     expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('102')
-    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('504')
+    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('498')
   })
 
   it('keeps every dense card constrained to its grid track', async () => {
@@ -494,6 +494,24 @@ describe('BooksPage', () => {
     expect(ratingBadge).toHaveTextContent('9/10')
   })
 
+  it('uses a red rating treatment for scores up to and including five', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated([
+      books[0],
+      { ...books[1], rating: 5 },
+    ]))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('button', { name: /cards/i }))
+
+    expect(screen.getByLabelText('Rating 9 out of 10')).not.toHaveClass('book-card-rating--low')
+    const lowRating = screen.getByLabelText('Rating 5 out of 10')
+    expect(lowRating).toHaveClass('book-card-rating--low')
+    expect(lowRating.querySelector('.book-card-rating__star')).toBeInTheDocument()
+  })
+
   it('shows status overlays on cards with status-specific colors', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     const user = userEvent.setup()
@@ -503,8 +521,17 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('button', { name: /cards/i }))
 
-    expect(screen.getAllByText('Reading')[0].parentElement).toHaveClass('bg-indigo-600/95', 'text-white')
-    expect(screen.getAllByText('Completed')[0].parentElement).toHaveClass('book-card-status--completed')
+    expect(screen.getByLabelText('Book status: Reading')).toHaveClass(
+      'book-details-status',
+      'book-details-status--reading',
+      'book-details-status--card',
+    )
+    expect(screen.getByLabelText('Book status: Completed')).toHaveClass(
+      'book-details-status',
+      'book-details-status--completed',
+      'book-details-status--card',
+    )
+    expect(screen.getByLabelText('Book status: Reading')).toHaveTextContent('StatusReading')
   })
 
   it('gives completed cards a dedicated golden glow treatment', async () => {
@@ -968,13 +995,18 @@ describe('BooksPage', () => {
   })
 
   it('keeps card page sizes aligned to complete rows', () => {
-    expect(getCardPageSizeOptions(3)).toEqual([21, 51, 102, 501])
+    expect(getCardPageSizeOptions(3)).toEqual([21, 51, 102, 498])
     expect(getCardPageSizeOptions(4)).toEqual([20, 52, 100, 500])
-    expect(getCardPageSizeOptions(6)).toEqual([24, 54, 102, 504])
-    expect(getCardPageSizeOptions(7)).toEqual([21, 56, 105, 504])
-    expect(getCardPageSizeOptions(8)).toEqual([24, 56, 104, 504])
+    expect(getCardPageSizeOptions(6)).toEqual([24, 54, 102, 498])
+    expect(getCardPageSizeOptions(7)).toEqual([21, 56, 105, 497])
+    expect(getCardPageSizeOptions(8)).toEqual([24, 56, 104, 496])
     expect(getClosestPageSize(50, getCardPageSizeOptions(6))).toBe(54)
     expect(getClosestPageSize(20, getCardPageSizeOptions(8))).toBe(24)
+    for (const cardsPerRow of [2, 3, 4, 5, 6, 7, 8]) {
+      expect(getCardPageSizeOptions(cardsPerRow).every((pageSize) => (
+        pageSize <= 500 && pageSize % cardsPerRow === 0
+      ))).toBe(true)
+    }
   })
 
   it('scales card text sizes with the cards-per-row setting', () => {

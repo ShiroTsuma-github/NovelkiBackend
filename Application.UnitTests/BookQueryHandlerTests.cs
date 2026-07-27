@@ -47,6 +47,29 @@ public class BookQueryHandlerTests
     }
 
     [Fact]
+    public async Task GetManagedBooks_ShouldReturnCombinedServicePage()
+    {
+        var managedBook = new ManagedBookListItemDto
+        {
+            Book = ListItem("Listed"),
+            Listing = new ManagedBookListingDto
+            {
+                Id = Guid.NewGuid(),
+                SourceBookId = Guid.NewGuid(),
+                SnapshotAt = DateTimeOffset.UtcNow
+            }
+        };
+        var service = new FakeBookListQueryService { ManagedBooks = [managedBook], Count = 1 };
+        var handler = new GetManagedBooksQueryHandler(service, new FakeUser());
+
+        var result = await handler.Handle(
+            new GetManagedBooksQuery(0, 50, "tag:fantasy"), CancellationToken.None);
+
+        Assert.Equal(1, result.Total);
+        Assert.Same(managedBook, Assert.Single(result.Data));
+    }
+
+    [Fact]
     public async Task GetAllAdminBooks_ShouldReturnServicePage()
     {
         var service = new FakeBookListQueryService
@@ -273,6 +296,7 @@ public class BookQueryHandlerTests
     private sealed class FakeBookListQueryService : IBookListQueryService
     {
         public IReadOnlyCollection<BookListItemDto> Books { get; init; } = [];
+        public IReadOnlyCollection<ManagedBookListItemDto> ManagedBooks { get; init; } = [];
         public IReadOnlyCollection<AdminBookListItemDto> AdminBooks { get; init; } = [];
         public int Count { get; init; }
         public int AdminCount { get; init; }
@@ -292,6 +316,13 @@ public class BookQueryHandlerTests
             CancellationToken cancellationToken)
         {
             return Task.FromResult(Count);
+        }
+
+        public Task<IReadOnlyCollection<ManagedBookListItemDto>> GetManagedBooksAsync(
+            Guid ownerId, BookSearchCriteria criteria, int skip, int take,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(ManagedBooks);
         }
 
         public Task<IReadOnlyCollection<AdminBookListItemDto>> GetAdminBooksAsync(BookSearchCriteria criteria, int skip,

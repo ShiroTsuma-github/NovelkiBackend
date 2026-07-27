@@ -23,6 +23,7 @@ describe('book API NSFW filtering', () => {
 
   it('adds the h-manhwa exclusion to every search-capable book request by default', async () => {
     await api.getBooks({ query: 'author:Toika' })
+    await api.getManagedBooks({ query: 'author:Toika' })
     await api.getBooksSummary({ query: 'author:Toika' })
     await api.getBookAnalytics({ query: 'author:Toika' })
     await api.getAdminBooks({ query: 'author:Toika' })
@@ -32,9 +33,20 @@ describe('book API NSFW filtering', () => {
 
     const urls = fetchMock.mock.calls.map(([input]) => new URL(String(input), 'http://localhost'))
 
-    expect(urls.slice(0, 6).map((url) => url.searchParams.get('query'))).toEqual(
-      Array(6).fill('author:Toika -tag:h-manhwa'),
+    expect(urls.slice(0, 7).map((url) => url.searchParams.get('query'))).toEqual(
+      Array(7).fill('author:Toika -tag:h-manhwa'),
     )
-    expect(urls[6].searchParams.get('search')).toBe('author:Toika -tag:h-manhwa')
+    expect(urls[7].searchParams.get('search')).toBe('author:Toika -tag:h-manhwa')
+  })
+
+  it('uses the dedicated manage endpoint for the owners listing inventory', async () => {
+    await api.getManagedBooks({
+      skip: 0,
+      take: 50,
+    })
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
+    expect(url.pathname).toBe('/api/v1/book/manage')
+    expect(url.searchParams.get('query')).toBe('-tag:h-manhwa')
   })
 })

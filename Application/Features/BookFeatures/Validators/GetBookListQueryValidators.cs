@@ -11,6 +11,15 @@ public sealed class GetAllBooksQueryValidator : AbstractValidator<GetAllBooksQue
     }
 }
 
+public sealed class GetManagedBooksQueryValidator : AbstractValidator<GetManagedBooksQuery>
+{
+    public GetManagedBooksQueryValidator()
+    {
+        RuleFor(query => query.Skip).GreaterThanOrEqualTo(0);
+        RuleFor(query => query.Take).InclusiveBetween(1, 500);
+    }
+}
+
 public sealed class GetAllAdminBooksQueryValidator : AbstractValidator<GetAllAdminBooksQuery>
 {
     public GetAllAdminBooksQueryValidator()

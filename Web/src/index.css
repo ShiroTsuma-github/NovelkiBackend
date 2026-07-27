@@ -1531,11 +1531,26 @@ select.ui-control {
   line-height: 1;
 }
 
-.book-card-status--completed {
-  border-color: rgb(224 195 103 / 0.76);
-  color: #fff1bd;
-  background: rgb(77 61 24 / 0.94);
-  box-shadow: inset 0 1px 0 rgb(255 239 177 / 0.12);
+.book-card-rating--low {
+  border-color: rgb(251 113 133 / 0.72);
+  color: #ffe4e6;
+  box-shadow:
+    0 6px 18px rgb(0 0 0 / 0.38),
+    0 0 14px rgb(244 63 94 / 0.22),
+    inset 0 1px 0 rgb(255 228 230 / 0.1);
+}
+
+.book-card-rating--low .book-card-rating__star {
+  fill: #fb7185;
+  color: #fb7185;
+}
+
+.book-card-rating--low .book-card-rating__value {
+  color: #ffe4e6;
+}
+
+.book-card-rating--low .book-card-rating__scale {
+  color: #fda4af;
 }
 
 .book-card__cover {
@@ -1580,6 +1595,31 @@ select.ui-control {
   font-weight: 780;
   letter-spacing: 0.055em;
   text-transform: uppercase;
+}
+
+.book-details-status--card {
+  min-height: 2rem;
+  gap: 0.38rem;
+  overflow: hidden;
+  padding: 0.35rem 0.62rem;
+}
+
+.book-details-status--card .book-details-status__dot {
+  width: 0.42rem;
+  height: 0.42rem;
+}
+
+.book-details-status--card .book-details-status__label {
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+}
+
+.book-details-status--card .book-details-status__value {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .book-details-status--reading {

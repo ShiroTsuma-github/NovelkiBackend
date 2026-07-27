@@ -64,6 +64,19 @@ public record BookListItemDto
     public int LinksCount { get; set; }
 }
 
+public sealed record ManagedBookListItemDto
+{
+    public required BookListItemDto Book { get; init; }
+    public ManagedBookListingDto? Listing { get; init; }
+}
+
+public sealed record ManagedBookListingDto
+{
+    public Guid Id { get; init; }
+    public Guid SourceBookId { get; init; }
+    public DateTimeOffset SnapshotAt { get; init; }
+}
+
 public record AdminBookDto : BookDto
 {
     public Guid OwnerId { get; set; }

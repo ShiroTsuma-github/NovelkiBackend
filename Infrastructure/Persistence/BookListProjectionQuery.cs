@@ -40,6 +40,40 @@ public sealed class BookListProjectionQuery
         return page.Select(BookListProjectionMapper.MapListProjection).ToList();
     }
 
+    public async Task<IReadOnlyCollection<ManagedBookListItemDto>> GetManagedBooksAsync(
+        IQueryable<Book> query,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var sortedPage = query
+            .OrderByDescending(book =>
+                _context.PublicBookSnapshots.Any(snapshot => snapshot.SourceBookId == book.Id))
+            .ThenBy(book => book.NormalizedPrimaryTitle)
+            .ThenBy(book => book.PrimaryTitle)
+            .ThenBy(book => book.Id)
+            .Skip(skip)
+            .Take(take);
+        var page = await ProjectBooks(sortedPage).ToListAsync(cancellationToken);
+        var bookIds = page.Select(book => book.Id).ToArray();
+        var listings = await _context.PublicBookSnapshots
+            .AsNoTracking()
+            .Where(snapshot => bookIds.Contains(snapshot.SourceBookId))
+            .Select(snapshot => new ManagedBookListingDto
+            {
+                Id = snapshot.Id,
+                SourceBookId = snapshot.SourceBookId,
+                SnapshotAt = snapshot.SnapshotAt
+            })
+            .ToDictionaryAsync(listing => listing.SourceBookId, cancellationToken);
+
+        return page.Select(book => new ManagedBookListItemDto
+        {
+            Book = BookListProjectionMapper.MapListProjection(book),
+            Listing = listings.GetValueOrDefault(book.Id)
+        }).ToList();
+    }
+
     public async Task<IReadOnlyCollection<AdminBookListItemDto>> GetAdminBooksAsync(
         IQueryable<Book> query,
         int skip,

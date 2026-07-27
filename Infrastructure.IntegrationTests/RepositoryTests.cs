@@ -1388,6 +1388,48 @@ public class RepositoryTests
     }
 
     [Fact]
+    public async Task BookRepository_ShouldSortManagedListingsBeforePagination()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var privateA = await TestData.AddBookAsync(context, database.UserId, "A private");
+        var privateB = await TestData.AddBookAsync(context, database.UserId, "B private");
+        var listedC = await TestData.AddBookAsync(context, database.UserId, "C listed");
+        var listedZ = await TestData.AddBookAsync(context, database.UserId, "Z listed");
+        context.PublicBookSnapshots.AddRange(
+            CreateSnapshot(listedC),
+            CreateSnapshot(listedZ));
+        await context.SaveChangesAsync();
+        var queryService = CreateReadQueryService(context);
+
+        var firstPage = (await queryService.GetManagedBooksAsync(
+            database.UserId, BookSearchCriteria.Empty, 0, 2, CancellationToken.None)).ToList();
+        var secondPage = (await queryService.GetManagedBooksAsync(
+            database.UserId, BookSearchCriteria.Empty, 2, 2, CancellationToken.None)).ToList();
+
+        Assert.Equal([listedC.Id, listedZ.Id], firstPage.Select(item => item.Book.Id));
+        Assert.All(firstPage, item => Assert.NotNull(item.Listing));
+        Assert.Equal([privateA.Id, privateB.Id], secondPage.Select(item => item.Book.Id));
+        Assert.All(secondPage, item => Assert.Null(item.Listing));
+
+        PublicBookSnapshot CreateSnapshot(Book book) => new()
+        {
+            SourceBookId = book.Id,
+            SourceBook = book,
+            OwnerId = database.UserId,
+            PrimaryTitle = book.PrimaryTitle,
+            NormalizedPrimaryTitle = book.NormalizedPrimaryTitle,
+            AlternativeTitlesJson = "[]",
+            AuthorOtherNamesJson = "[]",
+            ContentType = "Novel",
+            GenresJson = "[]",
+            TagsJson = "[]",
+            PublicTagIdsJson = "[]",
+            SnapshotAt = DateTimeOffset.Parse("2026-07-27T12:00:00+00:00")
+        };
+    }
+
+    [Fact]
     public async Task BookRepository_ShouldSortByTotalChaptersAlias()
     {
         using var database = new SqliteTestDatabase();

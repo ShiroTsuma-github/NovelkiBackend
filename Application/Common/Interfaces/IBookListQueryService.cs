@@ -13,6 +13,13 @@ public interface IBookListQueryService
         string? sortDirection,
         CancellationToken cancellationToken);
 
+    public Task<IReadOnlyCollection<ManagedBookListItemDto>> GetManagedBooksAsync(
+        Guid ownerId,
+        BookSearchCriteria criteria,
+        int skip,
+        int take,
+        CancellationToken cancellationToken);
+
     public Task<int> GetBookCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken);
 
     public Task<IReadOnlyCollection<AdminBookListItemDto>> GetAdminBooksAsync(

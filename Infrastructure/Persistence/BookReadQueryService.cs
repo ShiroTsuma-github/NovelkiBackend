@@ -37,6 +37,17 @@ public sealed class BookReadQueryService : IBookListQueryService
         return await _projectionQuery.GetBooksAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
     }
 
+    public async Task<IReadOnlyCollection<ManagedBookListItemDto>> GetManagedBooksAsync(
+        Guid ownerId,
+        BookSearchCriteria criteria,
+        int skip,
+        int take,
+        CancellationToken cancellationToken)
+    {
+        var query = ApplyCriteria(CreateOwnerQuery(ownerId), criteria);
+        return await _projectionQuery.GetManagedBooksAsync(query, skip, take, cancellationToken);
+    }
+
     public Task<int> GetBookCountAsync(Guid ownerId, BookSearchCriteria criteria, CancellationToken cancellationToken)
     {
         var query = ApplyCriteria(_context.Books.Where(book => book.OwnerId == ownerId), criteria);

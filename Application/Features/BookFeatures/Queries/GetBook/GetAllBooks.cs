@@ -56,6 +56,37 @@ public class GetBooksQueryHandler : IRequestHandler<GetAllBooksQuery, PaginatedR
     }
 }
 
+public record GetManagedBooksQuery(
+    int Skip = 0,
+    int Take = 50,
+    string? Query = null) : IRequest<PaginatedResult<ManagedBookListItemDto>>;
+
+public sealed class GetManagedBooksQueryHandler
+    : IRequestHandler<GetManagedBooksQuery, PaginatedResult<ManagedBookListItemDto>>
+{
+    private readonly IBookListQueryService _queryService;
+    private readonly IUser _user;
+
+    public GetManagedBooksQueryHandler(IBookListQueryService queryService, IUser user)
+    {
+        _queryService = queryService;
+        _user = user;
+    }
+
+    public async Task<PaginatedResult<ManagedBookListItemDto>> Handle(
+        GetManagedBooksQuery request,
+        CancellationToken cancellationToken)
+    {
+        var ownerId = _user.RequiredId;
+        var criteria = BookSearchQueryParser.Parse(request.Query);
+        var books = await _queryService.GetManagedBooksAsync(
+            ownerId, criteria, request.Skip, request.Take, cancellationToken);
+        var total = await _queryService.GetBookCountAsync(ownerId, criteria, cancellationToken);
+        return PaginatedResult<ManagedBookListItemDto>.Create(
+            request.Skip, request.Take, total, books);
+    }
+}
+
 public record GetAllBooksForExportQuery(
     int Skip = 0,
     int Take = 100,

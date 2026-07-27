@@ -63,6 +63,26 @@ public class BookControllerTests
     }
 
     [Fact]
+    public async Task GetManaged_ShouldReturnMediatorPage()
+    {
+        var query = new GetManagedBooksQuery(50, 50, "tag:fantasy");
+        var expected = PaginatedResult<ManagedBookListItemDto>.Create(50, 50, 0, []);
+        var mediator = new Mock<IMediator>();
+        mediator.Setup(mock => mock.Send(query, It.IsAny<CancellationToken>())).ReturnsAsync(expected);
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.GetManaged(query.Skip, query.Take, query.Query);
+
+        Assert.Same(expected, Assert.IsType<OkObjectResult>(result).Value);
+        mediator.Verify(mock => mock.Send(
+            It.Is<GetManagedBooksQuery>(request =>
+                request.Skip == 50 &&
+                request.Take == 50 &&
+                request.Query == "tag:fantasy"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ParseHtml_ShouldReturnResolvedDraftWithoutPersistingAnything()
     {
         var query = new ParseBookHtmlQuery("<html>NovelUpdates</html>");

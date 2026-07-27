@@ -9,6 +9,8 @@ import { HttpError } from '@/api/http'
 import { buttonVariants, DialogPanel, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { buttonClass, secondaryButtonClass } from '@/components/app/FormField'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
+import { isLowRating } from './bookRating'
+import { BookStatusPill } from './BookStatusPill'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
 import { getBookListReturnTo } from './bookListNavigation'
 import { DescribedMetadataPills } from './MetadataBadges'
@@ -168,7 +170,7 @@ export function BookDetailsPage() {
                       <div className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">{book.contentType}</div>
                       <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
                         <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">{book.primaryTitle}</h1>
-                        <StatusPill status={book.status} />
+                        <BookStatusPill status={book.status} />
                       </div>
                       {book.alternativeTitles.length ? (
                         <p className="text-sm text-slate-400">{book.alternativeTitles.join(' | ')}</p>
@@ -362,45 +364,24 @@ function ProgressBar({ book }: { book: BookDto }) {
 function RatingSummary({ rating }: { rating?: number | null }) {
   const normalizedRating = typeof rating === 'number' ? Math.max(0, Math.min(10, rating)) : null
   const filledStars = normalizedRating == null ? 0 : Math.round(normalizedRating)
+  const lowRating = isLowRating(normalizedRating)
 
   return (
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center gap-1">
         {Array.from({ length: 10 }, (_, index) => (
           <Star
-            className={`h-4 w-4 ${index < filledStars ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-300'}`}
+            className={`h-4 w-4 ${index < filledStars
+              ? lowRating ? 'fill-rose-500 text-rose-500' : 'fill-amber-400 text-amber-400'
+              : 'fill-slate-200 text-slate-300'}`}
             key={index}
           />
         ))}
       </div>
-      <div className="text-sm font-medium text-slate-700">{normalizedRating == null ? '?/10' : `${normalizedRating}/10`}</div>
+      <div className={`text-sm font-medium ${lowRating ? 'text-rose-400' : 'text-slate-700'}`}>
+        {normalizedRating == null ? '?/10' : `${normalizedRating}/10`}
+      </div>
     </div>
-  )
-}
-
-function StatusPill({ status }: { status: string }) {
-  const normalized = status.trim().toLowerCase()
-  const tone = normalized === 'reading'
-    ? 'reading'
-    : normalized === 'completed'
-      ? 'completed'
-      : normalized === 'plan to read'
-        ? 'planned'
-        : normalized === 'on hold'
-          ? 'paused'
-          : normalized === 'dropped'
-            ? 'dropped'
-            : 'neutral'
-
-  return (
-    <span
-      aria-label={`Book status: ${status}`}
-      className={`book-details-status book-details-status--${tone} self-start`}
-    >
-      <span aria-hidden="true" className="book-details-status__dot" />
-      <span aria-hidden="true" className="book-details-status__label">Status</span>
-      <span className="book-details-status__value">{status}</span>
-    </span>
   )
 }
 

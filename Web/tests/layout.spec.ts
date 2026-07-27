@@ -228,6 +228,15 @@ test('cards layout constrains long titles and shows active toggle styles', async
   const ratingBadge = page.getByLabel('Rating 9 out of 10')
   await expect(ratingBadge).toHaveCSS('background-color', 'rgba(8, 12, 19, 0.9)')
   await expect(ratingBadge).toHaveCSS('border-radius', '999px')
+
+  const lowRatingBadge = page.getByLabel('Rating 5 out of 10')
+  await expect(lowRatingBadge).toHaveCSS('border-color', 'rgba(251, 113, 133, 0.72)')
+  await expect(lowRatingBadge.locator('.book-card-rating__star')).toHaveCSS('color', 'rgb(251, 113, 133)')
+
+  const cardStatus = page.getByLabel('Book status: Reading')
+  await expect(cardStatus).toContainText('Status')
+  await expect(cardStatus).toHaveCSS('color', 'rgb(201, 244, 223)')
+  await expect(cardStatus).toHaveCSS('background-color', 'rgb(23, 54, 41)')
   await expectNoHorizontalOverflow(page)
 })
 

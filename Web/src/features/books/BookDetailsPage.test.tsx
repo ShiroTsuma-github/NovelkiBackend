@@ -194,6 +194,21 @@ describe('BookDetailsPage', () => {
     expect(status.querySelector('.book-details-status__dot')).toBeInTheDocument()
   })
 
+  it('renders ratings up to and including five in red', async () => {
+    vi.mocked(api.getBook).mockResolvedValue({ ...books[0], rating: 5 })
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    const rating = await screen.findByText('5/10')
+    expect(rating).toHaveClass('text-rose-400')
+    expect(rating.parentElement?.querySelectorAll('.fill-rose-500')).toHaveLength(5)
+  })
+
   it('keeps the status beside a long default title', async () => {
     vi.mocked(api.getBook).mockResolvedValue({
       ...books[0],
