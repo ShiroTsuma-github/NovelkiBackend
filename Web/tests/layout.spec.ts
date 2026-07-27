@@ -24,6 +24,11 @@ test('app shell keeps stable page landmarks and primary structure', async ({ pag
   await expect(page.locator('main')).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Books' })).toBeVisible()
   await expect(page.getByRole('button', { name: /log out/i })).toBeVisible()
+  const nsfwToggle = page.locator('.app-nsfw-toggle')
+  await expect(page.getByRole('button', { name: /enable nsfw content/i })).toBeVisible()
+  await expect(nsfwToggle).toHaveText('NSFW')
+  await expect(nsfwToggle).toHaveAttribute('aria-pressed', 'false')
+  await expect(nsfwToggle).toHaveCSS('box-shadow', 'none')
   await expect(page.locator('main')).toHaveCount(1)
 
   await expect(page.getByRole('navigation', { name: /primary/i })).toBeVisible()
@@ -31,6 +36,12 @@ test('app shell keeps stable page landmarks and primary structure', async ({ pag
   await expect(page.getByRole('link', { name: /skip to content/i })).toHaveAttribute('href', '#main-content')
 
   await expectNoHorizontalOverflow(page)
+
+  await nsfwToggle.click()
+  await page.mouse.move(0, 0)
+  await expect(nsfwToggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(nsfwToggle).toHaveCSS('border-color', 'rgb(251, 113, 133)')
+  await expect(nsfwToggle).not.toHaveCSS('box-shadow', 'none')
 })
 
 test('quiet structure POC keeps its defining visual rules', async ({ page }) => {

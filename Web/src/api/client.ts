@@ -1,4 +1,5 @@
 import { apiBlobRequest, apiFormRequest, apiRequest, toQueryString } from './http'
+import { withNsfwBookFilter } from '@/lib/nsfwPreference'
 import type {
   AuthorDto,
   AdminLibraryPurgeResult,
@@ -59,14 +60,14 @@ export const api = {
       token: null,
     }),
   getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string; advanceCycle?: boolean }) =>
-    apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(params)}`),
+    apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(withFilteredQuery(params))}`),
   getBooksSummary: (params: { query?: string }) =>
-    apiRequest<BookSummaryDto>(`/book/summary${toQueryString(params)}`),
+    apiRequest<BookSummaryDto>(`/book/summary${toQueryString(withFilteredQuery(params))}`),
   getBookAnalytics: (params: { query?: string; from?: string; to?: string; bucket?: string }) =>
-    apiRequest<BookAnalyticsDto>(`/book/analytics${toQueryString(params)}`),
+    apiRequest<BookAnalyticsDto>(`/book/analytics${toQueryString(withFilteredQuery(params))}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),
   getAdminBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string }) =>
-    apiRequest<PaginatedResult<AdminBookListItemDto>>(`/admin/books${toQueryString(params)}`),
+    apiRequest<PaginatedResult<AdminBookListItemDto>>(`/admin/books${toQueryString(withFilteredQuery(params))}`),
   getAdminBook: (id: string) => apiRequest<AdminBookDto>(`/admin/books/${id}`),
   createBook: (request: BookMutationRequest) =>
     apiRequest<{ id: string }>('/book', { method: 'POST', body: request }),
@@ -87,9 +88,9 @@ export const api = {
   downloadBookImportTemplate: () =>
     apiBlobRequest('/book/import/template'),
   downloadBooksExport: (params: { query?: string; sortBy?: string; sortDirection?: string }) =>
-    apiBlobRequest(`/book/export${toQueryString(params)}`),
+    apiBlobRequest(`/book/export${toQueryString(withFilteredQuery(params))}`),
   downloadBooksFullExport: (params: { query?: string; sortBy?: string; sortDirection?: string }) =>
-    apiBlobRequest(`/book/export/full${toQueryString(params)}`),
+    apiBlobRequest(`/book/export/full${toQueryString(withFilteredQuery(params))}`),
   getBookImportSession: (sessionId: string) =>
     apiRequest<BookImportSessionDto>(`/book/import/sessions/${sessionId}`),
   updateBookImportRow: (sessionId: string, rowId: string, request: BookImportRowUpdateRequest) =>
@@ -120,7 +121,9 @@ export const api = {
   deleteBook: (id: string) =>
     apiRequest<void>(`/book/${id}`, { method: 'DELETE' }),
   searchPublicBooks: (params: { search?: string; skip?: number; take?: number; mineOnly?: boolean }) =>
-    apiRequest<PaginatedResult<PublicBookSnapshotDto>>(`/public-book${toQueryString(params)}`),
+    apiRequest<PaginatedResult<PublicBookSnapshotDto>>(
+      `/public-book${toQueryString({ ...params, search: withNsfwBookFilter(params.search) })}`,
+    ),
   publishBook: (bookId: string) =>
     apiRequest<PublicBookSnapshotDto>(`/public-book/source/${bookId}`, { method: 'POST' }),
   refreshPublishedBook: (snapshotId: string) =>
@@ -189,4 +192,11 @@ export const api = {
     apiRequest<PaginatedResult<AdminUserDto>>(`/admin/users${toQueryString(params)}`),
   deleteAdminUser: (userId: string) =>
     apiRequest<AdminAccountDeleteResult>(`/admin/users/${userId}`, { method: 'DELETE' }),
+}
+
+function withFilteredQuery<T extends { query?: string }>(params: T): T {
+  return {
+    ...params,
+    query: withNsfwBookFilter(params.query),
+  }
 }

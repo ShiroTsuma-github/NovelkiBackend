@@ -274,10 +274,46 @@ h4 {
   transform: scaleX(1);
 }
 
-.app-logout {
+.app-session-actions {
+  display: flex;
   grid-column: 2;
   grid-row: 1;
+  align-items: center;
+  gap: 0.5rem;
   align-self: center;
+}
+
+.ui-button.app-nsfw-toggle {
+  border-color: var(--qs-border);
+  color: var(--qs-muted);
+  background: var(--qs-surface);
+  white-space: nowrap;
+}
+
+.ui-button.app-nsfw-toggle:hover:not(:disabled) {
+  border-color: var(--qs-border-strong);
+  color: var(--qs-text);
+  background: var(--qs-surface-raised);
+}
+
+.ui-button.app-nsfw-toggle--enabled {
+  border-color: #fb7185;
+  color: #ffe4e6;
+  background: rgb(136 19 55 / 0.42);
+  box-shadow:
+    0 0 0 1px rgb(251 113 133 / 0.3),
+    0 0 18px rgb(244 63 94 / 0.46),
+    inset 0 0 12px rgb(244 63 94 / 0.12);
+}
+
+.ui-button.app-nsfw-toggle--enabled:hover:not(:disabled) {
+  border-color: #fda4af;
+  color: #fff1f2;
+  background: rgb(159 18 57 / 0.56);
+  box-shadow:
+    0 0 0 1px rgb(253 164 175 / 0.38),
+    0 0 22px rgb(244 63 94 / 0.58),
+    inset 0 0 14px rgb(244 63 94 / 0.16);
 }
 
 .app-main {
@@ -2118,7 +2154,7 @@ select.ui-control {
 
   .app-brand,
   .app-nav,
-  .app-logout {
+  .app-session-actions {
     grid-column: auto;
     grid-row: auto;
   }
@@ -2212,6 +2248,12 @@ select.ui-control {
     padding-inline: 0;
   }
 
+  .app-nsfw-toggle {
+    width: 44px;
+    padding-inline: 0;
+  }
+
+  .app-nsfw-toggle__label,
   .app-logout__label {
     position: absolute;
     width: 1px;

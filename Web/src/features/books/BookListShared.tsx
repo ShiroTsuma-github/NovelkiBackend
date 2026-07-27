@@ -177,6 +177,7 @@ export function BookListFooter({
   canGoForward,
   currentPage,
   pageSize,
+  pageSizeOptions = bookListPageSizeOptions,
   setActivePageGapId,
   setPageSize,
   skip,
@@ -190,6 +191,7 @@ export function BookListFooter({
   canGoForward: boolean
   currentPage: number
   pageSize: number
+  pageSizeOptions?: readonly number[]
   setActivePageGapId: Dispatch<SetStateAction<string | null>>
   setPageSize: (nextPageSize: string) => void
   skip: number
@@ -211,7 +213,7 @@ export function BookListFooter({
                 value={pageSize}
                 onChange={(event) => setPageSize(event.target.value)}
               >
-                {bookListPageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+                {pageSizeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
               </select>
               <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             </span>
@@ -427,7 +429,7 @@ function PageGapJump({
 function readBookListPageSize(searchParams: URLSearchParams, storageKey?: string) {
   const parameter = searchParams.get('take')
   const value = Number(parameter ?? (storageKey ? window.localStorage.getItem(storageKey) : null) ?? 20)
-  return bookListPageSizeOptions.includes(value) ? value : 20
+  return Number.isInteger(value) && value >= 1 && value <= 1_000 ? value : 20
 }
 
 function getVisiblePageNumbers(currentPage: number, totalPages: number): Array<number | 'ellipsis'> {

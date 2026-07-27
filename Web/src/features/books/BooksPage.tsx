@@ -27,6 +27,7 @@ import {
   type ColumnDefinition,
 } from './bookListColumns'
 import {
+  bookListPageSizeOptions,
   BookListFooter,
   getNextSortDirection,
   ScrollShortcutButtons,
@@ -102,8 +103,11 @@ export function BooksPage() {
   const [importMenuOpen, setImportMenuOpen] = useState(false)
   const [importMode, setImportMode] = useState<'csv' | 'full'>('csv')
   const [summaryOpen, setSummaryOpen] = useState(false)
+  const pageSizeOptions = viewMode === 'cards'
+    ? getCardPageSizeOptions(cardsPerRow)
+    : bookListPageSizeOptions
   const {
-    pageSize,
+    pageSize: requestedPageSize,
     query,
     requestQuery,
     setPageSize,
@@ -114,6 +118,14 @@ export function BooksPage() {
     sortDirection,
     updateQuery,
   } = useBookListUrlState(searchParams, setSearchParams, { pageSizeStorageKey })
+  const pageSize = getClosestPageSize(requestedPageSize, pageSizeOptions)
+
+  useEffect(() => {
+    if (pageSize !== requestedPageSize) {
+      setPageSize(String(pageSize))
+    }
+  }, [pageSize, requestedPageSize, setPageSize])
+
   const visibleColumns = getVisibleColumns(bookColumns, columnPreferences)
   const visibleCardFields = getVisibleColumns(bookCardFields, cardFieldPreferences)
   const booksQuery = useQuery({
@@ -427,6 +439,7 @@ export function BooksPage() {
           canGoForward={pagination.canGoForward}
           currentPage={pagination.currentPage}
           pageSize={pageSize}
+          pageSizeOptions={pageSizeOptions}
           setActivePageGapId={pagination.setActivePageGapId}
           setPageSize={setPageSize}
           skip={skip}
@@ -1009,6 +1022,19 @@ function getCyclicSortDirectionFromResult(books: BookListItemDto[], sortBy: stri
 
 function normalizeCardsPerRow(value: number) {
   return cardsPerRowOptions.includes(value as typeof cardsPerRowOptions[number]) ? value : 4
+}
+
+export function getCardPageSizeOptions(cardsPerRow: number) {
+  const normalizedCardsPerRow = normalizeCardsPerRow(cardsPerRow)
+  return [...new Set(bookListPageSizeOptions.map((pageSize) => (
+    Math.ceil(pageSize / normalizedCardsPerRow) * normalizedCardsPerRow
+  )))]
+}
+
+export function getClosestPageSize(pageSize: number, options: readonly number[]) {
+  return options.reduce((closest, option) => (
+    Math.abs(option - pageSize) < Math.abs(closest - pageSize) ? option : closest
+  ), options[0] ?? bookListPageSizeOptions[0])
 }
 
 function getDesktopCardsPerRowClass(cardsPerRow: number) {

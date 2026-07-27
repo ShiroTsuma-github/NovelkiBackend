@@ -8,7 +8,7 @@ import { expectReadableTextContrast } from '@/test/contrast'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { toast } from 'sonner'
-import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardRowMinHeightClasses, getCardTextSizeClasses, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
+import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardPageSizeOptions, getCardRowMinHeightClasses, getCardTextSizeClasses, getClosestPageSize, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -452,6 +452,12 @@ describe('BooksPage', () => {
 
     expect(window.localStorage.getItem('novelki.books.cards-per-row.v1')).toBe('6')
     expect(container.querySelector('.lg\\:grid-cols-6')).toBeTruthy()
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({ take: 24 })))
+    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveValue('24')
+    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('24')
+    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('54')
+    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('102')
+    expect(screen.getByRole('combobox', { name: /per page/i })).toHaveTextContent('504')
   })
 
   it('keeps every dense card constrained to its grid track', async () => {
@@ -959,6 +965,16 @@ describe('BooksPage', () => {
     window.localStorage.setItem('novelki.books.cards-per-row.v1', '99')
 
     expect(readCardsPerRow('novelki.books.cards-per-row.v1')).toBe(4)
+  })
+
+  it('keeps card page sizes aligned to complete rows', () => {
+    expect(getCardPageSizeOptions(3)).toEqual([21, 51, 102, 501])
+    expect(getCardPageSizeOptions(4)).toEqual([20, 52, 100, 500])
+    expect(getCardPageSizeOptions(6)).toEqual([24, 54, 102, 504])
+    expect(getCardPageSizeOptions(7)).toEqual([21, 56, 105, 504])
+    expect(getCardPageSizeOptions(8)).toEqual([24, 56, 104, 504])
+    expect(getClosestPageSize(50, getCardPageSizeOptions(6))).toBe(54)
+    expect(getClosestPageSize(20, getCardPageSizeOptions(8))).toBe(24)
   })
 
   it('scales card text sizes with the cards-per-row setting', () => {

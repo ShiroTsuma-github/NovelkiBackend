@@ -1,8 +1,11 @@
-import { BarChart3, BookOpen, Compass, LogOut, Plus, Search, Settings2, Shield } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { BarChart3, BookOpen, Compass, LogOut, Plus, Search, Settings2, Shield, TriangleAlert } from 'lucide-react'
+import { useState } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/features/auth/AuthProvider'
 import { buttonVariants } from '@/components/app/DesignSystem'
 import { cn } from '@/lib/utils'
+import { isNsfwEnabled, setNsfwEnabled } from '@/lib/nsfwPreference'
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -15,10 +18,18 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export function AppShell() {
   const { isAdmin, logout } = useAuth()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [nsfwEnabled, setNsfwEnabledState] = useState(isNsfwEnabled)
 
   async function handleLogout() {
     await logout()
     navigate('/login', { replace: true })
+  }
+
+  function handleNsfwToggle() {
+    const nextEnabled = !nsfwEnabled
+    setNsfwEnabledState(setNsfwEnabled(nextEnabled))
+    void queryClient.invalidateQueries()
   }
 
   return (
@@ -63,15 +74,27 @@ export function AppShell() {
               </NavLink>
             ) : null}
           </nav>
-          <button
-            aria-label="Log out"
-            className={cn(buttonVariants.ghost, 'app-logout')}
-            type="button"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4" />
-            <span className="app-logout__label">Log out</span>
-          </button>
+          <div className="app-session-actions">
+            <button
+              aria-label={nsfwEnabled ? 'Disable NSFW content' : 'Enable NSFW content'}
+              aria-pressed={nsfwEnabled}
+              className={cn(buttonVariants.ghost, 'app-nsfw-toggle', nsfwEnabled && 'app-nsfw-toggle--enabled')}
+              type="button"
+              onClick={handleNsfwToggle}
+            >
+              <TriangleAlert aria-hidden="true" className="h-4 w-4" />
+              <span className="app-nsfw-toggle__label">NSFW</span>
+            </button>
+            <button
+              aria-label="Log out"
+              className={cn(buttonVariants.ghost, 'app-logout')}
+              type="button"
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="app-logout__label">Log out</span>
+            </button>
+          </div>
         </div>
       </header>
       <main className="app-main" id="main-content">
