@@ -71,7 +71,7 @@ docker compose up --build
 Domyslne adresy:
 
 - Web (HTTPS + HTTP/2): `https://localhost:8080`
-- Web HTTP redirect: `http://localhost:8081`
+- Web HTTP ingress: `http://localhost:8081`
 - API: `http://localhost:5232`
 - API health: `http://localhost:5232/health/ready`
 - Grafana: `http://localhost:3000`
@@ -82,7 +82,11 @@ Domyslne adresy:
 Porty Web, przekierowania HTTP, API i Grafany mozna zmienic przez `WEB_PORT`, `WEB_HTTP_PORT`, `API_PORT` i
 `GRAFANA_PORT` w `.env`. Kontener Web generuje przy pierwszym starcie lokalny certyfikat z SAN dla `localhost` i
 `127.0.0.1`, zapisuje go w wolumenie `web-cert-data` i udostepnia frontend oraz proxy `/api` przez HTTP/2. Przy
-pierwszym otwarciu przegladarka moze wymagac zaakceptowania lokalnego certyfikatu. W compose API ustawia
+lokalnym wejsciu przez `WEB_HTTP_PORT` HTTP przekierowuje na `WEB_PORT`. Przy NAT standardowe publiczne
+`80 -> WEB_HTTP_PORT` przekierowuje na publiczny HTTPS 443 bez ujawniania portu VM; publiczne
+`443 -> WEB_PORT` dostarcza polaczenie TLS. Przy pierwszym otwarciu przegladarka moze wymagac zaakceptowania
+lokalnego certyfikatu. Certyfikat deweloperski nie jest zaufanym certyfikatem dla publicznej domeny; dla No-IP
+nalezy zamontowac certyfikat wystawiony dla tej domeny jako `/etc/nginx/certs/tls.crt` i `tls.key`. W compose API ustawia
 `Database:AutoMigrate=true`, wiec migracje EF sa aplikowane przy starcie kontenera. Poza compose domyslnie zostaje
 `false`.
 

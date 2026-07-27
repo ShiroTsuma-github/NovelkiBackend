@@ -52,7 +52,8 @@ services:
       api:
         condition: service_healthy
     environment:
-      NGINX_ENVSUBST_FILTER: WEB_HTTPS_PORT
+      NGINX_ENVSUBST_FILTER: WEB_HTTP_PORT|WEB_HTTPS_PORT
+      WEB_HTTP_PORT: ${WEB_HTTP_PORT:-8081}
       WEB_HTTPS_PORT: ${WEB_PORT:-8080}
     volumes:
       - web-cert-data:/etc/nginx/certs
