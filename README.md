@@ -80,7 +80,9 @@ Domyslne adresy:
 - Tempo: `http://localhost:3200`
 
 Porty Web, przekierowania HTTP, API i Grafany mozna zmienic przez `WEB_PORT`, `WEB_HTTP_PORT`, `API_PORT` i
-`GRAFANA_PORT` w `.env`. Kontener Web generuje przy pierwszym starcie lokalny certyfikat z SAN dla `localhost` i
+`GRAFANA_PORT` w `.env`. Publiczny origin HTTPS mozna dodac do CORS przez `WEB_PUBLIC_ORIGIN`, na przyklad
+`WEB_PUBLIC_ORIGIN=https://example.ddns.net`. Ta wartosc jest tez kompilowana do frontendu, wiec jej zmiana wymaga
+ponownego zbudowania obrazu Web. Kontener Web generuje przy pierwszym starcie lokalny certyfikat z SAN dla `localhost` i
 `127.0.0.1`, zapisuje go w wolumenie `web-cert-data` i udostepnia frontend oraz proxy `/api` przez HTTP/2. Przy
 lokalnym wejsciu przez `WEB_HTTP_PORT` HTTP przekierowuje na `WEB_PORT`. Przy NAT standardowe publiczne
 `80 -> WEB_HTTP_PORT` przekierowuje na publiczny HTTPS 443 bez ujawniania portu VM; publiczne

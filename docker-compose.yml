@@ -20,9 +20,10 @@ services:
       RateLimiting__Account__WindowSeconds: ${RATE_LIMITING_ACCOUNT_WINDOW_SECONDS:-60}
       RateLimiting__Expensive__PermitLimit: ${RATE_LIMITING_EXPENSIVE_PERMIT_LIMIT:-20}
       RateLimiting__Expensive__WindowSeconds: ${RATE_LIMITING_EXPENSIVE_WINDOW_SECONDS:-60}
-      Cors__AllowedOrigins__0: https://localhost:${WEB_PORT:-8080}
-      Cors__AllowedOrigins__1: http://localhost:${WEB_HTTP_PORT:-8081}
-      Cors__AllowedOrigins__2: http://localhost:5173
+      Cors__AllowedOrigins__0: ${WEB_PUBLIC_ORIGIN:-https://localhost:8080}
+      Cors__AllowedOrigins__1: https://localhost:${WEB_PORT:-8080}
+      Cors__AllowedOrigins__2: http://localhost:${WEB_HTTP_PORT:-8081}
+      Cors__AllowedOrigins__3: http://localhost:5173
       BookCovers__S3__Endpoint: ${BOOK_COVERS__S3__ENDPOINT:-}
       BookCovers__S3__Region: ${BOOK_COVERS__S3__REGION:-}
       BookCovers__S3__AccessKey: ${BOOK_COVERS__S3__ACCESS_KEY:-}
@@ -48,6 +49,7 @@ services:
       dockerfile: Web/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
+        VITE_PUBLIC_ORIGIN: ${WEB_PUBLIC_ORIGIN:-}
     depends_on:
       api:
         condition: service_healthy
