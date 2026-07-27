@@ -61,6 +61,54 @@ describe('BookCoverSection', () => {
     vi.restoreAllMocks()
   })
 
+  it('waits until a lazy cover is near the viewport before fetching it', async () => {
+    const lazyCover = {
+      ...baseCover,
+      id: 'lazy-cover',
+      imageUrl: 'http://localhost/api/v1/books/book-lazy/cover',
+      thumbnailImageUrl: 'http://localhost/api/v1/books/book-lazy/cover?variant=thumbnail',
+    }
+    let reveal = () => {}
+    const observe = vi.fn()
+    const disconnect = vi.fn()
+    class MockIntersectionObserver implements IntersectionObserver {
+      readonly root = null
+      readonly rootMargin = '600px 0px'
+      readonly scrollMargin = '0px'
+      readonly thresholds = [0]
+
+      constructor(callback: IntersectionObserverCallback) {
+        reveal = () => callback([{ isIntersecting: true } as IntersectionObserverEntry], this)
+      }
+
+      disconnect = disconnect
+      observe = observe
+      takeRecords = () => []
+      unobserve = vi.fn()
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+
+    render(<BookCoverArtwork cover={lazyCover} loading="lazy" title="Lazy book cover" />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(observe).toHaveBeenCalledTimes(1)
+    expect(fetch).not.toHaveBeenCalled()
+
+    await act(async () => {
+      reveal()
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(disconnect).toHaveBeenCalled()
+    expect(screen.getByRole('img', { name: 'Lazy book cover' })).toHaveAttribute('loading', 'lazy')
+    expect(screen.getByRole('img', { name: 'Lazy book cover' })).toHaveAttribute('decoding', 'async')
+  })
+
   it('reuses the cached blob url when the same cover is mounted again', async () => {
     const firstRender = render(<BookCoverArtwork cover={baseCover} title="Book cover" />)
 

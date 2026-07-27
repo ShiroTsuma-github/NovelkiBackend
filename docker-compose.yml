@@ -20,8 +20,9 @@ services:
       RateLimiting__Account__WindowSeconds: ${RATE_LIMITING_ACCOUNT_WINDOW_SECONDS:-60}
       RateLimiting__Expensive__PermitLimit: ${RATE_LIMITING_EXPENSIVE_PERMIT_LIMIT:-20}
       RateLimiting__Expensive__WindowSeconds: ${RATE_LIMITING_EXPENSIVE_WINDOW_SECONDS:-60}
-      Cors__AllowedOrigins__0: http://localhost:${WEB_PORT:-8080}
-      Cors__AllowedOrigins__1: http://localhost:5173
+      Cors__AllowedOrigins__0: https://localhost:${WEB_PORT:-8080}
+      Cors__AllowedOrigins__1: http://localhost:${WEB_HTTP_PORT:-8081}
+      Cors__AllowedOrigins__2: http://localhost:5173
       BookCovers__S3__Endpoint: ${BOOK_COVERS__S3__ENDPOINT:-}
       BookCovers__S3__Region: ${BOOK_COVERS__S3__REGION:-}
       BookCovers__S3__AccessKey: ${BOOK_COVERS__S3__ACCESS_KEY:-}
@@ -50,9 +51,18 @@ services:
     depends_on:
       api:
         condition: service_healthy
+    environment:
+      NGINX_ENVSUBST_FILTER: WEB_HTTPS_PORT
+      WEB_HTTPS_PORT: ${WEB_PORT:-8080}
+    volumes:
+      - web-cert-data:/etc/nginx/certs
     ports:
-      - target: 80
+      - target: 443
         published: "${WEB_PORT:-8080}"
+        protocol: tcp
+        mode: host
+      - target: 80
+        published: "${WEB_HTTP_PORT:-8081}"
         protocol: tcp
         mode: host
 
@@ -118,6 +128,7 @@ services:
       - prometheus
 
 volumes:
+  web-cert-data:
   loki-data:
   tempo-data:
   prometheus-data:

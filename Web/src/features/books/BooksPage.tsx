@@ -741,6 +741,7 @@ function BookCardGrid({
                 className="book-card__cover min-w-0 w-full max-w-full"
                 cover={book.cover}
                 emptyLabel="No cover"
+                loading="lazy"
                 preferredVariant="thumbnail"
                 title={book.primaryTitle}
               />

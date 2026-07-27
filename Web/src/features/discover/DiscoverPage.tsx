@@ -114,6 +114,7 @@ function PublicBookCard({ snapshot, copying, onCopy }: {
           className="rounded-none border-0"
           cover={cover}
           emptyLabel="Snapshot without a cover"
+          loading="lazy"
           preferredVariant="thumbnail"
           title={`Cover of ${snapshot.primaryTitle}`}
         />

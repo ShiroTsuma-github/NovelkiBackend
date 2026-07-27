@@ -1,5 +1,5 @@
 import { X, ZoomIn } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BookCoverSummaryDto } from '@/api/types'
 import { buttonVariants, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { loadCoverBlobUrl } from './coverCache'
@@ -9,6 +9,7 @@ type BookCoverArtworkProps = {
   cover?: BookCoverSummaryDto | null
   imageUrl?: string | null
   preferredVariant?: 'full' | 'thumbnail'
+  loading?: 'eager' | 'lazy'
   interactive?: boolean
   onClick?: () => void
   onRemove?: () => void
@@ -30,6 +31,7 @@ type CoverLightboxProps = {
 }
 
 const COVER_CACHE_TTL_MS = 60_000
+const COVER_LAZY_LOAD_MARGIN = '600px 0px'
 
 type CoverCacheEntry = {
   blobUrl: string | null
@@ -40,14 +42,18 @@ type CoverCacheEntry = {
 
 const coverImageCache = new Map<string, CoverCacheEntry>()
 
-export function useResolvedCoverImage(cover?: BookCoverSummaryDto | null, variant: 'full' | 'thumbnail' = 'full') {
+export function useResolvedCoverImage(
+  cover?: BookCoverSummaryDto | null,
+  variant: 'full' | 'thumbnail' = 'full',
+  enabled = true,
+) {
   const [blobUrl, setBlobUrl] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
     const cacheKey = getCoverCacheKey(cover, variant)
 
-    if (!cacheKey) {
+    if (!enabled || !cacheKey) {
       setBlobUrl(null)
       return
     }
@@ -79,9 +85,44 @@ export function useResolvedCoverImage(cover?: BookCoverSummaryDto | null, varian
       active = false
       releaseCoverCacheEntry(cacheKey)
     }
-  }, [cover?.imageUrl, cover?.thumbnailImageUrl, cover?.lastAttemptAt, variant])
+  }, [cover?.imageUrl, cover?.thumbnailImageUrl, cover?.lastAttemptAt, enabled, variant])
 
   return blobUrl
+}
+
+function useCoverLoadPermission(lazy: boolean) {
+  const targetRef = useRef<HTMLElement | null>(null)
+  const [permitted, setPermitted] = useState(!lazy)
+  const setTarget = useCallback((node: HTMLElement | null) => {
+    targetRef.current = node
+  }, [])
+
+  useEffect(() => {
+    if (!lazy) {
+      setPermitted(true)
+      return
+    }
+
+    const target = targetRef.current
+    if (!target || typeof IntersectionObserver === 'undefined') {
+      setPermitted(true)
+      return
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) {
+        return
+      }
+
+      setPermitted(true)
+      observer.disconnect()
+    }, { rootMargin: COVER_LAZY_LOAD_MARGIN })
+    observer.observe(target)
+
+    return () => observer.disconnect()
+  }, [lazy])
+
+  return { permitted, setTarget }
 }
 
 function getCoverCacheKey(cover: BookCoverSummaryDto | null | undefined, variant: 'full' | 'thumbnail') {
@@ -145,6 +186,7 @@ export function BookCoverArtwork({
   cover,
   imageUrl,
   preferredVariant = 'full',
+  loading = 'eager',
   interactive = false,
   onClick,
   onRemove,
@@ -155,7 +197,8 @@ export function BookCoverArtwork({
   emptyActionLabel,
   hoverFooter,
 }: BookCoverArtworkProps) {
-  const blobUrl = useResolvedCoverImage(cover, preferredVariant)
+  const loadPermission = useCoverLoadPermission(loading === 'lazy')
+  const blobUrl = useResolvedCoverImage(cover, preferredVariant, loadPermission.permitted)
   const resolvedImageUrl = imageUrl ?? blobUrl
   const wrapperClassName = [
     'book-cover-artwork group relative flex aspect-[2/3] w-full items-center justify-center overflow-hidden',
@@ -166,7 +209,13 @@ export function BookCoverArtwork({
   ].filter(Boolean).join(' ')
 
   const content = resolvedImageUrl ? (
-    <img alt={title} className="h-full w-full object-cover" src={resolvedImageUrl} />
+    <img
+      alt={title}
+      className="h-full w-full object-cover"
+      decoding="async"
+      loading={loading}
+      src={resolvedImageUrl}
+    />
   ) : (
     <div className="grid place-items-center gap-2 px-6 text-center text-slate-500">
       <div className="text-xs font-semibold uppercase tracking-[0.28em] text-slate-400">No Cover</div>
@@ -182,7 +231,7 @@ export function BookCoverArtwork({
 
   if (!interactive) {
     return (
-      <div className={wrapperClassName}>
+      <div className={wrapperClassName} ref={loadPermission.setTarget}>
         {content}
         {resolvedImageUrl && onRemove ? (
           <button
@@ -199,7 +248,7 @@ export function BookCoverArtwork({
   }
 
   return (
-    <button className={wrapperClassName} type="button" onClick={onClick}>
+    <button className={wrapperClassName} ref={loadPermission.setTarget} type="button" onClick={onClick}>
       {content}
       {resolvedImageUrl && onRemove ? (
         <span
