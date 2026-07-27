@@ -1780,8 +1780,8 @@ public class RepositoryTests
         var author = TestData.Author("Er Gen");
         author.Names.Add(new AuthorName
         {
-            Name = "Ergen",
-            NormalizedName = MappingExtensions.NormalizeName("Ergen"),
+            Name = "Eargen",
+            NormalizedName = MappingExtensions.NormalizeName("Eargen"),
             IsPrimary = false,
             Source = "Test"
         });
@@ -1789,7 +1789,7 @@ public class RepositoryTests
         await context.SaveChangesAsync();
         var repository = new AuthorRepository(context);
 
-        var result = await repository.GetByNameAsync(database.UserId, "Ergen", CancellationToken.None);
+        var result = await repository.GetByNameAsync(database.UserId, "Eargen", CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.Equal("Er Gen", result.PrimaryName);

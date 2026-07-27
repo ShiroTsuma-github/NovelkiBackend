@@ -41,7 +41,7 @@ public sealed class PublicBookServiceTests
         book.Titles.Add(new BookTitle
         {
             Title = "Guimi Zhi Zhu",
-            NormalizedTitle = "GUIMI ZHI ZHU",
+            NormalizedTitle = "GUIMIZHIZHU",
             IsPrimary = false,
             Source = "Test"
         });

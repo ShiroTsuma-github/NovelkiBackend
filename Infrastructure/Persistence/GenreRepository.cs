@@ -17,11 +17,8 @@ public class GenreRepository : IGenreRepository
     public async Task<Genre?> GetByNameAsync(string name, CancellationToken cancellationToken)
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
-        var compactName = MappingExtensions.NormalizeNameIgnoringSpaces(name);
         var exact = await _context.Genres
-            .Where(genre => genre.NormalizedName == normalizedName ||
-                            genre.NormalizedName.Replace(" ", "") == compactName)
-            .OrderByDescending(genre => genre.NormalizedName == normalizedName)
+            .Where(genre => genre.NormalizedName == normalizedName)
             .FirstOrDefaultAsync(cancellationToken);
         if (exact != null)
         {

@@ -73,7 +73,7 @@ public class ManageMetadataFeatureTests
     }
 
     [Fact]
-    public async Task UpdateAuthor_ShouldReplaceAliasesAndKeepPrimaryName()
+    public async Task UpdateAuthor_ShouldReplaceAliasesAndIgnoreWhitespaceEquivalentPrimaryName()
     {
         var author = CreateAuthor("Er Gen", "Old alias");
         var repository = new FakeAuthorRepository(author);
@@ -84,7 +84,7 @@ public class ManageMetadataFeatureTests
                 CancellationToken.None);
 
         Assert.Equal("Er Gen", author.PrimaryName);
-        Assert.Equal(["Ergen", "耳根"], result.OtherNames);
+        Assert.Equal(["耳根"], result.OtherNames);
         Assert.True(result.IsOwned);
         Assert.Single(author.Names, name => name.IsPrimary);
         Assert.Equal(1, repository.SaveCount);
@@ -120,7 +120,7 @@ public class ManageMetadataFeatureTests
         var author = CreateAuthor("Er Gen");
         author.Books.Add(new Book
         {
-            OwnerId = OwnerId, PrimaryTitle = "Renegade Immortal", NormalizedPrimaryTitle = "RENEGADE IMMORTAL"
+            OwnerId = OwnerId, PrimaryTitle = "Renegade Immortal", NormalizedPrimaryTitle = "RENEGADEIMMORTAL"
         });
         var lifecycle = new FakeAuthorLifecycleService(author);
         var handler = new DeleteAuthorCommandHandler(lifecycle, new FakeUser());

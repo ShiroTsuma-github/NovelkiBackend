@@ -194,6 +194,27 @@ describe('BookDetailsPage', () => {
     expect(status.querySelector('.book-details-status__dot')).toBeInTheDocument()
   })
 
+  it('keeps the status beside a long default title', async () => {
+    vi.mocked(api.getBook).mockResolvedValue({
+      ...books[0],
+      primaryTitle: 'A Very Long Default Book Title That Needs Several Lines Without Moving The Status Below It',
+    })
+
+    renderWithProviders(
+      <Routes>
+        <Route element={<BookDetailsPage />} path="/books/:id" />
+      </Routes>,
+      { route: '/books/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' },
+    )
+
+    const heading = await screen.findByRole('heading', { level: 1 })
+    const status = screen.getByLabelText('Book status: Reading')
+
+    expect(heading).toHaveClass('min-w-0', 'break-words')
+    expect(heading.parentElement).toHaveClass('grid', 'grid-cols-[minmax(0,1fr)_auto]')
+    expect(status).toHaveClass('self-start')
+  })
+
   it('replaces a technical cover download error with a helpful generic message', async () => {
     vi.mocked(api.getBook).mockResolvedValue({
       ...books[0],

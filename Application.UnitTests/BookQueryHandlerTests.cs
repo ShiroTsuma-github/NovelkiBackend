@@ -134,7 +134,7 @@ public class BookQueryHandlerTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "Admin Book",
-            NormalizedPrimaryTitle = "ADMIN BOOK",
+            NormalizedPrimaryTitle = "ADMINBOOK",
             ContentTypeId = Guid.NewGuid(),
             ContentType = new ContentType { Id = Guid.NewGuid(), Name = "Novel", Slug = "novel" },
             StatusId = Guid.NewGuid(),

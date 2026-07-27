@@ -19,7 +19,7 @@ public sealed class AuthorLifecycleServiceTests
         var author = TestData.Author("Er Gen", database.UserId, true);
         author.Names.Add(new AuthorName
         {
-            Name = "Ergen", NormalizedName = "ERGEN", IsPrimary = false, Source = "Test"
+            Name = "Eargen", NormalizedName = "EARGEN", IsPrimary = false, Source = "Test"
         });
         var ownerBook = TestData.Book(database.UserId, "Owner book", author);
         var otherBook = TestData.Book(otherOwnerId, "Other book", author);
@@ -37,7 +37,7 @@ public sealed class AuthorLifecycleServiceTests
         Assert.Equal(database.UserId, original.OwnerId);
         Assert.Equal(author.Id, (await context.Books.SingleAsync(book => book.Id == ownerBook.Id)).AuthorId);
         Assert.Equal(localized.Id, (await context.Books.SingleAsync(book => book.Id == otherBook.Id)).AuthorId);
-        Assert.Contains(localized.Names, name => name.Name == "Ergen");
+        Assert.Contains(localized.Names, name => name.Name == "Eargen");
     }
 
     [Fact]

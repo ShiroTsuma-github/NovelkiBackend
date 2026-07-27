@@ -135,7 +135,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "Na Bbaego Da Gwihwanja",
-            NormalizedPrimaryTitle = "NA BBAEGO DA GWIHWANJA",
+            NormalizedPrimaryTitle = "NABBAEGODAGWIHWANJA",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId
         });
@@ -154,7 +154,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "History's Greatest Husband",
-            NormalizedPrimaryTitle = "HISTORY'S GREATEST HUSBAND",
+            NormalizedPrimaryTitle = "HISTORY'SGREATESTHUSBAND",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId
         });
@@ -173,7 +173,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "Old Title",
-            NormalizedPrimaryTitle = "OLD TITLE",
+            NormalizedPrimaryTitle = "OLDTITLE",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId,
             CurrentChapterNumber = 1,
@@ -233,7 +233,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "Finishing Book",
-            NormalizedPrimaryTitle = "FINISHING BOOK",
+            NormalizedPrimaryTitle = "FINISHINGBOOK",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId,
             CurrentChapterNumber = 20
@@ -268,7 +268,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = otherOwnerId,
             PrimaryTitle = "Other Owner Book",
-            NormalizedPrimaryTitle = "OTHER OWNER BOOK",
+            NormalizedPrimaryTitle = "OTHEROWNERBOOK",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId
         };
@@ -319,7 +319,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = Guid.Parse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
             PrimaryTitle = "Other Owner Book",
-            NormalizedPrimaryTitle = "OTHER OWNER BOOK",
+            NormalizedPrimaryTitle = "OTHEROWNERBOOK",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId
         };
@@ -366,7 +366,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "Old Title",
-            NormalizedPrimaryTitle = "OLD TITLE",
+            NormalizedPrimaryTitle = "OLDTITLE",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId,
             TotalChapters = 10
@@ -552,7 +552,7 @@ public class BookFeatureTests
             Id = Guid.NewGuid(),
             OwnerId = OwnerId,
             PrimaryTitle = "Old Title",
-            NormalizedPrimaryTitle = "OLD TITLE",
+            NormalizedPrimaryTitle = "OLDTITLE",
             ContentTypeId = ContentTypeId,
             StatusId = StatusId,
             TotalChapters = 0

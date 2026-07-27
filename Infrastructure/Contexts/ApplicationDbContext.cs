@@ -71,6 +71,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<Book>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Books_NormalizedPrimaryTitle_NoSpaces",
+                "\"NormalizedPrimaryTitle\" = replace(\"NormalizedPrimaryTitle\", ' ', '')"));
             entity.HasIndex(b => new { b.OwnerId, b.NormalizedPrimaryTitle, b.ContentTypeId }).IsUnique();
             entity.HasIndex(b => new { b.OwnerId, b.CurrentChapterNumber });
             entity.HasIndex(b => new { b.OwnerId, b.Rating });
@@ -125,6 +128,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
 
         modelBuilder.Entity<BookTitle>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_BookTitles_NormalizedTitle_NoSpaces",
+                "\"NormalizedTitle\" = replace(\"NormalizedTitle\", ' ', '')"));
             entity.HasIndex(t => t.NormalizedTitle);
             entity.HasIndex(t => new { t.BookId, t.NormalizedTitle }).IsUnique();
             entity.HasIndex(t => new { t.BookId, t.IsPrimary });
@@ -192,6 +198,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<Author>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Authors_NormalizedPrimaryName_NoSpaces",
+                "\"NormalizedPrimaryName\" = replace(\"NormalizedPrimaryName\", ' ', '')"));
             entity.HasIndex(a => a.NormalizedPrimaryName)
                 .IsUnique()
                 .HasFilter("\"IsPublic\" = TRUE");
@@ -208,6 +217,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
 
         modelBuilder.Entity<AuthorName>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_AuthorNames_NormalizedName_NoSpaces",
+                "\"NormalizedName\" = replace(\"NormalizedName\", ' ', '')"));
             entity.HasIndex(a => new { a.AuthorId, a.NormalizedName }).IsUnique();
             entity.Property(a => a.Name).HasMaxLength(300);
             entity.Property(a => a.NormalizedName).HasMaxLength(300);
@@ -224,6 +236,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<Genre>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Genres_NormalizedName_NoSpaces",
+                "\"NormalizedName\" = replace(\"NormalizedName\", ' ', '')"));
             entity.HasIndex(g => g.NormalizedName).IsUnique();
             entity.Property(g => g.Name).HasMaxLength(100);
             entity.Property(g => g.NormalizedName).HasMaxLength(100);
@@ -254,6 +269,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<Tag>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_Tags_NormalizedName_NoSpaces",
+                "\"NormalizedName\" = replace(\"NormalizedName\", ' ', '')"));
             entity.HasIndex(t => new { t.OwnerId, t.NormalizedName }).IsUnique();
             entity.HasIndex(t => t.NormalizedName)
                 .IsUnique()
@@ -273,6 +291,9 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         modelBuilder.Entity<PublicBookSnapshot>(entity =>
         {
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_PublicBookSnapshots_NormalizedPrimaryTitle_NoSpaces",
+                "\"NormalizedPrimaryTitle\" = replace(\"NormalizedPrimaryTitle\", ' ', '')"));
             entity.HasIndex(snapshot => snapshot.SourceBookId).IsUnique();
             entity.HasIndex(snapshot => snapshot.NormalizedPrimaryTitle);
             entity.HasIndex(snapshot => new { snapshot.OwnerId, snapshot.SnapshotAt });

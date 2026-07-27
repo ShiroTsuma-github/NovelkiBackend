@@ -4,6 +4,8 @@ using Application.Common.Interfaces;
 using Infrastructure.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql;
 using Testcontainers.PostgreSql;
 
@@ -43,6 +45,11 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
 
     public async Task ResetDatabaseAsync()
     {
+        await ResetDatabaseAsync(null);
+    }
+
+    public async Task ResetDatabaseAsync(string? targetMigration)
+    {
         await using (var connection = new NpgsqlConnection(_container.GetConnectionString()))
         {
             await connection.OpenAsync();
@@ -52,7 +59,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
         }
 
         await using var context = CreateContext(Guid.Empty);
-        await context.Database.MigrateAsync();
+        await context.Database.GetService<IMigrator>().MigrateAsync(targetMigration);
     }
 
     private sealed record FixtureUser(Guid UserId) : IUser

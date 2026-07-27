@@ -204,7 +204,7 @@ public class BookCoverProcessorTests
     {
         var book = new Book
         {
-            Id = BookId, OwnerId = OwnerId, PrimaryTitle = "Test Book", NormalizedPrimaryTitle = "test book"
+            Id = BookId, OwnerId = OwnerId, PrimaryTitle = "Test Book", NormalizedPrimaryTitle = "TESTBOOK"
         };
 
         return new BookCover { BookId = BookId, Book = book, Status = status };

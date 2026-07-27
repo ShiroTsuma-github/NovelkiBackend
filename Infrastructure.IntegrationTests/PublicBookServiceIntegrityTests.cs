@@ -1,5 +1,6 @@
 namespace Infrastructure.IntegrationTests;
 
+using Application.Common;
 using Application.Common.Interfaces;
 using Domain.Associations;
 using Domain.Entities;
@@ -94,7 +95,7 @@ public sealed class PublicBookServiceIntegrityTests
         context.ChangeTracker.Clear();
         book = await context.Books.SingleAsync(item => item.Id == book.Id);
         book.PrimaryTitle = "Edited source";
-        book.NormalizedPrimaryTitle = "EDITED SOURCE";
+        book.NormalizedPrimaryTitle = "EDITEDSOURCE";
         await context.SaveChangesAsync();
         var beforeRefresh = await service.SearchAsync("original", 0, 20, true, CancellationToken.None);
         Assert.Single(beforeRefresh.Data);
@@ -181,7 +182,7 @@ public sealed class PublicBookServiceIntegrityTests
         book.Description = "refreshed";
         context.BookTitles.Add(new BookTitle
         {
-            BookId = book.Id, Title = "Fresh Alias", NormalizedTitle = "FRESH ALIAS", IsPrimary = false,
+            BookId = book.Id, Title = "Fresh Alias", NormalizedTitle = "FRESHALIAS", IsPrimary = false,
             Source = "test"
         });
         await context.SaveChangesAsync();
@@ -260,7 +261,7 @@ public sealed class PublicBookServiceIntegrityTests
         var sourceAuthor = TestData.Author("Source Author", database.UserId, false);
         sourceAuthor.Names.Add(new AuthorName
         {
-            Name = "Source Alias", NormalizedName = "SOURCE ALIAS", IsPrimary = false, Source = "test"
+            Name = "Source Alias", NormalizedName = "SOURCEALIAS", IsPrimary = false, Source = "test"
         });
         var sourceTag = TestData.Tag(database.UserId, "snapshot-tag");
         var genre = TestData.Genre("Temporary Genre");
@@ -284,7 +285,7 @@ public sealed class PublicBookServiceIntegrityTests
         var preferredAuthor = TestData.Author("Preferred Local", targetOwner, false);
         preferredAuthor.Names.Add(new AuthorName
         {
-            Name = "Source Author", NormalizedName = "SOURCE AUTHOR", IsPrimary = false, Source = "test"
+            Name = "Source Author", NormalizedName = "SOURCEAUTHOR", IsPrimary = false, Source = "test"
         });
         var preferredTag = TestData.Tag(targetOwner, "snapshot-tag");
         context.AddRange(preferredAuthor, preferredTag);
@@ -577,7 +578,7 @@ public sealed class PublicBookServiceIntegrityTests
         SourceBook = book,
         OwnerId = ownerId,
         PrimaryTitle = title,
-        NormalizedPrimaryTitle = title.ToUpperInvariant(),
+        NormalizedPrimaryTitle = MappingExtensions.NormalizeName(title),
         AlternativeTitlesJson = alternatives,
         AuthorName = author,
         AuthorOtherNamesJson = aliases,

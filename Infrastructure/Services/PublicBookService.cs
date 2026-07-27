@@ -723,13 +723,15 @@ public sealed class PublicBookService(
     {
         var normalized = MappingExtensions.NormalizeName(value);
         return snapshot => snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
-                           snapshot.AlternativeTitlesJson.ToUpper().Contains(normalized) ||
-                           (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)) ||
-                           snapshot.AuthorOtherNamesJson.ToUpper().Contains(normalized) ||
-                           (snapshot.Description != null && snapshot.Description.ToUpper().Contains(normalized)) ||
-                           snapshot.ContentType.ToUpper().Contains(normalized) ||
-                           snapshot.GenresJson.ToUpper().Contains(normalized) ||
-                           snapshot.TagsJson.ToUpper().Contains(normalized);
+                           snapshot.AlternativeTitlesJson.ToUpper().Replace(" ", "").Contains(normalized) ||
+                           (snapshot.AuthorName != null &&
+                            snapshot.AuthorName.ToUpper().Replace(" ", "").Contains(normalized)) ||
+                           snapshot.AuthorOtherNamesJson.ToUpper().Replace(" ", "").Contains(normalized) ||
+                           (snapshot.Description != null &&
+                            snapshot.Description.ToUpper().Replace(" ", "").Contains(normalized)) ||
+                           snapshot.ContentType.ToUpper().Replace(" ", "").Contains(normalized) ||
+                           snapshot.GenresJson.ToUpper().Replace(" ", "").Contains(normalized) ||
+                           snapshot.TagsJson.ToUpper().Replace(" ", "").Contains(normalized);
     }
 
     private static Expression<Func<PublicBookSnapshot, bool>> BuildFieldSearchPredicate(BookSearchFieldFilter filter)
@@ -742,15 +744,20 @@ public sealed class PublicBookService(
                 BookSearchField.Title =>
                     (Expression<Func<PublicBookSnapshot, bool>>)(snapshot =>
                         snapshot.NormalizedPrimaryTitle.Contains(normalized) ||
-                        snapshot.AlternativeTitlesJson.ToUpper().Contains(normalized)),
+                        snapshot.AlternativeTitlesJson.ToUpper().Replace(" ", "").Contains(normalized)),
                 BookSearchField.Author => snapshot =>
-                    (snapshot.AuthorName != null && snapshot.AuthorName.ToUpper().Contains(normalized)) ||
-                    snapshot.AuthorOtherNamesJson.ToUpper().Contains(normalized),
+                    (snapshot.AuthorName != null &&
+                     snapshot.AuthorName.ToUpper().Replace(" ", "").Contains(normalized)) ||
+                    snapshot.AuthorOtherNamesJson.ToUpper().Replace(" ", "").Contains(normalized),
                 BookSearchField.Description => snapshot =>
-                    snapshot.Description != null && snapshot.Description.ToUpper().Contains(normalized),
-                BookSearchField.Genre => snapshot => snapshot.GenresJson.ToUpper().Contains(normalized),
-                BookSearchField.Tag => snapshot => snapshot.TagsJson.ToUpper().Contains(normalized),
-                BookSearchField.Type => snapshot => snapshot.ContentType.ToUpper().Contains(normalized),
+                    snapshot.Description != null &&
+                    snapshot.Description.ToUpper().Replace(" ", "").Contains(normalized),
+                BookSearchField.Genre => snapshot =>
+                    snapshot.GenresJson.ToUpper().Replace(" ", "").Contains(normalized),
+                BookSearchField.Tag => snapshot =>
+                    snapshot.TagsJson.ToUpper().Replace(" ", "").Contains(normalized),
+                BookSearchField.Type => snapshot =>
+                    snapshot.ContentType.ToUpper().Replace(" ", "").Contains(normalized),
                 _ => snapshot => false
             };
         })) ?? (_ => false);

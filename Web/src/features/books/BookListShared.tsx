@@ -89,52 +89,46 @@ export function useBookListUrlState(
 }
 
 export function useBookListPagination({
-  dataLength,
-  isFetching,
   pageSize,
+  scrollTargetId,
   setSkip,
   skip,
   total,
 }: {
-  dataLength: number
-  isFetching: boolean
   pageSize: number
+  scrollTargetId?: string
   setSkip: (nextSkip: number) => void
   skip: number
   total: number
 }) {
   const [activePageGapId, setActivePageGapId] = useState<string | null>(null)
-  const pendingBottomAnchorRef = useRef<number | null>(null)
   const canGoBack = skip > 0
   const canGoForward = skip + pageSize < total
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const currentPage = Math.min(totalPages, Math.floor(skip / pageSize) + 1)
   const visiblePages = getVisiblePageNumbers(currentPage, totalPages)
 
-  useEffect(() => {
-    if (isFetching || pendingBottomAnchorRef.current == null) {
-      return
-    }
-
-    const distanceFromBottom = pendingBottomAnchorRef.current
-    pendingBottomAnchorRef.current = null
-
-    requestAnimationFrame(() => {
-      const target = Math.max(0, document.documentElement.scrollHeight - window.innerHeight - distanceFromBottom)
-      window.scrollTo({ top: target })
-    })
-  }, [dataLength, isFetching, skip])
-
   function goToPage(page: number) {
     const nextPage = Math.min(Math.max(1, page), totalPages)
-    prepareBottomAnchorForPageChange()
     setActivePageGapId(null)
+    scrollToResultsStart()
     setSkip((nextPage - 1) * pageSize)
   }
 
-  function prepareBottomAnchorForPageChange() {
-    const distanceFromBottom = document.documentElement.scrollHeight - (window.scrollY + window.innerHeight)
-    pendingBottomAnchorRef.current = distanceFromBottom <= 24 ? Math.max(0, distanceFromBottom) : null
+  function scrollToResultsStart() {
+    if (!scrollTargetId) {
+      return
+    }
+
+    const target = document.getElementById(scrollTargetId)
+    if (!target) {
+      return
+    }
+
+    window.scrollTo({
+      top: Math.max(0, window.scrollY + target.getBoundingClientRect().top),
+      behavior: 'auto',
+    })
   }
 
   return {

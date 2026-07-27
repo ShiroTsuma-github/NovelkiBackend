@@ -29,7 +29,7 @@ public sealed class AuthorEndpointTests
     private static readonly Guid UserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
 
     [Fact]
-    public async Task UpdateAuthor_ShouldReplaceExistingAliasWithThreeAlternativeNames()
+    public async Task UpdateAuthor_ShouldIgnoreAliasEquivalentToPrimaryNameWithoutSpaces()
     {
         await using var factory = new AuthorApiFactory();
         var authorId = await factory.SeedAuthorAsync();
@@ -44,7 +44,7 @@ public sealed class AuthorEndpointTests
         Assert.True(response.IsSuccessStatusCode, $"Expected success, got {(int)response.StatusCode}: {body}");
         var author = await response.Content.ReadFromJsonAsync<AuthorDto>();
         Assert.NotNull(author);
-        Assert.Equal(["Eargen", "Ergen", "耳根"], author.OtherNames);
+        Assert.Equal(["Eargen", "耳根"], author.OtherNames);
 
         await using var scope = factory.Services.CreateAsyncScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -53,7 +53,7 @@ public sealed class AuthorEndpointTests
             .OrderBy(name => name.Name)
             .Select(name => name.Name)
             .ToListAsync();
-        Assert.Equal(["Eargen", "Ergen", "耳根"], storedNames);
+        Assert.Equal(["Eargen", "耳根"], storedNames);
     }
 
     private sealed class AuthorApiFactory : WebApplicationFactory<Program>
@@ -130,7 +130,7 @@ public sealed class AuthorEndpointTests
             var author = TestData.Author("Er Gen", UserId, false);
             author.Names.Add(new AuthorName
             {
-                Name = "Old alias", NormalizedName = "OLD ALIAS", IsPrimary = false, Source = "Test"
+                Name = "Old alias", NormalizedName = "OLDALIAS", IsPrimary = false, Source = "Test"
             });
             context.Authors.Add(author);
             await context.SaveChangesAsync();

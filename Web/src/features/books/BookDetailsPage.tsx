@@ -166,8 +166,8 @@ export function BookDetailsPage() {
                   <div className="flex min-w-0 flex-col gap-3">
                     <div className="flex flex-col gap-2">
                       <div className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">{book.contentType}</div>
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <h1 className="text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">{book.primaryTitle}</h1>
+                      <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+                        <h1 className="min-w-0 break-words text-3xl font-semibold tracking-tight text-slate-950 md:text-4xl">{book.primaryTitle}</h1>
                         <StatusPill status={book.status} />
                       </div>
                       {book.alternativeTitles.length ? (
@@ -395,7 +395,7 @@ function StatusPill({ status }: { status: string }) {
   return (
     <span
       aria-label={`Book status: ${status}`}
-      className={`book-details-status book-details-status--${tone} self-center`}
+      className={`book-details-status book-details-status--${tone} self-start`}
     >
       <span aria-hidden="true" className="book-details-status__dot" />
       <span aria-hidden="true" className="book-details-status__label">Status</span>

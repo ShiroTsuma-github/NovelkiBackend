@@ -36,11 +36,11 @@ public class MappingExtensionTests
     }
 
     [Fact]
-    public void NormalizeName_ShouldTrimCollapseWhitespaceAndUppercase()
+    public void NormalizeName_ShouldRemoveWhitespaceAndUppercase()
     {
         var result = MappingExtensions.NormalizeName("  Er\t \n Gen   ");
 
-        Assert.Equal("ER GEN", result);
+        Assert.Equal("ERGEN", result);
     }
 
     [Fact]
@@ -52,11 +52,11 @@ public class MappingExtensionTests
     }
 
     [Fact]
-    public void NormalizeNameIgnoringSpaces_ShouldCreateTheSameComparisonKey()
+    public void NormalizeName_ShouldCreateTheSameComparisonKeyRegardlessOfWhitespace()
     {
         Assert.Equal(
-            MappingExtensions.NormalizeNameIgnoringSpaces("Slice Of Life"),
-            MappingExtensions.NormalizeNameIgnoringSpaces("  SLICEOFLIFE  "));
+            MappingExtensions.NormalizeName("Slice Of Life"),
+            MappingExtensions.NormalizeName("  SLICEOFLIFE  "));
     }
 
     [Theory]
@@ -98,7 +98,7 @@ public class MappingExtensionTests
             Created = DateTimeOffset.Parse("2026-07-01T10:00:00Z"),
             LastModified = DateTimeOffset.Parse("2026-07-02T10:00:00Z"),
             PrimaryTitle = "Everyone Else is a Returnee",
-            NormalizedPrimaryTitle = "EVERYONE ELSE IS A RETURNEE",
+            NormalizedPrimaryTitle = "EVERYONEELSEISARETURNEE",
             Description = "Portal fantasy with returnee progression.",
             Author = author,
             AuthorId = author.Id,
@@ -111,7 +111,7 @@ public class MappingExtensionTests
             Priority = 1
         };
         book.Titles.Add("Everyone Else is a Returnee".ToPrimaryTitle());
-        book.Titles.Add(new BookTitle { Title = "Na Bbaego Da Gwihwanja", NormalizedTitle = "NA BBAEGO DA GWIHWANJA" });
+        book.Titles.Add(new BookTitle { Title = "Na Bbaego Da Gwihwanja", NormalizedTitle = "NABBAEGODAGWIHWANJA" });
         book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
         book.BookTags.Add(new BookTag { Book = book, Tag = tag });
         book.Links.Add(new BookLink { Url = "https://example.com", SourceType = "NovelUpdates", IsPrimary = true });
@@ -188,7 +188,7 @@ public class MappingExtensionTests
     [Fact]
     public void AuthorToDto_ShouldMapAliases()
     {
-        var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
+        var author = new Author { PrimaryName = "Er Gen", NormalizedPrimaryName = "ERGEN" };
         author.Names.Add(new AuthorName { Name = "Ergen", NormalizedName = "ERGEN", IsPrimary = false });
 
         var dto = author.ToDto();

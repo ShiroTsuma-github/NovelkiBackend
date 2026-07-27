@@ -19,13 +19,10 @@ public class TagRepository : ITagRepository
     public async Task<Tag?> GetByNameAsync(Guid ownerId, string name, CancellationToken cancellationToken)
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
-        var compactName = MappingExtensions.NormalizeNameIgnoringSpaces(name);
         var visibleTags = _context.Tags.Where(t => t.IsGlobal || t.OwnerId == ownerId);
         var exact = await visibleTags
-            .Where(t => (t.IsGlobal || t.OwnerId == ownerId) &&
-                        (t.NormalizedName == normalizedName || t.NormalizedName.Replace(" ", "") == compactName))
-            .OrderByDescending(t => t.NormalizedName == normalizedName)
-            .ThenByDescending(t => t.IsGlobal)
+            .Where(t => t.NormalizedName == normalizedName)
+            .OrderByDescending(t => t.IsGlobal)
             .FirstOrDefaultAsync(cancellationToken);
         if (exact != null)
         {
@@ -45,13 +42,10 @@ public class TagRepository : ITagRepository
     {
         var requestedNames = names.ToList();
         var normalizedNames = requestedNames.Select(MappingExtensions.NormalizeName).Distinct().ToList();
-        var compactNames = requestedNames.Select(MappingExtensions.NormalizeNameIgnoringSpaces).Distinct().ToList();
         var matches = await _context.Tags
             .Where(t => (t.IsGlobal || t.OwnerId == ownerId) &&
-                        (normalizedNames.Contains(t.NormalizedName) ||
-                         compactNames.Contains(t.NormalizedName.Replace(" ", ""))))
-            .OrderByDescending(t => normalizedNames.Contains(t.NormalizedName))
-            .ThenByDescending(t => t.IsGlobal)
+                        normalizedNames.Contains(t.NormalizedName))
+            .OrderByDescending(t => t.IsGlobal)
             .ToListAsync(cancellationToken);
         var result = matches.GroupBy(t => MetadataNameSimilarity.CreateKey(t.Name))
             .Select(group => group.First()).ToList();

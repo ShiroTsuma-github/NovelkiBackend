@@ -211,9 +211,8 @@ export function BooksPage() {
 
   const total = booksQuery.data?.total ?? 0
   const pagination = useBookListPagination({
-    dataLength: booksQuery.data?.data.length ?? 0,
-    isFetching: booksQuery.isFetching,
     pageSize,
+    scrollTargetId: 'book-list-results',
     setSkip,
     skip,
     total,
@@ -380,7 +379,7 @@ export function BooksPage() {
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <Surface className="min-w-0 overflow-hidden">
+      <Surface className="min-w-0 overflow-hidden" id="book-list-results">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {(booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>

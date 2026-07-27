@@ -245,8 +245,11 @@ public sealed class BookHtmlParserTests
         var types = new Mock<ITypeRepository>();
         types.Setup(repository => repository.GetByNameAsync("Novel", It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ContentType { Id = Guid.NewGuid(), Name = "Novel", Slug = "novel" });
-        var known = names.ToDictionary(MappingExtensions.NormalizeNameIgnoringSpaces,
-            name => new Genre { Id = Guid.NewGuid(), Name = name, NormalizedName = name.ToUpperInvariant() },
+        var known = names.ToDictionary(MappingExtensions.NormalizeName,
+            name => new Genre
+            {
+                Id = Guid.NewGuid(), Name = name, NormalizedName = MappingExtensions.NormalizeName(name)
+            },
             StringComparer.Ordinal);
         var genres = new Mock<IGenreRepository>();
         genres.Setup(repository => repository.GetByNameAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))

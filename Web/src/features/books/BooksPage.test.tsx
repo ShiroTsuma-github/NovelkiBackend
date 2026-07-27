@@ -860,7 +860,7 @@ describe('BooksPage', () => {
     expect(gapButtons[1]).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('preserves bottom anchoring when changing pages near the page bottom', async () => {
+  it('scrolls to the top of the table when changing pages near the page bottom', async () => {
     vi.mocked(api.getBooks).mockResolvedValue({
       skip: 0,
       take: 20,
@@ -870,17 +870,18 @@ describe('BooksPage', () => {
     const user = userEvent.setup()
     const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
 
-    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
     Object.defineProperty(window, 'scrollY', { configurable: true, value: 1190 })
-    Object.defineProperty(document.documentElement, 'scrollHeight', { configurable: true, value: 2000 })
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
+    vi.spyOn(document.getElementById('book-list-results')!, 'getBoundingClientRect').mockReturnValue({
+      top: -790,
+    } as DOMRect)
     await user.click(screen.getByRole('button', { name: '2' }))
 
     await waitFor(() => {
-      expect(scrollTo).toHaveBeenCalledWith({ top: 1190 })
+      expect(scrollTo).toHaveBeenCalledWith({ top: 400, behavior: 'auto' })
     })
 
     scrollTo.mockRestore()

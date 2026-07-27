@@ -709,12 +709,12 @@ public class BookCsvImportServiceTests
         var author = TestData.Author("Er Gen", database.UserId, true);
         author.Names.Add(new AuthorName
         {
-            Name = "Ergen", NormalizedName = "ERGEN", IsPrimary = false, Source = "Test"
+            Name = "Eargen", NormalizedName = "EARGEN", IsPrimary = false, Source = "Test"
         });
         context.Authors.Add(author);
         await context.SaveChangesAsync();
         var service = CreateService(context, database.UserId);
-        using var stream = CreateCsv("primaryTitle,authorName,contentType,status\nAlias Book,Ergen,Novel,Reading\n");
+        using var stream = CreateCsv("primaryTitle,authorName,contentType,status\nAlias Book,Eargen,Novel,Reading\n");
 
         var session = await service.CreateSessionAsync(stream, "books.csv", CancellationToken.None);
         await service.FinalizeAsync(session.SessionId, CancellationToken.None);

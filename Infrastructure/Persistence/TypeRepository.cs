@@ -48,7 +48,7 @@ public class TypeRepository : ITypeRepository
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.ContentTypes.FirstOrDefaultAsync(
-            t => t.Name.ToUpper() == normalizedName || t.Slug.ToUpper() == normalizedName,
+            t => t.Name.ToUpper().Replace(" ", "") == normalizedName || t.Slug.ToUpper() == normalizedName,
             cancellationToken);
     }
 

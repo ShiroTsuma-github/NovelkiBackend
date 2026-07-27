@@ -171,7 +171,7 @@ public class BookCoverTests
                     Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://graphql.anilist.co") });
         var book = CreateBook();
-        book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALT TITLE", IsPrimary = false });
+        book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALTTITLE", IsPrimary = false });
 
         var result = await provider.FindAsync(book, CancellationToken.None);
 
@@ -208,7 +208,7 @@ public class BookCoverTests
                     Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://api.jikan.moe") });
         var book = CreateBook();
-        book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALT TITLE", IsPrimary = false });
+        book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALTTITLE", IsPrimary = false });
 
         var result = await provider.FindAsync(book, CancellationToken.None);
 
@@ -270,7 +270,7 @@ public class BookCoverTests
                 Content = new StringContent("""{"docs":[{"cover_i":999}]}""", Encoding.UTF8, "application/json")
             })) { BaseAddress = new Uri("https://openlibrary.org") });
         var book = CreateBook();
-        book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALT TITLE", IsPrimary = false });
+        book.Titles.Add(new BookTitle { Title = "Alt Title", NormalizedTitle = "ALTTITLE", IsPrimary = false });
 
         var result = await provider.FindAsync(book, CancellationToken.None);
 
@@ -310,7 +310,7 @@ public class BookCoverTests
         var book = CreateBook();
         book.Titles.Add(new BookTitle
         {
-            Title = "Alt \"Quoted\" Title", NormalizedTitle = "ALT QUOTED TITLE", IsPrimary = false
+            Title = "Alt \"Quoted\" Title", NormalizedTitle = "ALTQUOTEDTITLE", IsPrimary = false
         });
 
         var result = await provider.FindAsync(book, CancellationToken.None);
@@ -854,7 +854,7 @@ public class BookCoverTests
             Id = BookId,
             OwnerId = OwnerId,
             PrimaryTitle = "I Shall Seal the Heavens",
-            NormalizedPrimaryTitle = "I SHALL SEAL THE HEAVENS",
+            NormalizedPrimaryTitle = "ISHALLSEALTHEHEAVENS",
             ContentTypeId = Guid.NewGuid(),
             StatusId = Guid.NewGuid(),
             Cover = hasCover ? cover ?? new BookCover { BookId = BookId } : null

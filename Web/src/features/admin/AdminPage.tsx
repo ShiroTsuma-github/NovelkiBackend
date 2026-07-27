@@ -78,9 +78,8 @@ export function AdminPage() {
   })
   const total = adminBooksQuery.data?.total ?? 0
   const pagination = useBookListPagination({
-    dataLength: adminBooksQuery.data?.data.length ?? 0,
-    isFetching: adminBooksQuery.isFetching,
     pageSize,
+    scrollTargetId: 'admin-book-list-results',
     setSkip,
     skip,
     total,
@@ -103,7 +102,7 @@ export function AdminPage() {
 
       <BookAdvancedSearch value={query} onChange={updateQuery} />
 
-      <Surface className="overflow-hidden">
+      <Surface className="overflow-hidden" id="admin-book-list-results">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
           {adminBooksQuery.isFetching && !adminBooksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>

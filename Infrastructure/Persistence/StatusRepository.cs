@@ -48,7 +48,7 @@ public class StatusRepository : IStatusRepository
     {
         var normalizedName = MappingExtensions.NormalizeName(name);
         return await _context.Statuses.FirstOrDefaultAsync(
-            s => s.Name.ToUpper() == normalizedName || s.Slug.ToUpper() == normalizedName,
+            s => s.Name.ToUpper().Replace(" ", "") == normalizedName || s.Slug.ToUpper() == normalizedName,
             cancellationToken);
     }
 

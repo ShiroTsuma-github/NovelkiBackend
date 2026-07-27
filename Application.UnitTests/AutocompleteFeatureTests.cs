@@ -15,7 +15,7 @@ public class AutocompleteFeatureTests
     public async Task SearchAuthors_ShouldReturnAuthorMatchedByAlias()
     {
         var repository = new FakeAuthorRepository();
-        var author = new Author { OwnerId = OwnerId, PrimaryName = "Er Gen", NormalizedPrimaryName = "ER GEN" };
+        var author = new Author { OwnerId = OwnerId, PrimaryName = "Er Gen", NormalizedPrimaryName = "ERGEN" };
         author.Names.Add(new AuthorName { Name = "耳根", NormalizedName = "耳根", IsPrimary = false });
         await repository.AddAsync(author, CancellationToken.None);
         var handler = new SearchAuthorsQueryHandler(repository, new FakeUser());
@@ -37,7 +37,7 @@ public class AutocompleteFeatureTests
             OwnerId = Guid.NewGuid(),
             IsPublic = true,
             PrimaryName = "Global Author",
-            NormalizedPrimaryName = "GLOBAL AUTHOR"
+            NormalizedPrimaryName = "GLOBALAUTHOR"
         }, CancellationToken.None);
         var handler = new SearchAuthorsQueryHandler(repository, new FakeUser());
 
@@ -57,7 +57,7 @@ public class AutocompleteFeatureTests
         await repository.AddAsync(new Tag { OwnerId = Guid.NewGuid(), Name = "favorite", NormalizedName = "FAVORITE" },
             CancellationToken.None);
         await repository.AddAsync(
-            new Tag { IsGlobal = true, Name = "official favorite", NormalizedName = "OFFICIAL FAVORITE" },
+            new Tag { IsGlobal = true, Name = "official favorite", NormalizedName = "OFFICIALFAVORITE" },
             CancellationToken.None);
         var handler = new SearchTagsQueryHandler(repository, new FakeUser());
 
