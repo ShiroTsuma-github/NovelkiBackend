@@ -262,6 +262,65 @@ public sealed class BookSearchCriteriaApplierTests
         Assert.Equal(new[] { first.Id, second.Id }.Order(), ids.Order());
     }
 
+    [Fact]
+    public async Task Exclusions_ShouldRejectMatchingNumbersTagsAndGenres()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var favorite = TestData.Tag(database.UserId, "Favorite");
+        var dropped = TestData.Tag(database.UserId, "Dropped");
+        var fantasy = TestData.Genre("Fantasy");
+        var romance = TestData.Genre("Romance");
+        var match = AddSearchBook("Match", 9, favorite, fantasy);
+        var rejectedRating = AddSearchBook("Rejected rating", 8, favorite, fantasy);
+        var rejectedTag = AddSearchBook("Rejected tag", 9, dropped, fantasy);
+        var rejectedGenre = AddSearchBook("Rejected genre", 9, favorite, romance);
+        var missingRating = AddSearchBook("Missing rating", null, favorite, fantasy);
+        context.Books.AddRange(match, rejectedRating, rejectedTag, rejectedGenre, missingRating);
+        await context.SaveChangesAsync();
+
+        var criteria = BookSearchQueryParser.Parse("-rating:8 -tag:dropped -genre:romance");
+        var ids = await Apply(context, criteria).Select(book => book.Id).ToArrayAsync();
+
+        Assert.Equal(new[] { match.Id, missingRating.Id }.Order(), ids.Order());
+
+        Book AddSearchBook(string title, int? rating, Tag tag, Genre genre)
+        {
+            var book = TestData.Book(database.UserId, title);
+            book.Rating = rating;
+            book.BookTags.Add(new BookTag { Book = book, Tag = tag });
+            book.BookGenres.Add(new BookGenre { Book = book, Genre = genre });
+            return book;
+        }
+    }
+
+    [Fact]
+    public async Task MultiValueExclusion_ShouldRejectAnyMatchingValue()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var allowed = TestData.Book(database.UserId, "Allowed");
+        allowed.BookTags.Add(new BookTag
+        {
+            Book = allowed,
+            Tag = TestData.Tag(database.UserId, "Favorite")
+        });
+        var blocked = TestData.Book(database.UserId, "Blocked");
+        blocked.BookTags.Add(new BookTag
+        {
+            Book = blocked,
+            Tag = TestData.Tag(database.UserId, "Dropped")
+        });
+        context.Books.AddRange(allowed, blocked);
+        await context.SaveChangesAsync();
+
+        var ids = await Apply(context, BookSearchQueryParser.Parse("-tag:dropped,blocked"))
+            .Select(book => book.Id)
+            .ToArrayAsync();
+
+        Assert.Equal([allowed.Id], ids);
+    }
+
     [Theory]
     [MemberData(nameof(FieldCases))]
     public void FieldFilters_ShouldGeneratePostgresQueryForEveryField(BookSearchField field)

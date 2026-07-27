@@ -74,7 +74,7 @@ export function AnalyticsPage() {
             <span className="ui-field-label">Query</span>
             <input
               className={controlClass}
-              placeholder="author:Toika rating:>=8"
+              placeholder="author:Toika rating:>=8 -genre:romance"
               value={draftFilters.query}
               onChange={(event) => setDraftFilters((current) => ({ ...current, query: event.target.value }))}
             />

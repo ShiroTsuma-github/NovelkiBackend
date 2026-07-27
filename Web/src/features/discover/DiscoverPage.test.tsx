@@ -53,9 +53,9 @@ describe('DiscoverPage', () => {
     await user.hover(screen.getByLabelText('2 alternative titles'))
     expect(screen.getByRole('tooltip')).toHaveTextContent('Alternative titles: LOTM Guimi Zhi Zhu')
 
-    await user.type(screen.getByPlaceholderText('Search title, author, genre, tag, type, or chapters…'), 'author:Cuttlefish')
+    await user.type(screen.getByPlaceholderText(/exclude with -tag:/i), '-tag:romance')
     await waitFor(() => expect(api.searchPublicBooks).toHaveBeenCalledWith({
-      search: 'author:Cuttlefish',
+      search: '-tag:romance',
       skip: 0,
       take: 40,
     }))

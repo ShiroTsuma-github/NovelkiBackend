@@ -6,7 +6,6 @@ import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
 import type { AuthorDto, BookListItemDto, PublicBookSnapshotDto, TagDto } from '@/api/types'
 import { Badge, buttonVariants, controlClass, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
-import { buildBookQuery, emptyFilters } from '@/features/books/queryBuilder'
 import { cn } from '@/lib/utils'
 
 type ManageSection = 'tags' | 'authors' | 'books'
@@ -39,7 +38,7 @@ export function ManagePage() {
     queryFn: ({ pageParam }) => api.getBooks({
       skip: pageParam,
       take: 50,
-      query: buildBookQuery({ ...emptyFilters, text: debouncedSearch }) || undefined,
+      query: debouncedSearch || undefined,
     }),
     getNextPageParam: (lastPage) => {
       const nextSkip = lastPage.skip + lastPage.data.length
@@ -160,7 +159,7 @@ export function ManagePage() {
             <span className="sr-only">Search {section}</span>
             <input
               autoComplete="off"
-              placeholder={section === 'tags' ? 'Search tags…' : section === 'authors' ? 'Search authors or aliases…' : 'Search your books…'}
+              placeholder={section === 'tags' ? 'Search tags…' : section === 'authors' ? 'Search authors or aliases…' : 'Search your books, e.g. -tag:dropped…'}
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}

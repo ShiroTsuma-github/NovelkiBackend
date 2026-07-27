@@ -38,7 +38,16 @@ public sealed class BookSearchCriteriaApplier
                 .OfType<Expression<Func<Book, bool>>>())
             .Concat(criteria.Missing
                 .Select(BuildMissingPredicate)
+                .OfType<Expression<Func<Book, bool>>>())
+            .Concat(criteria.Exclusions
+                .Select(BuildExclusionPredicate)
                 .OfType<Expression<Func<Book, bool>>>());
+    }
+
+    private Expression<Func<Book, bool>>? BuildExclusionPredicate(BookSearchCriteria exclusion)
+    {
+        var predicate = PredicateExpression.AndAll(BuildPredicates(exclusion));
+        return predicate == null ? null : PredicateExpression.Not(predicate);
     }
 
     private Expression<Func<Book, bool>> BuildGeneralTextPredicate(string search)

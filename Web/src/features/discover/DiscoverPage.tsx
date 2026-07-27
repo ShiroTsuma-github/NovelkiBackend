@@ -55,7 +55,7 @@ export function DiscoverPage() {
           <span className="sr-only">Search shared books</span>
           <input
             autoComplete="off"
-            placeholder="Search title, author, genre, tag, type, or chapters…"
+            placeholder="Search title, author, genre, tag, type, or exclude with -tag:…"
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}

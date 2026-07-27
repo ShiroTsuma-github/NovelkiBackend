@@ -234,6 +234,18 @@ describe('ManagePage', () => {
     await waitFor(() => expect(api.publishBook).toHaveBeenCalledWith(bookListItems[1].id))
   })
 
+  it('passes exclusion queries from the books section without quoting them', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<ManagePage />)
+
+    await user.click(screen.getByRole('tab', { name: 'Books' }))
+    await user.type(screen.getByPlaceholderText(/-tag:dropped/i), '-rating:8 -genre:romance')
+
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({
+      query: '-rating:8 -genre:romance',
+    })))
+  })
+
   it('keeps listed books first, sorts the rest, and blocks incomplete listings', async () => {
     const incomplete = {
       ...bookListItems[1],

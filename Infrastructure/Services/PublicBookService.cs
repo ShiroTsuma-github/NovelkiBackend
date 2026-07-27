@@ -676,6 +676,14 @@ public sealed class PublicBookService(
         IQueryable<PublicBookSnapshot> query,
         BookSearchCriteria criteria)
     {
+        ValidatePublicSearchCriteria(criteria);
+
+        var predicate = BuildPublicSearchPredicate(criteria);
+        return predicate is null ? query : query.Where(predicate);
+    }
+
+    private static void ValidatePublicSearchCriteria(BookSearchCriteria criteria)
+    {
         if (criteria.Missing.Count > 0 || criteria.Dates.Count > 0 ||
             criteria.Fields.Any(filter => filter.Field == BookSearchField.Status) ||
             criteria.Numbers.Any(filter => filter.Field != BookSearchNumberField.TotalChapters) ||
@@ -686,11 +694,29 @@ public sealed class PublicBookService(
                 "Missing metadata, rating, current chapter, label, status, priority, and date filters are private and unavailable.");
         }
 
+        foreach (var exclusion in criteria.Exclusions)
+        {
+            ValidatePublicSearchCriteria(exclusion);
+        }
+    }
+
+    private static Expression<Func<PublicBookSnapshot, bool>>? BuildPublicSearchPredicate(
+        BookSearchCriteria criteria)
+    {
         var predicates = criteria.Terms.Select(BuildGeneralSearchPredicate)
             .Concat(criteria.Fields.Select(BuildFieldSearchPredicate))
-            .Concat(criteria.Numbers.Select(BuildNumberSearchPredicate));
-        var predicate = PredicateExpression.AndAll(predicates);
-        return predicate is null ? query : query.Where(predicate);
+            .Concat(criteria.Numbers.Select(BuildNumberSearchPredicate))
+            .Concat(criteria.Exclusions
+                .Select(BuildPublicExclusionPredicate)
+                .OfType<Expression<Func<PublicBookSnapshot, bool>>>());
+        return PredicateExpression.AndAll(predicates);
+    }
+
+    private static Expression<Func<PublicBookSnapshot, bool>>? BuildPublicExclusionPredicate(
+        BookSearchCriteria exclusion)
+    {
+        var predicate = BuildPublicSearchPredicate(exclusion);
+        return predicate == null ? null : PredicateExpression.Not(predicate);
     }
 
     private static Expression<Func<PublicBookSnapshot, bool>> BuildGeneralSearchPredicate(string value)

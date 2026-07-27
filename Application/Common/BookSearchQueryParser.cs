@@ -92,37 +92,70 @@ public static class BookSearchQueryParser
         var numbers = new List<BookSearchNumberFilter>();
         var dates = new List<BookSearchDateFilter>();
         var missing = new List<BookSearchMissingFilter>();
+        var exclusions = new List<BookSearchCriteria>();
 
-        foreach (var token in Tokenize(query))
+        foreach (var rawToken in Tokenize(query))
         {
-            if (TryParseMissingFilter(token, out var missingFilter))
+            var isExcluded = rawToken.Length > 1 && rawToken[0] == '-';
+            var token = isExcluded ? rawToken[1..] : rawToken;
+            var parsed = ParseToken(token);
+            if (isExcluded)
             {
-                missing.Add(missingFilter);
+                exclusions.Add(parsed);
                 continue;
             }
 
-            if (TryParseDateFilter(token, out var dateFilters))
-            {
-                dates.AddRange(dateFilters);
-                continue;
-            }
-
-            if (TryParseNumberFilter(token, out var numberFilter))
-            {
-                numbers.Add(numberFilter);
-                continue;
-            }
-
-            if (TryParseFieldFilter(token, out var fieldFilter))
-            {
-                fields.Add(fieldFilter);
-                continue;
-            }
-
-            terms.Add(token);
+            terms.AddRange(parsed.Terms);
+            fields.AddRange(parsed.Fields);
+            numbers.AddRange(parsed.Numbers);
+            dates.AddRange(parsed.Dates);
+            missing.AddRange(parsed.Missing);
         }
 
-        return new BookSearchCriteria(terms, fields, numbers, dates, missing);
+        return new BookSearchCriteria(terms, fields, numbers, dates, missing)
+        {
+            Exclusions = exclusions
+        };
+    }
+
+    private static BookSearchCriteria ParseToken(string token)
+    {
+        if (TryParseMissingFilter(token, out var missingFilter))
+        {
+            return Criteria(missing: [missingFilter]);
+        }
+
+        if (TryParseDateFilter(token, out var dateFilters))
+        {
+            return Criteria(dates: dateFilters);
+        }
+
+        if (TryParseNumberFilter(token, out var numberFilter))
+        {
+            return Criteria(numbers: [numberFilter]);
+        }
+
+        if (TryParseFieldFilter(token, out var fieldFilter))
+        {
+            return Criteria(fields: [fieldFilter]);
+        }
+
+        return Criteria(terms: [token]);
+    }
+
+    private static BookSearchCriteria Criteria(
+        IReadOnlyCollection<string>? terms = null,
+        IReadOnlyCollection<BookSearchFieldFilter>? fields = null,
+        IReadOnlyCollection<BookSearchNumberFilter>? numbers = null,
+        IReadOnlyCollection<BookSearchDateFilter>? dates = null,
+        IReadOnlyCollection<BookSearchMissingFilter>? missing = null)
+    {
+        return new BookSearchCriteria(
+            terms ?? Array.Empty<string>(),
+            fields ?? Array.Empty<BookSearchFieldFilter>(),
+            numbers ?? Array.Empty<BookSearchNumberFilter>(),
+            dates ?? Array.Empty<BookSearchDateFilter>(),
+            missing ?? Array.Empty<BookSearchMissingFilter>());
     }
 
     private static bool TryParseMissingFilter(string token, out BookSearchMissingFilter filter)

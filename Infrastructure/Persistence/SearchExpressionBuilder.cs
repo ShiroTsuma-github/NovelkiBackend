@@ -202,6 +202,13 @@ internal static class PredicateExpression
         return CombineAll(predicates, Or);
     }
 
+    public static Expression<Func<T, bool>> Not<T>(Expression<Func<T, bool>> predicate)
+    {
+        return Expression.Lambda<Func<T, bool>>(
+            Expression.Not(predicate.Body),
+            predicate.Parameters);
+    }
+
     public static Expression<Func<T, bool>> Compare<T, TValue>(
         Expression<Func<T, TValue>> selector,
         BookSearchOperator op,

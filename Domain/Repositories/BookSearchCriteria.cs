@@ -7,6 +7,9 @@ public sealed record BookSearchCriteria(
     IReadOnlyCollection<BookSearchDateFilter> Dates,
     IReadOnlyCollection<BookSearchMissingFilter> Missing)
 {
+    public IReadOnlyCollection<BookSearchCriteria> Exclusions { get; init; } =
+        Array.Empty<BookSearchCriteria>();
+
     public BookSearchCriteria(
         IReadOnlyCollection<string> terms,
         IReadOnlyCollection<BookSearchFieldFilter> fields,
@@ -24,7 +27,8 @@ public sealed record BookSearchCriteria(
             Array.Empty<BookSearchMissingFilter>());
 
     public bool HasFilters =>
-        Terms.Count > 0 || Fields.Count > 0 || Numbers.Count > 0 || Dates.Count > 0 || Missing.Count > 0;
+        Terms.Count > 0 || Fields.Count > 0 || Numbers.Count > 0 || Dates.Count > 0 || Missing.Count > 0 ||
+        Exclusions.Count > 0;
 }
 
 public sealed record BookSearchFieldFilter(BookSearchField Field, IReadOnlyCollection<string> Values)

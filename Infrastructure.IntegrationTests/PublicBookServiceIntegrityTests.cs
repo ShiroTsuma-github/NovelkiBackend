@@ -44,10 +44,16 @@ public sealed class PublicBookServiceIntegrityTests
             CancellationToken.None)).Data);
         Assert.Single((await service.SearchAsync("genre:Fantasy tag:Mystery type:\"Web Novel\"", 0, 20, false,
             CancellationToken.None)).Data);
+        Assert.Equal(
+            other.Id,
+            Assert.Single((await service.SearchAsync("-tag:Mystery -genre:Fantasy", 0, 20, false,
+                CancellationToken.None)).Data).SourceBookId);
         var chapters = await service.SearchAsync("totalChapters:>=1000", 0, 20, false, CancellationToken.None);
         Assert.Equal(1432, Assert.Single(chapters.Data).TotalChapters);
         await Assert.ThrowsAsync<ValidationException>(() =>
             service.SearchAsync("rating:>=8", 0, 20, false, CancellationToken.None));
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            service.SearchAsync("-rating:8", 0, 20, false, CancellationToken.None));
         await Assert.ThrowsAsync<ValidationException>(() =>
             service.SearchAsync("currentChapter:10", 0, 20, false, CancellationToken.None));
         await Assert.ThrowsAsync<ValidationException>(() =>

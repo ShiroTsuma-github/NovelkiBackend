@@ -523,7 +523,7 @@ export function BookAdvancedSearch({
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           className={`${inputClass} ui-control--search`}
-          placeholder={'Search: returnee author:Toika title:"Lord of Mysteries" genre:fantasy,"slice of life" rating:>=8'}
+          placeholder={'Search: returnee author:Toika genre:fantasy rating:>=8 -tag:dropped -rating:8'}
           value={draftValue}
           onChange={(event) => {
             const nextValue = event.target.value
@@ -533,7 +533,7 @@ export function BookAdvancedSearch({
         />
       </label>
       <p className="text-xs text-slate-500">
-        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, <code>total-chapters:&gt;500</code>, and wildcard searches like <code>title:i*</code>.
+        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, <code>total-chapters:&gt;500</code>, and wildcard searches like <code>title:i*</code>. Prefix any term or filter with <code>-</code> to exclude matches, for example <code>-rating:8</code>, <code>-tag:dropped</code>, or <code>-genre:romance</code>.
       </p>
     </Surface>
   )

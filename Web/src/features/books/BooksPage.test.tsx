@@ -122,6 +122,9 @@ describe('BooksPage', () => {
     expect(screen.getByText('chapters:<200')).toBeInTheDocument()
     expect(screen.getByText('total:>500')).toBeInTheDocument()
     expect(screen.getByText('total-chapters:>500')).toBeInTheDocument()
+    expect(screen.getByText('-rating:8')).toBeInTheDocument()
+    expect(screen.getByText('-tag:dropped')).toBeInTheDocument()
+    expect(screen.getByText('-genre:romance')).toBeInTheDocument()
   })
 
   it('preserves spaces in the search input while sending a trimmed query to the api', async () => {

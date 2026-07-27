@@ -45,6 +45,48 @@ public class BookSearchQueryParserTests
     }
 
     [Fact]
+    public void Parse_ShouldReadExcludedTermsFieldsNumbersAndMissingValues()
+    {
+        var criteria = BookSearchQueryParser.Parse(
+            "fantasy -returnee -rating:8 -tag:\"to read soon\",dropped -genre:romance -cover:none");
+
+        Assert.Equal(["fantasy"], criteria.Terms);
+        Assert.Collection(
+            criteria.Exclusions,
+            term => Assert.Equal(["returnee"], term.Terms),
+            rating =>
+            {
+                var filter = Assert.Single(rating.Numbers);
+                Assert.Equal(BookSearchNumberField.Rating, filter.Field);
+                Assert.Equal(BookSearchOperator.Equal, filter.Operator);
+                Assert.Equal(8, filter.Value);
+            },
+            tag =>
+            {
+                var filter = Assert.Single(tag.Fields);
+                Assert.Equal(BookSearchField.Tag, filter.Field);
+                Assert.Equal(["to read soon", "dropped"], filter.Values);
+            },
+            genre =>
+            {
+                var filter = Assert.Single(genre.Fields);
+                Assert.Equal(BookSearchField.Genre, filter.Field);
+                Assert.Equal(["romance"], filter.Values);
+            },
+            missing => Assert.Equal(BookSearchMissingField.Cover, Assert.Single(missing.Missing).Field));
+    }
+
+    [Fact]
+    public void Parse_ShouldKeepExpandedDateRangeInsideOneExclusion()
+    {
+        var criteria = BookSearchQueryParser.Parse("-created:=2026-07");
+
+        var exclusion = Assert.Single(criteria.Exclusions);
+        Assert.Equal(2, exclusion.Dates.Count);
+        Assert.Empty(criteria.Dates);
+    }
+
+    [Fact]
     public void Parse_ShouldTreatRatingColonAsEqualNumberFilter()
     {
         var criteria = BookSearchQueryParser.Parse("rating:8 priority:2");
