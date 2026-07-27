@@ -377,6 +377,24 @@ describe('BookFormPage', () => {
     expect(await screen.findByText('Progression through spiritual realms and techniques.')).toBeInTheDocument()
   })
 
+  it('debounces author and tag suggestion requests while typing', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.type(screen.getByLabelText('Author'), 'Ergen')
+
+    expect(api.searchAuthors).not.toHaveBeenCalled()
+    await waitFor(() => expect(api.searchAuthors).toHaveBeenCalledTimes(1))
+    expect(api.searchAuthors).toHaveBeenLastCalledWith('Ergen', 8)
+
+    await user.type(screen.getByPlaceholderText('Start typing a tag'), 'cult')
+
+    expect(api.searchTags).not.toHaveBeenCalled()
+    await waitFor(() => expect(api.searchTags).toHaveBeenCalledTimes(1))
+    expect(api.searchTags).toHaveBeenLastCalledWith('cult', 8)
+  })
+
   it('accepts active genre and tag suggestions with Tab without losing focus', async () => {
     vi.mocked(api.searchTags).mockResolvedValue([{
       id: 'tag-1',

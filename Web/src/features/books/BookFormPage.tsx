@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, FileCode2, Link2, Save, Star, Upload, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -10,6 +10,7 @@ import { HttpError } from '@/api/http'
 import type { AuthorDto, BookCoverDto, BookHtmlParseResult, BookMutationRequest } from '@/api/types'
 import { buttonVariants, DialogPanel, PageHeader, Surface, useBodyScrollLock } from '@/components/app/DesignSystem'
 import { FormField, buttonClass, inputClass, secondaryButtonClass } from '@/components/app/FormField'
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCoverSection'
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
@@ -47,6 +48,7 @@ type ExistingCoverChange =
 
 const allowedCoverMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const allowedCoverExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp'])
+const suggestionSearchDelayMs = 150
 
 export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const { id } = useParams<{ id: string }>()
@@ -78,6 +80,8 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   })
 
   const authorName = form.watch('authorName') ?? ''
+  const trimmedAuthorName = authorName.trim()
+  const debouncedAuthorSearch = useDebouncedValue(trimmedAuthorName, suggestionSearchDelayMs)
   const authorInputValue = selectedAuthorDisplay
     ? formatAuthorDisplay(selectedAuthorDisplay.primaryName, selectedAuthorDisplay.matchedAlias)
     : authorName
@@ -91,11 +95,13 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const selectedStatus = statusesQuery.data?.data.find((status) => status.id === form.watch('statusId'))
   const resolvedCoverUrl = useResolvedCoverImage(bookQuery.data?.cover)
   const authorSuggestionsQuery = useQuery({
-    queryKey: ['authorSuggestions', authorName.trim()],
-    queryFn: () => api.searchAuthors(authorName.trim(), 8),
-    enabled: authorName.trim().length >= 2,
+    queryKey: ['authorSuggestions', debouncedAuthorSearch],
+    queryFn: () => api.searchAuthors(debouncedAuthorSearch, 8),
+    enabled: debouncedAuthorSearch.length >= 2,
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
+  const authorSearchPending = trimmedAuthorName !== debouncedAuthorSearch || authorSuggestionsQuery.isFetching
 
   useEffect(() => {
     initializedBookIdRef.current = null
@@ -465,9 +471,12 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                     }}
                     onFocus={() => setAuthorSuggestionsOpen(true)}
                   />
-                  {authorSuggestionsOpen && authorName.trim().length >= 2 ? (
-                    <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto">
-                      {authorSuggestionsQuery.isLoading ? (
+                  {authorSuggestionsOpen && trimmedAuthorName.length >= 2 ? (
+                    <div
+                      aria-busy={authorSearchPending}
+                      className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto"
+                    >
+                      {authorSearchPending && !authorSuggestionsQuery.data?.length ? (
                         <div className="px-3 py-2 text-sm text-slate-400">Searching authors...</div>
                       ) : null}
                       {authorSuggestionsQuery.data?.map((author) => {
@@ -492,7 +501,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                         </button>
                         )
                       })}
-                      {!authorSuggestionsQuery.isLoading && authorSuggestionsQuery.data?.length === 0 ? (
+                      {!authorSearchPending && authorSuggestionsQuery.data?.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-slate-400">No author found. A new one will be created.</div>
                       ) : null}
                     </div>
@@ -832,12 +841,16 @@ function TagChipSelect({
   onChange: (value: string[]) => void
 }) {
   const [input, setInput] = useState('')
+  const trimmedInput = input.trim()
+  const debouncedInput = useDebouncedValue(trimmedInput, suggestionSearchDelayMs)
   const tagSuggestionsQuery = useQuery({
-    queryKey: ['tagSuggestions', input.trim()],
-    queryFn: () => api.searchTags(input.trim(), 8),
-    enabled: input.trim().length >= 1,
+    queryKey: ['tagSuggestions', debouncedInput],
+    queryFn: () => api.searchTags(debouncedInput, 8),
+    enabled: debouncedInput.length >= 1,
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
+  const suggestionsPending = trimmedInput !== debouncedInput || tagSuggestionsQuery.isFetching
   const normalizedSelected = selected.map((tag) => tag.toLocaleLowerCase())
   const suggestions = (tagSuggestionsQuery.data ?? [])
     .filter((tag) => !normalizedSelected.includes(tag.name.toLocaleLowerCase()))
@@ -862,6 +875,7 @@ function TagChipSelect({
       suggestions={suggestions}
       onCreate={addTag}
       onInputChange={setInput}
+      suggestionsPending={suggestionsPending}
       onPick={addTag}
       onRemove={(tag) => onChange(selected.filter((selectedTag) => selectedTag !== tag))}
     />
@@ -877,6 +891,7 @@ function ChipBox({
   onPick,
   onRemove,
   onCreate,
+  suggestionsPending = false,
 }: {
   input: string
   placeholder: string
@@ -886,9 +901,15 @@ function ChipBox({
   onPick: (key: string) => void
   onRemove: (key: string) => void
   onCreate?: (value: string) => void
+  suggestionsPending?: boolean
 }) {
   const trimmed = input.trim()
-  const canCreate = Boolean(onCreate && trimmed && !suggestions.some((item) => item.label.toLocaleLowerCase() === trimmed.toLocaleLowerCase()))
+  const canCreate = Boolean(
+    onCreate &&
+    trimmed &&
+    !suggestionsPending &&
+    !suggestions.some((item) => item.label.toLocaleLowerCase() === trimmed.toLocaleLowerCase()),
+  )
   const [activeIndex, setActiveIndex] = useState(0)
   const listboxId = useId()
   const choiceCount = suggestions.length + (canCreate ? 1 : 0)
@@ -970,7 +991,12 @@ function ChipBox({
         />
       </div>
       {trimmed ? (
-        <div className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto" id={listboxId} role="listbox">
+        <div
+          aria-busy={suggestionsPending}
+          className="ui-popover absolute z-20 mt-1 max-h-64 w-full overflow-auto"
+          id={listboxId}
+          role="listbox"
+        >
           {suggestions.map((item, index) => (
             <button
               aria-selected={activeIndex === index}
@@ -999,7 +1025,10 @@ function ChipBox({
               Add "{trimmed}"
             </button>
           ) : null}
-          {!suggestions.length && !canCreate ? (
+          {suggestionsPending && !suggestions.length ? (
+            <div className="px-3 py-2 text-sm text-slate-400">Searching...</div>
+          ) : null}
+          {!suggestionsPending && !suggestions.length && !canCreate ? (
             <div className="px-3 py-2 text-sm text-slate-400">No results.</div>
           ) : null}
         </div>
