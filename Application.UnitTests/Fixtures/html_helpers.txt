@@ -1,0 +1,30 @@
+<div id="seriesgenre">
+<a class="genre" gid="8" href="https://www.novelupdates.com/genre/action/" title="A work typically depicting fighting, violence, chaos, and fast paced motion.">Action</a> <a class="genre" gid="13" href="https://www.novelupdates.com/genre/adventure/" title="Exploring new places, environments or situations. This is often associated with people on long journeys to places far away encountering amazing things.">Adventure</a> <a class="genre" gid="9" href="https://www.novelupdates.com/genre/drama/" title="A work meant to bring on an emotional response, such as instilling sadness or tension.
+
+Novels that often show life or characters through conflict and emotions. In general, the different parts of the story tend to form a whole that is greater than the sum of the parts. In other words, the story has a message that is bigger than just the story line itself">Drama</a> <a class="genre" gid="480" href="https://www.novelupdates.com/genre/xianxia/" title="Xianxia is fictional martial art stories where the main goal of the population is cultivating to Immortality, seeking eternal life and the pinnacle of strength.
+
+Xianxia stories features supernatural elements, influenced heavily by Chinese folklore/mythology. Cultivation path in xianxia involves taoism/daoism elements.">Xianxia</a> </div>
+
+<div id="showtags">
+	
+<a class="genre odd" id="etagme" href="https://www.novelupdates.com/stag/abandoned-children/" title="As the tag suggests, this is to be used ONLY when the protagonist is an abandoned child, meaning child who is thrown away at an early age, willingly or unwillingly. This should have some impact on the story, and it is preferable to use this tag if the protagonist being abandoned is known early on in the story. Please note that the child can only be the protagonist.">Abandoned Children</a> 
+...
+
+
+<div id="showauthors">
+<a class="genre" id="authtag" href="https://www.novelupdates.com/nauthor/er-gen/" title="View All Series by Er Gen">Er Gen</a><br><a class="genre" id="authtag" href="https://www.novelupdates.com/nauthor/%e8%80%b3%e6%a0%b9/" title="View All Series by 耳根">耳根</a><br></div>
+
+<div id="editdescription"><p>“What I want, the Heavens shall not lack!”</p>
+<p>“What I don’t want, had better not exist under the Heavens!” </p>
+<p>This is a story that originates between the Eighth and Ninth Mountains, the world in which the strong prey upon the weak. </p>
+<p>“My Name is Meng Hao! The Ninth Generation Demon Sealer, I shall seal the Heavens!”</p>
+</div>
+
+
+<div id="editassociated">Cennetleri Mühürlemeliyim<br>Demon Sealer<br>ISSTH<br>Ngã Dục Phong Thiên<br>Wo Yu Feng Tian<br>ผนึกสวรรค์ สยบมาร สะท้านเทพ<br>我欲封天</div>
+
+
+
+<div class="seriesimg">
+<img src="https://cdn.novelupdates.com/images/2015/06/15_ISSTH.jpg">
+</div>
