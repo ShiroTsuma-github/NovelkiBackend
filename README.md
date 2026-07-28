@@ -1,363 +1,212 @@
-# NovelkiBackend
+# Novelki
 
-Backend ASP.NET Core dla aplikacji do zarzadzania novelkami/ksiazkami. Projekt jest ulozony warstwowo w stylu Clean
-Architecture:
+Novelki to self-hosted aplikacja do prowadzenia prywatnej biblioteki powieści internetowych, mang, manhw i innych
+serii. Repozytorium zawiera API w ASP.NET Core, frontend w React oraz gotowy stack Docker Compose z monitoringiem.
 
-- `Api` - punkt wejscia HTTP, kontrolery, Swagger, Serilog i konfiguracja middleware.
-- `Application` - use case'y CQRS/MediatR, walidatory FluentValidation, DTO i mapowania extension methods.
-- `Domain` - encje, interfejsy repozytoriow i wyjatki domenowe.
-- `Infrastructure` - EF Core/PostgreSQL, ASP.NET Identity, JWT, implementacje repozytoriow, obsluga bledow.
-- `Application.UnitTests` - projekt testowy xUnit z testami walidatorow, handlerow i mapowan aplikacyjnych.
-- `Infrastructure.IntegrationTests` - testy integracyjne EF Core/repozytoriow na SQLite in-memory.
+## Funkcje
 
-## Stack
+- prywatna biblioteka z postępem czytania, oceną, priorytetem, statusem i historią zmian;
+- wyszukiwanie PostgreSQL z filtrami pól, wykluczeniami, fuzzy matchingiem, wildcardami i sugestiami;
+- import i eksport CSV oraz pełne archiwum ZIP razem z okładkami;
+- automatyczne pobieranie i przetwarzanie okładek, zapis lokalny albo w magazynie zgodnym z S3;
+- parser metadanych stron NovelUpdates, Royal Road, Scribble Hub i WebNovel;
+- publiczne snapshoty książek, katalog odkrywania i kopiowanie pozycji do własnej biblioteki;
+- statystyki biblioteki, wykresy aktywności i kontrola kompletności metadanych;
+- panel administracyjny do zarządzania kontami, autorami, tagami i słownikami systemowymi;
+- logowanie JWT z tokenami odświeżającymi, rate limitingiem i ochroną operacji kosztownych.
 
-- .NET 10 (`net10.0`)
-- ASP.NET Core Web API
-- MediatR 13
-- FluentValidation 12
-- EF Core 9 + Npgsql/PostgreSQL
-- ASP.NET Core Identity z kluczem `Guid`
-- JWT Bearer auth
-- Serilog
-- Swagger/Swashbuckle
-- xUnit, Moq, coverlet
-- SQLite in-memory w testach integracyjnych
+## Stos
 
-## Uruchomienie lokalne
+| Warstwa | Technologie |
+| --- | --- |
+| API | .NET 10, ASP.NET Core, MediatR, FluentValidation |
+| Dane | EF Core 10, PostgreSQL, `pg_trgm`, `fuzzystrmatch`, opcjonalny Redis |
+| Tożsamość | ASP.NET Core Identity, JWT Bearer |
+| Frontend | React 19, TypeScript 6, Vite 6, Tailwind CSS 4, TanStack Query |
+| Testy | xUnit, SQLite, Testcontainers PostgreSQL, Vitest, Testing Library, Playwright |
+| Monitoring | OpenTelemetry, Grafana, Prometheus, Loki, Tempo |
 
-Wymagana jest konfiguracja sekretow, bo `Api/appsettings.json` zawiera placeholdery `IN_SECRETS`.
+## Szybki start z Docker Compose
 
-Typowe ustawienia:
+Potrzebujesz Dockera oraz instancji PostgreSQL dostępnej z kontenera `api`. Compose uruchamia aplikację i monitoring,
+ale nie tworzy PostgreSQL ani Redis.
+
+1. Utwórz lokalny plik konfiguracyjny:
+
+   ```powershell
+   Copy-Item .env.example .env
+   ```
+
+   W systemie Linux lub macOS:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Uzupełnij w `.env`:
+
+   - `DB_CONNECTION_STRING` z hostem osiągalnym z kontenera;
+   - `JWT_KEY`, `JWT_ISSUER` i `JWT_AUDIENCE`;
+   - `ADMIN_EMAIL`, jeżeli aplikacja ma nadać rolę administratora przy starcie.
+
+   Redis jest opcjonalny. Ustaw pusty `REDIS_CONNECTION_STRING`, aby użyć cache in-memory. Jeśli nie korzystasz z S3,
+   wyczyść wartości `BOOK_COVERS__S3__*`; API zapisze wtedy okładki w `storage/covers`.
+
+3. Uruchom stack:
+
+   ```powershell
+   docker compose up --build -d
+   ```
+
+   Możesz też użyć `compose-up.ps1`, `compose-up.sh` albo `compose-up.bat`.
+
+4. Otwórz aplikację:
+
+   | Usługa | Adres |
+   | --- | --- |
+   | Web HTTPS | `https://localhost:8080` |
+   | Web HTTP | `http://localhost:8081` |
+   | API | `http://localhost:5232` |
+   | Swagger | `http://localhost:5232/swagger` |
+   | Health | `http://localhost:5232/health/ready` |
+   | Grafana | `http://localhost:3000` |
+   | Prometheus | `http://localhost:9090` |
+
+Kontener Web tworzy lokalny certyfikat dla `localhost` i `127.0.0.1`. Przeglądarka może poprosić o jego
+zaakceptowanie. Do publicznego wdrożenia zamontuj certyfikat wystawiony dla używanej domeny.
+
+Compose ustawia `Database:AutoMigrate=true`, więc API stosuje migracje podczas uruchamiania.
+
+## Uruchomienie bez Dockera
+
+### API
+
+Wymagania:
+
+- .NET SDK zgodny z `global.json`;
+- PostgreSQL z uprawnieniami do utworzenia rozszerzeń `pg_trgm` i `fuzzystrmatch`;
+- opcjonalnie Redis.
+
+Repozytorium trzyma w `Api/appsettings.json` placeholdery `IN_SECRETS`. Skonfiguruj sekrety lokalnie:
 
 ```powershell
-dotnet user-secrets set "Jwt:Key" "<dlugi-sekretny-klucz>" --project Api
-dotnet user-secrets set "Jwt:Issuer" "NovelkiBackend" --project Api
-dotnet user-secrets set "Jwt:Audience" "NovelkiBackend" --project Api
-dotnet user-secrets set "ConnectionStrings:DB" "Host=localhost;Port=5432;Database=novelki;Username=postgres;Password=<password>" --project Api
-dotnet user-secrets set "Admin:Emails:0" "<admin-email>" --project Api
+dotnet user-secrets set "Jwt:Key" "<dlugi-klucz-lokalny>" --project Api
+dotnet user-secrets set "Jwt:Issuer" "Novelki" --project Api
+dotnet user-secrets set "Jwt:Audience" "Novelki" --project Api
+dotnet user-secrets set "ConnectionStrings:DB" "Host=localhost;Port=5432;Database=novelki;Username=postgres;Password=<haslo>" --project Api
+dotnet user-secrets set "Admin:Emails:0" "<email-administratora>" --project Api
 ```
 
-Frontend uruchamiany jako osobny dev server powinien miec origin dopisany w `Cors:AllowedOrigins`. Domyslnie
-`Api/appsettings.json` dopuszcza `http://localhost:5173`, `http://localhost:3000` i `http://localhost:4200`.
-Rola `Admin` jest tworzona przy starcie API. Uzytkownicy z mailami z `Admin:Emails` dostaja role automatycznie i musza
-zalogowac sie ponownie, zeby token JWT zawieral uprawnienia admina.
-
-Start API:
+Przygotuj narzędzia, bazę i uruchom API:
 
 ```powershell
+dotnet tool restore
+dotnet restore
+dotnet ef database update --project Infrastructure --startup-project Api
 dotnet run --project Api --launch-profile https
 ```
 
-Profile z `Api/Properties/launchSettings.json`:
+Profile deweloperskie wystawiają API pod `https://localhost:7121` i `http://localhost:5232`. Swagger działa w
+środowisku `Development` pod `/swagger`.
 
-- HTTP: `http://localhost:5232`
-- HTTPS: `https://localhost:7121` oraz `http://localhost:5232`
-
-W trybie `Development` endpoint root przekierowuje do Swaggera pod `/swagger`.
-
-## Lokalny stack Docker + observability
-
-Repo zawiera lokalny stack: Web, API, OpenTelemetry Collector, Loki, Tempo, Prometheus i Grafana. Baza danych jest brana
-z connection stringa w `.env`.
-
-1. Skopiuj `.env.example` do `.env` i ustaw przynajmniej `DB_CONNECTION_STRING`, `JWT_KEY` i `ADMIN_EMAIL`.
-2. Uruchom:
+### Web
 
 ```powershell
-docker compose up --build
+Set-Location Web
+npm ci
+npm run dev
 ```
 
-Domyslne adresy:
+Vite uruchamia frontend pod `http://localhost:5173` i przekazuje `/api` do `https://localhost:7121`. Inny adres API
+ustawisz przez `VITE_API_PROXY_TARGET`.
 
-- Web (HTTPS + HTTP/2): `https://localhost:8080`
-- Web HTTP ingress: `http://localhost:8081`
-- API: `http://localhost:5232`
-- API health: `http://localhost:5232/health/ready`
-- Grafana: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Loki: `http://localhost:3100`
-- Tempo: `http://localhost:3200`
+## Konfiguracja
 
-Porty Web, przekierowania HTTP, API i Grafany mozna zmienic przez `WEB_PORT`, `WEB_HTTP_PORT`, `API_PORT` i
-`GRAFANA_PORT` w `.env`. Publiczny origin HTTPS mozna dodac do CORS przez `WEB_PUBLIC_ORIGIN`, na przyklad
-`WEB_PUBLIC_ORIGIN=https://example.ddns.net`. Ta wartosc jest tez kompilowana do frontendu, wiec jej zmiana wymaga
-ponownego zbudowania obrazu Web. Kontener Web generuje przy pierwszym starcie lokalny certyfikat z SAN dla `localhost` i
-`127.0.0.1`, zapisuje go w wolumenie `web-cert-data` i udostepnia frontend oraz proxy `/api` przez HTTP/2. Przy
-lokalnym wejsciu przez `WEB_HTTP_PORT` HTTP przekierowuje na `WEB_PORT`. Przy NAT standardowe publiczne
-`80 -> WEB_HTTP_PORT` przekierowuje na publiczny HTTPS 443 bez ujawniania portu VM; publiczne
-`443 -> WEB_PORT` dostarcza polaczenie TLS. Przy pierwszym otwarciu przegladarka moze wymagac zaakceptowania
-lokalnego certyfikatu. Certyfikat deweloperski nie jest zaufanym certyfikatem dla publicznej domeny; dla No-IP
-nalezy zamontowac certyfikat wystawiony dla tej domeny jako `/etc/nginx/certs/tls.crt` i `tls.key`. W compose API ustawia
-`Database:AutoMigrate=true`, wiec migracje EF sa aplikowane przy starcie kontenera. Poza compose domyslnie zostaje
-`false`.
+Najczęściej używane zmienne:
 
-Observability flow:
+| Zmienna | Wymagana | Opis |
+| --- | --- | --- |
+| `DB_CONNECTION_STRING` | tak | Connection string PostgreSQL |
+| `JWT_KEY` | tak | Klucz podpisujący tokeny |
+| `JWT_ISSUER`, `JWT_AUDIENCE` | tak | Issuer i audience JWT |
+| `ADMIN_EMAIL` | nie | Konto, które dostanie rolę `Admin` |
+| `REDIS_CONNECTION_STRING` | nie | Redis dla cache listy książek |
+| `WEB_PUBLIC_ORIGIN` | nie | Publiczny origin dodawany do CORS |
+| `API_PORT`, `WEB_PORT`, `WEB_HTTP_PORT` | nie | Porty wystawiane przez Compose |
+| `BOOK_COVERS__S3__*` | nie | Endpoint, dane dostępowe i bucket storage S3 |
+| `GRAFANA_ADMIN_USER`, `GRAFANA_ADMIN_PASSWORD` | nie | Konto lokalnej Grafany |
+
+Pełny zestaw wartości znajduje się w `.env.example`.
+
+## Wyszukiwanie
+
+Pole `query` w `GET /api/v1/book` łączy zwykły tekst z filtrami:
 
 ```text
-API --OTLP logs/traces/metrics--> OpenTelemetry Collector
-Collector logs  --> Loki
-Collector traces --> Tempo
-Collector metrics --> Prometheus scrape endpoint
-Grafana czyta Loki, Tempo i Prometheus jako provisioned datasources
+martial title:"Lord *" author:"Er Gen" tag:favorite -status:Dropped rating:>=8
 ```
 
-## Migracje EF Core
+Obsługiwane pola obejmują tytuł, autora, tag, gatunek, status, typ, opis, ocenę, priorytet, postęp, liczbę rozdziałów
+oraz daty utworzenia i modyfikacji. Prefiks `-` wyklucza wynik. Wartość `none` znajduje rekordy bez danej metadanej,
+na przykład `cover:none`. Cudzysłowy pozwalają używać spacji, a `*` działa jako wildcard w filtrach tekstowych.
 
-Komendy sa zapisane tez w `Migrations.txt`:
+Zapytanie bez pola korzysta z indeksu PostgreSQL i fuzzy matchingu. Interfejs podpowiada składnię oraz wartości autora,
+tagu, gatunku, statusu i typu na podstawie biblioteki użytkownika.
 
-```powershell
-dotnet ef migrations add <name> --project Infrastructure --startup-project Api
-dotnet ef database update --project Infrastructure --startup-project Api
-```
-
-`ApplicationDbContext` mieszka w `Infrastructure/Contexts/ApplicationDbContext.cs` i dziedziczy po
-`IdentityDbContext<User, IdentityRole<Guid>, Guid>`.
-
-## Flow requestu
-
-Standardowa sciezka HTTP wyglada tak:
-
-1. Request trafia do kontrolera w `Api/Controllers`.
-2. Kontroler tworzy lub przyjmuje `Command`/`Query` z `Application/Features/...` i wysyla go przez `IMediator`.
-3. MediatR uruchamia `ValidationBehavior<TRequest,TResponse>`.
-4. Jesli istnieje validator FluentValidation dla requestu, bledy koncza sie `ValidationException`.
-5. Handler w `Application/Features/...` wykonuje use case.
-6. Handler korzysta z interfejsow repozytoriow z `Domain/Repositories` oraz extension methods z
-   `Application/Common/MappingExtensions.cs`.
-7. Implementacja repozytorium w `Infrastructure/Persistence` operuje na `ApplicationDbContext`.
-8. `SaveChangesAsync` automatycznie uzupelnia pola audytowe `Created`, `CreatedBy`, `LastModified`, `LastModifiedBy` dla
-   `BaseAuditableEntity`.
-9. Wyjatki przechwytuje `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`, ktory zwraca JSON z `type`, `title`,
-   `status`, `detail`, `instance` i opcjonalnym `errors`.
-
-## Rejestracja zaleznosci
-
-Rejestracja jest rozbita na warstwy:
-
-- `Api/DependencyInjection.cs`
-    - kontrolery,
-    - Swagger,
-    - schemat JWT Bearer w Swagger UI.
-- `Application/DependencyInjection.cs`
-    - MediatR,
-    - FluentValidation,
-    - pipeline `ValidationBehavior`.
-- `Infrastructure/DependencyInjection.cs`
-    - `ApplicationDbContext` na PostgreSQL,
-    - repozytoria,
-    - `CurrentUser`,
-    - JWT,
-    - Identity,
-    - authentication/authorization.
-
-`CurrentUser` korzysta z `IHttpContextAccessor`, ktory jest rejestrowany w `Infrastructure/DependencyInjection.cs`.
-
-## Autoryzacja i konto
-
-Endpointy konta:
-
-- `POST /api/v1/account/register`
-- `POST /api/v1/account/login`
-
-Logowanie i rejestracja ida przez:
-
-- `Application/Features/AccountFeatures/Commands/RegisterUser.cs`
-- `Application/Features/AccountFeatures/Commands/LoginUser.cs`
-- `Infrastructure/Identity/IdentityService.cs`
-- `Infrastructure/Authentication/JwtTokenGenerator.cs`
-
-Pozostale kontrolery sa zasadniczo chronione `[Authorize]`, wiec wymagaja naglowka:
+## Architektura
 
 ```text
-Authorization: Bearer <access_token>
+Web ──HTTP──> Api ──MediatR──> Application ──> Domain
+                                   │
+                                   └── kontrakty <── Infrastructure
+                                                      │
+                                                      ├── PostgreSQL / Redis
+                                                      ├── storage lokalny / S3
+                                                      └── background services
 ```
 
-Token zawiera m.in. `sub` jako `Guid` uzytkownika oraz email. `CurrentUser` odczytuje identyfikator z
-`ClaimTypes.NameIdentifier`; przy problemach z audytem/OwnerId trzeba sprawdzic zgodnosc claimow generowanych w
-`JwtTokenGenerator` z tym, czego oczekuje `CurrentUser`.
+- `Api` konfiguruje HTTP, uwierzytelnianie, Swagger, rate limiting i monitoring.
+- `Application` zawiera use case'y, DTO, walidację i kontrakty usług.
+- `Domain` przechowuje encje, modele wyszukiwania, wyjątki i interfejsy repozytoriów.
+- `Infrastructure` implementuje dostęp do danych, Identity, okładki, import, cache i zadania w tle.
+- `Web` zawiera aplikację React oraz testy komponentowe i layoutowe.
 
-## Glowne obszary domeny
-
-Glowne encje w `Domain/Entities`:
-
-- `Book` - prywatna pozycja uzytkownika, z primary title, alternatywnymi tytulami, postepem, linkami, tagami, gatunkami
-  i historia progresu.
-- `BookTitle` - primary/alternative titles, np. tytuly chinskie i angielskie.
-- `Author` i `AuthorName` - globalny autor oraz aliasy/pen name'y.
-- `Genre`
-- `ContentType` - dawny `Type`, np. Novel/Manga/Manhwa/Manhua/Other.
-- `Status`
-- `Tag`
-- `BookLink`
-- `BookProgressHistory`
-
-Wspolne klasy:
-
-- `BaseEntity`
-- `BaseAuditableEntity`
-
-Relacje EF sa konfigurowane fluent API w `ApplicationDbContext.OnModelCreating`.
-
-## Feature'y i konwencje
-
-Feature'y sa grupowane wedlug obszaru:
-
-```text
-Application/Features/<Area>Features/
-  Commands/
-  Queries/
-  Validators/
-```
-
-Obecne obszary:
-
-- `AccountFeatures`
-- `BookFeatures`
-- `GenreFeatures`
-- `StatusFeatures`
-- `TypeFeatures`
-
-Typowy wzorzec dla zasobow slownikowych (`Genre`, `Status`, `Type`):
-
-- `Create*Command` sprawdza duplikat po nazwie przez repozytorium i rzuca `EntityAlreadyExistsException`.
-- `Update*Command` pobiera encje, rzuca `EntityNotFoundException` przy braku rekordu, aplikuje zmiany i zapisuje.
-- `Delete*Command` usuwa po `Guid`.
-- Jawne query, np. `GetGenreQuery`, `GetGenreDetailsQuery`, `GetGenreByNameQuery` i `GetGenreDetailsByNameQuery`,
-  zwracaja konkretny DTO bez generycznego `TDto`.
-- `GetAll*Query` zwraca `PaginatedResult<TDto>` z `Skip`, `Take`, `Total`, `Data`.
-
-Przy dodawaniu nowego zasobu najlepiej skopiowac ten schemat:
-
-1. Encja w `Domain/Entities`.
-2. Interfejs repozytorium w `Domain/Repositories`.
-3. Implementacja repozytorium w `Infrastructure/Persistence`.
-4. `DbSet` i relacje w `ApplicationDbContext`.
-5. DTO w `Application/Common/DTOs/<Area>`.
-6. Commands, Queries i Validators w `Application/Features/<Area>Features`.
-7. Mapowania DTO/encja jako extension methods w `Application/Common/MappingExtensions.cs`.
-8. Automatyczna rejestracja handlerow przez MediatR scan w `Application/DependencyInjection.cs`.
-9. Rejestracja repozytorium w `Infrastructure/DependencyInjection.cs`.
-10. Kontroler w `Api/Controllers`.
-11. Migracja EF.
-
-## API endpoints
-
-Aktualne kontrolery:
-
-- `api/v1/account`
-    - `POST register`
-    - `POST login`
-- `api/v1/book`
-    - `POST`
-    - `GET`
-    - `GET search-suggestions` - owner-scoped values and usage counts for the advanced query editor
-    - `GET {id:guid}`
-    - `PUT {id:guid}`
-    - `PATCH {id:guid}/progress`
-    - `DELETE {id:guid}`
-- `api/v1/author`
-    - `GET` autocomplete/search
-- `api/v1/tag`
-    - `GET` autocomplete/search prywatnych tagow uzytkownika
-- `api/v1/genre`
-    - `POST`
-    - `GET`
-    - `GET {id:guid}`
-    - `GET {id:guid}/details`
-    - `GET by-name/{name}`
-    - `GET by-name/{name}/details`
-    - `PUT {id:guid}`
-    - `DELETE {id:guid}`
-- `api/v1/status`
-- `api/v1/type`
-
-Przyklady pelnych wywolan HTTP, custom query dla ksiazek i flow dodawania ksiazki sa w `docs/http-examples.md`.
-
-Custom query dla `GET /api/v1/book` przyjmuje parametr `query`, np. `title:"Lord of Mysteries" tag:favorite rating>=8`.
-Obslugiwane sa filtry `title`, `author`, `tag`, `genre`, `status`, `type` oraz porownania numeryczne dla `rating`,
-`priority`, `current/currentChapter` i `total/totalChapters`. Brakujace metadane mozna filtrowac przez wartosc `none`,
-np. `author:none`, `rating:none`, `progress:none`, `cover:none` lub `links:none`.
-
-`StatusController` i `TypeController` sa analogiczne do `GenreController`; `TypeController` operuje pod spodem na encji
-`ContentType`.
-
-## Obsluga bledow
-
-Globalny middleware:
-
-- `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`
-- wlaczany w `Api/Program.cs` przez `app.UseErrorHandlingMiddleware()`.
-
-Aktualnie rozpoznaje m.in.:
-
-- `FluentValidation.ValidationException` -> 400
-- `WrongPasswordException` -> 401
-- `UsernameTakenException` / `EmailInUseException` -> 409
-- `IdentityOperationFailedException` -> 400
-- `EntityAlreadyExistsException<Genre|Status|ContentType, Guid>` -> 409
-- `EntityNotFoundException<Genre|Status|ContentType|Book, Guid>` -> 404
-- `EntityNotFoundException<User, string>` -> 404
-- inne wyjatki -> 500
-
-Jesli dodajesz nowe wyjatki domenowe albo nowy typ encji, trzeba dopisac mapowanie w middleware, inaczej klient dostanie
-
-500.
+API używa prefiksu `/api/v1`. Główne grupy endpointów to `account`, `book`, `public-book`, `author`, `tag`, `genre`,
+`status`, `type` i `admin`. Swagger w trybie deweloperskim pokazuje pełną, aktualną listę operacji.
 
 ## Testy
 
-Uruchomienie:
+Backend:
 
 ```powershell
-dotnet test NovelkiBackend.sln -c Release --no-restore
+dotnet build NovelkiBackend.sln
+dotnet test NovelkiBackend.sln --no-build
 ```
 
-Raport coverage z HTML:
+Testy integracyjne korzystają z SQLite oraz kontenera PostgreSQL. Docker musi działać przed ich uruchomieniem.
+
+Frontend:
 
 ```powershell
-.\tools\coverage.ps1
+Set-Location Web
+npm ci
+npx playwright install chromium
+npm run test:all
+npm run build
 ```
 
-Skrypt uruchamia testy z `coverage.runsettings`, generuje HTML w `artifacts/coverage/html/index.html` i zapisuje krotki
-raport najnizszego pokrycia w `artifacts/coverage/least-covered-files.txt`.
+`test:all` uruchamia sprawdzenie TypeScript, Vitest i testy layoutu Playwright dla widoku desktopowego oraz mobilnego.
 
-Struktura:
+## Monitoring
 
-- `Application.UnitTests` - szybkie testy jednostkowe bez bazy: walidatory account, flow handlerow `Genre`, tworzenie
-  ksiazki z aliasami tytulow/autorem/tagami/linkami/progresem, update progresu, autocomplete autorow i tagow, mapowania
-  DTO.
-- `Infrastructure.IntegrationTests` - SQLite in-memory z prawdziwym EF Core: seed slownikow systemowych, audit fields,
-  unikalnosc autorow/tagow, multi-tenant scope tagow i ksiazek, kaskady, restrict FK autora, eager loading repozytorium
-  ksiazek, wyszukiwanie aliasow autora, paginacja/count gatunkow.
+API wysyła logi, metryki i trace'y przez OTLP do OpenTelemetry Collector. Grafana korzysta z przygotowanych źródeł
+Prometheus, Loki i Tempo oraz dashboardu `Novelki overview`.
 
-Stan po ostatniej weryfikacji: 238 testow, wszystkie zielone (`164` unit + `74` integration). Kazdy nowy feature
-powinien miec test jednostkowy albo integracyjny; dla zachowan zaleznych od EF/relacji uzywamy SQLite in-memory zamiast
-providera `InMemory`.
+Endpointy diagnostyczne:
 
-## Znane miejsca wymagajace uwagi
+- `/health/live` sprawdza proces API;
+- `/health/ready` sprawdza gotowość aplikacji i zależności.
 
-W repo istnieje tez `Analysis.md` z szerszym audytem architektury. Najbardziej praktyczne punkty do sprawdzenia przy
-kolejnych pracach:
+## Licencja
 
-- Middleware obslugi bledow ma twardo wypisane typy encji, wiec nowe encje wymagaja aktualizacji.
-- Testow API/end-to-end jeszcze nie ma; obecny zakres konczy sie na warstwie Application i integracji Infrastructure/EF.
-
-## Szybka mapa plikow
-
-- Start aplikacji: `Api/Program.cs`
-- Konfiguracja web/Swagger: `Api/DependencyInjection.cs`
-- Kontrolery: `Api/Controllers`
-- Rejestracja Application: `Application/DependencyInjection.cs`
-- Pipeline walidacji: `Application/ValidationBehavior.cs`
-- DTO: `Application/Common/DTOs`
-- Komendy/zapytania: `Application/Features`
-- Mapowania DTO/encja: `Application/Common/MappingExtensions.cs`
-- Encje: `Domain/Entities`
-- Repozytoria - kontrakty: `Domain/Repositories`
-- DbContext: `Infrastructure/Contexts/ApplicationDbContext.cs`
-- Repozytoria - EF: `Infrastructure/Persistence`
-- Identity: `Infrastructure/Identity`
-- JWT: `Infrastructure/Authentication`
-- Aktualny uzytkownik: `Infrastructure/Services/CurrentUser.cs`
-- Globalne bledy: `Infrastructure/Middleware/ErrorHandlingMiddleware.cs`
-- Migracje: `Infrastructure/Migrations`
+Autor projektu nie wybrał jeszcze licencji.
