@@ -1,5 +1,6 @@
 namespace Infrastructure.Contexts;
 
+using Infrastructure.BookSearch;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 
@@ -65,6 +66,10 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         ConfigurePublicBooks(modelBuilder);
         ConfigureStorageCleanupQueue(modelBuilder);
         ConfigureBookSearchIndexQueue(modelBuilder);
+        if (Database.IsNpgsql())
+        {
+            ConfigureBookSearchFunctions(modelBuilder);
+        }
         ConfigureIdentity(modelBuilder);
         SeedSystemDictionaries(modelBuilder);
     }
@@ -375,6 +380,17 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
                 .HasForeignKey<BookSearchIndexQueueItem>(item => item.BookId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
+    }
+
+    private static void ConfigureBookSearchFunctions(ModelBuilder modelBuilder)
+    {
+        var method = typeof(BookSearchDbFunctions).GetMethod(
+            nameof(BookSearchDbFunctions.HasCloseLexeme),
+            [typeof(NpgsqlTypes.NpgsqlTsVector), typeof(string)])!;
+
+        modelBuilder.HasDbFunction(method)
+            .HasName("book_search_has_close_lexeme")
+            .HasSchema("public");
     }
 
     private static void SeedSystemDictionaries(ModelBuilder modelBuilder)

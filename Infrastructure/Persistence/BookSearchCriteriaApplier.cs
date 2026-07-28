@@ -1,6 +1,7 @@
 namespace Infrastructure.Persistence;
 
 using Domain.Entities;
+using Infrastructure.BookSearch;
 using NpgsqlTypes;
 using System.Linq.Expressions;
 
@@ -85,7 +86,10 @@ public sealed class BookSearchCriteriaApplier
         return book =>
             EF.Property<NpgsqlTsVector>(book, "SearchVector")
                 .Matches(EF.Functions.PlainToTsQuery("simple", term)) ||
-            EF.Functions.TrigramsAreWordSimilar(term, book.SearchDocument);
+            (EF.Functions.TrigramsAreWordSimilar(term, book.SearchDocument) &&
+             BookSearchDbFunctions.HasCloseLexeme(
+                 EF.Property<NpgsqlTsVector>(book, "SearchVector"),
+                 term));
     }
 
     private static string EscapeLike(string value)

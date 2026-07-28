@@ -83,6 +83,7 @@ public sealed class BookSearchCriteriaApplierTests
             Assert.Contains("\"SearchVector\" @@ plainto_tsquery", sql, StringComparison.Ordinal);
             Assert.Contains("<%", sql, StringComparison.Ordinal);
             Assert.Contains("\"SearchDocument\"", sql, StringComparison.Ordinal);
+            Assert.Contains("book_search_has_close_lexeme", sql, StringComparison.Ordinal);
         }
         else
         {
@@ -298,6 +299,19 @@ public sealed class BookSearchCriteriaApplierTests
             .ToArrayAsync();
 
         Assert.Equal(new[] { first.Id, second.Id }.Order(), ids.Order());
+    }
+
+    [Fact]
+    public void ShortPostgresGeneralTextSearch_ShouldSkipFuzzyLexemeValidation()
+    {
+        using var context = CreateQueryContext(postgres: true);
+
+        var sql = Apply(context, Criteria(["ma"])).ToQueryString();
+
+        Assert.Contains("\"SearchVector\" @@ plainto_tsquery", sql, StringComparison.Ordinal);
+        Assert.Contains("ILIKE", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("book_search_has_close_lexeme", sql, StringComparison.Ordinal);
+        Assert.DoesNotContain("<%", sql, StringComparison.Ordinal);
     }
 
     [Fact]
