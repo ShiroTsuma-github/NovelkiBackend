@@ -88,6 +88,13 @@ public sealed class NormalizedNameMigrationPostgreSqlTests(PostgreSqlFixture fix
     private async Task SeedCollidingDataAsync()
     {
         await using var context = fixture.CreateContext(OwnerId);
+        // The test intentionally runs the database on an older migration while using the current EF model.
+        // Keep the newly mapped store-generated column available only for the seed operation.
+        await context.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "Books"
+            ADD COLUMN "SearchDocument" text NOT NULL DEFAULT '',
+            ADD COLUMN "SearchVector" tsvector NOT NULL DEFAULT ''::tsvector;
+            """);
         var user = new User
         {
             Id = OwnerId,
@@ -146,6 +153,12 @@ public sealed class NormalizedNameMigrationPostgreSqlTests(PostgreSqlFixture fix
             new BookShareTagPromotion { Tag = firstTag },
             new BookShareTagPromotion { Tag = secondTag });
         await context.SaveChangesAsync();
+        context.ChangeTracker.Clear();
+        await context.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "Books"
+            DROP COLUMN "SearchDocument",
+            DROP COLUMN "SearchVector";
+            """);
     }
 
     private static Author Author(string name, string normalizedName)

@@ -36,5 +36,5 @@ export function withNsfwBookFilter(query?: string) {
     return trimmedQuery || undefined
   }
 
-  return trimmedQuery ? `${trimmedQuery} ${nsfwTagExclusion}` : nsfwTagExclusion
+  return trimmedQuery ? `${nsfwTagExclusion} ${trimmedQuery}` : nsfwTagExclusion
 }

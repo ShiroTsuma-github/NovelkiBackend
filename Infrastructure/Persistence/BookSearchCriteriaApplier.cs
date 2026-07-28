@@ -1,6 +1,7 @@
 namespace Infrastructure.Persistence;
 
 using Domain.Entities;
+using NpgsqlTypes;
 using System.Linq.Expressions;
 
 public sealed class BookSearchCriteriaApplier
@@ -8,13 +9,14 @@ public sealed class BookSearchCriteriaApplier
     private readonly DateSearchExpressionFactory _dateSearch;
     private readonly NumberSearchExpressionFactory _numberSearch;
     private readonly TextSearchExpressionFactory _textSearch;
+    private readonly bool _isPostgres;
 
     public BookSearchCriteriaApplier(ApplicationDbContext context)
     {
-        var isPostgres = context.Database.IsNpgsql();
-        _dateSearch = new DateSearchExpressionFactory(isPostgres);
-        _numberSearch = new NumberSearchExpressionFactory(isPostgres);
-        _textSearch = new TextSearchExpressionFactory(isPostgres);
+        _isPostgres = context.Database.IsNpgsql();
+        _dateSearch = new DateSearchExpressionFactory(_isPostgres);
+        _numberSearch = new NumberSearchExpressionFactory(_isPostgres);
+        _textSearch = new TextSearchExpressionFactory(_isPostgres);
     }
 
     public IQueryable<Book> Apply(IQueryable<Book> query, BookSearchCriteria criteria)
@@ -52,9 +54,46 @@ public sealed class BookSearchCriteriaApplier
 
     private Expression<Func<Book, bool>> BuildGeneralTextPredicate(string search)
     {
-        return PredicateExpression.Or(
+        if (_isPostgres)
+        {
+            return BuildPostgresGeneralTextPredicate(search);
+        }
+
+        return PredicateExpression.OrAll(
+        [
             BuildTitlePredicate(search),
-            BuildAuthorPredicate(search));
+            BuildAuthorPredicate(search),
+            BuildTagPredicate(search),
+            BuildGenrePredicate(search),
+            BuildStatusPredicate(search),
+            BuildTypePredicate(search)
+        ])!;
+    }
+
+    private static Expression<Func<Book, bool>> BuildPostgresGeneralTextPredicate(string search)
+    {
+        var term = search.Trim().ToLowerInvariant();
+        if (term.Length < 3)
+        {
+            var pattern = $"%{EscapeLike(term)}%";
+            return book =>
+                EF.Property<NpgsqlTsVector>(book, "SearchVector")
+                    .Matches(EF.Functions.PlainToTsQuery("simple", term)) ||
+                EF.Functions.ILike(book.SearchDocument, pattern, @"\");
+        }
+
+        return book =>
+            EF.Property<NpgsqlTsVector>(book, "SearchVector")
+                .Matches(EF.Functions.PlainToTsQuery("simple", term)) ||
+            EF.Functions.TrigramsAreWordSimilar(term, book.SearchDocument);
+    }
+
+    private static string EscapeLike(string value)
+    {
+        return value
+            .Replace(@"\", @"\\", StringComparison.Ordinal)
+            .Replace("%", @"\%", StringComparison.Ordinal)
+            .Replace("_", @"\_", StringComparison.Ordinal);
     }
 
     private Expression<Func<Book, bool>>? BuildFieldPredicate(BookSearchFieldFilter filter)

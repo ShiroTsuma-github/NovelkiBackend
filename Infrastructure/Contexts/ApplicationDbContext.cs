@@ -29,6 +29,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<BookShareAuthorPromotion> BookShareAuthorPromotions { get; set; }
     public DbSet<BookShareTagPromotion> BookShareTagPromotions { get; set; }
     public DbSet<StorageCleanupQueueItem> StorageCleanupQueueItems { get; set; }
+    public DbSet<BookSearchIndexQueueItem> BookSearchIndexQueueItems { get; set; }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = new())
     {
@@ -55,7 +56,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     {
         base.OnModelCreating(modelBuilder);
 
-        ConfigureBook(modelBuilder);
+        ConfigureBook(modelBuilder, Database.IsNpgsql());
         ConfigureAuthor(modelBuilder);
         ConfigureGenre(modelBuilder);
         ConfigureStatus(modelBuilder);
@@ -63,11 +64,12 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         ConfigureTag(modelBuilder);
         ConfigurePublicBooks(modelBuilder);
         ConfigureStorageCleanupQueue(modelBuilder);
+        ConfigureBookSearchIndexQueue(modelBuilder);
         ConfigureIdentity(modelBuilder);
         SeedSystemDictionaries(modelBuilder);
     }
 
-    private static void ConfigureBook(ModelBuilder modelBuilder)
+    private static void ConfigureBook(ModelBuilder modelBuilder, bool isPostgres)
     {
         modelBuilder.Entity<Book>(entity =>
         {
@@ -84,6 +86,14 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
 
             entity.Property(b => b.PrimaryTitle).HasMaxLength(500);
             entity.Property(b => b.NormalizedPrimaryTitle).HasMaxLength(500);
+            entity.Property(b => b.SearchDocument).HasDefaultValue(string.Empty);
+            if (isPostgres)
+            {
+                entity.Property<NpgsqlTypes.NpgsqlTsVector>("SearchVector")
+                    .HasColumnType("tsvector")
+                    .IsRequired()
+                    .HasDefaultValueSql("''::tsvector");
+            }
             entity.Property(b => b.CurrentChapterLabel).HasMaxLength(100);
 
             entity.HasOne(b => b.Author)
@@ -350,6 +360,20 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.HasIndex(item => item.NextAttemptAt);
             entity.Property(item => item.StoragePath).HasMaxLength(500);
             entity.Property(item => item.LastError).HasMaxLength(2000);
+        });
+    }
+
+    private static void ConfigureBookSearchIndexQueue(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<BookSearchIndexQueueItem>(entity =>
+        {
+            entity.HasKey(item => item.BookId);
+            entity.HasIndex(item => new { item.NextAttemptAt, item.LeaseUntil });
+            entity.Property(item => item.LastError).HasMaxLength(2000);
+            entity.HasOne(item => item.Book)
+                .WithOne()
+                .HasForeignKey<BookSearchIndexQueueItem>(item => item.BookId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

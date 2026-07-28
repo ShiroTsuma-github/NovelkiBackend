@@ -10,7 +10,11 @@ describe('NSFW preference', () => {
   it('fails closed and excludes h-manhwa by default', () => {
     expect(isNsfwEnabled()).toBe(false)
     expect(withNsfwBookFilter()).toBe('-tag:h-manhwa')
-    expect(withNsfwBookFilter('author:Toika')).toBe('author:Toika -tag:h-manhwa')
+    expect(withNsfwBookFilter('author:Toika')).toBe('-tag:h-manhwa author:Toika')
+  })
+
+  it('keeps an unfinished quoted user filter at the end of the query', () => {
+    expect(withNsfwBookFilter('title:"space')).toBe('-tag:h-manhwa title:"space')
   })
 
   it('does not duplicate an explicit exclusion', () => {

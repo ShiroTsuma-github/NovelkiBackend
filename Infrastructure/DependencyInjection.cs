@@ -4,6 +4,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Authentication;
 using BookCovers;
+using BookSearch;
 using BookMetadata;
 using Caching;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -38,10 +39,11 @@ public static class DependencyInjection
         var key = Encoding.UTF8.GetBytes(keyString);
 
         var connectionString = builder.Configuration.GetConnectionString(DatabaseConnectionString);
+        var bookSearchConnectionString = BookSearchConnectionSettings.Apply(connectionString);
         var redisConnectionString = builder.Configuration.GetConnectionString(RedisConnectionString);
         builder.Services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseNpgsql(connectionString,
+            options.UseNpgsql(bookSearchConnectionString,
                 npgsqlOptions => { npgsqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery); });
         });
         builder.Services.AddDistributedMemoryCache();
@@ -115,6 +117,9 @@ public static class DependencyInjection
         builder.Services.AddScoped<StorageCleanupQueueProcessor>();
         builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddHostedService<StorageCleanupBackgroundService>();
+        builder.Services.AddScoped<BookSearchIndexUpdater>();
+        builder.Services.AddScoped<BookSearchIndexQueueProcessor>();
+        builder.Services.AddHostedService<BookSearchIndexBackgroundService>();
         builder.Services.AddScoped<IAdminAccountService, AdminAccountService>();
 
         builder.Services.AddOptions<BookCoverOptions>()

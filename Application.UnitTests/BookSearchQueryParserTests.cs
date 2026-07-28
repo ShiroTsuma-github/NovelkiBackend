@@ -45,6 +45,19 @@ public class BookSearchQueryParserTests
     }
 
     [Fact]
+    public void Parse_ShouldKeepUnclosedQuotedValueAsAFieldFilter()
+    {
+        var criteria = BookSearchQueryParser.Parse("-tag:h-manhwa title:\"space");
+
+        var title = Assert.Single(criteria.Fields);
+        Assert.Equal(BookSearchField.Title, title.Field);
+        Assert.Equal(["space"], title.Values);
+        var exclusion = Assert.Single(criteria.Exclusions);
+        Assert.Equal(BookSearchField.Tag, Assert.Single(exclusion.Fields).Field);
+        Assert.Empty(criteria.Terms);
+    }
+
+    [Fact]
     public void Parse_ShouldReadExcludedTermsFieldsNumbersAndMissingValues()
     {
         var criteria = BookSearchQueryParser.Parse(

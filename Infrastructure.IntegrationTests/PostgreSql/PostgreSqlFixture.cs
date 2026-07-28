@@ -2,6 +2,7 @@ namespace Infrastructure.IntegrationTests.PostgreSql;
 
 using Application.Common.Interfaces;
 using Infrastructure.Contexts;
+using Infrastructure.BookSearch;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -34,7 +35,7 @@ public sealed class PostgreSqlFixture : IAsyncLifetime
     public ApplicationDbContext CreateContext(Guid userId, params IInterceptor[] interceptors)
     {
         var builder = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(_container.GetConnectionString());
+            .UseNpgsql(BookSearchConnectionSettings.Apply(_container.GetConnectionString()));
         if (interceptors.Length > 0)
         {
             builder.AddInterceptors(interceptors);

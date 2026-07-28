@@ -78,10 +78,19 @@ public sealed class BookSearchCriteriaApplierTests
 
         var sql = Apply(context, criteria).ToQueryString();
 
-        Assert.Contains(postgres ? "ILIKE" : "LIKE", sql, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains(postgres ? "BookTitles" : "NormalizedTitle", sql, StringComparison.Ordinal);
-        Assert.Contains(postgres ? "AuthorNames" : "NormalizedName", sql, StringComparison.Ordinal);
-        Assert.Equal(4, CountOccurrences(sql, postgres ? "ILIKE" : "LIKE"));
+        if (postgres)
+        {
+            Assert.Contains("\"SearchVector\" @@ plainto_tsquery", sql, StringComparison.Ordinal);
+            Assert.Contains("<%", sql, StringComparison.Ordinal);
+            Assert.Contains("\"SearchDocument\"", sql, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.Contains("LIKE", sql, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("NormalizedTitle", sql, StringComparison.Ordinal);
+            Assert.Contains("NormalizedName", sql, StringComparison.Ordinal);
+            Assert.Equal(8, CountOccurrences(sql, "LIKE"));
+        }
     }
 
     [Fact]
@@ -108,14 +117,43 @@ public sealed class BookSearchCriteriaApplierTests
             Source = "Test"
         });
         var authorAlias = TestData.Book(database.UserId, "Alias Author Book", aliasAuthor);
+        var tagged = TestData.Book(database.UserId, "Tagged Book");
+        tagged.BookTags.Add(new BookTag
+        {
+            Book = tagged,
+            Tag = TestData.Tag(database.UserId, "Tag Needle")
+        });
+        var genre = TestData.Book(database.UserId, "Genre Book");
+        genre.BookGenres.Add(new BookGenre
+        {
+            Book = genre,
+            Genre = TestData.Genre("Genre Needle")
+        });
+        var status = TestData.Book(database.UserId, "Status Book");
+        status.StatusId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        var type = TestData.Book(database.UserId, "Type Book");
+        type.ContentTypeId = Guid.Parse("10000000-0000-0000-0000-000000000002");
         var noMatch = TestData.Book(database.UserId, "Unrelated Book", TestData.Author("Unrelated Author"));
-        context.Books.AddRange(primaryTitle, alternateTitle, primaryAuthor, authorAlias, noMatch);
+        context.Books.AddRange(
+            primaryTitle,
+            alternateTitle,
+            primaryAuthor,
+            authorAlias,
+            tagged,
+            genre,
+            status,
+            type,
+            noMatch);
         await context.SaveChangesAsync();
 
         await AssertMatchesOnlyAsync("Primary Needle", primaryTitle.Id);
         await AssertMatchesOnlyAsync("Alternate Needle", alternateTitle.Id);
         await AssertMatchesOnlyAsync("Author Needle", primaryAuthor.Id);
         await AssertMatchesOnlyAsync("Alias Needle", authorAlias.Id);
+        await AssertMatchesOnlyAsync("Tag Needle", tagged.Id);
+        await AssertMatchesOnlyAsync("Genre Needle", genre.Id);
+        await AssertMatchesOnlyAsync("Completed", status.Id);
+        await AssertMatchesOnlyAsync("Manga", type.Id);
 
         async Task AssertMatchesOnlyAsync(string term, Guid expectedId)
         {

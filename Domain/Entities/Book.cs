@@ -6,6 +6,7 @@ public class Book : BaseAuditableEntity
 {
     public required string PrimaryTitle { get; set; }
     public required string NormalizedPrimaryTitle { get; set; }
+    public string SearchDocument { get; private set; } = null!;
     public string? Description { get; set; }
     public Guid? AuthorId { get; set; }
     public Author? Author { get; set; }

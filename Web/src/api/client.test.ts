@@ -34,9 +34,9 @@ describe('book API NSFW filtering', () => {
     const urls = fetchMock.mock.calls.map(([input]) => new URL(String(input), 'http://localhost'))
 
     expect(urls.slice(0, 7).map((url) => url.searchParams.get('query'))).toEqual(
-      Array(7).fill('author:Toika -tag:h-manhwa'),
+      Array(7).fill('-tag:h-manhwa author:Toika'),
     )
-    expect(urls[7].searchParams.get('search')).toBe('author:Toika -tag:h-manhwa')
+    expect(urls[7].searchParams.get('search')).toBe('-tag:h-manhwa author:Toika')
   })
 
   it('uses the dedicated manage endpoint for the owners listing inventory', async () => {

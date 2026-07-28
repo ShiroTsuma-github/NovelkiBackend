@@ -1,14 +1,18 @@
 namespace Infrastructure.Persistence;
 
 using FluentValidation;
+using Infrastructure.BookSearch;
 
 public class BookRepository : IBookRepository
 {
     private readonly ApplicationDbContext _context;
+    private readonly BookSearchIndexUpdater? _searchIndexUpdater;
+    private readonly HashSet<Guid> _pendingSearchRefreshes = [];
 
-    public BookRepository(ApplicationDbContext context)
+    public BookRepository(ApplicationDbContext context, BookSearchIndexUpdater? searchIndexUpdater = null)
     {
         _context = context;
+        _searchIndexUpdater = searchIndexUpdater;
     }
 
     public async Task<Book?> GetByIdAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
@@ -52,7 +56,7 @@ public class BookRepository : IBookRepository
     public async Task AddAsync(Book book, CancellationToken cancellationToken)
     {
         _context.Books.Add(book);
-        await _context.SaveChangesAsync(cancellationToken);
+        await SaveAsync(cancellationToken);
     }
 
     public async Task DeleteAsync(Guid id, Guid ownerId, CancellationToken cancellationToken)
@@ -69,7 +73,17 @@ public class BookRepository : IBookRepository
 
     public async Task SaveAsync(CancellationToken cancellationToken)
     {
+        var bookIds = GetChangedSearchBookIds();
         await _context.SaveChangesAsync(cancellationToken);
+        if (_searchIndexUpdater != null)
+        {
+            foreach (var bookId in bookIds)
+            {
+                await _searchIndexUpdater.RefreshAsync(bookId, cancellationToken);
+            }
+        }
+
+        _pendingSearchRefreshes.ExceptWith(bookIds);
     }
 
     public Task<int> GetCountAsync(Guid ownerId, CancellationToken cancellationToken)
@@ -167,6 +181,7 @@ public class BookRepository : IBookRepository
         BookProgressHistory? progressHistory,
         CancellationToken cancellationToken)
     {
+        _pendingSearchRefreshes.Add(bookId);
         await _context.BookTitles.Where(title => title.BookId == bookId).ExecuteDeleteAsync(cancellationToken);
         await _context.BookLinks.Where(link => link.BookId == bookId).ExecuteDeleteAsync(cancellationToken);
         await _context.Set<BookGenre>().Where(bookGenre => bookGenre.BookId == bookId)
@@ -198,6 +213,31 @@ public class BookRepository : IBookRepository
             progressHistory.BookId = bookId;
             _context.BookProgressHistory.Add(progressHistory);
         }
+    }
+
+    private Guid[] GetChangedSearchBookIds()
+    {
+        return _pendingSearchRefreshes
+            .Concat(_context.ChangeTracker.Entries<Book>()
+                .Where(entry =>
+                    entry.State == EntityState.Added ||
+                    entry.State == EntityState.Modified &&
+                    (entry.Property(book => book.PrimaryTitle).IsModified ||
+                     entry.Property(book => book.AuthorId).IsModified ||
+                     entry.Property(book => book.ContentTypeId).IsModified ||
+                     entry.Property(book => book.StatusId).IsModified))
+                .Select(entry => entry.Entity.Id))
+            .Concat(_context.ChangeTracker.Entries<BookTitle>()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .Select(entry => entry.Entity.BookId))
+            .Concat(_context.ChangeTracker.Entries<BookGenre>()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .Select(entry => entry.Entity.BookId))
+            .Concat(_context.ChangeTracker.Entries<BookTag>()
+                .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+                .Select(entry => entry.Entity.BookId))
+            .Distinct()
+            .ToArray();
     }
 
     private void DetachTrackedEditableCollections(Guid bookId)
