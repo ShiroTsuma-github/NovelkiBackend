@@ -72,10 +72,54 @@ ale nie tworzy PostgreSQL ani Redis.
    | Grafana | `http://localhost:3000` |
    | Prometheus | `http://localhost:9090` |
 
-Kontener Web tworzy lokalny certyfikat dla `localhost` i `127.0.0.1`. Przeglądarka może poprosić o jego
-zaakceptowanie. Do publicznego wdrożenia zamontuj certyfikat wystawiony dla używanej domeny.
+Domyślna konfiguracja tworzy lokalny certyfikat self-signed. Konfigurację publicznej domeny i ACME opisuje
+następna sekcja.
 
 Compose ustawia `Database:AutoMigrate=true`, więc API stosuje migracje podczas uruchamiania.
+
+## Wdrożenie produkcyjne z TLS
+
+Konfigurację konkretnej domeny przechowuj wyłącznie w lokalnym pliku `.env`. Przed pierwszym uruchomieniem:
+
+1. Upewnij się, że rekord DNS domeny wskazuje publiczny adres serwera.
+2. Przekieruj i odblokuj publiczne porty TCP 80 oraz 443 do hosta uruchamiającego Compose.
+3. Ustaw w `.env`:
+
+   ```dotenv
+   WEB_PORT=443
+   WEB_HTTP_PORT=80
+   WEB_PUBLIC_ORIGIN=https://library.example.com
+   PUBLIC_DOMAIN=library.example.com
+   PUBLIC_HTTPS_AUTHORITY=library.example.com
+   ACME_ENABLED=true
+   ACME_EMAIL=adres-do-powiadomien@example.com
+   ```
+
+4. Zbuduj i uruchom stack:
+
+   ```powershell
+   docker compose up --build -d
+   ```
+
+Przy pierwszym starcie kontener Web wystawia certyfikat Let's Encrypt metodą HTTP-01. Dane ACME są przechowywane
+w wolumenie `letsencrypt-data`. Kontener sprawdza odnowienie co 12 godzin i po udanym odnowieniu automatycznie
+przeładowuje nginx. Nie usuwaj tego wolumenu podczas zwykłych aktualizacji.
+
+Nginx przyjmuje wyłącznie host podany w `PUBLIC_DOMAIN`, przekierowuje HTTP na stały adres
+`PUBLIC_HTTPS_AUTHORITY` i odrzuca pozostałe wartości `Host`. API jest publikowane przez Compose wyłącznie na
+loopback hosta; ruch publiczny powinien przechodzić przez nginx.
+
+Do lokalnego uruchomienia bez ACME ustaw zamiast tego:
+
+```dotenv
+WEB_PORT=8080
+WEB_HTTP_PORT=8081
+PUBLIC_DOMAIN=localhost
+PUBLIC_HTTPS_AUTHORITY=localhost:8080
+ACME_ENABLED=false
+```
+
+W tym trybie kontener tworzy krótkotrwały certyfikat self-signed przeznaczony wyłącznie do developmentu.
 
 ## Uruchomienie bez Dockera
 

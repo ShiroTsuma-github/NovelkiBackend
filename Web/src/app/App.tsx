@@ -63,7 +63,11 @@ function AdminOnly({ children }: { children: ReactNode }) {
 }
 
 function ProtectedLayout() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isRestoring } = useAuth()
+
+  if (isRestoring) {
+    return <main aria-busy="true" aria-label="Restoring session" />
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />

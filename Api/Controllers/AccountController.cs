@@ -1,12 +1,16 @@
 ﻿namespace Api.Controllers;
 
 using Application.Features.AccountFeatures.Commands;
-using Microsoft.AspNetCore.RateLimiting;
+using Application.Common.Models;
+using Domain.Exceptions;
+using FluentValidation;
 
 [ApiController]
 [Route(ApiRoutes.Account)]
 public class AccountController : ControllerBase
 {
+    internal const string RefreshTokenCookieName = "__Host-novelki.refresh";
+
     private readonly ILogger<AccountController> _logger;
     private readonly IMediator _mediator;
 
@@ -17,7 +21,6 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("register")]
-    [EnableRateLimiting(DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Register(RegisterUserCommand registerUserCommand)
     {
         var response = await _mediator.Send(registerUserCommand);
@@ -27,10 +30,19 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("login")]
-    [EnableRateLimiting(DependencyInjection.AccountAuthRateLimitPolicy)]
     public async Task<IActionResult> Login(LoginUserCommand loginUserCommand)
     {
-        var response = await _mediator.Send(loginUserCommand);
+        TokenResponse response;
+        try
+        {
+            response = await _mediator.Send(loginUserCommand);
+        }
+        catch (ValidationException)
+        {
+            throw new AuthenticationFailedException();
+        }
+
+        SetRefreshTokenCookie(response);
         _logger.LogInformation(
             "User logged in. UserId={UserId} IdentifierType={IdentifierType}",
             response.UserId,
@@ -39,17 +51,42 @@ public class AccountController : ControllerBase
     }
 
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] RefreshTokenCommand refreshTokenCommand)
+    public async Task<IActionResult> Refresh()
     {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName] ?? string.Empty;
+        var refreshTokenCommand = new RefreshTokenCommand(refreshToken);
         var response = await _mediator.Send(refreshTokenCommand);
+        SetRefreshTokenCookie(response);
         _logger.LogInformation("Access token refreshed. UserId={UserId}", response.UserId);
         return Ok(response);
     }
 
     [HttpPost("logout")]
-    public async Task<IActionResult> Logout([FromBody] LogoutCommand logoutCommand)
+    public async Task<IActionResult> Logout()
     {
+        var refreshToken = Request.Cookies[RefreshTokenCookieName];
+        var logoutCommand = new LogoutCommand(refreshToken);
         await _mediator.Send(logoutCommand);
+        Response.Cookies.Delete(RefreshTokenCookieName, CreateRefreshTokenCookieOptions());
         return NoContent();
+    }
+
+    private void SetRefreshTokenCookie(TokenResponse response)
+    {
+        var options = CreateRefreshTokenCookieOptions();
+        options.Expires = response.RefreshTokenExpiresAt;
+        Response.Cookies.Append(RefreshTokenCookieName, response.RefreshToken, options);
+    }
+
+    private static CookieOptions CreateRefreshTokenCookieOptions()
+    {
+        return new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/",
+            IsEssential = true
+        };
     }
 }

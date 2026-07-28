@@ -4,7 +4,6 @@ using System.Text.Json;
 using Domain.Entities;
 using Domain.Exceptions;
 using FluentValidation;
-using FluentValidation.Results;
 using Infrastructure.Identity;
 using Infrastructure.Middleware;
 using Infrastructure.Services;
@@ -14,59 +13,43 @@ using Moq;
 
 public class ErrorHandlingMiddlewareTests
 {
-    public static TheoryData<Exception, int, string> MappedExceptions => new()
+    public static TheoryData<Exception, int, string, string> MappedExceptions => new()
     {
         {
-            new EntityNotFoundException<User, string>("missing"), StatusCodes.Status404NotFound, "Authentication Failed"
+            new AuthenticationFailedException(), StatusCodes.Status401Unauthorized, "Unauthorized",
+            "AuthenticationFailed"
         },
-        { new WrongPasswordException(), StatusCodes.Status401Unauthorized, "Authentication Failed" },
-        { new EntityNotFoundException<User, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new CannotDeleteCurrentAccountException(), StatusCodes.Status409Conflict, "Conflict" },
         {
-            new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()), StatusCodes.Status409Conflict,
-            "Conflict"
+            new EntityNotFoundException<User, string>("missing"), StatusCodes.Status401Unauthorized, "Unauthorized",
+            "AuthenticationFailed"
         },
-        { new EntityNotFoundException<Genre, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         {
-            new EntityAlreadyExistsException<Status, Guid>("Reading", Guid.NewGuid()), StatusCodes.Status409Conflict,
-            "Conflict"
+            new EntityNotFoundException<User, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found",
+            "NotFound"
         },
-        { new EntityNotFoundException<Status, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         {
-            new EntityAlreadyExistsException<ContentType, Guid>("Novel", Guid.NewGuid()), StatusCodes.Status409Conflict,
-            "Conflict"
+            new EntityAlreadyExistsException<Genre, Guid>("Fantasy", Guid.NewGuid()),
+            StatusCodes.Status409Conflict, "Conflict", "Conflict"
         },
-        { new EntityNotFoundException<ContentType, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityNotFoundException<Book, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityNotFoundException<BookCover, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
         {
-            new EntityNotFoundException<PublicBookSnapshot, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound,
-            "Not Found"
+            new EntityNotFoundException<Book, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found",
+            "NotFound"
         },
-        { new EntityNotFoundException<Tag, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityNotFoundException<Author, Guid>(Guid.NewGuid()), StatusCodes.Status404NotFound, "Not Found" },
-        { new EntityInUseException<Tag>("favorite"), StatusCodes.Status409Conflict, "Conflict" },
-        { new EntityInUseException<Author>("Er Gen"), StatusCodes.Status409Conflict, "Conflict" },
-        { new EntityInUseException<Genre>("Fantasy"), StatusCodes.Status409Conflict, "Conflict" },
-        { new EntityInUseException<Status>("Reading"), StatusCodes.Status409Conflict, "Conflict" },
-        { new EntityInUseException<ContentType>("Novel"), StatusCodes.Status409Conflict, "Conflict" },
+        {
+            new EntityInUseException<Tag>("favorite"), StatusCodes.Status409Conflict, "Conflict", "Conflict"
+        },
         {
             new FullImportCapacityExceededException("Full import capacity reached."),
-            StatusCodes.Status429TooManyRequests, "Full Import Capacity Reached"
+            StatusCodes.Status429TooManyRequests, "Too Many Requests", "RateLimitExceeded"
         },
         {
-            new ImportCapacityExceededException("Import capacity reached."), StatusCodes.Status429TooManyRequests,
-            "Import Capacity Reached"
+            new BookImportProcessingTimeoutException("Full import timed out."),
+            StatusCodes.Status408RequestTimeout, "Request Timeout", "RequestTimeout"
         },
         {
-            new BookImportProcessingTimeoutException("Full import timed out."), StatusCodes.Status408RequestTimeout,
-            "Full Import Timed Out"
-        },
-        {
-            new AccountTemporarilyBlockedException(DateTimeOffset.UtcNow.AddHours(24)),
-            StatusCodes.Status429TooManyRequests, "Account Temporarily Blocked"
-        },
-        { new InvalidOperationException("boom"), StatusCodes.Status500InternalServerError, "Internal Server Error" }
+            new InvalidOperationException("secret implementation detail"),
+            StatusCodes.Status500InternalServerError, "Internal Server Error", "InternalServerError"
+        }
     };
 
     [Fact]
@@ -90,106 +73,68 @@ public class ErrorHandlingMiddlewareTests
 
     [Theory]
     [MemberData(nameof(MappedExceptions))]
-    public async Task InvokeAsync_ShouldMapKnownExceptions(Exception exception, int expectedStatus,
-        string expectedTitle)
+    public async Task InvokeAsync_ShouldMapKnownExceptionsWithoutExposingExceptionDetails(
+        Exception exception,
+        int expectedStatus,
+        string expectedTitle,
+        string expectedType)
     {
         var context = await InvokeWithException(exception);
 
         context.Response.Body.Position = 0;
         using var document = await JsonDocument.ParseAsync(context.Response.Body);
+        var root = document.RootElement;
 
         Assert.Equal(expectedStatus, context.Response.StatusCode);
-        Assert.Equal(expectedTitle, document.RootElement.GetProperty("title").GetString());
-        Assert.Equal(exception.GetType().Name, document.RootElement.GetProperty("type").GetString());
-        Assert.Equal(expectedStatus, document.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal(expectedTitle, root.GetProperty("title").GetString());
+        Assert.Equal(expectedType, root.GetProperty("type").GetString());
+        Assert.Equal(expectedStatus, root.GetProperty("status").GetInt32());
+        Assert.DoesNotContain(exception.GetType().Name, root.GetRawText());
+        if (exception is not AuthenticationFailedException and not EntityNotFoundException<User, string>)
+        {
+            Assert.DoesNotContain(exception.Message, root.GetRawText());
+        }
     }
 
     [Fact]
-    public async Task InvokeAsync_ShouldHideBookConflictInternalId()
+    public async Task InvokeAsync_ShouldUseUniformPublicLoginFailure()
     {
-        var existingId = Guid.Parse("11111111-1111-1111-1111-111111111111");
-        var context = new DefaultHttpContext();
-        context.Response.Body = new MemoryStream();
-        var middleware = new ErrorHandlingMiddleware(
-            _ => throw new EntityAlreadyExistsException<Book, Guid>("Duplicated Book", existingId),
-            Mock.Of<ILogger<ErrorHandlingMiddleware>>());
+        var missingUser = await InvokeWithException(new EntityNotFoundException<User, string>("reader"));
+        var wrongPassword = await InvokeWithException(new WrongPasswordException());
 
-        await middleware.InvokeAsync(context);
-
-        context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var detail = document.RootElement.GetProperty("detail").GetString();
-
-        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.Equal("A book named 'Duplicated Book' already exists.", detail);
-        Assert.DoesNotContain(existingId.ToString(), detail);
+        Assert.Equal(StatusCodes.Status401Unauthorized, missingUser.Response.StatusCode);
+        Assert.Equal(StatusCodes.Status401Unauthorized, wrongPassword.Response.StatusCode);
+        Assert.Equal(
+            await ReadDetailAsync(missingUser),
+            await ReadDetailAsync(wrongPassword));
+        Assert.Equal(AuthenticationFailedException.PublicMessage, await ReadDetailAsync(missingUser));
     }
 
     [Fact]
-    public async Task InvokeAsync_ShouldReturnIdentityOperationErrors()
+    public async Task InvokeAsync_ShouldKeepValidationDetailOnlyInLogs()
     {
-        var context =
-            await InvokeWithException(new IdentityOperationFailedException(["Password is too weak."]));
-
-        context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
-
-        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Identity", out var identityErrors));
-        Assert.Contains("Password is too weak.", identityErrors.EnumerateArray().Select(e => e.GetString()));
-    }
-
-    [Fact]
-    public async Task InvokeAsync_ShouldReturnGroupedValidationErrors()
-    {
-        var exception = new ValidationException([
-            new ValidationFailure("Title", "Title is required."),
-            new ValidationFailure("Title", "Title is too long."),
-            new ValidationFailure("Rating", "Rating must be valid.")
-        ]);
-
-        var context = await InvokeWithException(exception);
-
-        context.Response.Body.Position = 0;
-        using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
-
-        Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
-        Assert.Equal("Title: Title is required.", document.RootElement.GetProperty("detail").GetString());
-        Assert.Equal(2, errors.GetProperty("Title").GetArrayLength());
-        Assert.Single(errors.GetProperty("Rating").EnumerateArray());
-    }
-
-    [Fact]
-    public async Task InvokeAsync_ShouldReturnAndLogMessageOnlyValidationError()
-    {
+        const string sensitiveDetail = "Full backup is missing manifest.json.";
         var logger = new Mock<ILogger<ErrorHandlingMiddleware>>();
         var context = new DefaultHttpContext();
         context.Request.Method = HttpMethods.Post;
         context.Request.Path = "/api/v1/book/import/full/sessions";
         context.Response.Body = new MemoryStream();
         var middleware = new ErrorHandlingMiddleware(
-            _ => throw new ValidationException("Full backup is missing manifest.json."),
+            _ => throw new ValidationException(sensitiveDetail),
             logger.Object);
 
         await middleware.InvokeAsync(context);
 
         context.Response.Body.Position = 0;
         using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
-
         Assert.Equal(StatusCodes.Status400BadRequest, context.Response.StatusCode);
-        Assert.Equal("Full backup is missing manifest.json.",
-            document.RootElement.GetProperty("detail").GetString());
-        Assert.Contains("Full backup is missing manifest.json.",
-            errors.GetProperty("General").EnumerateArray().Select(item => item.GetString()));
+        Assert.DoesNotContain(sensitiveDetail, document.RootElement.GetRawText());
         logger.Verify(
             candidate => candidate.Log(
                 LogLevel.Warning,
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((state, _) =>
-                    state.ToString()!.Contains("Full backup is missing manifest.json.") &&
+                    state.ToString()!.Contains(sensitiveDetail) &&
                     state.ToString()!.Contains("/api/v1/book/import/full/sessions")),
                 It.IsAny<Exception?>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
@@ -207,46 +152,29 @@ public class ErrorHandlingMiddlewareTests
         Assert.InRange(retryAfter, 23 * 60 * 60, 24 * 60 * 60);
     }
 
-    [Fact]
-    public async Task InvokeAsync_ShouldReturnFieldErrorForUsernameConflict()
+    [Theory]
+    [InlineData("reader", null)]
+    [InlineData(null, "reader@example.com")]
+    public async Task InvokeAsync_ShouldNotExposeAccountConflictIdentifier(string? username, string? email)
     {
-        var context = new DefaultHttpContext();
-        context.Response.Body = new MemoryStream();
-        var middleware = new ErrorHandlingMiddleware(
-            _ => throw new UsernameTakenException("reader"),
-            Mock.Of<ILogger<ErrorHandlingMiddleware>>());
-
-        await middleware.InvokeAsync(context);
+        Exception exception = username != null
+            ? new UsernameTakenException(username)
+            : new EmailInUseException(email!);
+        var context = await InvokeWithException(exception);
 
         context.Response.Body.Position = 0;
         using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
+        var response = document.RootElement.GetRawText();
 
         Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Username", out var usernameErrors));
-        Assert.Contains("Account with username 'reader' already exists.",
-            usernameErrors.EnumerateArray().Select(e => e.GetString()));
+        Assert.DoesNotContain(username ?? email!, response);
     }
 
-    [Fact]
-    public async Task InvokeAsync_ShouldReturnFieldErrorForEmailConflict()
+    private static async Task<string?> ReadDetailAsync(DefaultHttpContext context)
     {
-        var context = new DefaultHttpContext();
-        context.Response.Body = new MemoryStream();
-        var middleware = new ErrorHandlingMiddleware(
-            _ => throw new EmailInUseException("reader@example.com"),
-            Mock.Of<ILogger<ErrorHandlingMiddleware>>());
-
-        await middleware.InvokeAsync(context);
-
         context.Response.Body.Position = 0;
         using var document = await JsonDocument.ParseAsync(context.Response.Body);
-        var errors = document.RootElement.GetProperty("errors");
-
-        Assert.Equal(StatusCodes.Status409Conflict, context.Response.StatusCode);
-        Assert.True(errors.TryGetProperty("Email", out var emailErrors));
-        Assert.Contains("The account with email reader@example.com already exists.",
-            emailErrors.EnumerateArray().Select(e => e.GetString()));
+        return document.RootElement.GetProperty("detail").GetString();
     }
 
     private static async Task<DefaultHttpContext> InvokeWithException(Exception exception)
@@ -259,7 +187,6 @@ public class ErrorHandlingMiddlewareTests
             Mock.Of<ILogger<ErrorHandlingMiddleware>>());
 
         await middleware.InvokeAsync(context);
-
         return context;
     }
 }

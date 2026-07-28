@@ -9,10 +9,16 @@ import {
 } from 'react'
 import type { TokenResponse } from '@/api/types'
 import { api } from '@/api/client'
-import { clearStoredSession, getStoredSession, setStoredSession, subscribeUnauthorized } from '@/api/http'
+import {
+  clearStoredSession,
+  refreshSession,
+  setStoredSession,
+  subscribeUnauthorized,
+} from '@/api/http'
 
 type AuthContextValue = {
   token: string | null
+  isRestoring: boolean
   isAuthenticated: boolean
   roles: string[]
   isAdmin: boolean
@@ -23,11 +29,17 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() =>
-    getStoredSession()?.accessToken ?? null,
-  )
+  const [token, setToken] = useState<string | null>(null)
+  const [isRestoring, setIsRestoring] = useState(true)
 
-  useEffect(() => subscribeUnauthorized(() => setToken(null)), [])
+  useEffect(() => {
+    clearStoredSession()
+    const unsubscribe = subscribeUnauthorized(() => setToken(null))
+    void refreshSession()
+      .then((accessToken) => setToken(accessToken))
+      .finally(() => setIsRestoring(false))
+    return unsubscribe
+  }, [])
 
   const setSession = useCallback((session: TokenResponse) => {
     setStoredSession(session)
@@ -35,15 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(async () => {
-    const refreshToken = getStoredSession()?.refreshToken ?? null
     clearStoredSession()
     setToken(null)
-    if (refreshToken) {
-      try {
-        await api.logout(refreshToken)
-      } catch {
-        // Explicit logout should still clear the local session even if the backend call fails.
-      }
+    try {
+      await api.logout()
+    } catch {
+      // Explicit logout should still clear the in-memory session if the backend call fails.
     }
   }, [])
 
@@ -52,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const roles = readRoles(token)
       return {
         token,
+        isRestoring,
         isAuthenticated: Boolean(token),
         roles,
         isAdmin: roles.includes('Admin'),
@@ -59,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
       }
     },
-    [logout, setSession, token],
+    [isRestoring, logout, setSession, token],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

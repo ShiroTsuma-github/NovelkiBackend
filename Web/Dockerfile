@@ -12,10 +12,10 @@ RUN npm ci
 COPY Web/ .
 RUN npm run build
 
-FROM nginx:1.29-alpine AS runtime
-RUN apk add --no-cache openssl
+FROM nginx:1.31.3-alpine AS runtime
+RUN apk add --no-cache certbot openssl
 COPY Web/nginx.conf /etc/nginx/templates/default.conf.template
-COPY Web/docker-entrypoint.d/15-generate-dev-certificate.sh /docker-entrypoint.d/15-generate-dev-certificate.sh
-RUN chmod +x /docker-entrypoint.d/15-generate-dev-certificate.sh
+COPY Web/docker-entrypoint.d/15-configure-tls.sh /docker-entrypoint.d/15-configure-tls.sh
+RUN chmod +x /docker-entrypoint.d/15-configure-tls.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 80 443

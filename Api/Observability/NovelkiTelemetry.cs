@@ -19,6 +19,8 @@ public static class NovelkiTelemetry
         Meter.CreateCounter<long>("novelki.book.progress_updated");
 
     public static readonly Counter<long> BookSearchRequests = Meter.CreateCounter<long>("novelki.search.requests");
+    public static readonly Counter<long> RateLimitRejections =
+        Meter.CreateCounter<long>("novelki.security.rate_limit_rejections");
 
     public static readonly Counter<long> AdminDictionaryCreated =
         Meter.CreateCounter<long>("novelki.admin.dictionary.created");

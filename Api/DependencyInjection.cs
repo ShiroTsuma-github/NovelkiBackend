@@ -4,6 +4,9 @@ using System.IO.Compression;
 using System.Net.Mime;
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Api.Observability;
+using Domain.Exceptions;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.Net.Http.Headers;
 using Microsoft.OpenApi;
@@ -11,13 +14,14 @@ using Microsoft.OpenApi;
 internal static class DependencyInjection
 {
     public const string FrontendCorsPolicy = "Frontend";
-    public const string AccountAuthRateLimitPolicy = "account-auth";
     public const string ExpensiveUserActionRateLimitPolicy = "expensive-user-action";
     public const string FullBackupRateLimitPolicy = "full-backup";
 
     private const string CorsAllowedOriginsKey = "Cors:AllowedOrigins";
-    private const string AccountPermitLimitKey = "RateLimiting:Account:PermitLimit";
-    private const string AccountWindowSecondsKey = "RateLimiting:Account:WindowSeconds";
+    private const string LoginIpPermitLimitKey = "RateLimiting:LoginIp:PermitLimit";
+    private const string LoginIpWindowSecondsKey = "RateLimiting:LoginIp:WindowSeconds";
+    private const string LoginAccountPermitLimitKey = "RateLimiting:LoginAccount:PermitLimit";
+    private const string LoginAccountWindowSecondsKey = "RateLimiting:LoginAccount:WindowSeconds";
     private const string ExpensivePermitLimitKey = "RateLimiting:Expensive:PermitLimit";
     private const string ExpensiveWindowSecondsKey = "RateLimiting:Expensive:WindowSeconds";
     private const string ProblemJsonMediaType = "application/problem+json";
@@ -27,6 +31,40 @@ internal static class DependencyInjection
     public static void AddWebServices(this IHostApplicationBuilder builder)
     {
         builder.Services.AddControllers();
+        builder.Services.Configure<ApiBehaviorOptions>(options =>
+        {
+            options.InvalidModelStateResponseFactory = context =>
+            {
+                var isLogin = context.HttpContext.Request.Path.Equals(
+                    "/api/v1/account/login",
+                    StringComparison.OrdinalIgnoreCase);
+                var status = isLogin
+                    ? StatusCodes.Status401Unauthorized
+                    : StatusCodes.Status400BadRequest;
+                var detail = isLogin
+                    ? AuthenticationFailedException.PublicMessage
+                    : "The request contains invalid data.";
+                return new ObjectResult(new
+                {
+                    type = isLogin ? "AuthenticationFailed" : "ValidationError",
+                    title = isLogin ? "Unauthorized" : "Bad Request",
+                    status,
+                    detail,
+                    instance = context.HttpContext.Request.Path.Value
+                })
+                {
+                    StatusCode = status,
+                    ContentTypes = { ProblemJsonMediaType }
+                };
+            };
+        });
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+            options.ForwardLimit = 1;
+        });
         builder.Services.AddResponseCompression(options =>
         {
             options.EnableForHttps = true;
@@ -56,7 +94,8 @@ internal static class DependencyInjection
                 {
                     policy.WithOrigins(origins)
                         .AllowAnyHeader()
-                        .AllowAnyMethod();
+                        .AllowAnyMethod()
+                        .AllowCredentials();
                 }
                 else if (builder.Environment.IsDevelopment())
                 {
@@ -74,8 +113,12 @@ internal static class DependencyInjection
         });
         builder.Services.AddRateLimiter(options =>
         {
-            var accountPermitLimit = builder.Configuration.GetValue<int?>(AccountPermitLimitKey) ?? 10;
-            var accountWindowSeconds = builder.Configuration.GetValue<int?>(AccountWindowSecondsKey) ?? 60;
+            var loginIpPermitLimit = builder.Configuration.GetValue<int?>(LoginIpPermitLimitKey) ?? 20;
+            var loginIpWindowSeconds = builder.Configuration.GetValue<int?>(LoginIpWindowSecondsKey) ?? 60;
+            var loginAccountPermitLimit =
+                builder.Configuration.GetValue<int?>(LoginAccountPermitLimitKey) ?? 5;
+            var loginAccountWindowSeconds =
+                builder.Configuration.GetValue<int?>(LoginAccountWindowSecondsKey) ?? 300;
             var expensivePermitLimit = builder.Configuration.GetValue<int?>(ExpensivePermitLimitKey) ?? 20;
             var expensiveWindowSeconds =
                 builder.Configuration.GetValue<int?>(ExpensiveWindowSecondsKey) ?? 60;
@@ -103,6 +146,7 @@ internal static class DependencyInjection
                     context.HttpContext.Request.Path,
                     detail,
                     context.HttpContext.TraceIdentifier);
+                NovelkiTelemetry.RateLimitRejections.Add(1);
 
                 await context.HttpContext.Response.WriteAsJsonAsync(
                     new
@@ -116,16 +160,19 @@ internal static class DependencyInjection
                     }, cancellationToken);
             };
 
-            options.AddPolicy(AccountAuthRateLimitPolicy, httpContext =>
-                RateLimitPartition.GetFixedWindowLimiter(
-                    GetRemoteIpPartitionKey(httpContext),
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = accountPermitLimit,
-                        Window = TimeSpan.FromSeconds(accountWindowSeconds),
-                        QueueLimit = 0,
-                        AutoReplenishment = true
-                    }));
+            var loginIpLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                IsLoginRequest(httpContext)
+                    ? RateLimitPartition.GetFixedWindowLimiter(
+                        GetRemoteIpPartitionKey(httpContext),
+                        _ => FixedWindow(loginIpPermitLimit, loginIpWindowSeconds))
+                    : RateLimitPartition.GetNoLimiter("not-login-ip"));
+            var loginAccountLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+                IsLoginRequest(httpContext)
+                    ? RateLimitPartition.GetFixedWindowLimiter(
+                        GetLoginIdentifierPartitionKey(httpContext),
+                        _ => FixedWindow(loginAccountPermitLimit, loginAccountWindowSeconds))
+                    : RateLimitPartition.GetNoLimiter("not-login-account"));
+            options.GlobalLimiter = PartitionedRateLimiter.CreateChained(loginIpLimiter, loginAccountLimiter);
 
             options.AddPolicy(ExpensiveUserActionRateLimitPolicy, httpContext =>
             {
@@ -207,6 +254,32 @@ internal static class DependencyInjection
     private static string GetRemoteIpPartitionKey(HttpContext httpContext)
     {
         return httpContext.Connection.RemoteIpAddress?.ToString() ?? UnknownRateLimitPartition;
+    }
+
+    private static string GetLoginIdentifierPartitionKey(HttpContext httpContext)
+    {
+        var identifier = httpContext.Items[LoginSecurityMiddlewareExtensions.LoginIdentifierItemKey] as string ??
+                         "missing";
+        return identifier == "missing"
+            ? $"missing:{GetRemoteIpPartitionKey(httpContext)}"
+            : identifier;
+    }
+
+    private static bool IsLoginRequest(HttpContext httpContext)
+    {
+        return HttpMethods.IsPost(httpContext.Request.Method) &&
+               httpContext.Request.Path.Equals("/api/v1/account/login", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static FixedWindowRateLimiterOptions FixedWindow(int permitLimit, int windowSeconds)
+    {
+        return new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = Math.Max(1, permitLimit),
+            Window = TimeSpan.FromSeconds(Math.Max(1, windowSeconds)),
+            QueueLimit = 0,
+            AutoReplenishment = true
+        };
     }
 
     private static string GetAuthenticatedUserPartitionKey(HttpContext httpContext)

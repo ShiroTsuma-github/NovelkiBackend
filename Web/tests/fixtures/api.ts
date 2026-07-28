@@ -198,15 +198,7 @@ const analytics = {
 
 export async function seedAuthenticatedSession(page: Page) {
   await page.addInitScript(() => {
-    window.localStorage.setItem('novelki.session', JSON.stringify({
-      accessToken: 'header.eyJyb2xlIjoiVXNlciJ9.signature',
-      refreshToken: 'refresh-token',
-      tokenType: 'Bearer',
-      expiresAt: '2099-01-01T00:00:00Z',
-      refreshTokenExpiresAt: '2099-02-01T00:00:00Z',
-      userId: '11111111-1111-1111-1111-111111111111',
-      createdAt: '2026-01-01T00:00:00Z',
-    }))
+    window.localStorage.removeItem('novelki.session')
   })
 }
 
@@ -214,6 +206,20 @@ export async function installLayoutApiMocks(page: Page) {
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url())
     const path = url.pathname.replace('/api/v1/', '')
+
+    if (path === 'account/refresh') {
+      await route.fulfill({
+        json: {
+          accessToken: 'header.eyJyb2xlIjoiVXNlciJ9.signature',
+          tokenType: 'Bearer',
+          expiresAt: '2099-01-01T00:00:00Z',
+          refreshTokenExpiresAt: '2099-02-01T00:00:00Z',
+          userId: '11111111-1111-1111-1111-111111111111',
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+      })
+      return
+    }
 
     if (path === 'book/import/sessions') {
       await route.fulfill({ json: invalidImportSession })

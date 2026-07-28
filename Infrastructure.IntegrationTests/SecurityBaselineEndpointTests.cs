@@ -93,9 +93,11 @@ public class SecurityBaselineEndpointTests
         Assert.Equal("nosniff", response.Headers.GetValues("X-Content-Type-Options").Single());
         Assert.Equal("DENY", response.Headers.GetValues("X-Frame-Options").Single());
         Assert.Equal("no-referrer", response.Headers.GetValues("Referrer-Policy").Single());
-        Assert.Equal("camera=(), microphone=(), geolocation=()",
+        Assert.Equal("camera=(), microphone=(), geolocation=(), payment=(), usb=()",
             response.Headers.GetValues("Permissions-Policy").Single());
         Assert.Equal("same-origin", response.Headers.GetValues("Cross-Origin-Opener-Policy").Single());
+        Assert.Contains("frame-ancestors 'none'",
+            response.Headers.GetValues("Content-Security-Policy").Single());
     }
 
     [Fact]
@@ -126,6 +128,59 @@ public class SecurityBaselineEndpointTests
 
         Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
         Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+        Assert.True(secondResponse.Headers.Contains("Retry-After"));
+    }
+
+    [Fact]
+    public async Task AccountLogin_ShouldRateLimitIdentifierAcrossDifferentRemoteIps()
+    {
+        await using var factory = new SecurityApiFactory();
+        using var client =
+            factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+        using var first = new HttpRequestMessage(HttpMethod.Post, "/api/v1/account/login")
+        {
+            Content = JsonContent.Create(new { username = "reader", password = "Wrong1!" })
+        };
+        first.Headers.Add("X-Forwarded-For", "198.51.100.10");
+        using var second = new HttpRequestMessage(HttpMethod.Post, "/api/v1/account/login")
+        {
+            Content = JsonContent.Create(new { username = "reader", password = "Wrong1!" })
+        };
+        second.Headers.Add("X-Forwarded-For", "198.51.100.11");
+
+        var firstResponse = await client.SendAsync(first);
+        var secondResponse = await client.SendAsync(second);
+
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+        Assert.True(secondResponse.Headers.Contains("Retry-After"));
+    }
+
+    [Fact]
+    public async Task AccountLogin_ShouldRateLimitMultipleIdentifiersFromOneRemoteIp()
+    {
+        await using var factory = new SecurityApiFactory();
+        using var client =
+            factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+        async Task<HttpResponseMessage> SendAsync(string username)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/api/v1/account/login")
+            {
+                Content = JsonContent.Create(new { username, password = "Wrong1!" })
+            };
+            request.Headers.Add("X-Forwarded-For", "198.51.100.20");
+            return await client.SendAsync(request);
+        }
+
+        var firstResponse = await SendAsync("reader-one");
+        var secondResponse = await SendAsync("reader-two");
+        var thirdResponse = await SendAsync("reader-three");
+
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, firstResponse.StatusCode);
+        Assert.NotEqual(HttpStatusCode.TooManyRequests, secondResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, thirdResponse.StatusCode);
+        Assert.True(thirdResponse.Headers.Contains("Retry-After"));
     }
 
     [Fact]
@@ -236,6 +291,9 @@ public class SecurityBaselineEndpointTests
         {
             _connection.Open();
             builder.UseEnvironment("Testing");
+            builder.UseSetting(
+                "ConnectionStrings:DB",
+                "Host=localhost;Database=test;Username=test;Password=test");
             builder.ConfigureAppConfiguration((_, config) =>
             {
                 config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -246,8 +304,10 @@ public class SecurityBaselineEndpointTests
                     ["Jwt:Issuer"] = "NovelkiBackend.Tests",
                     ["Jwt:Audience"] = "NovelkiBackend.Tests",
                     ["Database:AutoMigrate"] = "false",
-                    ["RateLimiting:Account:PermitLimit"] = "1",
-                    ["RateLimiting:Account:WindowSeconds"] = "60",
+                    ["RateLimiting:LoginIp:PermitLimit"] = "2",
+                    ["RateLimiting:LoginIp:WindowSeconds"] = "60",
+                    ["RateLimiting:LoginAccount:PermitLimit"] = "1",
+                    ["RateLimiting:LoginAccount:WindowSeconds"] = "60",
                     ["RateLimiting:Expensive:PermitLimit"] = "1",
                     ["RateLimiting:Expensive:WindowSeconds"] = "60",
                     ["BookCovers:S3:Endpoint"] = "",

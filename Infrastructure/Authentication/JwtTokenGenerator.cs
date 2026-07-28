@@ -46,18 +46,19 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(Math.Clamp(_configuration.AccessTokenMinutes, 1, 30));
         var token = new JwtSecurityToken(
             _configuration.Issuer,
             _configuration.Audience,
             claims,
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: expiresAt.UtcDateTime,
             signingCredentials: creds);
 
         return new TokenResponse
         {
             AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
             RefreshToken = string.Empty,
-            ExpiresAt = DateTimeOffset.UtcNow.AddHours(1),
+            ExpiresAt = expiresAt,
             RefreshTokenExpiresAt = DateTimeOffset.UtcNow,
             UserId = user.RequiredId,
             CreatedAt = user.CreatedAt ?? DateTimeOffset.UtcNow

@@ -2,7 +2,6 @@ import type { BookDto, BookListItemDto, DictionaryDto, PaginatedResult, TokenRes
 
 export const testSession: TokenResponse = {
   accessToken: createJwt({ role: 'User' }),
-  refreshToken: 'refresh-token',
   tokenType: 'Bearer',
   expiresAt: '2099-01-01T00:00:00Z',
   refreshTokenExpiresAt: '2099-02-01T00:00:00Z',

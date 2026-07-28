@@ -7,7 +7,7 @@ services:
       otel-collector:
         condition: service_started
     environment:
-      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_URLS: http://+:5232
       ConnectionStrings__DB: ${DB_CONNECTION_STRING}
       ConnectionStrings__Redis: ${REDIS_CONNECTION_STRING:-}
@@ -15,9 +15,13 @@ services:
       Jwt__Key: ${JWT_KEY}
       Jwt__Issuer: ${JWT_ISSUER}
       Jwt__Audience: ${JWT_AUDIENCE}
+      Jwt__AccessTokenMinutes: ${JWT_ACCESS_TOKEN_MINUTES:-10}
       Admin__Emails__0: ${ADMIN_EMAIL}
-      RateLimiting__Account__PermitLimit: ${RATE_LIMITING_ACCOUNT_PERMIT_LIMIT:-10}
-      RateLimiting__Account__WindowSeconds: ${RATE_LIMITING_ACCOUNT_WINDOW_SECONDS:-60}
+      RateLimiting__LoginIp__PermitLimit: ${RATE_LIMITING_LOGIN_IP_PERMIT_LIMIT:-20}
+      RateLimiting__LoginIp__WindowSeconds: ${RATE_LIMITING_LOGIN_IP_WINDOW_SECONDS:-60}
+      RateLimiting__LoginAccount__PermitLimit: ${RATE_LIMITING_LOGIN_ACCOUNT_PERMIT_LIMIT:-5}
+      RateLimiting__LoginAccount__WindowSeconds: ${RATE_LIMITING_LOGIN_ACCOUNT_WINDOW_SECONDS:-300}
+      Authentication__MinimumFailureResponseMilliseconds: ${AUTH_MINIMUM_FAILURE_RESPONSE_MILLISECONDS:-250}
       RateLimiting__Expensive__PermitLimit: ${RATE_LIMITING_EXPENSIVE_PERMIT_LIMIT:-20}
       RateLimiting__Expensive__WindowSeconds: ${RATE_LIMITING_EXPENSIVE_WINDOW_SECONDS:-60}
       Cors__AllowedOrigins__0: ${WEB_PUBLIC_ORIGIN:-https://localhost:8080}
@@ -35,7 +39,7 @@ services:
     volumes:
       - ./storage/covers:/app/storage/covers
     ports:
-      - "${API_PORT:-5232}:5232"
+      - "127.0.0.1:${API_PORT:-5232}:5232"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:5232/health/ready || exit 1"]
       interval: 10s
@@ -54,11 +58,15 @@ services:
       api:
         condition: service_healthy
     environment:
-      NGINX_ENVSUBST_FILTER: WEB_HTTP_PORT|WEB_HTTPS_PORT
-      WEB_HTTP_PORT: ${WEB_HTTP_PORT:-8081}
-      WEB_HTTPS_PORT: ${WEB_PORT:-8080}
+      NGINX_ENVSUBST_FILTER: PUBLIC_DOMAIN|PUBLIC_HTTPS_AUTHORITY
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:-localhost}
+      PUBLIC_HTTPS_AUTHORITY: ${PUBLIC_HTTPS_AUTHORITY:-localhost:8080}
+      ACME_ENABLED: ${ACME_ENABLED:-false}
+      ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - web-cert-data:/etc/nginx/certs
+      - letsencrypt-data:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
     ports:
       - target: 443
         published: "${WEB_PORT:-8080}"
@@ -132,6 +140,8 @@ services:
 
 volumes:
   web-cert-data:
+  letsencrypt-data:
+  certbot-webroot:
   loki-data:
   tempo-data:
   prometheus-data:

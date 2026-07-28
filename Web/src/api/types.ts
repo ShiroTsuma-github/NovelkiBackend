@@ -16,7 +16,6 @@ export type ApiError = {
 
 export type TokenResponse = {
   accessToken: string
-  refreshToken: string
   tokenType: string
   expiresAt: string
   refreshTokenExpiresAt: string

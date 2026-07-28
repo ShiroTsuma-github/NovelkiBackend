@@ -73,10 +73,12 @@ public class IdentityServiceTests
         await service.RegisterUser(new RegisterDto("password-reader", "password@example.com", "Strong1!"),
             CancellationToken.None);
 
-        await Assert.ThrowsAsync<EntityNotFoundException<User, string>>(() =>
+        var missingUser = await Assert.ThrowsAsync<AuthenticationFailedException>(() =>
             service.LoginUser(new LoginDto("missing-reader", null, "Strong1!"), CancellationToken.None));
-        await Assert.ThrowsAsync<WrongPasswordException>(() =>
+        var wrongPassword = await Assert.ThrowsAsync<AuthenticationFailedException>(() =>
             service.LoginUser(new LoginDto("password-reader", null, "Wrong1!"), CancellationToken.None));
+        Assert.Equal(AuthenticationFailedException.PublicMessage, missingUser.Message);
+        Assert.Equal(missingUser.Message, wrongPassword.Message);
     }
 
     [Fact]
@@ -103,6 +105,30 @@ public class IdentityServiceTests
         Assert.Equal("Rotated", tokens[0].ReasonRevoked);
         Assert.NotNull(tokens[0].ReplacedByTokenHash);
         Assert.Null(tokens[1].RevokedAt);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_ShouldRevokeTokenFamilyWhenRotatedTokenIsReused()
+    {
+        using var host = new IdentityTestHost();
+        var service = host.GetRequiredService<IdentityService>();
+        await service.RegisterUser(new RegisterDto("reuse-reader", "reuse@example.com", "Strong1!"),
+            CancellationToken.None);
+        var login = await service.LoginUser(new LoginDto("reuse-reader", null, "Strong1!"),
+            CancellationToken.None);
+        var refreshed = await service.RefreshTokenAsync(login.RefreshToken, CancellationToken.None);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.RefreshTokenAsync(login.RefreshToken, CancellationToken.None));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            service.RefreshTokenAsync(refreshed.RefreshToken, CancellationToken.None));
+
+        await using var context = host.CreateContext();
+        var tokens = await context.RefreshTokens
+            .Where(token => token.UserId == login.UserId)
+            .ToListAsync();
+        Assert.All(tokens, token => Assert.False(token.IsActive));
+        Assert.Contains(tokens, token => token.ReasonRevoked == "Refresh token reuse detected");
     }
 
     [Fact]

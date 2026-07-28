@@ -10,6 +10,7 @@ type StoredSession = TokenResponse
 
 const unauthorizedListeners = new Set<() => void>()
 let refreshRequest: Promise<string | null> | null = null
+let currentSession: StoredSession | null = null
 
 export class HttpError extends Error {
   readonly apiError: ApiError
@@ -55,6 +56,7 @@ export async function apiBlobRequest(
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers,
+    credentials: 'include',
   })
 
   if (response.status === 401 && shouldTryRefresh(path)) {
@@ -94,6 +96,7 @@ async function requestWithBody<T>(
     ...options,
     headers,
     body,
+    credentials: 'include',
   })
 
   if (response.status === 401 && allowRefresh && shouldTryRefresh(path)) {
@@ -177,17 +180,7 @@ export function toQueryString(params: Record<string, string | number | boolean |
 }
 
 export function getStoredSession(): StoredSession | null {
-  const raw = localStorage.getItem(sessionStorageKey)
-  if (!raw) {
-    return null
-  }
-
-  try {
-    return JSON.parse(raw) as StoredSession
-  } catch {
-    localStorage.removeItem(sessionStorageKey)
-    return null
-  }
+  return currentSession
 }
 
 export function getStoredSessionUserId() {
@@ -195,11 +188,16 @@ export function getStoredSessionUserId() {
 }
 
 export function setStoredSession(session: StoredSession) {
-  localStorage.setItem(sessionStorageKey, JSON.stringify(session))
+  currentSession = session
 }
 
 export function clearStoredSession() {
-  localStorage.removeItem(sessionStorageKey)
+  currentSession = null
+  try {
+    localStorage.removeItem(sessionStorageKey)
+  } catch {
+    // Authentication state remains cleared even when browser storage is unavailable.
+  }
 }
 
 export function subscribeUnauthorized(listener: () => void) {
@@ -209,7 +207,7 @@ export function subscribeUnauthorized(listener: () => void) {
   }
 }
 
-async function refreshSession() {
+export async function refreshSession() {
   if (refreshRequest) {
     return refreshRequest
   }
@@ -223,18 +221,10 @@ async function refreshSession() {
 }
 
 async function performRefresh() {
-  const session = getStoredSession()
-  if (!session?.refreshToken) {
-    clearStoredSession()
-    notifyUnauthorized()
-    return null
-  }
-
   try {
     const response = await fetch(`${API_BASE_URL}/account/refresh`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: session.refreshToken }),
+      credentials: 'include',
     })
     if (!response.ok) {
       clearStoredSession()

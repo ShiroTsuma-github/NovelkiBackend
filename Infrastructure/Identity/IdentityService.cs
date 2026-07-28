@@ -5,46 +5,51 @@ using System.Text;
 using Application.Common.DTOs.User;
 using Application.Common.Models;
 using Authentication;
+using Microsoft.Extensions.Logging;
 using Services;
 
 public class IdentityService : IIdentityService
 {
+    private const string DummyPassword = "Dummy-password-used-only-for-timing-9!";
     private static readonly TimeSpan RefreshTokenLifetime = TimeSpan.FromDays(30);
+    private static readonly User DummyUser = new() { UserName = "timing-placeholder" };
+    private static readonly string DummyPasswordHash =
+        new PasswordHasher<User>().HashPassword(DummyUser, DummyPassword);
+
     private readonly AccountAbuseGuard _accountAbuseGuard;
     private readonly ApplicationDbContext _context;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
-    private readonly SignInManager<User> _signInManager;
+    private readonly ILogger<IdentityService> _logger;
     private readonly UserManager<User> _userManager;
 
     public IdentityService(
         UserManager<User> userManager,
-        SignInManager<User> signInManager,
         IJwtTokenGenerator jwtTokenGenerator,
         ApplicationDbContext context,
-        AccountAbuseGuard accountAbuseGuard)
+        AccountAbuseGuard accountAbuseGuard,
+        ILogger<IdentityService> logger)
     {
         _userManager = userManager;
-        _signInManager = signInManager;
         _jwtTokenGenerator = jwtTokenGenerator;
         _context = context;
         _accountAbuseGuard = accountAbuseGuard;
+        _logger = logger;
     }
 
     public async Task<TokenResponse> LoginUser(LoginDto login, CancellationToken cancellation)
     {
-        var identifier = login.username ?? login.email ?? "No Identifier";
-        var user = await _userManager.FindByNameAsync(login.username ?? "") ??
-                   await _userManager.FindByEmailAsync(login.email ?? "");
+        var user = !string.IsNullOrWhiteSpace(login.username)
+            ? await _userManager.FindByNameAsync(login.username)
+            : await _userManager.FindByEmailAsync(login.email ?? string.Empty);
         if (user == null)
         {
-            throw new EntityNotFoundException<User, string>(identifier);
+            _userManager.PasswordHasher.VerifyHashedPassword(DummyUser, DummyPasswordHash, login.password);
+            throw new AuthenticationFailedException();
         }
 
-        var result = await _signInManager.CheckPasswordSignInAsync(user, login.password, false);
-
-        if (!result.Succeeded)
+        if (!await _userManager.CheckPasswordAsync(user, login.password))
         {
-            throw new WrongPasswordException();
+            throw new AuthenticationFailedException();
         }
 
         var roles = await _userManager.GetRolesAsync(user);
@@ -105,13 +110,38 @@ public class IdentityService : IIdentityService
         var hashedToken = HashToken(refreshToken);
         var storedToken = await _context.RefreshTokens
             .FirstOrDefaultAsync(token => token.TokenHash == hashedToken, cancellationToken);
-        if (storedToken == null || !storedToken.IsActive)
+        if (storedToken == null)
         {
-            throw new UnauthorizedAccessException("Refresh token is invalid or expired.");
+            throw new UnauthorizedAccessException();
+        }
+
+        if (!storedToken.IsActive)
+        {
+            if (storedToken.ReplacedByTokenHash != null)
+            {
+                var now = DateTimeOffset.UtcNow;
+                var candidateTokens = await _context.RefreshTokens
+                    .Where(token => token.UserId == storedToken.UserId &&
+                                    token.RevokedAt == null)
+                    .ToListAsync(cancellationToken);
+                var activeTokens = candidateTokens.Where(token => token.ExpiresAt > now);
+                foreach (var activeToken in activeTokens)
+                {
+                    activeToken.RevokedAt = now;
+                    activeToken.ReasonRevoked = "Refresh token reuse detected";
+                }
+
+                await _context.SaveChangesAsync(cancellationToken);
+                _logger.LogWarning(
+                    "Refresh token reuse detected; active token family revoked. UserId={UserId}",
+                    storedToken.UserId);
+            }
+
+            throw new UnauthorizedAccessException();
         }
 
         var user = await _userManager.FindByIdAsync(storedToken.UserId.ToString())
-                   ?? throw new UnauthorizedAccessException("Refresh token user no longer exists.");
+                   ?? throw new UnauthorizedAccessException();
 
         var roles = await _userManager.GetRolesAsync(user);
         var authUser = new AuthUser

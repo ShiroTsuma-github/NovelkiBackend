@@ -43,16 +43,14 @@ export const api = {
       body: request,
       token: null,
     }),
-  refresh: (refreshToken: string) =>
+  refresh: () =>
     apiRequest<TokenResponse>('/account/refresh', {
       method: 'POST',
-      body: { refreshToken },
       token: null,
     }),
-  logout: (refreshToken: string | null) =>
+  logout: () =>
     apiRequest<void>('/account/logout', {
       method: 'POST',
-      body: { refreshToken },
       token: null,
     }),
   register: (request: RegisterRequest) =>

@@ -3,9 +3,11 @@ using Application.Common.DTOs.User;
 using Application.Common.Models;
 using Application.Features.AccountFeatures.Commands;
 using MediatR;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using System.Text.Json;
 
 namespace Application.UnitTests;
 
@@ -33,12 +35,26 @@ public class AccountControllerTests
             .ReturnsAsync(registerResponse);
         mediator.Setup(mock => mock.Send(loginCommand, It.IsAny<CancellationToken>())).ReturnsAsync(tokenResponse);
         mediator.Setup(mock => mock.Send(refreshCommand, It.IsAny<CancellationToken>())).ReturnsAsync(tokenResponse);
-        var controller = new AccountController(mediator.Object, NullLogger<AccountController>.Instance);
+        var httpContext = new DefaultHttpContext();
+        httpContext.Request.Headers.Cookie = "__Host-novelki.refresh=refresh";
+        var controller = new AccountController(mediator.Object, NullLogger<AccountController>.Instance)
+        {
+            ControllerContext = new ControllerContext { HttpContext = httpContext }
+        };
 
         Assert.Same(registerResponse, Assert.IsType<OkObjectResult>(await controller.Register(registerCommand)).Value);
         Assert.Same(tokenResponse, Assert.IsType<OkObjectResult>(await controller.Login(loginCommand)).Value);
-        Assert.Same(tokenResponse, Assert.IsType<OkObjectResult>(await controller.Refresh(refreshCommand)).Value);
-        Assert.IsType<NoContentResult>(await controller.Logout(logoutCommand));
+        Assert.Same(tokenResponse, Assert.IsType<OkObjectResult>(await controller.Refresh()).Value);
+        Assert.IsType<NoContentResult>(await controller.Logout());
         mediator.Verify(mock => mock.Send(logoutCommand, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Contains(httpContext.Response.Headers.SetCookie,
+            value => value != null &&
+                     value.Contains("HttpOnly", StringComparison.OrdinalIgnoreCase) &&
+                     value.Contains("Secure", StringComparison.OrdinalIgnoreCase) &&
+                     value.Contains("SameSite=Strict", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(
+            "\"refreshToken\":",
+            JsonSerializer.Serialize(tokenResponse),
+            StringComparison.OrdinalIgnoreCase);
     }
 }

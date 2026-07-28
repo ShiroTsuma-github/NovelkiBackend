@@ -27,6 +27,8 @@ var app = builder.Build();
 
 await app.ApplyDatabaseMigrationsAsync();
 
+app.UseForwardedHeaders();
+
 app.UseSerilogRequestLogging(options =>
 {
     options.GetLevel = (httpContext, _, exception) =>
@@ -58,6 +60,7 @@ app.UseSerilogRequestLogging(options =>
 
 app.UseResponseCompression();
 app.UseSecurityHeaders();
+app.UseLoginSecurity();
 app.UseErrorHandlingMiddleware();
 
 if (app.Environment.IsDevelopment())
