@@ -49,4 +49,15 @@ describe('book API NSFW filtering', () => {
     expect(url.pathname).toBe('/api/v1/book/manage')
     expect(url.searchParams.get('query')).toBe('-tag:h-manhwa')
   })
+
+  it('uses the dedicated owner-scoped search suggestion endpoint', async () => {
+    await api.getBookSearchSuggestions({ field: 'author', search: 'er', take: 10 })
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
+    expect(url.pathname).toBe('/api/v1/book/search-suggestions')
+    expect(url.searchParams.get('field')).toBe('author')
+    expect(url.searchParams.get('search')).toBe('er')
+    expect(url.searchParams.get('take')).toBe('10')
+    expect(url.searchParams.has('query')).toBe(false)
+  })
 })

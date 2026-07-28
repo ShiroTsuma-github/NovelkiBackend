@@ -288,7 +288,7 @@ test('book list metadata tooltips escape the scrolling table surface', async ({ 
 test('search and compact selects reserve space for their icons', async ({ page }) => {
   await page.goto('/books')
 
-  const search = page.getByPlaceholder(/^Search:/)
+  const search = page.getByRole('combobox', { name: 'Search books' })
   const pageSize = page.getByLabel('Per page')
 
   await expect(search).toHaveCSS('padding-left', '40px')
@@ -304,6 +304,23 @@ test('search and compact selects reserve space for their icons', async ({ page }
   const cardsPerRowBox = await requiredBox(cardsPerRow)
   expect(cardsPerRowBox.width).toBeGreaterThanOrEqual(64)
   expect(cardsPerRowBox.width).toBeLessThanOrEqual(66)
+})
+
+test('advanced search suggestions stay usable inside desktop and mobile viewports', async ({ page }) => {
+  await page.goto('/books')
+  const search = page.getByRole('combobox', { name: 'Search books' })
+
+  await search.click()
+  const listbox = page.getByRole('listbox')
+  await expect(listbox).toBeVisible()
+  await expectInViewport(listbox)
+  await expectMinHeight(listbox.getByRole('option').first(), 44)
+
+  await search.fill('rating:')
+  await expect(listbox.getByRole('option', { name: /^rating:>=N/i })).toBeVisible()
+  await search.press('ArrowDown')
+  await expect(search).toHaveAttribute('aria-activedescendant', /book-search-suggestions-/)
+  await expectNoHorizontalOverflow(page)
 })
 
 test('page numbers are round and borderless while direction controls remain structural', async ({ page }) => {

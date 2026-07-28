@@ -251,6 +251,7 @@ Aktualne kontrolery:
 - `api/v1/book`
     - `POST`
     - `GET`
+    - `GET search-suggestions` - owner-scoped values and usage counts for the advanced query editor
     - `GET {id:guid}`
     - `PUT {id:guid}`
     - `PATCH {id:guid}/progress`

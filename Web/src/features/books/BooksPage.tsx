@@ -17,6 +17,7 @@ import { BookDataTable } from './BookDataTable'
 import { BookCoverArtwork } from './BookCoverSection'
 import { isLowRating } from './bookRating'
 import { BookStatusPill } from './BookStatusPill'
+import { BookSearchInput } from './BookSearchInput'
 import { formatProgress } from './bookProgress'
 import { saveBookListScrollPosition, takeBookListScrollPosition } from './bookListNavigation'
 import {
@@ -391,7 +392,7 @@ export function BooksPage() {
         />
       ) : null}
 
-      <BookAdvancedSearch value={query} onChange={updateQuery} />
+      <BookSearchInput value={query} onChange={updateQuery} />
 
       <Surface className="min-w-0 overflow-hidden" id="book-list-results">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">

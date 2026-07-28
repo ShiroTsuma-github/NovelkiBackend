@@ -14,6 +14,7 @@ vi.mock('@/api/client', () => ({
   api: {
     getBooks: vi.fn(),
     getBooksSummary: vi.fn(),
+    getBookSearchSuggestions: vi.fn(),
     downloadBooksExport: vi.fn(),
     downloadBooksFullExport: vi.fn(),
   },
@@ -32,6 +33,8 @@ describe('BooksPage', () => {
     window.sessionStorage.clear()
     vi.mocked(api.getBooks).mockReset()
     vi.mocked(api.getBooksSummary).mockReset()
+    vi.mocked(api.getBookSearchSuggestions).mockReset()
+    vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([])
   })
 
   it('renders books in table view and fetches with default list params', async () => {
@@ -109,22 +112,46 @@ describe('BooksPage', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Magic, strange worlds, and supernatural stories.')
   })
 
-  it('shows the colon-based rating operator syntax in advanced search help', async () => {
+  it('discovers filters and colon-based operators from the search suggestions', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
 
     renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
-    expect(screen.getByPlaceholderText(/rating:>=8/i)).toBeInTheDocument()
-    expect(screen.getByText('rating:>=8')).toBeInTheDocument()
-    expect(screen.getByText('rating:8')).toBeInTheDocument()
-    expect(screen.getByText('progress:>=50')).toBeInTheDocument()
-    expect(screen.getByText('chapters:<200')).toBeInTheDocument()
-    expect(screen.getByText('total:>500')).toBeInTheDocument()
-    expect(screen.getByText('total-chapters:>500')).toBeInTheDocument()
-    expect(screen.getByText('-rating:8')).toBeInTheDocument()
-    expect(screen.getByText('-tag:dropped')).toBeInTheDocument()
-    expect(screen.getByText('-genre:romance')).toBeInTheDocument()
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
+    await user.click(searchInput)
+    expect(screen.getByRole('option', { name: /^title:#/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /^description:#/i })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /:none/i })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('option', { name: /^rating:/i }))
+
+    expect(searchInput).toHaveValue('rating:')
+    expect(screen.getByRole('option', { name: /^rating:>=N/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /^rating:<=N/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /^rating:=N/i })).toBeInTheDocument()
+  })
+
+  it('keeps title and description values manual', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
+    await user.click(searchInput)
+    await user.click(screen.getByRole('option', { name: /^title:#/i }))
+    expect(searchInput).toHaveValue('title:""')
+    expect(searchInput).toHaveFocus()
+    expect((searchInput as HTMLInputElement).selectionStart).toBe('title:"'.length)
+    expect(screen.getByRole('option', { name: /^\* wildcard/i })).toHaveTextContent(
+      'Matches any sequence of characters',
+    )
+    await user.keyboard('Lord')
+
+    expect(searchInput).toHaveValue('title:"Lord"')
+    expect(api.getBookSearchSuggestions).not.toHaveBeenCalled()
   })
 
   it('preserves spaces in the search input while sending a trimmed query to the api', async () => {
@@ -134,7 +161,7 @@ describe('BooksPage', () => {
     renderWithProviders(<BooksPage />, { route: '/books' })
 
     await screen.findByText('Lord of Mysteries')
-    const searchInput = screen.getByPlaceholderText(/rating:>=8/i)
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
     await user.clear(searchInput)
     await user.type(searchInput, 'status:plan to read ')
 
@@ -144,6 +171,97 @@ describe('BooksPage', () => {
     })))
   })
 
+  it('inserts frequency-ranked text suggestions as quoted filter values', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
+      { value: 'Completed', count: 12, isExact: false },
+      { value: 'Currently Reading', count: 4, isExact: false },
+      { value: 'none', count: 1, isExact: false },
+    ])
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books' })
+
+    await screen.findByText('Lord of Mysteries')
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
+    await user.type(searchInput, 'status:comp')
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+      field: 'status',
+      search: 'comp',
+      take: 10,
+    }))
+    const [completedSuggestion] = await screen.findAllByText('Completed')
+    await user.click(completedSuggestion)
+
+    expect(searchInput).toHaveValue('status:"Completed" ')
+    expect(screen.getByRole('option', { name: /^title:#/i })).toBeInTheDocument()
+    expect(screen.queryByRole('option', { name: /^none/i })).not.toBeInTheDocument()
+  })
+
+  it('shows close values alongside actions when the current author is not an exact match', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
+      { value: 'Perfect123', count: 3, isExact: false },
+    ])
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=author%3A%22perf%22' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('combobox', { name: /search books/i }))
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+      field: 'author',
+      search: 'perf',
+      take: 10,
+    }))
+
+    expect(screen.getByRole('option', { name: /^Exclude author:"perf"/i })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /^Remove author:"perf"/i })).toBeInTheDocument()
+    expect(await screen.findByRole('option', { name: /^Perfect123/i })).toBeInTheDocument()
+  })
+
+  it('shows only token actions when the current author is an exact match', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
+      { value: 'Perf', count: 2, isExact: true },
+      { value: 'Perfect123', count: 3, isExact: false },
+    ])
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=author%3A%22Perf%22' })
+
+    await screen.findByText('Lord of Mysteries')
+    await user.click(screen.getByRole('combobox', { name: /search books/i }))
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+      field: 'author',
+      search: 'Perf',
+      take: 10,
+    }))
+    await waitFor(() => {
+      expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'false')
+      expect(screen.getByRole('option', { name: /^Exclude author:"Perf"/ })).toBeInTheDocument()
+      expect(screen.getByRole('option', { name: /^Remove author:"Perf"/ })).toBeInTheDocument()
+      expect(screen.queryByText('Perf')).not.toBeInTheDocument()
+      expect(screen.queryByRole('option', { name: /^Perfect123/ })).not.toBeInTheDocument()
+    })
+  })
+
+  it('can exclude and remove the complete filter under the caret', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=tag%3Afavorite' })
+
+    await screen.findByText('Lord of Mysteries')
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
+    await user.click(searchInput)
+    await user.click(screen.getByRole('option', { name: /^Exclude tag:favorite/i }))
+    expect(searchInput).toHaveValue('-tag:favorite')
+
+    await user.click(screen.getByRole('option', { name: /^Remove -tag:favorite/i }))
+    expect(searchInput).toHaveValue('')
+  })
+
   it('keeps the caret position when inserting a space in the middle of the search', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
     const user = userEvent.setup()
@@ -151,7 +269,7 @@ describe('BooksPage', () => {
     renderWithProviders(<BooksPage />, { route: '/books?query=title%3ALordofMysteries' })
 
     await screen.findByText('Lord of Mysteries')
-    const searchInput = screen.getByPlaceholderText(/rating:>=8/i) as HTMLInputElement
+    const searchInput = screen.getByRole('combobox', { name: /search books/i }) as HTMLInputElement
     searchInput.focus()
     searchInput.setSelectionRange('title:Lord'.length, 'title:Lord'.length)
     await user.keyboard(' ')
@@ -348,8 +466,8 @@ describe('BooksPage', () => {
     expect(screen.getByText('Status distribution')).toBeInTheDocument()
     expect(screen.getByText('Book types')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /open analytics/i })).toBeInTheDocument()
-    const searchText = screen.getByText(/supports filters like/i)
-    expect((summarySection?.compareDocumentPosition(searchText) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
+    expect((summarySection?.compareDocumentPosition(searchInput) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('shows a summary empty state when no books match the current filters', async () => {

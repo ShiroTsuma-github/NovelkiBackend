@@ -57,6 +57,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<BookSortBuilder>();
         builder.Services.AddScoped<BookListProjectionQuery>();
         builder.Services.AddScoped<IBookListQueryService, BookReadQueryService>();
+        builder.Services.AddScoped<IBookSearchSuggestionQueryService, BookSearchSuggestionQueryService>();
         builder.Services.AddScoped<IBookExportQueryService, BookExportQueryService>();
         builder.Services.AddScoped<IBookSummaryQueryService, BookSummaryQueryService>();
         builder.Services.AddScoped<IBookAnalyticsQueryService, BookAnalyticsQueryService>();

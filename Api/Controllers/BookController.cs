@@ -118,6 +118,15 @@ public partial class BookController : ControllerBase
         return Ok(summary);
     }
 
+    [HttpGet("search-suggestions")]
+    [Authorize]
+    public async Task<IActionResult> GetSearchSuggestions(
+        [FromQuery] GetBookSearchSuggestionsQuery query,
+        CancellationToken cancellationToken)
+    {
+        return Ok(await _mediator.Send(query, cancellationToken));
+    }
+
     [HttpGet("analytics")]
     [Authorize]
     public async Task<IActionResult> GetAnalytics(

@@ -20,6 +20,7 @@ import type {
   DictionaryMutationRequest,
   DictionaryDto,
   BookSummaryDto,
+  BookSearchSuggestionDto,
   LoginRequest,
   PaginatedResult,
   RegisterRequest,
@@ -66,6 +67,8 @@ export const api = {
     apiRequest<PaginatedResult<ManagedBookListItemDto>>(`/book/manage${toQueryString(withFilteredQuery(params))}`),
   getBooksSummary: (params: { query?: string }) =>
     apiRequest<BookSummaryDto>(`/book/summary${toQueryString(withFilteredQuery(params))}`),
+  getBookSearchSuggestions: (params: { field: string; search?: string; take?: number }) =>
+    apiRequest<BookSearchSuggestionDto[]>(`/book/search-suggestions${toQueryString(params)}`),
   getBookAnalytics: (params: { query?: string; from?: string; to?: string; bucket?: string }) =>
     apiRequest<BookAnalyticsDto>(`/book/analytics${toQueryString(withFilteredQuery(params))}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),

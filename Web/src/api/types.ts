@@ -168,6 +168,12 @@ export type BookSummaryRatingCountDto = {
   bookCount: number
 }
 
+export type BookSearchSuggestionDto = {
+  value: string
+  count: number
+  isExact: boolean
+}
+
 export type BookAnalyticsDto = {
   generatedAt: string
   scope: BookAnalyticsScopeDto
