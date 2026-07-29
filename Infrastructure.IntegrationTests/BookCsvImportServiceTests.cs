@@ -576,6 +576,66 @@ public class BookCsvImportServiceTests
     }
 
     [Fact]
+    public async Task FullImport_Admin_ShouldAcceptArchiveUpToDoubleTheRegularUserLimit()
+    {
+        using var database = new SqliteTestDatabase(Guid.NewGuid());
+        await using var context = database.CreateContext();
+        var options = Options.Create(new BookImportSecurityOptions
+        {
+            MaxUncompressedArchiveBytes = 1024,
+            AdminMaxUncompressedArchiveBytes = 2048,
+            MaxCoverBytes = 4096
+        });
+        using var store = new BookImportSessionStore(options);
+        var gate = new BookImportConcurrencyGate(options);
+        var regularService = CreateService(
+            context,
+            database.UserId,
+            securityOptions: options,
+            sessionStore: store,
+            concurrencyGate: gate);
+        var adminService = CreateService(
+            context,
+            database.UserId,
+            securityOptions: options,
+            sessionStore: store,
+            concurrencyGate: gate,
+            roles: [AuthorizationRoles.Admin]);
+        var coverBytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(1400);
+        coverBytes[0] = 0xFF;
+        coverBytes[1] = 0xD8;
+        coverBytes[2] = 0xFF;
+        using var archive = CreateFullBackup(
+            "primaryTitle,contentType,status\nRole Limit Book,Novel,Reading\n",
+            new BookFullBackupManifest
+            {
+                Books =
+                [
+                    new BookFullBackupManifestItem
+                    {
+                        PrimaryTitle = "Role Limit Book",
+                        ContentType = "Novel",
+                        OriginalCoverPath = "covers/000001/original.jpg",
+                        OriginalCoverMimeType = "image/jpeg"
+                    }
+                ]
+            },
+            "covers/000001/original.jpg",
+            coverBytes);
+
+        await Assert.ThrowsAsync<ValidationException>(() =>
+            regularService.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None));
+
+        archive.Position = 0;
+        var adminSession =
+            await adminService.CreateFullSessionAsync(archive, "backup.zip", CancellationToken.None);
+
+        Assert.True(adminSession.CanFinalize);
+        Assert.Single(adminSession.Rows);
+        await adminService.CancelAsync(adminSession.SessionId, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task FullImport_ShouldLimitActiveDraftsAndReleaseStagedDiskOnCancel()
     {
         using var database = new SqliteTestDatabase(Guid.NewGuid());

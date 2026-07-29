@@ -79,13 +79,16 @@ public static class DependencyInjection
         builder.Services.AddScoped<IBookHtmlResolver, WebNovelHtmlResolver>();
         builder.Services.AddOptions<BookImportSecurityOptions>()
             .Bind(builder.Configuration.GetSection(BookImportSecurityOptions.SectionName))
-            .Validate(options => options.MaxArchiveEntries > 0 &&
+            .Validate(options => options.MaxFullBackupRequestBytes > 0 &&
+                                 options.AdminMaxFullBackupRequestBytes >= options.MaxFullBackupRequestBytes &&
+                                 options.MaxArchiveEntries > 0 &&
                                  options.MaxCsvRows > 0 &&
                                  options.MaxManifestBooks > 0 &&
                                  options.MaxCsvBytes > 0 &&
                                  options.MaxManifestBytes > 0 &&
                                  options.MaxCoverBytes > 0 &&
                                  options.MaxUncompressedArchiveBytes > 0 &&
+                                 options.AdminMaxUncompressedArchiveBytes >= options.MaxUncompressedArchiveBytes &&
                                  options.MaxCompressionRatio >= 1 &&
                                  options.SuspiciousCompressionRatio > options.MaxCompressionRatio &&
                                  options.SuspiciousCompressionMinimumBytes > 0 &&
@@ -98,7 +101,7 @@ public static class DependencyInjection
                                  options.MaxActiveFullSessionsPerUser > 0 &&
                                  options.MaxActiveFullSessionsGlobal <= options.MaxActiveSessionsGlobal &&
                                  options.MaxActiveFullSessionsPerUser <= options.MaxActiveSessionsPerUser &&
-                                 options.MaxStagedBytesGlobal >= options.MaxUncompressedArchiveBytes &&
+                                 options.MaxStagedBytesGlobal >= options.AdminMaxUncompressedArchiveBytes &&
                                  options.SessionIdleTimeout > TimeSpan.Zero &&
                                  options.SessionAbsoluteLifetime >= options.SessionIdleTimeout &&
                                  options.CleanupInterval > TimeSpan.Zero &&

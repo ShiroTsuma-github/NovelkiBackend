@@ -3,6 +3,7 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using Api.Filters;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Features.BookFeatures.Commands;
@@ -206,9 +207,9 @@ public partial class BookController : ControllerBase
     [HttpPost("import/full/sessions")]
     [Authorize]
     [Consumes(MultipartFormData)]
-    [RequestSizeLimit(300L * 1024 * 1024)]
+    [FullBackupRequestSizeLimit]
     [RequestFormLimits(
-        MultipartBodyLengthLimit = 300L * 1024 * 1024,
+        MultipartBodyLengthLimit = 600L * 1024 * 1024,
         MultipartBoundaryLengthLimit = 128,
         MultipartHeadersCountLimit = 8,
         MultipartHeadersLengthLimit = 4096,

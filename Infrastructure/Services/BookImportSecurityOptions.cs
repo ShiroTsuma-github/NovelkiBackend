@@ -4,6 +4,8 @@ public sealed class BookImportSecurityOptions
 {
     public const string SectionName = "BookImports:Security";
 
+    public long MaxFullBackupRequestBytes { get; set; } = 300L * 1024 * 1024;
+    public long AdminMaxFullBackupRequestBytes { get; set; } = 600L * 1024 * 1024;
     public int MaxArchiveEntries { get; set; } = 5_000;
     public int MaxCsvRows { get; set; } = 50_000;
     public int MaxManifestBooks { get; set; } = 50_000;
@@ -11,6 +13,7 @@ public sealed class BookImportSecurityOptions
     public long MaxManifestBytes { get; set; } = 2 * 1024 * 1024;
     public long MaxCoverBytes { get; set; } = 10 * 1024 * 1024;
     public long MaxUncompressedArchiveBytes { get; set; } = 256 * 1024 * 1024;
+    public long AdminMaxUncompressedArchiveBytes { get; set; } = 512L * 1024 * 1024;
     public double MaxCompressionRatio { get; set; } = 100;
     public double SuspiciousCompressionRatio { get; set; } = 500;
     public long SuspiciousCompressionMinimumBytes { get; set; } = 8 * 1024 * 1024;

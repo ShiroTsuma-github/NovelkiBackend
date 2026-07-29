@@ -24,6 +24,7 @@ internal static class DependencyInjection
     private const string LoginAccountWindowSecondsKey = "RateLimiting:LoginAccount:WindowSeconds";
     private const string ExpensivePermitLimitKey = "RateLimiting:Expensive:PermitLimit";
     private const string ExpensiveWindowSecondsKey = "RateLimiting:Expensive:WindowSeconds";
+    private const string FullBackupWindowMinutesKey = "RateLimiting:FullBackup:WindowMinutes";
     private const string ProblemJsonMediaType = "application/problem+json";
     private const string AdminRateLimitPartition = "admin";
     private const string UnknownRateLimitPartition = "unknown";
@@ -119,9 +120,11 @@ internal static class DependencyInjection
                 builder.Configuration.GetValue<int?>(LoginAccountPermitLimitKey) ?? 5;
             var loginAccountWindowSeconds =
                 builder.Configuration.GetValue<int?>(LoginAccountWindowSecondsKey) ?? 300;
-            var expensivePermitLimit = builder.Configuration.GetValue<int?>(ExpensivePermitLimitKey) ?? 20;
+            var expensivePermitLimit = builder.Configuration.GetValue<int?>(ExpensivePermitLimitKey) ?? 40;
             var expensiveWindowSeconds =
                 builder.Configuration.GetValue<int?>(ExpensiveWindowSecondsKey) ?? 60;
+            var fullBackupWindowMinutes =
+                builder.Configuration.GetValue<int?>(FullBackupWindowMinutesKey) ?? 20;
 
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.OnRejected = async (context, cancellationToken) =>
@@ -203,7 +206,10 @@ internal static class DependencyInjection
                     $"{GetAuthenticatedUserPartitionKey(httpContext)}:{httpContext.Request.Path.Value?.ToLowerInvariant()}",
                     _ => new FixedWindowRateLimiterOptions
                     {
-                        PermitLimit = 1, Window = TimeSpan.FromMinutes(30), QueueLimit = 0, AutoReplenishment = true
+                        PermitLimit = 1,
+                        Window = TimeSpan.FromMinutes(fullBackupWindowMinutes),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
                     });
             });
         });

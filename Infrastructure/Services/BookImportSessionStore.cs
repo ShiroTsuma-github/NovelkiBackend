@@ -68,7 +68,7 @@ public sealed class BookImportSessionStore : IDisposable
         DeleteDirectoryIfSafe(_instanceRoot);
     }
 
-    internal FullSessionReservation ReserveFullSession(Guid ownerId)
+    internal FullSessionReservation ReserveFullSession(Guid ownerId, long reservedBytes)
     {
         CleanupExpired();
         lock (_gate)
@@ -98,7 +98,8 @@ public sealed class BookImportSessionStore : IDisposable
                     "You already have the maximum number of active full import drafts. Finalize or cancel the existing draft first.");
             }
 
-            if (_reservedStagedBytes > _options.MaxStagedBytesGlobal - _options.MaxUncompressedArchiveBytes)
+            if (reservedBytes <= 0 || reservedBytes > _options.MaxStagedBytesGlobal ||
+                _reservedStagedBytes > _options.MaxStagedBytesGlobal - reservedBytes)
             {
                 throw new FullImportCapacityExceededException(
                     "The server has reached the temporary storage limit for full imports. Try again later.");
@@ -106,8 +107,8 @@ public sealed class BookImportSessionStore : IDisposable
 
             _pendingFullSessions++;
             _pendingFullSessionsByOwner[ownerId] = _pendingFullSessionsByOwner.GetValueOrDefault(ownerId) + 1;
-            _reservedStagedBytes += _options.MaxUncompressedArchiveBytes;
-            return new FullSessionReservation(this, ownerId, _options.MaxUncompressedArchiveBytes);
+            _reservedStagedBytes += reservedBytes;
+            return new FullSessionReservation(this, ownerId, reservedBytes);
         }
     }
 

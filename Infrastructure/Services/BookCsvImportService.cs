@@ -94,13 +94,22 @@ public sealed class BookCsvImportService : IBookCsvImportService
         CancellationToken cancellationToken)
     {
         await _abuseGuard.ThrowIfBlockedAsync(_user, cancellationToken);
+        var maxUncompressedArchiveBytes = AccountAbuseGuard.IsAdmin(_user)
+            ? _securityOptions.AdminMaxUncompressedArchiveBytes
+            : _securityOptions.MaxUncompressedArchiveBytes;
         using var operationLease = _concurrencyGate.TryAcquire();
-        using var sessionReservation = _sessionStore.ReserveFullSession(_user.RequiredId);
+        using var sessionReservation =
+            _sessionStore.ReserveFullSession(_user.RequiredId, maxUncompressedArchiveBytes);
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(_securityOptions.DraftProcessingTimeout);
         try
         {
-            return await CreateFullSessionCoreAsync(archiveStream, fileName, sessionReservation, timeout.Token);
+            return await CreateFullSessionCoreAsync(
+                archiveStream,
+                fileName,
+                sessionReservation,
+                maxUncompressedArchiveBytes,
+                timeout.Token);
         }
         catch (SuspiciousBookImportException exception)
         {
@@ -330,15 +339,16 @@ public sealed class BookCsvImportService : IBookCsvImportService
     }
 
     private async Task<BookImportSessionDto> CreateFullSessionCoreAsync(Stream archiveStream, string fileName,
-        BookImportSessionStore.FullSessionReservation sessionReservation, CancellationToken cancellationToken)
+        BookImportSessionStore.FullSessionReservation sessionReservation, long maxUncompressedArchiveBytes,
+        CancellationToken cancellationToken)
     {
         using var archive = new ZipArchive(archiveStream, ZipArchiveMode.Read, true);
-        var entries = ValidateArchiveMetadata(archive);
+        var entries = ValidateArchiveMetadata(archive, maxUncompressedArchiveBytes);
         var csvEntry = GetRequiredEntry(entries, "books.csv");
         var manifestEntry = GetRequiredEntry(entries, "manifest.json");
         ValidateEntrySize(csvEntry, _securityOptions.MaxCsvBytes, "books.csv");
         ValidateEntrySize(manifestEntry, _securityOptions.MaxManifestBytes, "manifest.json");
-        var readBudget = new ArchiveReadBudget(_securityOptions.MaxUncompressedArchiveBytes);
+        var readBudget = new ArchiveReadBudget(maxUncompressedArchiveBytes);
 
         var manifestBytes = await ReadEntryToBytesAsync(manifestEntry, _securityOptions.MaxManifestBytes,
             readBudget, cancellationToken);
@@ -902,7 +912,9 @@ public sealed class BookCsvImportService : IBookCsvImportService
         }
     }
 
-    private Dictionary<string, ZipArchiveEntry> ValidateArchiveMetadata(ZipArchive archive)
+    private Dictionary<string, ZipArchiveEntry> ValidateArchiveMetadata(
+        ZipArchive archive,
+        long maxUncompressedArchiveBytes)
     {
         if (archive.Entries.Count == 0 || archive.Entries.Count > _securityOptions.MaxArchiveEntries)
         {
@@ -960,7 +972,7 @@ public sealed class BookCsvImportService : IBookCsvImportService
                 throw new ValidationException("Full backup archive contains invalid size metadata.");
             }
 
-            if (entry.Length > _securityOptions.MaxUncompressedArchiveBytes - declaredTotal)
+            if (entry.Length > maxUncompressedArchiveBytes - declaredTotal)
             {
                 var projectedDeclaredTotal = declaredTotal + (double)entry.Length;
                 var projectedCompressedTotal = compressedTotal + (double)entry.CompressedLength;
