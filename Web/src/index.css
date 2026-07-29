@@ -1634,11 +1634,16 @@ select.ui-control {
   background: #3b3016;
 }
 
-.book-details-status--planned,
+.book-details-status--planned {
+  border-color: #6875bd;
+  color: #dce3ff;
+  background: #242947;
+}
+
 .book-details-status--paused {
-  border-color: #9c7541;
-  color: #ffe1ad;
-  background: #402d15;
+  border-color: #c8662d;
+  color: #ffe0c2;
+  background: #47230f;
 }
 
 .book-details-status--dropped {
