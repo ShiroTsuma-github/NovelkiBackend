@@ -7,18 +7,27 @@ import {
 } from './nsfwPreference'
 
 describe('NSFW preference', () => {
-  it('fails closed and excludes h-manhwa by default', () => {
+  it('fails closed and excludes all configured NSFW metadata by default', () => {
     expect(isNsfwEnabled()).toBe(false)
-    expect(withNsfwBookFilter()).toBe('-tag:h-manhwa')
-    expect(withNsfwBookFilter('author:Toika')).toBe('-tag:h-manhwa author:Toika')
+    expect(withNsfwBookFilter()).toBe('-tag:h-manhwa -genre:Adult -tag:R-18')
+    expect(withNsfwBookFilter('author:Toika')).toBe(
+      '-tag:h-manhwa -genre:Adult -tag:R-18 author:Toika',
+    )
   })
 
   it('keeps an unfinished quoted user filter at the end of the query', () => {
-    expect(withNsfwBookFilter('title:"space')).toBe('-tag:h-manhwa title:"space')
+    expect(withNsfwBookFilter('title:"space')).toBe(
+      '-tag:h-manhwa -genre:Adult -tag:R-18 title:"space',
+    )
   })
 
-  it('does not duplicate an explicit exclusion', () => {
-    expect(withNsfwBookFilter('genre:fantasy -tag:"h-manhwa"')).toBe('genre:fantasy -tag:"h-manhwa"')
+  it('does not duplicate explicit exclusions', () => {
+    expect(withNsfwBookFilter('genre:fantasy -tag:"h-manhwa"')).toBe(
+      '-genre:Adult -tag:R-18 genre:fantasy -tag:"h-manhwa"',
+    )
+    expect(withNsfwBookFilter("-tag:h-manhwa -genre:'adult' -tag:R-18")).toBe(
+      "-tag:h-manhwa -genre:'adult' -tag:R-18",
+    )
   })
 
   it('leaves the request unchanged after the user enables NSFW content', () => {
