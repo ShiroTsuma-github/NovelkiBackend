@@ -227,6 +227,18 @@ export function getBookSearchValue(context: BookSearchTokenContext) {
   return unquote(context.valueText)
 }
 
+export function getBookSearchScopeQuery(query: string, context: BookSearchTokenContext) {
+  const before = query.slice(0, context.start).trimEnd()
+  const after = query.slice(context.end).trimStart()
+  if (!before) {
+    return after
+  }
+  if (!after) {
+    return before
+  }
+  return `${before} ${after}`
+}
+
 function getTokenActions(context: BookSearchTokenContext): BookSearchSuggestionItem[] {
   if (!context.complete) {
     return []

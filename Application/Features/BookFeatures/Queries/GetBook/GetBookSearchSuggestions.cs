@@ -5,7 +5,8 @@ using Application.Common.DTOs.Book;
 public sealed record GetBookSearchSuggestionsQuery(
     string Field,
     string? Search = null,
-    int Take = 10) : IRequest<IReadOnlyCollection<BookSearchSuggestionDto>>;
+    int Take = 10,
+    string? Query = null) : IRequest<IReadOnlyCollection<BookSearchSuggestionDto>>;
 
 public sealed class GetBookSearchSuggestionsQueryHandler
     : IRequestHandler<GetBookSearchSuggestionsQuery, IReadOnlyCollection<BookSearchSuggestionDto>>
@@ -34,6 +35,7 @@ public sealed class GetBookSearchSuggestionsQueryHandler
             _user.RequiredId,
             field,
             request.Search?.Trim(),
+            BookSearchQueryParser.Parse(request.Query),
             Math.Clamp(request.Take, 1, 20),
             cancellationToken);
     }

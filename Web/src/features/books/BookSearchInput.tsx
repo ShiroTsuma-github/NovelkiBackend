@@ -9,6 +9,7 @@ import {
   analyzeBookSearch,
   applyBookSearchSuggestion,
   getBookSearchValue,
+  getBookSearchScopeQuery,
   getLocalBookSearchSuggestions,
   type BookSearchSuggestionItem,
 } from './bookSearchSyntax'
@@ -40,14 +41,16 @@ export function BookSearchInput({
     ? context.definition.canonical
     : null
   const searchValue = getBookSearchValue(context)
-  const remoteRequest = remoteField == null ? '' : `${remoteField}\u0000${searchValue}`
+  const scopeQuery = getBookSearchScopeQuery(draftValue, context)
+  const remoteRequest = remoteField == null ? '' : `${remoteField}\u0000${searchValue}\u0000${scopeQuery}`
   const debouncedRequest = useDebouncedValue(remoteRequest, suggestionDelayMs)
-  const [debouncedField, debouncedSearch = ''] = debouncedRequest.split('\u0000')
+  const [debouncedField, debouncedSearch = '', debouncedScopeQuery = ''] = debouncedRequest.split('\u0000')
   const remoteSuggestions = useQuery({
-    queryKey: ['book-search-suggestions', debouncedField, debouncedSearch],
+    queryKey: ['book-search-suggestions', debouncedField, debouncedSearch, debouncedScopeQuery],
     queryFn: () => api.getBookSearchSuggestions({
       field: debouncedField,
       search: debouncedSearch || undefined,
+      query: debouncedScopeQuery || undefined,
       take: 10,
     }),
     enabled: open && remoteField != null && debouncedField === remoteField,

@@ -1,20 +1,25 @@
 namespace Infrastructure.Persistence;
 
 using Application.Common.DTOs.Book;
+using Domain.Entities;
+using Domain.Repositories;
 
 public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQueryService
 {
     private readonly ApplicationDbContext _context;
+    private readonly BookSearchCriteriaApplier _criteriaApplier;
 
     public BookSearchSuggestionQueryService(ApplicationDbContext context)
     {
         _context = context;
+        _criteriaApplier = new BookSearchCriteriaApplier(context);
     }
 
     public Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetSuggestionsAsync(
         Guid ownerId,
         string field,
         string? search,
+        BookSearchCriteria? criteria,
         int take,
         CancellationToken cancellationToken)
     {
@@ -25,28 +30,39 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
         return field switch
         {
             BookSearchSuggestionFields.Author =>
-                GetAuthorSuggestionsAsync(ownerId, normalizedSearch, take, cancellationToken),
+                GetAuthorSuggestionsAsync(ownerId, normalizedSearch, criteria, take, cancellationToken),
             BookSearchSuggestionFields.Tag =>
-                GetTagSuggestionsAsync(ownerId, normalizedSearch, take, cancellationToken),
+                GetTagSuggestionsAsync(ownerId, normalizedSearch, criteria, take, cancellationToken),
             BookSearchSuggestionFields.Genre =>
-                GetGenreSuggestionsAsync(ownerId, normalizedSearch, take, cancellationToken),
+                GetGenreSuggestionsAsync(ownerId, normalizedSearch, criteria, take, cancellationToken),
             BookSearchSuggestionFields.Status =>
-                GetStatusSuggestionsAsync(ownerId, search, take, cancellationToken),
+                GetStatusSuggestionsAsync(ownerId, search, criteria, take, cancellationToken),
             BookSearchSuggestionFields.Type =>
-                GetTypeSuggestionsAsync(ownerId, search, take, cancellationToken),
+                GetTypeSuggestionsAsync(ownerId, search, criteria, take, cancellationToken),
             _ => Task.FromResult<IReadOnlyCollection<BookSearchSuggestionDto>>([])
         };
+    }
+
+    private IQueryable<Book> GetScopedBooks(Guid ownerId, BookSearchCriteria? criteria)
+    {
+        var books = _context.Books
+            .AsNoTracking()
+            .Where(book => book.OwnerId == ownerId);
+
+        return criteria?.HasFilters == true
+            ? _criteriaApplier.Apply(books, criteria)
+            : books;
     }
 
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetAuthorSuggestionsAsync(
         Guid ownerId,
         string normalizedSearch,
+        BookSearchCriteria? criteria,
         int take,
         CancellationToken cancellationToken)
     {
-        var books = _context.Books
-            .AsNoTracking()
-            .Where(book => book.OwnerId == ownerId && book.Author != null);
+        var books = GetScopedBooks(ownerId, criteria)
+            .Where(book => book.Author != null);
         if (normalizedSearch.Length > 0)
         {
             books = books.Where(book =>
@@ -72,12 +88,11 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetTagSuggestionsAsync(
         Guid ownerId,
         string normalizedSearch,
+        BookSearchCriteria? criteria,
         int take,
         CancellationToken cancellationToken)
     {
-        var tags = _context.Books
-            .AsNoTracking()
-            .Where(book => book.OwnerId == ownerId)
+        var tags = GetScopedBooks(ownerId, criteria)
             .SelectMany(book => book.BookTags);
         if (normalizedSearch.Length > 0)
         {
@@ -99,12 +114,11 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetGenreSuggestionsAsync(
         Guid ownerId,
         string normalizedSearch,
+        BookSearchCriteria? criteria,
         int take,
         CancellationToken cancellationToken)
     {
-        var genres = _context.Books
-            .AsNoTracking()
-            .Where(book => book.OwnerId == ownerId)
+        var genres = GetScopedBooks(ownerId, criteria)
             .SelectMany(book => book.BookGenres);
         if (normalizedSearch.Length > 0)
         {
@@ -126,13 +140,12 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetStatusSuggestionsAsync(
         Guid ownerId,
         string? search,
+        BookSearchCriteria? criteria,
         int take,
         CancellationToken cancellationToken)
     {
         var normalizedSearch = search?.Trim().ToUpperInvariant() ?? string.Empty;
-        var books = _context.Books
-            .AsNoTracking()
-            .Where(book => book.OwnerId == ownerId);
+        var books = GetScopedBooks(ownerId, criteria);
         if (normalizedSearch.Length > 0)
         {
             books = books.Where(book => book.Status.Name.ToUpper().Contains(normalizedSearch));
@@ -153,13 +166,12 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetTypeSuggestionsAsync(
         Guid ownerId,
         string? search,
+        BookSearchCriteria? criteria,
         int take,
         CancellationToken cancellationToken)
     {
         var normalizedSearch = search?.Trim().ToUpperInvariant() ?? string.Empty;
-        var books = _context.Books
-            .AsNoTracking()
-            .Where(book => book.OwnerId == ownerId);
+        var books = GetScopedBooks(ownerId, criteria);
         if (normalizedSearch.Length > 0)
         {
             books = books.Where(book => book.ContentType.Name.ToUpper().Contains(normalizedSearch));

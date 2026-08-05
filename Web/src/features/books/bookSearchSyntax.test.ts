@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   analyzeBookSearch,
   applyBookSearchSuggestion,
+  getBookSearchScopeQuery,
   getLocalBookSearchSuggestions,
 } from './bookSearchSyntax'
 
@@ -131,5 +132,12 @@ describe('book search syntax', () => {
         expect.objectContaining({ label: 'title:#' }),
         expect.objectContaining({ label: 'author:' }),
       ]))
+  })
+
+  it('builds a suggestion scope query without the active token', () => {
+    const query = 'type:"Novel" status:"rea" rating:>=7'
+    const context = analyzeBookSearch(query, query.indexOf('rea') + 2)
+
+    expect(getBookSearchScopeQuery(query, context)).toBe('type:"Novel" rating:>=7')
   })
 })

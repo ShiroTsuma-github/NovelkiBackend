@@ -3,6 +3,7 @@ namespace Application.UnitTests;
 using Application.Common.DTOs.Book;
 using Application.Common.Interfaces;
 using Application.Features.BookFeatures.Queries.GetBook;
+using Domain.Repositories;
 using FluentValidation;
 
 public sealed class BookSearchSuggestionTests
@@ -23,6 +24,7 @@ public sealed class BookSearchSuggestionTests
         Assert.Equal("author", service.Field);
         Assert.Equal("er", service.Search);
         Assert.Equal(20, service.Take);
+        Assert.False(service.Criteria?.HasFilters);
     }
 
     [Theory]
@@ -41,18 +43,21 @@ public sealed class BookSearchSuggestionTests
         public Guid OwnerId { get; private set; }
         public string? Field { get; private set; }
         public string? Search { get; private set; }
+        public BookSearchCriteria? Criteria { get; private set; }
         public int Take { get; private set; }
 
         public Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetSuggestionsAsync(
             Guid ownerId,
             string field,
             string? search,
+            BookSearchCriteria? criteria,
             int take,
             CancellationToken cancellationToken)
         {
             OwnerId = ownerId;
             Field = field;
             Search = search;
+            Criteria = criteria;
             Take = take;
             return Task.FromResult<IReadOnlyCollection<BookSearchSuggestionDto>>([]);
         }
