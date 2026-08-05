@@ -138,6 +138,45 @@ public sealed class BookSearchSuggestionQueryServiceTests
 
         Assert.Equal(("Reading", 3), (Assert.Single(statuses).Value, Assert.Single(statuses).Count));
         Assert.Equal(("Manga", 4), (Assert.Single(types).Value, Assert.Single(types).Count));
+        Assert.True(Assert.Single(statuses).IsAvailable);
+        Assert.True(Assert.Single(types).IsAvailable);
+    }
+
+    [Fact]
+    public async Task Suggestions_ShouldReturnUnavailableExistingValuesOutsideTheEvaluatedQueryScope()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        AddBooks(
+            context,
+            database.UserId,
+            "Novel Completed",
+            TestData.NovelTypeId,
+            Guid.Parse("20000000-0000-0000-0000-000000000002"),
+            2);
+        AddBooks(
+            context,
+            database.UserId,
+            "Manga Reading",
+            Guid.Parse("10000000-0000-0000-0000-000000000002"),
+            TestData.ReadingStatusId,
+            4);
+        await context.SaveChangesAsync();
+        var service = new BookSearchSuggestionQueryService(context);
+
+        var types = await service.GetSuggestionsAsync(
+            database.UserId,
+            BookSearchSuggestionFields.Type,
+            "manga",
+            BookSearchQueryParser.Parse("status:Completed"),
+            10,
+            CancellationToken.None);
+
+        var type = Assert.Single(types);
+        Assert.Equal("Manga", type.Value);
+        Assert.Equal(0, type.Count);
+        Assert.True(type.IsExact);
+        Assert.False(type.IsAvailable);
     }
 
     private static User User(Guid id)

@@ -122,10 +122,15 @@ public partial class BookController : ControllerBase
     [HttpGet("search-suggestions")]
     [Authorize]
     public async Task<IActionResult> GetSearchSuggestions(
-        [FromQuery] GetBookSearchSuggestionsQuery query,
-        CancellationToken cancellationToken)
+        [FromQuery] string field,
+        [FromQuery] string? search,
+        [FromQuery] int take = 10,
+        [FromQuery(Name = "query")] string? searchQuery = null,
+        CancellationToken cancellationToken = default)
     {
-        return Ok(await _mediator.Send(query, cancellationToken));
+        return Ok(await _mediator.Send(
+            new GetBookSearchSuggestionsQuery(field, search, take, searchQuery),
+            cancellationToken));
     }
 
     [HttpGet("analytics")]

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight, Ban, CalendarDays, Hash, ListFilter, Search, TextCursorInput, Trash2, Undo2 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import { inputClass } from '@/components/app/FormField'
 import { Surface } from '@/components/app/DesignSystem'
@@ -29,12 +29,24 @@ export function BookSearchInput({
   const [open, setOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
+  const pendingSelectionRef = useRef<number | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     setDraftValue(value)
     setCaret((current) => Math.min(current, value.length))
   }, [value])
+
+  useLayoutEffect(() => {
+    const pendingSelection = pendingSelectionRef.current
+    if (pendingSelection == null) {
+      return
+    }
+
+    pendingSelectionRef.current = null
+    inputRef.current?.focus()
+    inputRef.current?.setSelectionRange(pendingSelection, pendingSelection)
+  }, [draftValue])
 
   const context = useMemo(() => analyzeBookSearch(draftValue, caret), [caret, draftValue])
   const remoteField = context.definition?.remote && context.hasColon
@@ -68,7 +80,7 @@ export function BookSearchInput({
           (suggestion) => suggestion.value.trim().toLocaleLowerCase() !== 'none',
         )
       : []
-    if (context.complete && response.some((suggestion) => suggestion.isExact)) {
+    if (context.complete && response.some((suggestion) => suggestion.isExact && suggestion.isAvailable)) {
       return local
     }
 
@@ -76,7 +88,10 @@ export function BookSearchInput({
       id: `value:${suggestion.value}`,
       kind: 'value',
       label: suggestion.value,
-      description: `${formatCount(suggestion.count)} ${suggestion.count === 1 ? 'book' : 'books'}`,
+      description: suggestion.isAvailable
+        ? `${formatCount(suggestion.count)} ${suggestion.count === 1 ? 'book' : 'books'}`
+        : '0 books in current filters',
+      disabled: !suggestion.isAvailable,
       value: suggestion.value,
     }))
     return [...local, ...values]
@@ -84,7 +99,7 @@ export function BookSearchInput({
 
   const suggestionSignature = suggestions.map((suggestion) => suggestion.id).join('|')
   useEffect(() => {
-    setActiveIndex(0)
+    setActiveIndex(getNextSelectableIndex(suggestions, -1, 1))
   }, [suggestionSignature])
 
   useEffect(() => {
@@ -105,13 +120,14 @@ export function BookSearchInput({
   }
 
   function selectSuggestion(suggestion: BookSearchSuggestionItem) {
+    if (suggestion.disabled) {
+      return
+    }
+
     const result = applyBookSearchSuggestion(draftValue, context, suggestion)
+    pendingSelectionRef.current = result.caret
     updateDraft(result.value, result.caret)
     setOpen(true)
-    window.requestAnimationFrame(() => {
-      inputRef.current?.focus()
-      inputRef.current?.setSelectionRange(result.caret, result.caret)
-    })
   }
 
   const loadingRemote = remoteField != null &&
@@ -162,13 +178,13 @@ export function BookSearchInput({
             }
             if (event.key === 'ArrowDown') {
               event.preventDefault()
-              setActiveIndex((current) => (current + 1) % suggestions.length)
+              setActiveIndex((current) => getNextSelectableIndex(suggestions, current, 1))
             } else if (event.key === 'ArrowUp') {
               event.preventDefault()
-              setActiveIndex((current) => (current - 1 + suggestions.length) % suggestions.length)
+              setActiveIndex((current) => getNextSelectableIndex(suggestions, current, -1))
             } else if (event.key === 'Enter' || event.key === 'Tab') {
               const suggestion = suggestions[activeIndex] ?? suggestions[0]
-              if (suggestion) {
+              if (suggestion && !suggestion.disabled) {
                 event.preventDefault()
                 selectSuggestion(suggestion)
               }
@@ -185,9 +201,13 @@ export function BookSearchInput({
           >
             {suggestions.map((suggestion, index) => (
               <button
+                aria-disabled={suggestion.disabled || undefined}
                 aria-selected={activeIndex === index}
+                disabled={suggestion.disabled}
                 className={`group flex min-h-11 w-full items-center gap-3 rounded-[var(--qs-control-radius)] px-3 py-2 text-left transition ${
-                  activeIndex === index
+                  suggestion.disabled
+                    ? 'cursor-not-allowed text-slate-400 opacity-60'
+                    : activeIndex === index
                     ? 'bg-slate-900 text-white'
                     : suggestion.kind === 'remove'
                       ? 'text-rose-700 hover:bg-rose-50'
@@ -197,7 +217,11 @@ export function BookSearchInput({
                 key={suggestion.id}
                 role="option"
                 type="button"
-                onMouseEnter={() => setActiveIndex(index)}
+                onMouseEnter={() => {
+                  if (!suggestion.disabled) {
+                    setActiveIndex(index)
+                  }
+                }}
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => selectSuggestion(suggestion)}
               >
@@ -214,7 +238,9 @@ export function BookSearchInput({
                   suggestion.kind === 'value' ||
                   suggestion.kind === 'wildcard') ? (
                   <ArrowRight className={`h-4 w-4 shrink-0 ${
-                    activeIndex === index ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-600'
+                    suggestion.disabled
+                      ? 'text-slate-300'
+                      : activeIndex === index ? 'text-slate-300' : 'text-slate-400 group-hover:text-slate-600'
                   }`} />
                 ) : null}
               </button>
@@ -275,4 +301,19 @@ function SuggestionIcon({ item }: { item: BookSearchSuggestionItem }) {
 
 function formatCount(count: number) {
   return new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(count)
+}
+
+function getNextSelectableIndex(suggestions: BookSearchSuggestionItem[], current: number, direction: 1 | -1) {
+  if (suggestions.length === 0 || suggestions.every((suggestion) => suggestion.disabled)) {
+    return 0
+  }
+
+  for (let offset = 1; offset <= suggestions.length; offset += 1) {
+    const index = (current + offset * direction + suggestions.length) % suggestions.length
+    if (!suggestions[index]?.disabled) {
+      return index
+    }
+  }
+
+  return 0
 }

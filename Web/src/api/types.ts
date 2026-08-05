@@ -171,6 +171,7 @@ export type BookSearchSuggestionDto = {
   value: string
   count: number
   isExact: boolean
+  isAvailable: boolean
 }
 
 export type BookAnalyticsDto = {

@@ -150,11 +150,33 @@ public class BookSearchQueryParserTests
     [Fact]
     public void Parse_ShouldTreatInvalidFiltersAsTerms()
     {
-        var criteria = BookSearchQueryParser.Parse("title: rating:bad unknown:value progress:abc");
+        var criteria = BookSearchQueryParser.Parse("rating:bad unknown:value progress:abc");
 
-        Assert.Equal(["title:", "rating:bad", "unknown:value", "progress:abc"], criteria.Terms);
+        Assert.Equal(["rating:bad", "unknown:value", "progress:abc"], criteria.Terms);
         Assert.Empty(criteria.Fields);
         Assert.Empty(criteria.Numbers);
+    }
+
+    [Theory]
+    [InlineData("type:")]
+    [InlineData("type:\"\"")]
+    [InlineData("status:''")]
+    [InlineData("author:")]
+    [InlineData("rating:")]
+    [InlineData("created:")]
+    [InlineData("cover:")]
+    [InlineData("-status:\"\"")]
+    public void Parse_ShouldIgnoreEmptyKnownFilterTokens(string query)
+    {
+        var criteria = BookSearchQueryParser.Parse(query);
+
+        Assert.Empty(criteria.Terms);
+        Assert.Empty(criteria.Fields);
+        Assert.Empty(criteria.Numbers);
+        Assert.Empty(criteria.Dates);
+        Assert.Empty(criteria.Missing);
+        Assert.Empty(criteria.Exclusions);
+        Assert.False(criteria.HasFilters);
     }
 
     [Theory]

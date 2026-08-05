@@ -174,9 +174,9 @@ describe('BooksPage', () => {
   it('inserts frequency-ranked text suggestions as quoted filter values', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
     vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
-      { value: 'Completed', count: 12, isExact: false },
-      { value: 'Currently Reading', count: 4, isExact: false },
-      { value: 'none', count: 1, isExact: false },
+      { value: 'Completed', count: 12, isExact: false, isAvailable: true },
+      { value: 'Currently Reading', count: 4, isExact: false, isAvailable: true },
+      { value: 'none', count: 1, isExact: false, isAvailable: true },
     ])
     const user = userEvent.setup()
 
@@ -201,7 +201,7 @@ describe('BooksPage', () => {
   it('shows close values alongside actions when the current author is not an exact match', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
     vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
-      { value: 'Perfect123', count: 3, isExact: false },
+      { value: 'Perfect123', count: 3, isExact: false, isAvailable: true },
     ])
     const user = userEvent.setup()
 
@@ -223,8 +223,8 @@ describe('BooksPage', () => {
   it('shows only token actions when the current author is an exact match', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
     vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
-      { value: 'Perf', count: 2, isExact: true },
-      { value: 'Perfect123', count: 3, isExact: false },
+      { value: 'Perf', count: 2, isExact: true, isAvailable: true },
+      { value: 'Perfect123', count: 3, isExact: false, isAvailable: true },
     ])
     const user = userEvent.setup()
 
@@ -244,6 +244,33 @@ describe('BooksPage', () => {
       expect(screen.queryByText('Perf')).not.toBeInTheDocument()
       expect(screen.queryByRole('option', { name: /^Perfect123/ })).not.toBeInTheDocument()
     })
+  })
+
+  it('shows matching values outside the current filter as disabled suggestions', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
+      { value: 'Manga', count: 0, isExact: true, isAvailable: false },
+    ])
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=status%3ACompleted%20type%3A%22Manga%22' })
+
+    await screen.findByText('Lord of Mysteries')
+    const searchInput = screen.getByRole('combobox', { name: /search books/i })
+    await user.click(searchInput)
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+      field: 'type',
+      search: 'Manga',
+      query: 'status:Completed',
+      take: 10,
+    }))
+
+    const unavailable = await screen.findByRole('option', { name: /^Manga/i })
+    expect(unavailable).toBeDisabled()
+    expect(unavailable).toHaveTextContent('0 books in current filters')
+    await user.click(unavailable)
+
+    expect(searchInput).toHaveValue('status:Completed type:"Manga"')
   })
 
   it('can exclude and remove the complete filter under the caret', async () => {

@@ -52,7 +52,7 @@ describe('book API NSFW filtering', () => {
     expect(url.searchParams.get('query')).toBe('-tag:h-manhwa -genre:Adult -tag:R-18')
   })
 
-  it('uses the dedicated owner-scoped search suggestion endpoint', async () => {
+  it('uses the dedicated owner-scoped search suggestion endpoint with NSFW exclusions', async () => {
     await api.getBookSearchSuggestions({ field: 'author', search: 'er', take: 10 })
 
     const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
@@ -60,6 +60,20 @@ describe('book API NSFW filtering', () => {
     expect(url.searchParams.get('field')).toBe('author')
     expect(url.searchParams.get('search')).toBe('er')
     expect(url.searchParams.get('take')).toBe('10')
-    expect(url.searchParams.has('query')).toBe(false)
+    expect(url.searchParams.get('query')).toBe('-tag:h-manhwa -genre:Adult -tag:R-18')
+  })
+
+  it('adds NSFW exclusions before the search suggestion scope query', async () => {
+    await api.getBookSearchSuggestions({
+      field: 'status',
+      query: 'type:"Novel"',
+      take: 10,
+    })
+
+    const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://localhost')
+    expect(url.pathname).toBe('/api/v1/book/search-suggestions')
+    expect(url.searchParams.get('field')).toBe('status')
+    expect(url.searchParams.has('search')).toBe(false)
+    expect(url.searchParams.get('query')).toBe('-tag:h-manhwa -genre:Adult -tag:R-18 type:"Novel"')
   })
 })

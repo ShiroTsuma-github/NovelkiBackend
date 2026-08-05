@@ -66,7 +66,7 @@ export const api = {
   getBooksSummary: (params: { query?: string }) =>
     apiRequest<BookSummaryDto>(`/book/summary${toQueryString(withFilteredQuery(params))}`),
   getBookSearchSuggestions: (params: { field: string; search?: string; query?: string; take?: number }) =>
-    apiRequest<BookSearchSuggestionDto[]>(`/book/search-suggestions${toQueryString(params)}`),
+    apiRequest<BookSearchSuggestionDto[]>(`/book/search-suggestions${toQueryString(withFilteredQuery(params))}`),
   getBookAnalytics: (params: { query?: string; from?: string; to?: string; bucket?: string }) =>
     apiRequest<BookAnalyticsDto>(`/book/analytics${toQueryString(withFilteredQuery(params))}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),

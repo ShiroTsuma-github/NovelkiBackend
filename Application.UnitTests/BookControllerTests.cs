@@ -83,6 +83,33 @@ public class BookControllerTests
     }
 
     [Fact]
+    public async Task GetSearchSuggestions_ShouldForwardScopeQueryWithEmptySearch()
+    {
+        var expected = new[]
+        {
+            new BookSearchSuggestionDto("Reading", 3, false, true)
+        };
+        var mediator = new Mock<IMediator>();
+        mediator
+            .Setup(mock => mock.Send(
+                new GetBookSearchSuggestionsQuery("status", null, 10, "type:\"Novel\""),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(expected);
+        var controller = CreateController(mediator.Object);
+
+        var result = await controller.GetSearchSuggestions("status", null, 10, "type:\"Novel\"", CancellationToken.None);
+
+        Assert.Same(expected, Assert.IsType<OkObjectResult>(result).Value);
+        mediator.Verify(mock => mock.Send(
+            It.Is<GetBookSearchSuggestionsQuery>(request =>
+                request.Field == "status" &&
+                request.Search == null &&
+                request.Take == 10 &&
+                request.Query == "type:\"Novel\""),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task ParseHtml_ShouldReturnResolvedDraftWithoutPersistingAnything()
     {
         var query = new ParseBookHtmlQuery("<html>NovelUpdates</html>");

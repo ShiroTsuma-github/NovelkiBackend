@@ -99,6 +99,11 @@ public static class BookSearchQueryParser
             var isExcluded = rawToken.Length > 1 && rawToken[0] == '-';
             var token = isExcluded ? rawToken[1..] : rawToken;
             var parsed = ParseToken(token);
+            if (!parsed.HasFilters)
+            {
+                continue;
+            }
+
             if (isExcluded)
             {
                 exclusions.Add(parsed);
@@ -120,6 +125,11 @@ public static class BookSearchQueryParser
 
     private static BookSearchCriteria ParseToken(string token)
     {
+        if (IsEmptyKnownFilterToken(token))
+        {
+            return Criteria();
+        }
+
         if (TryParseMissingFilter(token, out var missingFilter))
         {
             return Criteria(missing: [missingFilter]);
@@ -141,6 +151,32 @@ public static class BookSearchQueryParser
         }
 
         return Criteria(terms: [token]);
+    }
+
+    private static bool IsEmptyKnownFilterToken(string token)
+    {
+        var separatorIndex = token.IndexOf(':');
+        if (separatorIndex <= 0)
+        {
+            return false;
+        }
+
+        var fieldName = token[..separatorIndex];
+        if (!IsKnownFilterAlias(fieldName))
+        {
+            return false;
+        }
+
+        var value = token[(separatorIndex + 1)..].Trim();
+        return value.Length == 0 || string.IsNullOrWhiteSpace(Unquote(value));
+    }
+
+    private static bool IsKnownFilterAlias(string fieldName)
+    {
+        return FieldAliases.ContainsKey(fieldName) ||
+               NumberAliases.ContainsKey(fieldName) ||
+               DateAliases.ContainsKey(fieldName) ||
+               MissingAliases.ContainsKey(fieldName);
     }
 
     private static BookSearchCriteria Criteria(

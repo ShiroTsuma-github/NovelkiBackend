@@ -58,6 +58,7 @@ export type BookSearchSuggestionItem = {
   kind: 'filter' | 'operator' | 'value' | 'wildcard' | 'none' | 'exclude' | 'include' | 'remove'
   label: string
   description: string
+  disabled?: boolean
   value?: string
   definition?: BookSearchFilterDefinition
 }
