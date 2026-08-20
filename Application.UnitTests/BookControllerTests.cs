@@ -56,7 +56,7 @@ public class BookControllerTests
         mediator.Setup(mock => mock.Send(query, It.IsAny<CancellationToken>())).ReturnsAsync(expected);
         var controller = CreateController(mediator.Object);
 
-        var result = await controller.GetAll(query);
+        var result = await controller.GetAll(query, CancellationToken.None);
 
         var ok = Assert.IsType<OkObjectResult>(result);
         Assert.Same(expected, ok.Value);

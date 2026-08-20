@@ -65,14 +65,28 @@ export const api = {
     apiRequest<ReadingTimeSettingDto[]>('/account/reading-time-settings'),
   updateReadingTimeSettings: (request: UpdateReadingTimeSettingsRequest) =>
     apiRequest<ReadingTimeSettingDto[]>('/account/reading-time-settings', { method: 'PUT', body: request }),
-  getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string; advanceCycle?: boolean }) =>
-    apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(withFilteredQuery(params))}`),
+  getBooks: ({ signal, ...params }: {
+    skip?: number
+    take?: number
+    query?: string
+    sortBy?: string
+    sortDirection?: string
+    advanceCycle?: boolean
+    signal?: AbortSignal
+  }) =>
+    apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(withFilteredQuery(params))}`, { signal }),
   getManagedBooks: (params: { skip?: number; take?: number; query?: string }) =>
     apiRequest<PaginatedResult<ManagedBookListItemDto>>(`/book/manage${toQueryString(withFilteredQuery(params))}`),
   getBooksSummary: (params: { query?: string }) =>
     apiRequest<BookSummaryDto>(`/book/summary${toQueryString(withFilteredQuery(params))}`),
-  getBookSearchSuggestions: (params: { field: string; search?: string; query?: string; take?: number }) =>
-    apiRequest<BookSearchSuggestionDto[]>(`/book/search-suggestions${toQueryString(withFilteredQuery(params))}`),
+  getBookSearchSuggestions: ({ signal, ...params }: {
+    field: string
+    search?: string
+    query?: string
+    take?: number
+    signal?: AbortSignal
+  }) =>
+    apiRequest<BookSearchSuggestionDto[]>(`/book/search-suggestions${toQueryString(withFilteredQuery(params))}`, { signal }),
   getBookAnalytics: (params: { query?: string; from?: string; to?: string; bucket?: string }) =>
     apiRequest<BookAnalyticsDto>(`/book/analytics${toQueryString(withFilteredQuery(params))}`),
   getBook: (id: string) => apiRequest<BookDto>(`/book/${id}`),

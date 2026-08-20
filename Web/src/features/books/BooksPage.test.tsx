@@ -197,12 +197,12 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     const searchInput = screen.getByRole('combobox', { name: /search books/i })
     await user.type(searchInput, 'status:comp')
-    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({
       field: 'status',
       search: 'comp',
       take: 10,
-    }))
-    const [completedSuggestion] = await screen.findAllByText('Completed')
+    })))
+    const completedSuggestion = await screen.findByRole('option', { name: /^Completed/i })
     await user.click(completedSuggestion)
 
     expect(searchInput).toHaveValue('status:"Completed" ')
@@ -221,11 +221,11 @@ describe('BooksPage', () => {
 
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('combobox', { name: /search books/i }))
-    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({
       field: 'author',
       search: 'perf',
       take: 10,
-    }))
+    })))
 
     expect(screen.getByRole('option', { name: /^Exclude author:"perf"/i })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /^Remove author:"perf"/i })).toBeInTheDocument()
@@ -244,11 +244,11 @@ describe('BooksPage', () => {
 
     await screen.findByText('Lord of Mysteries')
     await user.click(screen.getByRole('combobox', { name: /search books/i }))
-    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({
       field: 'author',
       search: 'Perf',
       take: 10,
-    }))
+    })))
     await waitFor(() => {
       expect(screen.getByRole('listbox')).toHaveAttribute('aria-busy', 'false')
       expect(screen.getByRole('option', { name: /^Exclude author:"Perf"/ })).toBeInTheDocument()
@@ -270,12 +270,12 @@ describe('BooksPage', () => {
     await screen.findByText('Lord of Mysteries')
     const searchInput = screen.getByRole('combobox', { name: /search books/i })
     await user.click(searchInput)
-    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith({
+    await waitFor(() => expect(api.getBookSearchSuggestions).toHaveBeenCalledWith(expect.objectContaining({
       field: 'type',
       search: 'Manga',
       query: 'status:Completed',
       take: 10,
-    }))
+    })))
 
     const unavailable = await screen.findByRole('option', { name: /^Manga/i })
     expect(unavailable).toBeDisabled()

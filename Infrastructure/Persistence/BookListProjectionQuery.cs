@@ -33,9 +33,7 @@ public sealed class BookListProjectionQuery
             return clientSortedPage.Select(BookListProjectionMapper.MapListProjection).ToList();
         }
 
-        var pageQuery =
-            await BuildProjectedPageQueryAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
-        var page = await pageQuery.ToListAsync(cancellationToken);
+        var page = await GetProjectedPageAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
 
         return page.Select(BookListProjectionMapper.MapListProjection).ToList();
     }
@@ -96,9 +94,7 @@ public sealed class BookListProjectionQuery
                 .ToList();
         }
 
-        var pageQuery =
-            await BuildProjectedPageQueryAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
-        var page = await pageQuery.ToListAsync(cancellationToken);
+        var page = await GetProjectedPageAsync(query, skip, take, sortBy, sortDirection, cancellationToken);
         var owners =
             await GetOwnersAsync(page.Select(book => book.OwnerId), cancellationToken);
 
@@ -116,7 +112,7 @@ public sealed class BookListProjectionQuery
             .ToDictionaryAsync(user => user.Id, cancellationToken);
     }
 
-    private async Task<IQueryable<BookListProjection>> BuildProjectedPageQueryAsync(
+    private async Task<IReadOnlyList<BookListProjection>> GetProjectedPageAsync(
         IQueryable<Book> query,
         int skip,
         int take,
@@ -124,11 +120,24 @@ public sealed class BookListProjectionQuery
         string? sortDirection,
         CancellationToken cancellationToken)
     {
-        var sortedPage =
-            (await _sortBuilder.ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
+        var pageIds = await (await _sortBuilder.ApplySortingAsync(query, sortBy, sortDirection, cancellationToken))
             .Skip(skip)
-            .Take(take);
-        return ProjectBooks(sortedPage);
+            .Take(take)
+            .Select(book => book.Id)
+            .ToArrayAsync(cancellationToken);
+
+        if (pageIds.Length == 0)
+        {
+            return [];
+        }
+
+        var pageOrder = pageIds
+            .Select((id, index) => (id, index))
+            .ToDictionary(item => item.id, item => item.index);
+        var page = await ProjectBooks(_context.Books.AsNoTracking().Where(book => pageIds.Contains(book.Id)))
+            .ToListAsync(cancellationToken);
+
+        return page.OrderBy(book => pageOrder[book.Id]).ToList();
     }
 
     private static IQueryable<BookListProjection> ProjectBooks(IQueryable<Book> query)

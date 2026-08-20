@@ -18,6 +18,7 @@ import { BookCoverArtwork } from './BookCoverSection'
 import { isLowRating } from './bookRating'
 import { BookStatusPill } from './BookStatusPill'
 import { BookSearchInput } from './BookSearchInput'
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { formatProgress } from './bookProgress'
 import { saveBookListScrollPosition, takeBookListScrollPosition } from './bookListNavigation'
 import {
@@ -63,6 +64,7 @@ const bookLayoutStorageKey = 'novelki.books.layout.v1'
 const cardsPerRowStorageKey = 'novelki.books.cards-per-row.v1'
 const pageSizeStorageKey = 'novelki.books.page-size.v1'
 const topActionButtonSpacingClass = 'gap-2.5 pl-3.5 pr-4'
+const bookSearchDelayMs = 220
 
 const bookColumns: ColumnDefinition<BookListItemDto>[] = [
   { id: 'title', label: 'Title', defaultVisible: true, sortBy: 'title', widthClass: 'w-72', render: (book) => <TitleCell book={book} /> },
@@ -123,6 +125,8 @@ export function BooksPage() {
     updateQuery,
   } = useBookListUrlState(searchParams, setSearchParams, { pageSizeStorageKey })
   const pageSize = getClosestPageSize(requestedPageSize, pageSizeOptions)
+  const debouncedRequestQuery = useDebouncedValue(requestQuery, bookSearchDelayMs)
+  const isWaitingForSearch = debouncedRequestQuery !== requestQuery
 
   useEffect(() => {
     if (pageSize !== requestedPageSize) {
@@ -133,8 +137,15 @@ export function BooksPage() {
   const visibleColumns = getVisibleColumns(bookColumns, columnPreferences)
   const visibleCardFields = getVisibleColumns(bookCardFields, cardFieldPreferences)
   const booksQuery = useQuery({
-    queryKey: ['books', skip, pageSize, requestQuery, sortBy, sortDirection],
-    queryFn: () => api.getBooks({ skip, take: pageSize, query: requestQuery, sortBy, sortDirection }),
+    queryKey: ['books', skip, pageSize, debouncedRequestQuery, sortBy, sortDirection],
+    queryFn: ({ signal }) => api.getBooks({
+      skip,
+      take: pageSize,
+      query: debouncedRequestQuery,
+      sortBy,
+      sortDirection,
+      signal,
+    }),
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
@@ -397,7 +408,7 @@ export function BooksPage() {
 
       <Surface className="min-w-0 overflow-hidden" id="book-list-results">
         <div className="flex flex-wrap items-center justify-end gap-2 border-b border-slate-200 px-4 py-3">
-          {(booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
+          {(isWaitingForSearch || booksQuery.isFetching || cycleSortMutation.isPending) && !booksQuery.isLoading ? (
             <span className="mr-auto text-xs font-medium text-slate-500">Searching...</span>
           ) : null}
           {viewMode === 'cards' ? <CardsPerRowControl value={cardsPerRow} onChange={setCardsPerRow} /> : null}

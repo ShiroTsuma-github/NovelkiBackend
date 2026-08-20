@@ -14,7 +14,7 @@ import {
   type BookSearchSuggestionItem,
 } from './bookSearchSyntax'
 
-const suggestionDelayMs = 150
+const suggestionDelayMs = 220
 const suggestionListId = 'book-search-suggestions'
 
 export function BookSearchInput({
@@ -59,11 +59,12 @@ export function BookSearchInput({
   const [debouncedField, debouncedSearch = '', debouncedScopeQuery = ''] = debouncedRequest.split('\u0000')
   const remoteSuggestions = useQuery({
     queryKey: ['book-search-suggestions', debouncedField, debouncedSearch, debouncedScopeQuery],
-    queryFn: () => api.getBookSearchSuggestions({
+    queryFn: ({ signal }) => api.getBookSearchSuggestions({
       field: debouncedField,
       search: debouncedSearch || undefined,
       query: debouncedScopeQuery || undefined,
       take: 10,
+      signal,
     }),
     enabled: open && remoteField != null && debouncedField === remoteField,
     staleTime: 30_000,

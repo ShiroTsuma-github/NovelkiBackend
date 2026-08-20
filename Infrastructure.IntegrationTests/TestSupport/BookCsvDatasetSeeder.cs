@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using Application.Common;
 using Domain.Associations;
 using Domain.Entities;
@@ -21,12 +22,17 @@ public static class BookCsvDatasetSeeder
 
     private static readonly string[] CsvRelativePaths =
         ["Sample/books-export.csv", "Infrastructure.IntegrationTests/Sample/books-export.csv"];
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public static async Task<BookCsvDatasetSnapshot> SeedAsync(
         ApplicationDbContext context,
         Guid ownerId,
         CancellationToken cancellationToken = default,
-        string? csvPath = null)
+        string? csvPath = null,
+        BookCsvSeedProfile profile = BookCsvSeedProfile.SyntheticBalanced)
     {
         var rows = ReadRows(csvPath).ToList();
         if (rows.Count == 0)
@@ -67,8 +73,12 @@ public static class BookCsvDatasetSeeder
         for (var index = 0; index < rows.Count; index++)
         {
             var row = rows[index];
-            var typeName = TypeNames[index % TypeNames.Length];
-            var statusName = StatusNames[index % StatusNames.Length];
+            var typeName = profile == BookCsvSeedProfile.PreserveSource
+                ? ResolveSourceName(row.ContentType, contentTypes, "Other")
+                : TypeNames[index % TypeNames.Length];
+            var statusName = profile == BookCsvSeedProfile.PreserveSource
+                ? ResolveSourceName(row.Status, statuses, "Unknown")
+                : StatusNames[index % StatusNames.Length];
             var title = MakeUniqueTitle(row.PrimaryTitle, ownerId, contentTypes[typeName].Id, usedKeys);
             var book = new Book
             {
@@ -84,6 +94,7 @@ public static class BookCsvDatasetSeeder
                 TotalChapters = row.TotalChapters,
                 Rating = row.Rating,
                 Priority = row.Priority,
+                Description = row.Description,
                 Notes = row.Notes,
                 Cover = new BookCover { Status = BookCoverStatus.Pending }
             };
@@ -96,7 +107,28 @@ public static class BookCsvDatasetSeeder
                 Source = "CsvTestDataset"
             });
 
-            foreach (var genreName in SelectGenres(row, genreNames, random))
+            var normalizedTitles = new HashSet<string>(StringComparer.Ordinal)
+            {
+                MappingExtensions.NormalizeName(title)
+            };
+            foreach (var alternativeTitle in row.AlternativeTitles)
+            {
+                var normalizedAlternativeTitle = MappingExtensions.NormalizeName(alternativeTitle);
+                if (!normalizedTitles.Add(normalizedAlternativeTitle))
+                {
+                    continue;
+                }
+
+                book.Titles.Add(new BookTitle
+                {
+                    Title = alternativeTitle,
+                    NormalizedTitle = normalizedAlternativeTitle,
+                    IsPrimary = false,
+                    Source = "CsvTestDataset"
+                });
+            }
+
+            foreach (var genreName in SelectGenres(row, genreNames, random, profile))
             {
                 book.BookGenres.Add(new BookGenre
                 {
@@ -109,7 +141,37 @@ public static class BookCsvDatasetSeeder
                 book.BookTags.Add(new BookTag { Book = book, Tag = tags[MappingExtensions.NormalizeName(tagName)] });
             }
 
-            if (row.CurrentChapterNumber != null || row.CurrentChapterLabel != null)
+            if (profile == BookCsvSeedProfile.PreserveSource)
+            {
+                foreach (var link in row.Links)
+                {
+                    book.Links.Add(new BookLink
+                    {
+                        Url = link.Url,
+                        Label = link.Label,
+                        SourceType = link.SourceType,
+                        IsPrimary = link.IsPrimary,
+                        LastReadHere = link.LastReadHere
+                    });
+                }
+
+                foreach (var progress in row.ProgressHistory)
+                {
+                    book.ProgressHistory.Add(new BookProgressHistory
+                    {
+                        ChangedAt = progress.ChangedAt,
+                        ChapterNumber = progress.ChapterNumber,
+                        ChapterLabel = progress.ChapterLabel,
+                        Comment = progress.Comment
+                    });
+                }
+
+                if (row.ProgressHistory.Count > 0)
+                {
+                    book.LastProgressUpdatedAt = row.ProgressHistory.Max(progress => progress.ChangedAt);
+                }
+            }
+            else if (row.CurrentChapterNumber != null || row.CurrentChapterLabel != null)
             {
                 book.ProgressHistory.Add(new BookProgressHistory
                 {
@@ -273,10 +335,21 @@ public static class BookCsvDatasetSeeder
         return authors;
     }
 
+    private static string ResolveSourceName<T>(string? sourceName, IReadOnlyDictionary<string, T> knownNames,
+        string fallback)
+    {
+        return sourceName != null && knownNames.ContainsKey(sourceName) ? sourceName : fallback;
+    }
+
     private static IReadOnlyCollection<string> SelectGenres(CsvBookRow row, IReadOnlyList<string> genreNames,
-        Random random)
+        Random random, BookCsvSeedProfile profile)
     {
         var selected = new HashSet<string>(row.Genres, StringComparer.OrdinalIgnoreCase);
+        if (profile == BookCsvSeedProfile.PreserveSource)
+        {
+            return selected;
+        }
+
         var targetCount = Math.Max(selected.Count, random.Next(1, Math.Min(3, genreNames.Count) + 1));
         while (selected.Count < targetCount)
         {
@@ -331,6 +404,8 @@ public static class BookCsvDatasetSeeder
             yield return new CsvBookRow(
                 title.Trim(),
                 TrimToNull(GetField(fields, headerIndexes, "author") ?? GetField(fields, headerIndexes, "authorName")),
+                TrimToNull(GetField(fields, headerIndexes, "contentType")),
+                TrimToNull(GetField(fields, headerIndexes, "status")),
                 TryDecimal(GetField(fields, headerIndexes, "currentChapterNumber")),
                 TrimToNull(GetField(fields, headerIndexes, "currentChapterLabel")),
                 TryDecimal(GetField(fields, headerIndexes, "totalChapters")),
@@ -338,7 +413,11 @@ public static class BookCsvDatasetSeeder
                 TryInt(GetField(fields, headerIndexes, "priority")),
                 SplitSemicolonList(GetField(fields, headerIndexes, "genres")),
                 SplitSemicolonList(GetField(fields, headerIndexes, "tags")),
-                TrimToNull(GetField(fields, headerIndexes, "notes")));
+                ParseAlternativeTitles(GetField(fields, headerIndexes, "alternativeTitles")),
+                TrimToNull(GetField(fields, headerIndexes, "description")),
+                TrimToNull(GetField(fields, headerIndexes, "notes")),
+                DeserializeJsonList<CsvBookLink>(GetField(fields, headerIndexes, "links")),
+                DeserializeJsonList<CsvBookProgressHistory>(GetField(fields, headerIndexes, "progressHistory")));
         }
     }
 
@@ -418,9 +497,63 @@ public static class BookCsvDatasetSeeder
                 .ToArray();
     }
 
+    private static IReadOnlyList<string> ParseAlternativeTitles(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(value);
+            if (document.RootElement.ValueKind != JsonValueKind.Array)
+            {
+                return [];
+            }
+
+            return document.RootElement
+                .EnumerateArray()
+                .Select(element => element.ValueKind switch
+                {
+                    JsonValueKind.String => element.GetString(),
+                    JsonValueKind.Object when element.TryGetProperty("title", out var title) => title.GetString(),
+                    JsonValueKind.Object when element.TryGetProperty("Title", out var title) => title.GetString(),
+                    _ => null
+                })
+                .Where(title => !string.IsNullOrWhiteSpace(title))
+                .Select(title => title!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    private static IReadOnlyList<T> DeserializeJsonList<T>(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<T>>(value, JsonOptions) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
     private sealed record CsvBookRow(
         string PrimaryTitle,
         string? Author,
+        string? ContentType,
+        string? Status,
         decimal? CurrentChapterNumber,
         string? CurrentChapterLabel,
         decimal? TotalChapters,
@@ -428,9 +561,32 @@ public static class BookCsvDatasetSeeder
         int? Priority,
         IReadOnlyList<string> Genres,
         IReadOnlyList<string> Tags,
-        string? Notes);
+        IReadOnlyList<string> AlternativeTitles,
+        string? Description,
+        string? Notes,
+        IReadOnlyList<CsvBookLink> Links,
+        IReadOnlyList<CsvBookProgressHistory> ProgressHistory);
+
+    private sealed record CsvBookLink(
+        string Url,
+        string? Label,
+        string SourceType,
+        bool IsPrimary,
+        bool LastReadHere);
+
+    private sealed record CsvBookProgressHistory(
+        DateTimeOffset ChangedAt,
+        decimal? ChapterNumber,
+        string? ChapterLabel,
+        string? Comment);
 
     private sealed record BookUniqueKey(Guid OwnerId, string NormalizedTitle, Guid ContentTypeId);
+}
+
+public enum BookCsvSeedProfile
+{
+    SyntheticBalanced,
+    PreserveSource
 }
 
 public sealed record BookCsvDatasetSnapshot(

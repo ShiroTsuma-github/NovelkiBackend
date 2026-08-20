@@ -31,7 +31,16 @@ public sealed class SearchSystemBenchmarkPostgreSqlTests(PostgreSqlFixture fixtu
         await using var context = fixture.CreateContext(ownerId);
         await AddUserAsync(context, ownerId);
         var csvPath = Environment.GetEnvironmentVariable("SEARCH_BENCHMARK_CSV");
-        var dataset = await BookCsvDatasetSeeder.SeedAsync(context, ownerId, csvPath: csvPath);
+        if (string.IsNullOrWhiteSpace(csvPath))
+        {
+            throw new InvalidOperationException(
+                "SEARCH_BENCHMARK_CSV must point to the local production-like CSV dataset for this system benchmark.");
+        }
+        var dataset = await BookCsvDatasetSeeder.SeedAsync(
+            context,
+            ownerId,
+            csvPath: csvPath,
+            profile: BookCsvSeedProfile.PreserveSource);
 
         var wildcardTarget = TestData.Book(ownerId, "Devil Sword King");
         context.Books.Add(wildcardTarget);
@@ -41,6 +50,7 @@ public sealed class SearchSystemBenchmarkPostgreSqlTests(PostgreSqlFixture fixtu
         var workload = CreateWorkload(dataset.Samples);
         var parallelism = GetParallelism();
         var durations = new ConcurrentBag<double>();
+        var durationsByKind = new ConcurrentDictionary<string, ConcurrentBag<double>>(StringComparer.Ordinal);
         var resultCount = 0;
         var elapsed = Stopwatch.StartNew();
 
@@ -63,7 +73,9 @@ public sealed class SearchSystemBenchmarkPostgreSqlTests(PostgreSqlFixture fixtu
                     null,
                     null,
                     cancellationToken);
-                durations.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+                var duration = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+                durations.Add(duration);
+                durationsByKind.GetOrAdd(item.Kind, _ => []).Add(duration);
                 Interlocked.Add(ref resultCount, result.Count);
             }
             catch (Exception exception)
@@ -77,10 +89,17 @@ public sealed class SearchSystemBenchmarkPostgreSqlTests(PostgreSqlFixture fixtu
 
         var ordered = durations.OrderBy(duration => duration).ToArray();
         var plans = await GetRepresentativePlansAsync(context, ownerId);
+        output.WriteLine($"Dataset: {csvPath}");
         output.WriteLine($"Search workload: {TotalOperations} backend operations across {dataset.BookCount} books, results: {resultCount}");
         output.WriteLine($"Parallelism: {parallelism}; wall-clock: {elapsed.Elapsed.TotalSeconds:F2} s; throughput: {TotalOperations / elapsed.Elapsed.TotalSeconds:F2} requests/s");
         output.WriteLine($"Query mix: {string.Join(", ", workload.GroupBy(item => item.Kind).OrderBy(group => group.Key).Select(group => $"{group.Key}={group.Count()}"))}");
         output.WriteLine($"p50: {Percentile(ordered, 0.50):F2} ms; p95: {Percentile(ordered, 0.95):F2} ms; p99: {Percentile(ordered, 0.99):F2} ms; aggregate: {durations.Sum():F2} ms");
+        foreach (var (kind, kindDurations) in durationsByKind.OrderBy(item => item.Key, StringComparer.Ordinal))
+        {
+            var orderedByKind = kindDurations.OrderBy(duration => duration).ToArray();
+            output.WriteLine($"{kind}: count={orderedByKind.Length}; p50={Percentile(orderedByKind, 0.50):F2} ms; " +
+                             $"p95={Percentile(orderedByKind, 0.95):F2} ms; p99={Percentile(orderedByKind, 0.99):F2} ms");
+        }
         foreach (var (name, plan) in plans)
         {
             output.WriteLine($"{name} EXPLAIN (ANALYZE, BUFFERS):{Environment.NewLine}{plan}");

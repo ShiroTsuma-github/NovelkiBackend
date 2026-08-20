@@ -61,46 +61,32 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
         int take,
         CancellationToken cancellationToken)
     {
-        var allBooks = GetOwnerBooks(ownerId)
-            .Where(book => book.Author != null);
-        var scopedBooks = GetScopedBooks(ownerId, criteria)
+        var scoped = criteria?.HasFilters == true;
+        var scopedBookIds = GetScopedBooks(ownerId, criteria).Select(book => book.Id);
+        var books = GetOwnerBooks(ownerId)
             .Where(book => book.Author != null);
         if (normalizedSearch.Length > 0)
         {
-            allBooks = allBooks.Where(book =>
-                book.Author!.NormalizedPrimaryName.Contains(normalizedSearch) ||
-                book.Author.Names.Any(name => name.NormalizedName.Contains(normalizedSearch)));
-            scopedBooks = scopedBooks.Where(book =>
+            books = books.Where(book =>
                 book.Author!.NormalizedPrimaryName.Contains(normalizedSearch) ||
                 book.Author.Names.Any(name => name.NormalizedName.Contains(normalizedSearch)));
         }
 
-        var allRows = allBooks
+        var rows = books
             .GroupBy(book => book.Author!.NormalizedPrimaryName)
             .Select(group => new SuggestionRow
             {
                 Key = group.Key,
                 Value = group.Min(book => book.Author!.PrimaryName)!,
-                Count = group.Select(book => book.Id).Distinct().Count(),
+                Count = scoped
+                    ? group.Where(book => scopedBookIds.Contains(book.Id)).Select(book => book.Id).Distinct().Count()
+                    : group.Select(book => book.Id).Distinct().Count(),
                 IsExact = normalizedSearch.Length > 0 &&
                           (group.Key == normalizedSearch ||
                            group.Any(book =>
                                book.Author!.Names.Any(name => name.NormalizedName == normalizedSearch)))
             });
-        var scopedRows = scopedBooks
-            .GroupBy(book => book.Author!.NormalizedPrimaryName)
-            .Select(group => new SuggestionRow
-            {
-                Key = group.Key,
-                Value = group.Min(book => book.Author!.PrimaryName)!,
-                Count = group.Select(book => book.Id).Distinct().Count(),
-                IsExact = normalizedSearch.Length > 0 &&
-                          (group.Key == normalizedSearch ||
-                           group.Any(book =>
-                               book.Author!.Names.Any(name => name.NormalizedName == normalizedSearch)))
-            });
-
-        return ExecuteAsync(allRows, scopedRows, criteria, take, cancellationToken);
+        return ExecuteAsync(rows, scoped, take, cancellationToken);
     }
 
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetTagSuggestionsAsync(
@@ -110,36 +96,27 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
         int take,
         CancellationToken cancellationToken)
     {
-        var allTags = GetOwnerBooks(ownerId)
-            .SelectMany(book => book.BookTags);
-        var scopedTags = GetScopedBooks(ownerId, criteria)
+        var scoped = criteria?.HasFilters == true;
+        var scopedBookIds = GetScopedBooks(ownerId, criteria).Select(book => book.Id);
+        var tags = GetOwnerBooks(ownerId)
             .SelectMany(book => book.BookTags);
         if (normalizedSearch.Length > 0)
         {
-            allTags = allTags.Where(bookTag => bookTag.Tag.NormalizedName.Contains(normalizedSearch));
-            scopedTags = scopedTags.Where(bookTag => bookTag.Tag.NormalizedName.Contains(normalizedSearch));
+            tags = tags.Where(bookTag => bookTag.Tag.NormalizedName.Contains(normalizedSearch));
         }
 
-        var allRows = allTags
+        var rows = tags
             .GroupBy(bookTag => bookTag.Tag.NormalizedName)
             .Select(group => new SuggestionRow
             {
                 Key = group.Key,
                 Value = group.Min(bookTag => bookTag.Tag.Name)!,
-                Count = group.Select(bookTag => bookTag.BookId).Distinct().Count(),
+                Count = scoped
+                    ? group.Where(bookTag => scopedBookIds.Contains(bookTag.BookId)).Select(bookTag => bookTag.BookId).Distinct().Count()
+                    : group.Select(bookTag => bookTag.BookId).Distinct().Count(),
                 IsExact = normalizedSearch.Length > 0 && group.Key == normalizedSearch
             });
-        var scopedRows = scopedTags
-            .GroupBy(bookTag => bookTag.Tag.NormalizedName)
-            .Select(group => new SuggestionRow
-            {
-                Key = group.Key,
-                Value = group.Min(bookTag => bookTag.Tag.Name)!,
-                Count = group.Select(bookTag => bookTag.BookId).Distinct().Count(),
-                IsExact = normalizedSearch.Length > 0 && group.Key == normalizedSearch
-            });
-
-        return ExecuteAsync(allRows, scopedRows, criteria, take, cancellationToken);
+        return ExecuteAsync(rows, scoped, take, cancellationToken);
     }
 
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetGenreSuggestionsAsync(
@@ -149,36 +126,27 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
         int take,
         CancellationToken cancellationToken)
     {
-        var allGenres = GetOwnerBooks(ownerId)
-            .SelectMany(book => book.BookGenres);
-        var scopedGenres = GetScopedBooks(ownerId, criteria)
+        var scoped = criteria?.HasFilters == true;
+        var scopedBookIds = GetScopedBooks(ownerId, criteria).Select(book => book.Id);
+        var genres = GetOwnerBooks(ownerId)
             .SelectMany(book => book.BookGenres);
         if (normalizedSearch.Length > 0)
         {
-            allGenres = allGenres.Where(bookGenre => bookGenre.Genre.NormalizedName.Contains(normalizedSearch));
-            scopedGenres = scopedGenres.Where(bookGenre => bookGenre.Genre.NormalizedName.Contains(normalizedSearch));
+            genres = genres.Where(bookGenre => bookGenre.Genre.NormalizedName.Contains(normalizedSearch));
         }
 
-        var allRows = allGenres
+        var rows = genres
             .GroupBy(bookGenre => bookGenre.Genre.NormalizedName)
             .Select(group => new SuggestionRow
             {
                 Key = group.Key,
                 Value = group.Min(bookGenre => bookGenre.Genre.Name)!,
-                Count = group.Select(bookGenre => bookGenre.BookId).Distinct().Count(),
+                Count = scoped
+                    ? group.Where(bookGenre => scopedBookIds.Contains(bookGenre.BookId)).Select(bookGenre => bookGenre.BookId).Distinct().Count()
+                    : group.Select(bookGenre => bookGenre.BookId).Distinct().Count(),
                 IsExact = normalizedSearch.Length > 0 && group.Key == normalizedSearch
             });
-        var scopedRows = scopedGenres
-            .GroupBy(bookGenre => bookGenre.Genre.NormalizedName)
-            .Select(group => new SuggestionRow
-            {
-                Key = group.Key,
-                Value = group.Min(bookGenre => bookGenre.Genre.Name)!,
-                Count = group.Select(bookGenre => bookGenre.BookId).Distinct().Count(),
-                IsExact = normalizedSearch.Length > 0 && group.Key == normalizedSearch
-            });
-
-        return ExecuteAsync(allRows, scopedRows, criteria, take, cancellationToken);
+        return ExecuteAsync(rows, scoped, take, cancellationToken);
     }
 
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetStatusSuggestionsAsync(
@@ -189,34 +157,26 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
         CancellationToken cancellationToken)
     {
         var normalizedSearch = search?.Trim().ToUpperInvariant() ?? string.Empty;
-        var allBooks = GetOwnerBooks(ownerId);
-        var scopedBooks = GetScopedBooks(ownerId, criteria);
+        var scoped = criteria?.HasFilters == true;
+        var scopedBookIds = GetScopedBooks(ownerId, criteria).Select(book => book.Id);
+        var books = GetOwnerBooks(ownerId);
         if (normalizedSearch.Length > 0)
         {
-            allBooks = allBooks.Where(book => book.Status.Name.ToUpper().Contains(normalizedSearch));
-            scopedBooks = scopedBooks.Where(book => book.Status.Name.ToUpper().Contains(normalizedSearch));
+            books = books.Where(book => book.Status.Name.ToUpper().Contains(normalizedSearch));
         }
 
-        var allRows = allBooks
+        var rows = books
             .GroupBy(book => new { book.StatusId, book.Status.Name })
             .Select(group => new SuggestionRow
             {
                 Key = group.Key.Name.ToUpper(),
                 Value = group.Key.Name,
-                Count = group.Count(),
+                Count = scoped
+                    ? group.Count(book => scopedBookIds.Contains(book.Id))
+                    : group.Count(),
                 IsExact = normalizedSearch.Length > 0 && group.Key.Name.ToUpper() == normalizedSearch
             });
-        var scopedRows = scopedBooks
-            .GroupBy(book => new { book.StatusId, book.Status.Name })
-            .Select(group => new SuggestionRow
-            {
-                Key = group.Key.Name.ToUpper(),
-                Value = group.Key.Name,
-                Count = group.Count(),
-                IsExact = normalizedSearch.Length > 0 && group.Key.Name.ToUpper() == normalizedSearch
-            });
-
-        return ExecuteAsync(allRows, scopedRows, criteria, take, cancellationToken);
+        return ExecuteAsync(rows, scoped, take, cancellationToken);
     }
 
     private Task<IReadOnlyCollection<BookSearchSuggestionDto>> GetTypeSuggestionsAsync(
@@ -227,34 +187,26 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
         CancellationToken cancellationToken)
     {
         var normalizedSearch = search?.Trim().ToUpperInvariant() ?? string.Empty;
-        var allBooks = GetOwnerBooks(ownerId);
-        var scopedBooks = GetScopedBooks(ownerId, criteria);
+        var scoped = criteria?.HasFilters == true;
+        var scopedBookIds = GetScopedBooks(ownerId, criteria).Select(book => book.Id);
+        var books = GetOwnerBooks(ownerId);
         if (normalizedSearch.Length > 0)
         {
-            allBooks = allBooks.Where(book => book.ContentType.Name.ToUpper().Contains(normalizedSearch));
-            scopedBooks = scopedBooks.Where(book => book.ContentType.Name.ToUpper().Contains(normalizedSearch));
+            books = books.Where(book => book.ContentType.Name.ToUpper().Contains(normalizedSearch));
         }
 
-        var allRows = allBooks
+        var rows = books
             .GroupBy(book => new { book.ContentTypeId, book.ContentType.Name })
             .Select(group => new SuggestionRow
             {
                 Key = group.Key.Name.ToUpper(),
                 Value = group.Key.Name,
-                Count = group.Count(),
+                Count = scoped
+                    ? group.Count(book => scopedBookIds.Contains(book.Id))
+                    : group.Count(),
                 IsExact = normalizedSearch.Length > 0 && group.Key.Name.ToUpper() == normalizedSearch
             });
-        var scopedRows = scopedBooks
-            .GroupBy(book => new { book.ContentTypeId, book.ContentType.Name })
-            .Select(group => new SuggestionRow
-            {
-                Key = group.Key.Name.ToUpper(),
-                Value = group.Key.Name,
-                Count = group.Count(),
-                IsExact = normalizedSearch.Length > 0 && group.Key.Name.ToUpper() == normalizedSearch
-            });
-
-        return ExecuteAsync(allRows, scopedRows, criteria, take, cancellationToken);
+        return ExecuteAsync(rows, scoped, take, cancellationToken);
     }
 
     private IQueryable<Book> GetOwnerBooks(Guid ownerId)
@@ -265,56 +217,23 @@ public sealed class BookSearchSuggestionQueryService : IBookSearchSuggestionQuer
     }
 
     private static async Task<IReadOnlyCollection<BookSearchSuggestionDto>> ExecuteAsync(
-        IQueryable<SuggestionRow> allRows,
         IQueryable<SuggestionRow> rows,
-        BookSearchCriteria? criteria,
+        bool scoped,
         int take,
         CancellationToken cancellationToken)
     {
-        if (criteria?.HasFilters != true)
-        {
-            return await rows
-                .OrderByDescending(row => row.IsExact)
-                .ThenByDescending(row => row.Count)
-                .ThenBy(row => row.Value)
-                .Take(take)
-                .Select(row => new BookSearchSuggestionDto(row.Value, row.Count, row.IsExact, true))
-                .ToListAsync(cancellationToken);
-        }
-
-        var availableRows = await rows
+        return await rows
             .OrderByDescending(row => row.IsExact)
+            .ThenByDescending(row => !scoped || row.Count > 0)
             .ThenByDescending(row => row.Count)
             .ThenBy(row => row.Value)
             .Take(take)
+            .Select(row => new BookSearchSuggestionDto(
+                row.Value,
+                row.Count,
+                row.IsExact,
+                !scoped || row.Count > 0))
             .ToListAsync(cancellationToken);
-        var allMatches = await allRows
-            .OrderByDescending(row => row.IsExact)
-            .ThenByDescending(row => row.Count)
-            .ThenBy(row => row.Value)
-            .Take(take)
-            .ToListAsync(cancellationToken);
-
-        var availableByKey = availableRows.ToDictionary(row => row.Key, StringComparer.OrdinalIgnoreCase);
-        return allMatches
-            .Select(row =>
-            {
-                var isAvailable = availableByKey.TryGetValue(row.Key, out var available);
-                return new BookSearchSuggestionDto(
-                    row.Value,
-                    isAvailable ? available!.Count : 0,
-                    row.IsExact || (isAvailable && available!.IsExact),
-                    isAvailable);
-            })
-            .Concat(availableRows
-                .Where(row => allMatches.All(match => !match.Key.Equals(row.Key, StringComparison.OrdinalIgnoreCase)))
-                .Select(row => new BookSearchSuggestionDto(row.Value, row.Count, row.IsExact, true)))
-            .OrderByDescending(row => row.IsExact)
-            .ThenByDescending(row => row.IsAvailable)
-            .ThenByDescending(row => row.Count)
-            .ThenBy(row => row.Value)
-            .Take(take)
-            .ToList();
     }
 
     private sealed class SuggestionRow

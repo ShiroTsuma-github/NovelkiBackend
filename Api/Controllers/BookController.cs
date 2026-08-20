@@ -58,14 +58,16 @@ public partial class BookController : ControllerBase
 
     [HttpGet]
     [Authorize]
-    public async Task<IActionResult> GetAll([FromQuery] GetAllBooksQuery getAllBooks)
+    public async Task<IActionResult> GetAll(
+        [FromQuery] GetAllBooksQuery getAllBooks,
+        CancellationToken cancellationToken)
     {
         using var activity = NovelkiTelemetry.ActivitySource.StartActivity("Book.Search", ActivityKind.Internal);
         activity?.SetTag(NovelkiTelemetryTags.BookQuery, getAllBooks.Query);
         activity?.SetTag(NovelkiTelemetryTags.BookSortBy, getAllBooks.SortBy);
         activity?.SetTag(NovelkiTelemetryTags.BookSortDirection, getAllBooks.SortDirection);
         NovelkiTelemetry.BookSearchRequests.Add(1);
-        var books = await _mediator.Send(getAllBooks);
+        var books = await _mediator.Send(getAllBooks, cancellationToken);
         activity?.SetTag(NovelkiTelemetryTags.BookResultCount, books.Data.Count);
 
         return Ok(books);
