@@ -468,7 +468,7 @@
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
+            "insertNulls": 300000,
             "lineInterpolation": "smooth",
             "lineWidth": 1.5,
             "pointSize": 5,
@@ -598,7 +598,7 @@
               "tooltip": false,
               "viz": false
             },
-            "insertNulls": false,
+            "insertNulls": 300000,
             "lineInterpolation": "linear",
             "lineWidth": 1.5,
             "pointSize": 5,
