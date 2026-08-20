@@ -80,10 +80,9 @@ public sealed class BookSearchCriteriaApplierTests
 
         if (postgres)
         {
-            Assert.Contains("\"SearchVector\" @@ plainto_tsquery", sql, StringComparison.Ordinal);
-            Assert.Contains("<%", sql, StringComparison.Ordinal);
             Assert.Contains("\"SearchDocument\"", sql, StringComparison.Ordinal);
-            Assert.Contains("book_search_has_close_lexeme", sql, StringComparison.Ordinal);
+            Assert.Contains("ILIKE", sql, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("plainto_tsquery", sql, StringComparison.Ordinal);
         }
         else
         {
@@ -475,7 +474,13 @@ public sealed class BookSearchCriteriaApplierTests
         var sql = Apply(context, criteria).ToQueryString();
 
         Assert.Contains("WHERE", sql, StringComparison.OrdinalIgnoreCase);
-        var column = field == BookSearchDateField.Created ? "Created" : "LastModified";
+        var column = field switch
+        {
+            BookSearchDateField.Created => "Created",
+            BookSearchDateField.LastModified => "LastModified",
+            BookSearchDateField.LastProgressUpdated => "LastProgressUpdatedAt",
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
         Assert.Contains(column, sql, StringComparison.Ordinal);
         AssertDateOperatorShape(sql, op);
     }
@@ -496,6 +501,15 @@ public sealed class BookSearchCriteriaApplierTests
         string[] expectedTitles)
     {
         await AssertDateResultsAsync(BookSearchDateField.LastModified, op, expectedTitles);
+    }
+
+    [Theory]
+    [MemberData(nameof(OperatorExpectedTitles))]
+    public async Task LastProgressUpdatedDateFilters_ShouldReturnExactResultsForEveryOperator(
+        BookSearchOperator op,
+        string[] expectedTitles)
+    {
+        await AssertDateResultsAsync(BookSearchDateField.LastProgressUpdated, op, expectedTitles);
     }
 
     [Fact]
@@ -852,8 +866,9 @@ public sealed class BookSearchCriteriaApplierTests
     {
         var created = field == BookSearchDateField.Created ? targetDate : unrelatedDate;
         var lastModified = field == BookSearchDateField.LastModified ? targetDate : unrelatedDate;
+        var lastProgressUpdated = field == BookSearchDateField.LastProgressUpdated ? targetDate : unrelatedDate;
         return context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET Created = {created}, LastModified = {lastModified} WHERE Id = {bookId}");
+            $"UPDATE Books SET Created = {created}, LastModified = {lastModified}, LastProgressUpdatedAt = {lastProgressUpdated} WHERE Id = {bookId}");
     }
 
     private static void AssertDateOperatorShape(string sql, BookSearchOperator op)

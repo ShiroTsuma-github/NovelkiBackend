@@ -104,10 +104,10 @@ public sealed class BookSortBuilder
                     : query.OrderBy(book => book.Created).ThenBy(book => book.PrimaryTitle);
             case BookSortFields.NormalizedLastModified:
                 return descending
-                    ? query.OrderByDescending(book => book.LastModified).ThenBy(book => book.PrimaryTitle)
-                    : query.OrderBy(book => book.LastModified).ThenBy(book => book.PrimaryTitle);
+                    ? query.OrderByDescending(book => book.LastProgressUpdatedAt).ThenBy(book => book.PrimaryTitle)
+                    : query.OrderBy(book => book.LastProgressUpdatedAt).ThenBy(book => book.PrimaryTitle);
             default:
-                return query.OrderByDescending(book => book.LastModified).ThenBy(book => book.PrimaryTitle);
+                return query.OrderByDescending(book => book.LastProgressUpdatedAt).ThenBy(book => book.PrimaryTitle);
         }
     }
 
@@ -144,8 +144,8 @@ public sealed class BookSortBuilder
                     ? books.OrderByDescending(book => book.Created).ThenBy(book => book.PrimaryTitle)
                     : books.OrderBy(book => book.Created).ThenBy(book => book.PrimaryTitle)
                 : descending
-                    ? books.OrderByDescending(book => book.LastModified).ThenBy(book => book.PrimaryTitle)
-                    : books.OrderBy(book => book.LastModified).ThenBy(book => book.PrimaryTitle);
+                    ? books.OrderByDescending(book => book.LastProgressUpdatedAt).ThenBy(book => book.PrimaryTitle)
+                    : books.OrderBy(book => book.LastProgressUpdatedAt).ThenBy(book => book.PrimaryTitle);
             return sorted.Skip(skip).Take(take).ToList();
         }
 

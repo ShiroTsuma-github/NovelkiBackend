@@ -19,6 +19,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<BookTitle> BookTitles { get; set; }
     public DbSet<BookLink> BookLinks { get; set; }
     public DbSet<BookProgressHistory> BookProgressHistory { get; set; }
+    public DbSet<ReadingTimeSetting> ReadingTimeSettings { get; set; }
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<Author> Authors { get; set; }
     public DbSet<AuthorName> AuthorNames { get; set; }
@@ -39,9 +40,16 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             switch (entry.State)
             {
                 case EntityState.Added:
-                    entry.Entity.Created = DateTimeOffset.UtcNow;
+                    var now = DateTimeOffset.UtcNow;
+                    entry.Entity.Created = now;
                     entry.Entity.CreatedBy = _user.Id;
-                    goto case EntityState.Modified;
+                    entry.Entity.LastModified = now;
+                    entry.Entity.LastModifiedBy = _user.Id;
+                    if (entry.Entity is Book book && book.LastProgressUpdatedAt == default)
+                    {
+                        book.LastProgressUpdatedAt = now;
+                    }
+                    break;
 
                 case EntityState.Modified:
                     entry.Entity.LastModified = DateTimeOffset.UtcNow;
@@ -66,6 +74,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         ConfigurePublicBooks(modelBuilder);
         ConfigureStorageCleanupQueue(modelBuilder);
         ConfigureBookSearchIndexQueue(modelBuilder);
+        ConfigureReadingTimeSettings(modelBuilder);
         if (Database.IsNpgsql())
         {
             ConfigureBookSearchFunctions(modelBuilder);
@@ -86,6 +95,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.HasIndex(b => new { b.OwnerId, b.Rating });
             entity.HasIndex(b => new { b.OwnerId, b.Priority });
             entity.HasIndex(b => new { b.OwnerId, b.Created });
+            entity.HasIndex(b => new { b.OwnerId, b.LastProgressUpdatedAt });
             entity.HasIndex(b => new { b.OwnerId, b.StatusId });
             entity.HasIndex(b => new { b.OwnerId, b.ContentTypeId });
 
@@ -299,6 +309,26 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
                 .HasForeignKey(t => t.OwnerId)
                 .OnDelete(DeleteBehavior.Cascade)
                 .IsRequired(false);
+        });
+    }
+
+    private static void ConfigureReadingTimeSettings(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ReadingTimeSetting>(entity =>
+        {
+            entity.HasIndex(setting => new { setting.UserId, setting.ContentTypeId }).IsUnique();
+            entity.Property(setting => setting.MinutesPerChapter).HasPrecision(6, 2);
+            entity.ToTable(table => table.HasCheckConstraint(
+                "CK_ReadingTimeSettings_MinutesPerChapter_Range",
+                "CAST(\"MinutesPerChapter\" AS REAL) >= 0 AND CAST(\"MinutesPerChapter\" AS REAL) <= 1440"));
+            entity.HasOne(setting => setting.ContentType)
+                .WithMany()
+                .HasForeignKey(setting => setting.ContentTypeId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<User>()
+                .WithMany()
+                .HasForeignKey(setting => setting.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 

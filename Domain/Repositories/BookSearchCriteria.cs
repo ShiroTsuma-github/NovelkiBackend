@@ -67,7 +67,8 @@ public enum BookSearchNumberField
 public enum BookSearchDateField
 {
     Created,
-    LastModified
+    LastModified,
+    LastProgressUpdated
 }
 
 public enum BookSearchMissingField

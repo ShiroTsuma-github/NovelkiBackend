@@ -54,7 +54,7 @@ public class RepositoryTests
     private static Task SetBookAuditDatesAsync(ApplicationDbContext context, Guid bookId, DateTimeOffset value)
     {
         return context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET Created = {value}, LastModified = {value} WHERE Id = {bookId}");
+            $"UPDATE Books SET Created = {value}, LastModified = {value}, LastProgressUpdatedAt = {value} WHERE Id = {bookId}");
     }
 
     private static Task SetBookAuditDatesAsync(ApplicationDbContext context, DateTimeOffset value, params Book[] books)
@@ -1343,7 +1343,7 @@ public class RepositoryTests
     }
 
     [Fact]
-    public async Task BookRepository_ShouldSortByLastModifiedDescendingByDefault()
+    public async Task BookRepository_ShouldSortByLastProgressUpdatedDescendingByDefault()
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
@@ -1352,9 +1352,9 @@ public class RepositoryTests
         var olderTimestamp = DateTimeOffset.Parse("2026-07-01T10:00:00+00:00");
         var newerTimestamp = DateTimeOffset.Parse("2026-07-02T10:00:00+00:00");
         await context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET LastModified = {olderTimestamp} WHERE OwnerId = {database.UserId}");
+            $"UPDATE Books SET LastProgressUpdatedAt = {olderTimestamp} WHERE OwnerId = {database.UserId}");
         await context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET LastModified = {newerTimestamp} WHERE Id = {newer.Id}");
+            $"UPDATE Books SET LastProgressUpdatedAt = {newerTimestamp} WHERE Id = {newer.Id}");
         context.ChangeTracker.Clear();
         var queryService = CreateReadQueryService(context);
 

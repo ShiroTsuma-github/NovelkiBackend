@@ -1,4 +1,6 @@
 import type { BookAnalyticsRelationCountDto } from '@/api/types'
+import { useState } from 'react'
+import { buttonVariants } from '@/components/app/DesignSystem'
 import { DrilldownLink, fieldQuery, formatCount, formatPercent } from './chartUtils'
 
 type TopRelationsChartProps = {
@@ -10,7 +12,8 @@ type TopRelationsChartProps = {
 const topLimit = 5
 
 export function TopRelationsChart({ field, items, title }: TopRelationsChartProps) {
-  const rows = toTopRelationRows(items)
+  const [showAll, setShowAll] = useState(false)
+  const rows = showAll ? toAllRelationRows(items) : toTopRelationRows(items)
 
   if (!items.length) {
     return <div className="grid min-h-56 place-items-center text-sm text-slate-500">No {title.toLowerCase()} data for this analytics scope.</div>
@@ -36,16 +39,32 @@ export function TopRelationsChart({ field, items, title }: TopRelationsChartProp
           </div>
         </div>
       ))}
+      {items.length > topLimit ? (
+        <button
+          aria-expanded={showAll}
+          className={`${buttonVariants.ghost} justify-self-start`}
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+        >
+          {showAll ? `Show top ${topLimit}` : `Show all ${items.length}`}
+        </button>
+      ) : null}
     </div>
   )
 }
 
 export function relationRows(items: BookAnalyticsRelationCountDto[]) {
-  return toTopRelationRows(items).map((item) => [
+  return toAllRelationRows(items).map((item) => [
     item.name,
     formatCount(item.bookCount),
     formatPercent(item.shareOfBooks),
   ])
+}
+
+function toAllRelationRows(items: BookAnalyticsRelationCountDto[]) {
+  return [...items]
+    .sort((left, right) => right.bookCount - left.bookCount || left.name.localeCompare(right.name))
+    .map((item) => ({ ...item, isOther: false }))
 }
 
 function toTopRelationRows(items: BookAnalyticsRelationCountDto[]) {

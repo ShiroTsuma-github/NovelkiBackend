@@ -1,6 +1,7 @@
 import pandas as pd
 import random
 import argparse
+from pathlib import Path
 
 def randomize_string(text):
     if not text or pd.isna(text):
@@ -88,7 +89,8 @@ def generate_queries(filepath, output_file, total_queries, general_search_count,
 
     print(f"\n--- Pomyślnie wygenerowano {total_queries} zapytań do pliku: {output_file} ---")
 
-if _name_ == "_main_":
+if __name__ == "__main__":
+    default_input = Path(__file__).with_name("books-export.csv")
     parser = argparse.ArgumentParser(description="Generator zapytań dla NovelkiBackend.")
     parser.add_argument("--count", type=int, default=20, help="Łączna liczba zapytań do wygenerowania")
     parser.add_argument("--general", type=int, default=5, help="Ilość zapytań zawierających General Search (<= count)")
@@ -106,4 +108,4 @@ if _name_ == "_main_":
         print("Błąd: Parametr --split musi składać się z liczb oddzielonych dwukropkiem (np. 50:30:20:10)")
         exit(1)
         
-    generate_queries('books-export.csv', args.output, args.count, args.general, split_weights)
+    generate_queries(default_input, args.output, args.count, args.general, split_weights)

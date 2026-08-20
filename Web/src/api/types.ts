@@ -67,6 +67,15 @@ export type BookDto = {
   links: BookLinkDto[]
 }
 
+export type ReadingTimeSettingDto = {
+  contentType: string
+  minutesPerChapter: number
+}
+
+export type UpdateReadingTimeSettingsRequest = {
+  settings: ReadingTimeSettingDto[]
+}
+
 export type PublicBookMetadataDto = {
   name: string
   description?: string | null

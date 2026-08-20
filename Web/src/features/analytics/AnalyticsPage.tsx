@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { addDays, format, isSameDay, parseISO, subMonths, subYears } from 'date-fns'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DayPicker, type DateRange } from 'react-day-picker'
@@ -39,6 +39,7 @@ export function AnalyticsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlFilters = useMemo(() => getAnalyticsFilters(searchParams), [searchParams])
   const [draftFilters, setDraftFilters] = useState(urlFilters)
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     setDraftFilters(urlFilters)
@@ -50,8 +51,20 @@ export function AnalyticsPage() {
     placeholderData: keepPreviousData,
     staleTime: 30_000,
   })
+  const readingTimeSettingsQuery = useQuery({
+    queryKey: ['reading-time-settings'],
+    queryFn: api.getReadingTimeSettings,
+    staleTime: 60_000,
+  })
+  const readingTimeSettingsMutation = useMutation({
+    mutationFn: api.updateReadingTimeSettings,
+    onSuccess: (settings) => queryClient.setQueryData(['reading-time-settings'], settings),
+  })
 
   const data = analyticsQuery.data
+  const readingTimeSettings = Object.fromEntries(
+    (readingTimeSettingsQuery.data ?? []).map((setting) => [setting.contentType, setting.minutesPerChapter]),
+  )
   const isInitialLoading = analyticsQuery.isLoading && !data
   const emptyMessage = getAnalyticsEmptyMessage(data, urlFilters.query)
 
@@ -239,15 +252,22 @@ export function AnalyticsPage() {
           isEmpty={!isInitialLoading && !(data?.progress.typeVolumes.length)}
           isError={analyticsQuery.isError && !!data}
           isLoading={isInitialLoading}
-          rows={estimatedReadingTimeRows(data)}
+          rows={estimatedReadingTimeRows(data, readingTimeSettings)}
           title="Estimated reading time"
           onRetry={() => analyticsQuery.refetch()}
         >
-          <EstimatedReadingTimeChart data={data} />
+          <EstimatedReadingTimeChart
+            data={data}
+            isSaving={readingTimeSettingsMutation.isPending}
+            settings={readingTimeSettings}
+            onSave={(settings) => readingTimeSettingsMutation.mutateAsync({
+              settings: Object.entries(settings).map(([contentType, minutesPerChapter]) => ({ contentType, minutesPerChapter })),
+            })}
+          />
         </AnalyticsChartCard>
         <AnalyticsChartCard
-          columns={['Date', 'Progress events', 'Books touched', 'Chapters advanced']}
-          description="Track recent progress events and touched books in the selected range."
+          columns={['Date', 'Daily chapters', 'Cumulative chapters', 'Progress events', 'Books touched']}
+          description="Compare daily chapter progress with the cumulative reading total in the selected range."
           emptyMessage="No reading activity in this time range."
           isEmpty={!isInitialLoading && !(data?.activity.points.length)}
           isError={analyticsQuery.isError && !!data}

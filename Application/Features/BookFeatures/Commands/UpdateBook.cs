@@ -127,6 +127,11 @@ public class UpdateBookHandler : IRequestHandler<UpdateBookCommand>
             }
             : null;
 
+        if (progressChanged)
+        {
+            book.LastProgressUpdatedAt = DateTimeOffset.UtcNow;
+        }
+
         await _bookRepository.ReplaceEditableCollectionsAsync(book.Id, titles, links, genreIds, tagIds, progressHistory,
             cancellationToken);
 

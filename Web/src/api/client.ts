@@ -34,6 +34,8 @@ import type {
   CreateTagRequest,
   CopyPublicBookResult,
   PublicBookSnapshotDto,
+  ReadingTimeSettingDto,
+  UpdateReadingTimeSettingsRequest,
 } from './types'
 
 export const api = {
@@ -59,6 +61,10 @@ export const api = {
       body: request,
       token: null,
     }),
+  getReadingTimeSettings: () =>
+    apiRequest<ReadingTimeSettingDto[]>('/account/reading-time-settings'),
+  updateReadingTimeSettings: (request: UpdateReadingTimeSettingsRequest) =>
+    apiRequest<ReadingTimeSettingDto[]>('/account/reading-time-settings', { method: 'PUT', body: request }),
   getBooks: (params: { skip?: number; take?: number; query?: string; sortBy?: string; sortDirection?: string; advanceCycle?: boolean }) =>
     apiRequest<PaginatedResult<BookListItemDto>>(`/book${toQueryString(withFilteredQuery(params))}`),
   getManagedBooks: (params: { skip?: number; take?: number; query?: string }) =>

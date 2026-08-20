@@ -2,6 +2,9 @@ namespace Application.Common;
 
 using System.Globalization;
 using Domain.Repositories;
+using Pidgin;
+using static Pidgin.Parser;
+using static Pidgin.Parser<char>;
 
 public static class BookSearchQueryParser
 {
@@ -39,10 +42,11 @@ public static class BookSearchQueryParser
         ["createDate"] = BookSearchDateField.Created,
         ["created"] = BookSearchDateField.Created,
         ["createdDate"] = BookSearchDateField.Created,
-        ["updateDate"] = BookSearchDateField.LastModified,
-        ["updated"] = BookSearchDateField.LastModified,
-        ["updatedDate"] = BookSearchDateField.LastModified,
-        ["lastModified"] = BookSearchDateField.LastModified
+        ["updateDate"] = BookSearchDateField.LastProgressUpdated,
+        ["updated"] = BookSearchDateField.LastProgressUpdated,
+        ["updatedDate"] = BookSearchDateField.LastProgressUpdated,
+        ["lastModified"] = BookSearchDateField.LastModified,
+        ["modified"] = BookSearchDateField.LastModified
     };
 
     private static readonly Dictionary<string, BookSearchMissingField> MissingAliases =
@@ -78,6 +82,8 @@ public static class BookSearchQueryParser
         "d/M/yyyy"
     ];
 
+    private static readonly Parser<char, IReadOnlyList<string>> QueryTokens = CreateQueryTokens();
+
     public static BookSearchCriteria Parse(string? query)
     {
         if (string.IsNullOrWhiteSpace(query))
@@ -94,7 +100,7 @@ public static class BookSearchQueryParser
         var missing = new List<BookSearchMissingFilter>();
         var exclusions = new List<BookSearchCriteria>();
 
-        foreach (var rawToken in Tokenize(query))
+        foreach (var rawToken in QueryTokens.ParseOrThrow(query))
         {
             var isExcluded = rawToken.Length > 1 && rawToken[0] == '-';
             var token = isExcluded ? rawToken[1..] : rawToken;
@@ -366,69 +372,57 @@ public static class BookSearchQueryParser
         };
     }
 
-    private static IEnumerable<string> Tokenize(string query)
+    private static Parser<char, IReadOnlyList<string>> CreateQueryTokens()
     {
-        var token = new List<char>();
-        char? quote = null;
+        var doubleQuoted = Char('"')
+            .Then(AnyCharExcept('"').ManyString())
+            .Before(Char('"').Optional());
+        var singleQuoted = Char('\'')
+            .Then(AnyCharExcept('\'').ManyString())
+            .Before(Char('\'').Optional());
+        var bare = Token(character => !char.IsWhiteSpace(character) && character is not '"' and not '\'')
+            .AtLeastOnceString();
+        var token = doubleQuoted.Or(singleQuoted).Or(bare).AtLeastOnceString();
 
-        foreach (var c in query)
+        return SkipWhitespaces
+            .Then(token.SeparatedAtLeastOnce(Whitespace.AtLeastOnce()))
+            .Before(SkipWhitespaces)
+            .Before(End)
+            .Select(CoalesceFieldValueTokens);
+    }
+
+    private static IReadOnlyList<string> CoalesceFieldValueTokens(IEnumerable<string> rawTokens)
+    {
+        var tokens = new List<string>();
+        string? current = null;
+        foreach (var rawToken in rawTokens)
         {
-            if (c is '"' or '\'')
+            var token = rawToken.Trim();
+            if (current != null && ShouldContinueFieldValueList(current))
             {
-                if (quote == c)
-                {
-                    quote = null;
-                    continue;
-                }
-
-                if (quote == null)
-                {
-                    quote = c;
-                    continue;
-                }
-            }
-
-            if (char.IsWhiteSpace(c) && quote == null)
-            {
-                if (ShouldContinueFieldValueList(token))
-                {
-                    continue;
-                }
-
-                if (token.Count > 0)
-                {
-                    yield return new string(token.ToArray()).Trim();
-                    token.Clear();
-                }
-
+                current += token;
                 continue;
             }
 
-            token.Add(c);
+            if (current != null)
+            {
+                tokens.Add(current);
+            }
+
+            current = token;
         }
 
-        if (token.Count > 0)
+        if (current != null)
         {
-            yield return new string(token.ToArray()).Trim();
+            tokens.Add(current);
         }
+
+        return tokens;
     }
 
-    private static bool ShouldContinueFieldValueList(List<char> token)
+    private static bool ShouldContinueFieldValueList(string token)
     {
-        if (token.Count == 0 || !token.Contains(':'))
-        {
-            return false;
-        }
-
-        for (var i = token.Count - 1; i >= 0; i--)
-        {
-            if (!char.IsWhiteSpace(token[i]))
-            {
-                return token[i] == ',';
-            }
-        }
-
-        return false;
+        return token.Contains(':') && token.AsSpan().TrimEnd().EndsWith(",", StringComparison.Ordinal);
     }
 
     private static IEnumerable<string> SplitFieldValues(string value)

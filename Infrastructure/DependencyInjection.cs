@@ -68,6 +68,7 @@ public static class DependencyInjection
         builder.Services.AddScoped<ITypeRepository, TypeRepository>();
         builder.Services.AddScoped<ITagRepository, TagRepository>();
         builder.Services.AddScoped<IBookCoverRepository, BookCoverRepository>();
+        builder.Services.AddScoped<IReadingTimeSettingRepository, ReadingTimeSettingRepository>();
         builder.Services.AddScoped<BookListCache>();
         builder.Services.AddScoped<IBookListCache>(provider => provider.GetRequiredService<BookListCache>());
         builder.Services.AddScoped<IBookListCacheInvalidator>(provider => provider.GetRequiredService<BookListCache>());

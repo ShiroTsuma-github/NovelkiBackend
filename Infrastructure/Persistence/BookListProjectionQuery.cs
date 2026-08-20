@@ -134,11 +134,14 @@ public sealed class BookListProjectionQuery
     private static IQueryable<BookListProjection> ProjectBooks(IQueryable<Book> query)
     {
         return query
+            // The list DTO contains several collection projections. Keeping them in one SQL statement
+            // multiplies rows for broadly matching genre/tag searches before the page can be materialized.
+            .AsSplitQuery()
             .Select(book => new BookListProjection
             {
                 Id = book.Id,
                 Created = book.Created,
-                LastModified = book.LastModified,
+                LastModified = book.LastProgressUpdatedAt,
                 OwnerId = book.OwnerId,
                 PrimaryTitle = book.PrimaryTitle,
                 Description = book.Description,
@@ -166,20 +169,20 @@ public sealed class BookListProjectionQuery
                 Notes = book.Notes,
                 Genres = book.BookGenres
                     .OrderBy(bookGenre => bookGenre.Genre.Name)
-                    .Select(bookGenre => bookGenre.Genre.Name)
-                    .ToList(),
-                GenreDescriptions = book.BookGenres
-                    .OrderBy(bookGenre => bookGenre.Genre.Name)
-                    .Select(bookGenre => bookGenre.Genre.Description)
+                    .Select(bookGenre => new BookListRelationProjection
+                    {
+                        Name = bookGenre.Genre.Name,
+                        Description = bookGenre.Genre.Description
+                    })
                     .ToList(),
                 GenresCount = book.BookGenres.Count(),
                 Tags = book.BookTags
                     .OrderBy(bookTag => bookTag.Tag.Name)
-                    .Select(bookTag => bookTag.Tag.Name)
-                    .ToList(),
-                TagDescriptions = book.BookTags
-                    .OrderBy(bookTag => bookTag.Tag.Name)
-                    .Select(bookTag => bookTag.Tag.Description)
+                    .Select(bookTag => new BookListRelationProjection
+                    {
+                        Name = bookTag.Tag.Name,
+                        Description = bookTag.Tag.Description
+                    })
                     .ToList(),
                 TagsCount = book.BookTags.Count(),
                 LinksCount = book.Links.Count(),

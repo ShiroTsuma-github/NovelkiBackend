@@ -24,6 +24,7 @@ public class Book : BaseAuditableEntity
     public decimal? TotalChapters { get; set; }
     public decimal? CurrentChapterNumber { get; set; }
     public string? CurrentChapterLabel { get; set; }
+    public DateTimeOffset LastProgressUpdatedAt { get; set; }
     public string? Notes { get; set; }
     public string? RawImportedLine { get; set; }
     public int? Priority { get; set; }

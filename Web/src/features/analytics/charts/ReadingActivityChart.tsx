@@ -24,14 +24,15 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
         <ResponsiveContainer>
           <LineChart data={chartPoints}>
             <XAxis dataKey="date" tickLine={false} />
-            <YAxis allowDecimals={false} tickLine={false} />
+            <YAxis allowDecimals={false} tickLine={false} yAxisId="daily" />
+            <YAxis allowDecimals={false} orientation="right" tickLine={false} yAxisId="cumulative" />
             <Tooltip
               {...analyticsTooltipProps}
               formatter={(value, name) => [`${formatCount(Number(value))}`, activityLabel(name)]}
               labelFormatter={(label) => `Bucket ${label}`}
             />
-            <Line dataKey="progressEvents" name="progressEvents" stroke="#8b92d8" strokeWidth={2} dot={{ r: 3 }} />
-            <Line dataKey="booksTouched" name="booksTouched" stroke="#75b69c" strokeWidth={2} dot={{ r: 3 }} />
+            <Line dataKey="dailyChapters" name="dailyChapters" stroke="#75b69c" strokeWidth={2} yAxisId="daily" dot={{ r: 3 }} />
+            <Line dataKey="cumulativeChapters" name="cumulativeChapters" stroke="#8b92d8" strokeWidth={2} yAxisId="cumulative" dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>
@@ -44,7 +45,9 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
                 {formatCount(point.progressEvents)} events · {formatCount(point.booksTouched)} books touched
               </span>
             </div>
-            <div className="mt-1 text-slate-600">Chapters advanced: {formatCount(point.chaptersAdvanced)}</div>
+            <div className="mt-1 text-slate-600">
+              Daily: {formatCount(point.dailyChapters)} chapters. Cumulative: {formatCount(point.cumulativeChapters)} chapters.
+            </div>
           </Surface>
         ))}
       </div>
@@ -55,26 +58,42 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
 export function readingActivityRows(data?: BookAnalyticsDto) {
   return compactActivityPoints(data?.activity.points ?? [], data?.scope.bucket ?? 'day').map((point) => [
     point.label,
+    formatCount(point.dailyChapters),
+    formatCount(point.cumulativeChapters),
     formatCount(point.progressEvents),
     formatCount(point.booksTouched),
-    formatCount(point.chaptersAdvanced),
   ])
 }
 
 export function readingActivityChartPoints(points: BookAnalyticsActivityPointDto[], bucket: string) {
+  let cumulativeChapters = 0
   return points.map((point) => {
     const period = dateRangeForBucket(point.date, bucket)
-    return { ...point, label: formatDateRange(period.start, period.end), endExclusive: period.end }
+    const dailyChapters = point.chaptersAdvanced
+    cumulativeChapters += dailyChapters
+    return {
+      ...point,
+      dailyChapters,
+      cumulativeChapters,
+      label: formatDateRange(period.start, period.end),
+      endExclusive: period.end,
+    }
   })
 }
 
 function compactActivityPoints(points: BookAnalyticsActivityPointDto[], bucket: string) {
-  return readingActivityChartPoints(points, bucket).reduce<Array<BookAnalyticsActivityPointDto & { label: string; endExclusive: string }>>((rows, point) => {
-    const isEmpty = point.progressEvents === 0 && point.booksTouched === 0 && point.chaptersAdvanced === 0
+  return readingActivityChartPoints(points, bucket).reduce<Array<BookAnalyticsActivityPointDto & {
+    dailyChapters: number
+    cumulativeChapters: number
+    label: string
+    endExclusive: string
+  }>>((rows, point) => {
+    const isEmpty = point.progressEvents === 0 && point.booksTouched === 0 && point.dailyChapters === 0
     const previous = rows.at(-1)
-    if (isEmpty && previous && previous.progressEvents === 0 && previous.booksTouched === 0 && previous.chaptersAdvanced === 0) {
+    if (isEmpty && previous && previous.progressEvents === 0 && previous.booksTouched === 0 && previous.dailyChapters === 0) {
       previous.endExclusive = point.endExclusive
       previous.label = formatDateRange(previous.date, previous.endExclusive)
+      previous.cumulativeChapters = point.cumulativeChapters
       return rows
     }
 
@@ -84,11 +103,11 @@ function compactActivityPoints(points: BookAnalyticsActivityPointDto[], bucket: 
 }
 
 function activityLabel(name: unknown) {
-  if (name === 'progressEvents') {
-    return 'Progress events'
+  if (name === 'dailyChapters') {
+    return 'Daily chapters advanced'
   }
-  if (name === 'booksTouched') {
-    return 'Books touched'
+  if (name === 'cumulativeChapters') {
+    return 'Cumulative chapters advanced'
   }
   return String(name)
 }

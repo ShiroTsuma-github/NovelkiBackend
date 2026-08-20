@@ -93,7 +93,8 @@ public sealed class NormalizedNameMigrationPostgreSqlTests(PostgreSqlFixture fix
         await context.Database.ExecuteSqlRawAsync("""
             ALTER TABLE "Books"
             ADD COLUMN "SearchDocument" text NOT NULL DEFAULT '',
-            ADD COLUMN "SearchVector" tsvector NOT NULL DEFAULT ''::tsvector;
+            ADD COLUMN "SearchVector" tsvector NOT NULL DEFAULT ''::tsvector,
+            ADD COLUMN "LastProgressUpdatedAt" timestamp with time zone NOT NULL DEFAULT now();
             """);
         var user = new User
         {
@@ -157,7 +158,8 @@ public sealed class NormalizedNameMigrationPostgreSqlTests(PostgreSqlFixture fix
         await context.Database.ExecuteSqlRawAsync("""
             ALTER TABLE "Books"
             DROP COLUMN "SearchDocument",
-            DROP COLUMN "SearchVector";
+            DROP COLUMN "SearchVector",
+            DROP COLUMN "LastProgressUpdatedAt";
             """);
     }
 

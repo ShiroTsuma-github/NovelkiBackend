@@ -4,18 +4,24 @@ import type { BookAnalyticsDto } from '@/api/types'
 import { buttonVariants, Surface } from '@/components/app/DesignSystem'
 import { inputClass } from '@/components/app/FormField'
 import { formatChapterCount } from '@/features/books/BooksPage'
-import { readReadingTimeSettings, writeReadingTimeSettings } from '../readingTimeSettings'
 import { formatCount } from './chartUtils'
 
 type EstimatedReadingTimeChartProps = {
   data: BookAnalyticsDto | undefined
+  settings: Record<string, number>
+  isSaving?: boolean
+  onSave: (settings: Record<string, number>) => Promise<unknown>
 }
 
-export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartProps) {
+export function EstimatedReadingTimeChart({ data, settings, isSaving = false, onSave }: EstimatedReadingTimeChartProps) {
   const items = data?.progress.typeVolumes ?? []
-  const [minutesPerType, setMinutesPerType] = useState<Record<string, number>>(() => readReadingTimeSettings())
+  const minutesPerType = useMemo(() => getMinutesByType(items, settings), [items, settings])
+  const [draftMinutesPerType, setDraftMinutesPerType] = useState<Record<string, number>>({})
   const [isEditing, setIsEditing] = useState(false)
-  const estimates = useMemo(() => getEstimatedReadingRows(items, minutesPerType), [items, minutesPerType])
+  const estimates = useMemo(
+    () => getEstimatedReadingRows(items, isEditing ? draftMinutesPerType : minutesPerType),
+    [draftMinutesPerType, isEditing, items, minutesPerType],
+  )
   const totalHours = estimates.reduce((sum, item) => sum + item.hours, 0)
 
   if (!items.length) {
@@ -34,7 +40,17 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
             aria-pressed={isEditing}
             className={buttonVariants.secondary}
             type="button"
-            onClick={() => setIsEditing((current) => !current)}
+            disabled={isSaving}
+            onClick={async () => {
+              if (isEditing) {
+                await onSave(draftMinutesPerType)
+                setIsEditing(false)
+                return
+              }
+
+              setDraftMinutesPerType(minutesPerType)
+              setIsEditing(true)
+            }}
           >
             {isEditing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
             {isEditing ? 'Done' : 'Edit estimates'}
@@ -62,11 +78,7 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
                   value={item.minutesPerChapter}
                   onChange={(event) => {
                     const nextValue = normalizeMinutes(Number(event.target.value))
-                    setMinutesPerType((current) => {
-                      const updated = { ...current, [item.type]: nextValue }
-                      writeReadingTimeSettings(updated)
-                      return updated
-                    })
+                    setDraftMinutesPerType((current) => ({ ...current, [item.type]: nextValue }))
                   }}
                 />
                 <span className="text-sm text-slate-600">minutes per chapter</span>
@@ -81,13 +93,20 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
   )
 }
 
-export function estimatedReadingTimeRows(data?: BookAnalyticsDto, settings: Record<string, number> = readReadingTimeSettings()) {
+export function estimatedReadingTimeRows(data?: BookAnalyticsDto, settings: Record<string, number> = {}) {
   return getEstimatedReadingRows(data?.progress.typeVolumes ?? [], settings).map((item) => [
     item.type,
     formatChapterCount(item.currentChapters),
     formatCount(item.minutesPerChapter),
     formatHours(item.hours),
   ])
+}
+
+function getMinutesByType(
+  items: NonNullable<BookAnalyticsDto['progress']>['typeVolumes'],
+  settings: Record<string, number>,
+) {
+  return Object.fromEntries(items.map((item) => [item.type, normalizeMinutes(settings[item.type] ?? 5)]))
 }
 
 function getEstimatedReadingRows(items: NonNullable<BookAnalyticsDto['progress']>['typeVolumes'], settings: Record<string, number>) {

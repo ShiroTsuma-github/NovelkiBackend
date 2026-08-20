@@ -74,6 +74,12 @@ public sealed class BookSearchCriteriaApplier
     private static Expression<Func<Book, bool>> BuildPostgresGeneralTextPredicate(string search)
     {
         var term = search.Trim().ToLowerInvariant();
+        if (term.Contains('*'))
+        {
+            var pattern = $"%{EscapeLike(term).Replace("*", "%", StringComparison.Ordinal)}%";
+            return book => EF.Functions.ILike(book.SearchDocument, pattern, @"\");
+        }
+
         if (term.Length < 3)
         {
             var pattern = $"%{EscapeLike(term)}%";
@@ -139,6 +145,8 @@ public sealed class BookSearchCriteriaApplier
                 _dateSearch.Match<Book>(book => book.Created, filter.Operator, filter.Value),
             BookSearchDateField.LastModified =>
                 _dateSearch.Match<Book>(book => book.LastModified, filter.Operator, filter.Value),
+            BookSearchDateField.LastProgressUpdated =>
+                _dateSearch.Match<Book>(book => book.LastProgressUpdatedAt, filter.Operator, filter.Value),
             _ => null
         };
     }

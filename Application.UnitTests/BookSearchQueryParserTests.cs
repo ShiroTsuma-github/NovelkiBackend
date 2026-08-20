@@ -211,7 +211,7 @@ public class BookSearchQueryParserTests
         16)]
     [InlineData("createDate:>=15.07.2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2026, 7,
         15)]
-    [InlineData("updateDate:<15/07/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 15)]
+    [InlineData("updateDate:<15/07/2026", BookSearchDateField.LastProgressUpdated, BookSearchOperator.LessThan, 2026, 7, 15)]
     [InlineData("lastModified:<=5/7/2026", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 7, 6)]
     public void Parse_ShouldReadDateFiltersWithSupportedDateFormats(
         string query,
@@ -233,8 +233,8 @@ public class BookSearchQueryParserTests
     [Theory]
     [InlineData("createdDate:=5.7.2026", BookSearchDateField.Created, 2026, 7, 5, 2026, 7, 6)]
     [InlineData("created:=2026", BookSearchDateField.Created, 2026, 1, 1, 2027, 1, 1)]
-    [InlineData("updateDate:=07.2026", BookSearchDateField.LastModified, 2026, 7, 1, 2026, 8, 1)]
-    [InlineData("updated:=2026-07", BookSearchDateField.LastModified, 2026, 7, 1, 2026, 8, 1)]
+    [InlineData("updateDate:=07.2026", BookSearchDateField.LastProgressUpdated, 2026, 7, 1, 2026, 8, 1)]
+    [InlineData("updated:=2026-07", BookSearchDateField.LastProgressUpdated, 2026, 7, 1, 2026, 8, 1)]
     public void Parse_ShouldExpandEqualDateFiltersToDateRanges(
         string query,
         BookSearchDateField expectedField,
@@ -266,7 +266,7 @@ public class BookSearchQueryParserTests
 
     [Theory]
     [InlineData("created:>2026", BookSearchDateField.Created, BookSearchOperator.GreaterThanOrEqual, 2027, 1, 1)]
-    [InlineData("updated:<=2026-07", BookSearchDateField.LastModified, BookSearchOperator.LessThan, 2026, 8, 1)]
+    [InlineData("updated:<=2026-07", BookSearchDateField.LastProgressUpdated, BookSearchOperator.LessThan, 2026, 8, 1)]
     public void Parse_ShouldReadPartialDateFiltersWithRangeOperators(
         string query,
         BookSearchDateField expectedField,

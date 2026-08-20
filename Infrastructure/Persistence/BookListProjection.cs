@@ -22,11 +22,9 @@ internal sealed class BookListProjection
     public int? Rating { get; init; }
     public int? Priority { get; init; }
     public string? Notes { get; init; }
-    public required List<string> Genres { get; init; }
-    public required List<string?> GenreDescriptions { get; init; }
+    public required List<BookListRelationProjection> Genres { get; init; }
     public int GenresCount { get; init; }
-    public required List<string> Tags { get; init; }
-    public required List<string?> TagDescriptions { get; init; }
+    public required List<BookListRelationProjection> Tags { get; init; }
     public int TagsCount { get; init; }
     public int LinksCount { get; init; }
     public BookCoverStatus? CoverStatus { get; init; }
@@ -37,6 +35,12 @@ internal sealed class BookListProjection
     public DateTimeOffset? CoverCreated { get; init; }
     public bool HasCoverStoragePath { get; init; }
     public bool HasCoverThumbnailStoragePath { get; init; }
+}
+
+internal sealed class BookListRelationProjection
+{
+    public required string Name { get; init; }
+    public string? Description { get; init; }
 }
 
 internal sealed class BookOwnerProjection
@@ -124,15 +128,13 @@ internal static class BookListProjectionMapper
         destination.Rating = projection.Rating;
         destination.Priority = projection.Priority;
         destination.Notes = projection.Notes;
-        destination.Genres = projection.Genres;
+        destination.Genres = projection.Genres.Select(genre => genre.Name).ToList();
         destination.GenreDescriptions = projection.Genres
-            .Zip(projection.GenreDescriptions)
-            .ToDictionary(item => item.First, item => item.Second);
+            .ToDictionary(genre => genre.Name, genre => genre.Description);
         destination.GenresCount = projection.GenresCount;
-        destination.Tags = projection.Tags;
+        destination.Tags = projection.Tags.Select(tag => tag.Name).ToList();
         destination.TagDescriptions = projection.Tags
-            .Zip(projection.TagDescriptions)
-            .ToDictionary(item => item.First, item => item.Second);
+            .ToDictionary(tag => tag.Name, tag => tag.Description);
         destination.TagsCount = projection.TagsCount;
         destination.LinksCount = projection.LinksCount;
         destination.Cover = MapCoverProjection(projection);

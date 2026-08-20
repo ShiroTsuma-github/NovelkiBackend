@@ -98,16 +98,16 @@ public class BookSortBuilderTests
     }
 
     [Fact]
-    public async Task ToSortedPageAsync_ShouldFallbackToLastModifiedForUnknownSort()
+    public async Task ToSortedPageAsync_ShouldFallbackToLastProgressUpdatedForUnknownSort()
     {
         using var database = new SqliteTestDatabase();
         await using var context = database.CreateContext();
         var older = await TestData.AddBookAsync(context, database.UserId, "Older");
         var newer = await TestData.AddBookAsync(context, database.UserId, "Newer");
         await context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET LastModified = {DateTimeOffset.Parse("2026-01-01T00:00:00+00:00")} WHERE Id = {older.Id}");
+            $"UPDATE Books SET LastProgressUpdatedAt = {DateTimeOffset.Parse("2026-01-01T00:00:00+00:00")} WHERE Id = {older.Id}");
         await context.Database.ExecuteSqlInterpolatedAsync(
-            $"UPDATE Books SET LastModified = {DateTimeOffset.Parse("2026-01-02T00:00:00+00:00")} WHERE Id = {newer.Id}");
+            $"UPDATE Books SET LastProgressUpdatedAt = {DateTimeOffset.Parse("2026-01-02T00:00:00+00:00")} WHERE Id = {newer.Id}");
         context.ChangeTracker.Clear();
         var sortBuilder = new BookSortBuilder(context);
 

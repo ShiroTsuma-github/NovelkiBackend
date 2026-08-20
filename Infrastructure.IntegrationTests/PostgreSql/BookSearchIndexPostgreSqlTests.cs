@@ -90,6 +90,25 @@ public sealed class BookSearchIndexPostgreSqlTests(PostgreSqlFixture fixture)
     }
 
     [Fact]
+    public async Task GeneralSearch_WildcardShouldMatchTermsAcrossWords()
+    {
+        await fixture.ResetDatabaseAsync();
+        var ownerId = Guid.NewGuid();
+        await using var context = fixture.CreateContext(ownerId);
+        await AddUserAsync(context, ownerId);
+        var target = TestData.Book(ownerId, "Devil Sword King");
+        var distractor = TestData.Book(ownerId, "Divine Spear Master");
+        context.Books.AddRange(target, distractor);
+        await context.SaveChangesAsync();
+        await context.Database.ExecuteSqlInterpolatedAsync($"SELECT refresh_book_search_index({target.Id})");
+        await context.Database.ExecuteSqlInterpolatedAsync($"SELECT refresh_book_search_index({distractor.Id})");
+
+        Assert.Equal(
+            [target.Id],
+            await SearchAsync(context, BookSearchQueryParser.Parse("devi*king")));
+    }
+
+    [Fact]
     public async Task QueueProcessor_ShouldCoalesceChangesRefreshDocumentAndInvalidateCache()
     {
         await fixture.ResetDatabaseAsync();
@@ -160,28 +179,47 @@ public sealed class BookSearchIndexPostgreSqlTests(PostgreSqlFixture fixture)
         var ownerId = Guid.NewGuid();
         await using var context = fixture.CreateContext(ownerId);
         await AddUserAsync(context, ownerId);
-        var book = TestData.Book(ownerId, "Upgrade Search Document");
-        context.Books.Add(book);
-        await context.SaveChangesAsync();
-        await context.Database.ExecuteSqlInterpolatedAsync($"SELECT refresh_book_search_index({book.Id})");
+        var bookId = Guid.NewGuid();
+        var now = DateTimeOffset.UtcNow;
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "Books" (
+                "Id", "OwnerId", "PrimaryTitle", "NormalizedPrimaryTitle", "ContentTypeId", "StatusId",
+                "Created", "CreatedBy", "LastModified", "LastModifiedBy")
+            VALUES (
+                {bookId}, {ownerId}, {"Upgrade Search Document"},
+                {MappingExtensions.NormalizeName("Upgrade Search Document")},
+                {Guid.Parse("10000000-0000-0000-0000-000000000001")},
+                {Guid.Parse("20000000-0000-0000-0000-000000000001")},
+                {now}, {ownerId}, {now}, {ownerId});
+            """);
+        await context.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "BookTitles" (
+                "Id", "BookId", "Title", "NormalizedTitle", "IsPrimary",
+                "Created", "CreatedBy", "LastModified", "LastModifiedBy")
+            VALUES (
+                {Guid.NewGuid()}, {bookId}, {"Upgrade Search Document"},
+                {MappingExtensions.NormalizeName("Upgrade Search Document")}, TRUE,
+                {now}, {ownerId}, {now}, {ownerId});
+            """);
+        await context.Database.ExecuteSqlInterpolatedAsync($"SELECT refresh_book_search_index({bookId})");
 
-        var beforeUpgrade = await GetSearchDocumentAsync(context, book.Id);
+        var beforeUpgrade = await GetSearchDocumentAsync(context, bookId);
         Assert.Equal(2, CountOccurrences(beforeUpgrade, "upgrade search document"));
 
         var migrator = context.Database.GetService<IMigrator>();
         await migrator.MigrateAsync();
 
         Assert.True(await HasCloseLexemeFunctionAsync(context));
-        var afterUpgrade = await GetSearchDocumentAsync(context, book.Id);
+        var afterUpgrade = await GetSearchDocumentAsync(context, bookId);
         Assert.Equal(1, CountOccurrences(afterUpgrade, "upgrade search document"));
         Assert.Equal(
-            [book.Id],
+            [bookId],
             await SearchAsync(context, BookSearchQueryParser.Parse("upgrde")));
 
         await migrator.MigrateAsync(previousMigration);
 
         Assert.False(await HasCloseLexemeFunctionAsync(context));
-        var afterRollback = await GetSearchDocumentAsync(context, book.Id);
+        var afterRollback = await GetSearchDocumentAsync(context, bookId);
         Assert.Equal(2, CountOccurrences(afterRollback, "upgrade search document"));
     }
 

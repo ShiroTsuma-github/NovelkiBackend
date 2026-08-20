@@ -125,6 +125,7 @@ public class BookRepository : IBookRepository
 
         if (progressChanged)
         {
+            book.LastProgressUpdatedAt = DateTimeOffset.UtcNow;
             _context.BookProgressHistory.Add(new BookProgressHistory
             {
                 BookId = book.Id,

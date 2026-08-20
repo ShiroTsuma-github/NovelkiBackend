@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
-import { readReadingTimeSettings, readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { expectReadableTextContrast } from '@/test/contrast'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -597,8 +596,7 @@ describe('BooksPage', () => {
     expectReadableTextContrast((await screen.findAllByText('Novel'))[0])
   })
 
-  it('links summary to analytics without query and preserves shared reading-time settings', async () => {
-    window.localStorage.setItem(readingTimeStorageKey, JSON.stringify({ Novel: 2 }))
+  it('links summary to analytics without a query', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(books))
     vi.mocked(api.getBooksSummary).mockResolvedValue(createSummary())
     const user = userEvent.setup()
@@ -609,7 +607,6 @@ describe('BooksPage', () => {
     await user.click(screen.getByRole('button', { name: /summary/i }))
 
     expect(await screen.findByRole('link', { name: /open analytics/i })).toHaveAttribute('href', '/analytics')
-    expect(readReadingTimeSettings()).toEqual({ Novel: 2 })
   })
 
   it('lets the user change cards per row and persists the preference', async () => {

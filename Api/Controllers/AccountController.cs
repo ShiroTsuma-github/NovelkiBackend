@@ -1,6 +1,8 @@
 ﻿namespace Api.Controllers;
 
 using Application.Features.AccountFeatures.Commands;
+using Application.Features.AccountFeatures;
+using Application.Common.DTOs.User;
 using Application.Common.Models;
 using Domain.Exceptions;
 using FluentValidation;
@@ -69,6 +71,20 @@ public class AccountController : ControllerBase
         await _mediator.Send(logoutCommand);
         Response.Cookies.Delete(RefreshTokenCookieName, CreateRefreshTokenCookieOptions());
         return NoContent();
+    }
+
+    [HttpGet("reading-time-settings")]
+    [Authorize]
+    public async Task<IActionResult> GetReadingTimeSettings()
+    {
+        return Ok(await _mediator.Send(new GetReadingTimeSettingsQuery()));
+    }
+
+    [HttpPut("reading-time-settings")]
+    [Authorize]
+    public async Task<IActionResult> UpdateReadingTimeSettings([FromBody] UpdateReadingTimeSettingsRequest request)
+    {
+        return Ok(await _mediator.Send(new UpdateReadingTimeSettingsCommand(request.Settings ?? [])));
     }
 
     private void SetRefreshTokenCookie(TokenResponse response)

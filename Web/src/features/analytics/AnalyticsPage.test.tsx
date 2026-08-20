@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { api } from '@/api/client'
 import { setStoredSession } from '@/api/http'
 import type { BookAnalyticsDto } from '@/api/types'
-import { readingTimeStorageKey } from '@/features/analytics/readingTimeSettings'
 import { expectReadableTextContrast } from '@/test/contrast'
 import { testSession } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
@@ -18,12 +17,17 @@ import { distributeStackedPercents, statusByTypeRows, statusByTypeTooltipRows } 
 vi.mock('@/api/client', () => ({
   api: {
     getBookAnalytics: vi.fn(),
+    getReadingTimeSettings: vi.fn(),
+    updateReadingTimeSettings: vi.fn(),
   },
 }))
 
 describe('AnalyticsPage', () => {
   beforeEach(() => {
     vi.mocked(api.getBookAnalytics).mockReset()
+    vi.mocked(api.getReadingTimeSettings).mockReset()
+    vi.mocked(api.updateReadingTimeSettings).mockReset()
+    vi.mocked(api.getReadingTimeSettings).mockResolvedValue([])
   })
 
   afterEach(() => {
@@ -557,6 +561,9 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByRole('link', { name: 'Drama "Special" / 2026' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20genre%3A%22Drama%20%5C%22Special%5C%22%20%2F%202026%22')
     expect(await screen.findByRole('link', { name: 'slow burn' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20tag%3A%22slow%20burn%22')
     expect(await screen.findByText('Other')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Show all 7' }))
+    expect(screen.getByRole('link', { name: 'Very Long Genre Name That Must Stay Readable' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show top 5' })).toHaveAttribute('aria-expanded', 'true')
 
     await user.click(screen.getByRole('button', { name: /view data for top genres/i }))
     expect(screen.queryByRole('columnheader', { name: /bucket/i })).not.toBeInTheDocument()
@@ -683,8 +690,9 @@ describe('AnalyticsPage', () => {
     expect(screen.getByRole('link', { name: /open manga completed books/i })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20type%3AManga%20status%3ACompleted')
   })
 
-  it('estimates reading time from shared localStorage without refetching', async () => {
-    window.localStorage.setItem(readingTimeStorageKey, JSON.stringify({ Novel: 2 }))
+  it('estimates reading time from account settings and saves only after editing is done', async () => {
+    vi.mocked(api.getReadingTimeSettings).mockResolvedValue([{ contentType: 'Novel', minutesPerChapter: 2 }])
+    vi.mocked(api.updateReadingTimeSettings).mockResolvedValue([{ contentType: 'Novel', minutesPerChapter: 0 }])
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
       progress: {
         typeVolumes: [
@@ -709,7 +717,11 @@ describe('AnalyticsPage', () => {
     await user.type(input, '0')
 
     expect(await screen.findByText('0.0 h')).toBeInTheDocument()
-    expect(window.localStorage.getItem(readingTimeStorageKey)).toContain('"Novel":0')
+    expect(api.updateReadingTimeSettings).not.toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /done/i }))
+    await waitFor(() => expect(vi.mocked(api.updateReadingTimeSettings).mock.calls[0]?.[0]).toEqual({
+      settings: [{ contentType: 'Novel', minutesPerChapter: 0 }],
+    }))
     expect(vi.mocked(api.getBookAnalytics).mock.calls.length).toBe(requestCount)
   })
 
@@ -753,7 +765,7 @@ describe('AnalyticsPage', () => {
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-01-01&to=2026-02-01&bucket=week' })
 
-    expect(await screen.findByText(/Chapters advanced: 9,999/i)).toBeInTheDocument()
+    expect(await screen.findByText(/Cumulative: 9,999 chapters/i)).toBeInTheDocument()
     expect(screen.getAllByText('January 1–14, 2026').length).toBeGreaterThan(1)
     expect(screen.getByText(/\+1,000,000 added/i)).toBeInTheDocument()
     expect(screen.getByText(/No additions by type/i)).toBeInTheDocument()
@@ -801,11 +813,12 @@ describe('AnalyticsPage', () => {
     }))
 
     expect(readingActivityChartPoints(activityPoints, 'day')).toHaveLength(4)
+    expect(readingActivityChartPoints(activityPoints, 'day').map((point) => point.cumulativeChapters)).toEqual([0, 0, 7, 7])
     expect(libraryGrowthChartPoints(growthPoints, 'day')).toHaveLength(4)
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-07-10&to=2026-07-14&bucket=day' })
 
-    expect(await screen.findByText(/Chapters advanced: 7/i)).toBeInTheDocument()
+    expect((await screen.findAllByText(/Cumulative: 7 chapters/i)).length).toBeGreaterThan(0)
 
     const readingActivitySection = screen.getByRole('heading', { name: 'Reading activity' }).closest('section')
     const libraryGrowthSection = screen.getByRole('heading', { name: 'Library growth' }).closest('section')

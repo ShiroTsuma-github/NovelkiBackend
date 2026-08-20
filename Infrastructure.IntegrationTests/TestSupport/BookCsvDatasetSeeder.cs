@@ -25,9 +25,10 @@ public static class BookCsvDatasetSeeder
     public static async Task<BookCsvDatasetSnapshot> SeedAsync(
         ApplicationDbContext context,
         Guid ownerId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? csvPath = null)
     {
-        var rows = ReadRows().ToList();
+        var rows = ReadRows(csvPath).ToList();
         if (rows.Count == 0)
         {
             throw new InvalidOperationException(
@@ -299,10 +300,10 @@ public static class BookCsvDatasetSeeder
         return title;
     }
 
-    private static IEnumerable<CsvBookRow> ReadRows()
+    private static IEnumerable<CsvBookRow> ReadRows(string? csvPath = null)
     {
-        var csvPath = FindCsvPath();
-        using var parser = new TextFieldParser(csvPath)
+        var resolvedCsvPath = FindCsvPath(csvPath);
+        using var parser = new TextFieldParser(resolvedCsvPath)
         {
             TextFieldType = FieldType.Delimited, HasFieldsEnclosedInQuotes = true, TrimWhiteSpace = false
         };
@@ -329,7 +330,7 @@ public static class BookCsvDatasetSeeder
 
             yield return new CsvBookRow(
                 title.Trim(),
-                TrimToNull(GetField(fields, headerIndexes, "author")),
+                TrimToNull(GetField(fields, headerIndexes, "author") ?? GetField(fields, headerIndexes, "authorName")),
                 TryDecimal(GetField(fields, headerIndexes, "currentChapterNumber")),
                 TrimToNull(GetField(fields, headerIndexes, "currentChapterLabel")),
                 TryDecimal(GetField(fields, headerIndexes, "totalChapters")),
@@ -341,8 +342,19 @@ public static class BookCsvDatasetSeeder
         }
     }
 
-    private static string FindCsvPath([CallerFilePath] string sourceFilePath = "")
+    private static string FindCsvPath(string? explicitCsvPath = null, [CallerFilePath] string sourceFilePath = "")
     {
+        if (!string.IsNullOrWhiteSpace(explicitCsvPath))
+        {
+            if (!File.Exists(explicitCsvPath))
+            {
+                throw new FileNotFoundException($"The requested CSV test dataset was not found: {explicitCsvPath}",
+                    explicitCsvPath);
+            }
+
+            return explicitCsvPath;
+        }
+
         foreach (var startPath in new[]
                  {
                      AppContext.BaseDirectory, Directory.GetCurrentDirectory(),
@@ -446,6 +458,7 @@ public sealed record BookCsvDatasetSnapshot(
 public sealed record BookCsvDatasetSample(
     Guid Id,
     string PrimaryTitle,
+    string? Author,
     string ContentType,
     string Status,
     decimal? CurrentChapterNumber,
@@ -462,6 +475,7 @@ public sealed record BookCsvDatasetSample(
         return new BookCsvDatasetSample(
             book.Id,
             book.PrimaryTitle,
+            book.Author?.PrimaryName,
             contentType,
             status,
             book.CurrentChapterNumber,

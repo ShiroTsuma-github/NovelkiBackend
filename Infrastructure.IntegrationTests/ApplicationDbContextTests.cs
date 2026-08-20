@@ -1,4 +1,5 @@
 using Domain.Entities;
+using Infrastructure.Persistence;
 using Infrastructure.IntegrationTests.TestSupport;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,6 +33,40 @@ public class ApplicationDbContextTests
         Assert.Equal(database.UserId, genre.LastModifiedBy);
         Assert.True(genre.Created > DateTimeOffset.MinValue);
         Assert.True(genre.LastModified > DateTimeOffset.MinValue);
+    }
+
+    [Fact]
+    public async Task SaveChanges_ShouldInitializeBookProgressTimestampAtCreation()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var book = TestData.Book(database.UserId, "New book");
+
+        context.Books.Add(book);
+        await context.SaveChangesAsync();
+
+        Assert.Equal(book.Created, book.LastProgressUpdatedAt);
+    }
+
+    [Fact]
+    public async Task ReadingTimeSettings_ShouldPersistPerUserAndContentType()
+    {
+        using var database = new SqliteTestDatabase();
+        await using var context = database.CreateContext();
+        var repository = new ReadingTimeSettingRepository(context);
+
+        await repository.UpsertAsync(database.UserId, new Dictionary<Guid, decimal>
+        {
+            [TestData.NovelTypeId] = 4
+        }, CancellationToken.None);
+        await repository.UpsertAsync(database.UserId, new Dictionary<Guid, decimal>
+        {
+            [TestData.NovelTypeId] = 6
+        }, CancellationToken.None);
+
+        var setting = Assert.Single(await repository.GetByUserIdAsync(database.UserId, CancellationToken.None));
+        Assert.Equal("Novel", setting.ContentType.Name);
+        Assert.Equal(6, setting.MinutesPerChapter);
     }
 
     [Fact]
