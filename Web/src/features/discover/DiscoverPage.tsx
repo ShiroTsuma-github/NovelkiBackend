@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { BookPlus, Compass, Search, Sparkles } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
+import { BookPlus, Compass, Sparkles } from 'lucide-react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
@@ -8,23 +8,21 @@ import { HttpError } from '@/api/http'
 import type { BookCoverDto, PublicBookMetadataDto, PublicBookSnapshotDto } from '@/api/types'
 import { Badge, buttonVariants, PageHeader, Surface } from '@/components/app/DesignSystem'
 import { BookCoverArtwork } from '@/features/books/BookCoverSection'
+import { BookSearchInput } from '@/features/books/BookSearchInput'
 import { DescribedMetadataPills, MetadataSummary } from '@/features/books/MetadataBadges'
+import { useDebouncedValue } from '@/lib/useDebouncedValue'
 
 export function DiscoverPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debouncedSearch = useDebouncedValue(search.trim(), 220)
   const [copyingId, setCopyingId] = useState<string | null>(null)
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedSearch(search.trim()), 200)
-    return () => window.clearTimeout(timeout)
-  }, [search])
 
   const books = useQuery({
     queryKey: ['public-books', debouncedSearch],
     queryFn: () => api.searchPublicBooks({ search: debouncedSearch || undefined, skip: 0, take: 40 }),
+    placeholderData: keepPreviousData,
   })
 
   async function copyBook(snapshot: PublicBookSnapshotDto) {
@@ -50,18 +48,19 @@ export function DiscoverPage() {
       />
 
       <Surface className="discover-toolbar" tone="elevated">
-        <label className="manage-search discover-search">
-          <Search aria-hidden="true" className="h-4 w-4" />
-          <span className="sr-only">Search shared books</span>
-          <input
-            autoComplete="off"
+        <div className="discover-search">
+          <BookSearchInput
+            appearance="compact"
+            ariaLabel="Search shared books"
             placeholder="Search title, author, genre, tag, type, or exclude with -tag:…"
-            type="search"
+            allowedFields={['title', 'author', 'description', 'genre', 'tag', 'type', 'chapters']}
+            remoteSuggestionsEnabled={false}
+            showHelp={false}
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={setSearch}
           />
           {books.isFetching ? <span className="manage-search__status">Searching…</span> : null}
-        </label>
+        </div>
         <div className="discover-toolbar__meta">
           <Compass className="h-4 w-4" />
           <span>{books.data?.total ?? 0} shared snapshots</span>

@@ -827,6 +827,7 @@ public class RepositoryTests
             CancellationToken.None);
 
         Assert.Equal(7, day.Activity.Points.Count);
+        Assert.Equal(53m, day.Activity.BaselineChapters);
         AssertActivityPoint(day, new DateOnly(2026, 1, 1), 2, 1, 2m);
         AssertActivityPoint(day, new DateOnly(2026, 1, 2), 1, 1, 0m);
         AssertActivityPoint(day, new DateOnly(2026, 1, 3), 1, 1, 0m);

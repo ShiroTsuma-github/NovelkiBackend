@@ -89,9 +89,10 @@ public sealed record BookAnalyticsTypeVolumeSnapshot(
     decimal? MedianCurrentChapter);
 
 public sealed record BookAnalyticsActivitySnapshot(
+    decimal BaselineChapters,
     IReadOnlyList<BookAnalyticsActivityPointSnapshot> Points)
 {
-    public static BookAnalyticsActivitySnapshot Empty { get; } = new([]);
+    public static BookAnalyticsActivitySnapshot Empty { get; } = new(0m, []);
 }
 
 public sealed record BookAnalyticsActivityPointSnapshot(

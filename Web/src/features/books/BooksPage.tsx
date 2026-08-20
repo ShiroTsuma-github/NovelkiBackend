@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Download, Edit, Eye, LayoutGrid, List, Plus, Search, Star, Upload } from 'lucide-react'
+import { ChevronDown, Download, Edit, Eye, LayoutGrid, List, Plus, Star, Upload } from 'lucide-react'
 import { useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { Link, useLocation, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -150,8 +150,8 @@ export function BooksPage() {
     staleTime: 30_000,
   })
   const summaryQuery = useQuery({
-    queryKey: ['books-summary', requestQuery],
-    queryFn: () => api.getBooksSummary({ query: requestQuery }),
+    queryKey: ['books-summary', debouncedRequestQuery],
+    queryFn: () => api.getBooksSummary({ query: debouncedRequestQuery }),
     enabled: summaryOpen,
     staleTime: 30_000,
   })
@@ -538,32 +538,12 @@ export function BookAdvancedSearch({
   value: string
   onChange: (value: string) => void
 }) {
-  const [draftValue, setDraftValue] = useState(value)
-
-  useEffect(() => {
-    setDraftValue(value)
-  }, [value])
-
-  return (
-    <Surface className="grid gap-3 p-4" tone="muted">
-      <label className="relative">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-        <input
-          className={`${inputClass} ui-control--search`}
-          placeholder={'Search: returnee author:Toika genre:fantasy rating:>=8 -tag:dropped -rating:8'}
-          value={draftValue}
-          onChange={(event) => {
-            const nextValue = event.target.value
-            setDraftValue(nextValue)
-            onChange(nextValue)
-          }}
-        />
-      </label>
-      <p className="text-xs text-slate-500">
-        Supports filters like <code>author:John</code>, <code>tag:favorite,"to read soon"</code>, <code>genre:fantasy,"slice of life"</code>, <code>rating:&gt;=8</code>, <code>rating:8</code>, <code>progress:&gt;=50</code>, <code>chapters:&lt;200</code>, <code>total:&gt;500</code>, <code>total-chapters:&gt;500</code>, and wildcard searches like <code>title:i*</code>. Prefix any term or filter with <code>-</code> to exclude matches, for example <code>-rating:8</code>, <code>-tag:dropped</code>, or <code>-genre:romance</code>.
-      </p>
-    </Surface>
-  )
+  return <BookSearchInput
+    placeholder={'Search: returnee author:Toika genre:fantasy rating:>=8 -tag:dropped -rating:8'}
+    remoteSuggestionsEnabled={false}
+    value={value}
+    onChange={onChange}
+  />
 }
 
 function BookSummaryPanel({

@@ -8,6 +8,7 @@ import { getStoredSession } from '@/api/http'
 import type { BookAnalyticsDto } from '@/api/types'
 import { Badge, buttonVariants, controlClass, PageHeader, Surface } from '@/components/app/DesignSystem'
 import { formatAverageRating, formatChapterCount } from '@/features/books/BooksPage'
+import { BookSearchInput } from '@/features/books/BookSearchInput'
 import { AnalyticsChartCard } from './AnalyticsChartCard'
 import { ChapterVolumeChart, chapterVolumeRows } from './charts/ChapterVolumeChart'
 import { formatCount } from './charts/chartUtils'
@@ -83,15 +84,17 @@ export function AnalyticsPage() {
 
       <Surface className="grid gap-3 p-4">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_18rem_9rem_auto]">
-          <label className="ui-form-field min-w-0">
+          <div className="ui-form-field min-w-0">
             <span className="ui-field-label">Query</span>
-            <input
-              className={controlClass}
+            <BookSearchInput
+              appearance="compact"
+              ariaLabel="Query"
               placeholder="author:Toika rating:>=8 -genre:romance"
               value={draftFilters.query}
-              onChange={(event) => setDraftFilters((current) => ({ ...current, query: event.target.value }))}
+              showHelp={false}
+              onChange={(query) => setDraftFilters((current) => ({ ...current, query }))}
             />
-          </label>
+          </div>
           <DateRangeChooser filters={draftFilters} onChange={setDraftFilters} />
           <label className="ui-form-field">
             <span className="ui-field-label">Bucket</span>

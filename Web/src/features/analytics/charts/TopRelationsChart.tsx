@@ -10,10 +10,14 @@ type TopRelationsChartProps = {
 }
 
 const topLimit = 5
+const moreLimit = 50
 
 export function TopRelationsChart({ field, items, title }: TopRelationsChartProps) {
-  const [showAll, setShowAll] = useState(false)
-  const rows = showAll ? toAllRelationRows(items) : toTopRelationRows(items)
+  const [visibleLimit, setVisibleLimit] = useState(topLimit)
+  const rows = toLimitedRelationRows(items, visibleLimit)
+  const remainingCount = Math.max(0, items.length - visibleLimit)
+  const nextBatchCount = Math.min(moreLimit, remainingCount)
+  const expanded = visibleLimit > topLimit
 
   if (!items.length) {
     return <div className="grid min-h-56 place-items-center text-sm text-slate-500">No {title.toLowerCase()} data for this analytics scope.</div>
@@ -39,14 +43,15 @@ export function TopRelationsChart({ field, items, title }: TopRelationsChartProp
           </div>
         </div>
       ))}
-      {items.length > topLimit ? (
+      {remainingCount > 0 || expanded ? (
         <button
-          aria-expanded={showAll}
+          aria-expanded={expanded}
           className={`${buttonVariants.ghost} justify-self-start`}
           type="button"
-          onClick={() => setShowAll((current) => !current)}
+          onClick={() => setVisibleLimit((current) =>
+            current >= items.length ? topLimit : current + moreLimit)}
         >
-          {showAll ? `Show top ${topLimit}` : `Show all ${items.length}`}
+          {remainingCount > 0 ? `Show ${nextBatchCount} more` : `Show top ${topLimit}`}
         </button>
       ) : null}
     </div>
@@ -67,10 +72,10 @@ function toAllRelationRows(items: BookAnalyticsRelationCountDto[]) {
     .map((item) => ({ ...item, isOther: false }))
 }
 
-function toTopRelationRows(items: BookAnalyticsRelationCountDto[]) {
+function toLimitedRelationRows(items: BookAnalyticsRelationCountDto[], limit: number) {
   const sorted = [...items].sort((left, right) => right.bookCount - left.bookCount || left.name.localeCompare(right.name))
-  const top = sorted.slice(0, topLimit).map((item) => ({ ...item, isOther: false }))
-  const other = sorted.slice(topLimit)
+  const top = sorted.slice(0, limit).map((item) => ({ ...item, isOther: false }))
+  const other = sorted.slice(limit)
   if (!other.length) {
     return top
   }

@@ -4,6 +4,7 @@ import {
   applyBookSearchSuggestion,
   getBookSearchScopeQuery,
   getLocalBookSearchSuggestions,
+  isBookSearchValueAlreadyApplied,
 } from './bookSearchSyntax'
 
 describe('book search syntax', () => {
@@ -103,6 +104,21 @@ describe('book search syntax', () => {
     expect(labels.some((label) => label.endsWith(':none'))).toBe(false)
   })
 
+  it('limits local syntax suggestions to the fields supported by a consumer', () => {
+    const suggestions = getLocalBookSearchSuggestions(analyzeBookSearch('', 0), [
+      'title',
+      'author',
+      'genre',
+      'tag',
+      'type',
+      'chapters',
+    ])
+
+    expect(suggestions.map((suggestion) => suggestion.definition?.canonical)).toContain('title')
+    expect(suggestions.map((suggestion) => suggestion.definition?.canonical)).not.toContain('status')
+    expect(suggestions.map((suggestion) => suggestion.definition?.canonical)).not.toContain('rating')
+  })
+
   it('never proposes none as a filter value', () => {
     const suggestions = getLocalBookSearchSuggestions(
       analyzeBookSearch('rating:', 'rating:'.length),
@@ -139,5 +155,13 @@ describe('book search syntax', () => {
     const context = analyzeBookSearch(query, query.indexOf('rea') + 2)
 
     expect(getBookSearchScopeQuery(query, context)).toBe('type:"Novel" rating:>=7')
+  })
+
+  it('recognizes an already selected value outside the active token', () => {
+    const query = 'type:"Novel" tag:"Male Protagonist" tag:""'
+    const context = analyzeBookSearch(query, query.length - 1)
+
+    expect(isBookSearchValueAlreadyApplied(query, context, 'tag', 'Male Protagonist')).toBe(true)
+    expect(isBookSearchValueAlreadyApplied(query, context, 'tag', 'Female Protagonist')).toBe(false)
   })
 })

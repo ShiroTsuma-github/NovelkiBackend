@@ -383,7 +383,15 @@ public sealed class BookAnalyticsQueryService(ApplicationDbContext context, Book
             }
         }
 
-        return new BookAnalyticsActivitySnapshot(points
+        var baselineChapters = rows
+            .GroupBy(row => row.BookId)
+            .Sum(group => group
+                .OrderBy(row => row.ChangedAt)
+                .ThenBy(row => row.Id)
+                .Select(row => row.ChapterNumber)
+                .FirstOrDefault() ?? 0m);
+
+        return new BookAnalyticsActivitySnapshot(baselineChapters, points
             .OrderBy(point => point.Key)
             .Select(point => new BookAnalyticsActivityPointSnapshot(
                 point.Key,

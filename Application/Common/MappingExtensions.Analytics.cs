@@ -99,6 +99,7 @@ public static partial class MappingExtensions
             },
             Activity = new BookAnalyticsActivityDto
             {
+                BaselineChapters = source.Activity.BaselineChapters,
                 Points = source.Activity.Points
                     .Select(item => new BookAnalyticsActivityPointDto
                     {

@@ -9,9 +9,10 @@ type ReadingActivityChartProps = {
 
 export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
   const points = data?.activity.points ?? []
+  const baselineChapters = data?.activity.baselineChapters ?? 0
   const bucket = data?.scope.bucket ?? 'day'
-  const chartPoints = readingActivityChartPoints(points, bucket)
-  const displayPoints = compactActivityPoints(points, bucket)
+  const chartPoints = readingActivityChartPoints(points, bucket, baselineChapters)
+  const displayPoints = compactActivityPoints(points, bucket, baselineChapters)
   const newestDisplayPoints = [...displayPoints].reverse()
 
   if (!points.length) {
@@ -56,7 +57,11 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
 }
 
 export function readingActivityRows(data?: BookAnalyticsDto) {
-  return compactActivityPoints(data?.activity.points ?? [], data?.scope.bucket ?? 'day').map((point) => [
+  return compactActivityPoints(
+    data?.activity.points ?? [],
+    data?.scope.bucket ?? 'day',
+    data?.activity.baselineChapters ?? 0,
+  ).map((point) => [
     point.label,
     formatCount(point.dailyChapters),
     formatCount(point.cumulativeChapters),
@@ -65,8 +70,12 @@ export function readingActivityRows(data?: BookAnalyticsDto) {
   ])
 }
 
-export function readingActivityChartPoints(points: BookAnalyticsActivityPointDto[], bucket: string) {
-  let cumulativeChapters = 0
+export function readingActivityChartPoints(
+  points: BookAnalyticsActivityPointDto[],
+  bucket: string,
+  baselineChapters = 0,
+) {
+  let cumulativeChapters = baselineChapters
   return points.map((point) => {
     const period = dateRangeForBucket(point.date, bucket)
     const dailyChapters = point.chaptersAdvanced
@@ -81,8 +90,8 @@ export function readingActivityChartPoints(points: BookAnalyticsActivityPointDto
   })
 }
 
-function compactActivityPoints(points: BookAnalyticsActivityPointDto[], bucket: string) {
-  return readingActivityChartPoints(points, bucket).reduce<Array<BookAnalyticsActivityPointDto & {
+function compactActivityPoints(points: BookAnalyticsActivityPointDto[], bucket: string, baselineChapters = 0) {
+  return readingActivityChartPoints(points, bucket, baselineChapters).reduce<Array<BookAnalyticsActivityPointDto & {
     dailyChapters: number
     cumulativeChapters: number
     label: string
@@ -107,7 +116,7 @@ function activityLabel(name: unknown) {
     return 'Daily chapters advanced'
   }
   if (name === 'cumulativeChapters') {
-    return 'Cumulative chapters advanced'
+    return 'Cumulative tracked chapters'
   }
   return String(name)
 }

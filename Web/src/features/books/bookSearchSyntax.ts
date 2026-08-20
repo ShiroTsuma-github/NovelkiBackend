@@ -98,12 +98,19 @@ export function analyzeBookSearch(value: string, requestedCaret: number): BookSe
   }
 }
 
-export function getLocalBookSearchSuggestions(context: BookSearchTokenContext): BookSearchSuggestionItem[] {
+export function getLocalBookSearchSuggestions(
+  context: BookSearchTokenContext,
+  allowedFields?: readonly string[],
+): BookSearchSuggestionItem[] {
+  const isAllowed = (definition: BookSearchFilterDefinition) =>
+    allowedFields == null || allowedFields.includes(definition.canonical)
+
   if (!context.hasColon || !context.definition) {
     const search = context.fieldText.toLocaleLowerCase()
     return bookSearchFilters
       .filter((definition) =>
         definition.suggestible !== false &&
+        isAllowed(definition) &&
         (!search || [
           definition.canonical,
           ...definition.aliases,
@@ -120,6 +127,9 @@ export function getLocalBookSearchSuggestions(context: BookSearchTokenContext): 
 
   const items = getTokenActions(context)
   const definition = context.definition
+  if (!isAllowed(definition)) {
+    return []
+  }
   const normalizedValue = unquote(context.valueText).toLocaleLowerCase()
 
   if (
@@ -238,6 +248,39 @@ export function getBookSearchScopeQuery(query: string, context: BookSearchTokenC
     return before
   }
   return `${before} ${after}`
+}
+
+export function isBookSearchValueAlreadyApplied(
+  query: string,
+  activeContext: BookSearchTokenContext,
+  field: string,
+  value: string,
+) {
+  const normalizedField = field.toLocaleLowerCase()
+  const normalizedValue = normalizeSearchValue(value)
+  if (!normalizedValue) {
+    return false
+  }
+
+  return tokenize(query).some((token) => {
+    if (token.start === activeContext.start && token.end === activeContext.end) {
+      return false
+    }
+
+    const text = query.slice(token.start, token.end).replace(/^-/, '')
+    const colon = text.indexOf(':')
+    if (colon < 1) {
+      return false
+    }
+
+    const definition = definitionsByAlias.get(text.slice(0, colon).trim().toLocaleLowerCase())
+    if (definition?.canonical !== normalizedField) {
+      return false
+    }
+
+    return splitFilterValues(text.slice(colon + 1)).some((candidate) =>
+      normalizeSearchValue(candidate) === normalizedValue)
+  })
 }
 
 function getTokenActions(context: BookSearchTokenContext): BookSearchSuggestionItem[] {
@@ -380,6 +423,30 @@ function unquote(value: string) {
     return trimmed.slice(1, -1)
   }
   return trimmed.replace(/^["']/, '')
+}
+
+function normalizeSearchValue(value: string) {
+  return unquote(value).trim().toLocaleLowerCase()
+}
+
+function splitFilterValues(value: string) {
+  const values: string[] = []
+  let start = 0
+  let quote: '"' | "'" | null = null
+
+  for (let index = 0; index <= value.length; index += 1) {
+    const character = value[index]
+    if (character === '"' || character === "'") {
+      quote = quote === character ? null : quote == null ? character : quote
+      continue
+    }
+    if (index === value.length || (character === ',' && quote == null)) {
+      values.push(value.slice(start, index))
+      start = index + 1
+    }
+  }
+
+  return values
 }
 
 function sanitizeQuotedValue(value: string) {

@@ -163,6 +163,7 @@ const analytics = {
     }],
   },
   activity: {
+    baselineChapters: 0,
     points: [{
       date: '2026-01-05',
       progressEvents: 3,

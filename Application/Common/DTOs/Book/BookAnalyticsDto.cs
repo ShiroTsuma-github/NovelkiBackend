@@ -108,6 +108,7 @@ public sealed record BookAnalyticsTypeVolumeDto
 
 public sealed record BookAnalyticsActivityDto
 {
+    public decimal BaselineChapters { get; init; }
     public IReadOnlyList<BookAnalyticsActivityPointDto> Points { get; init; } = [];
 }
 

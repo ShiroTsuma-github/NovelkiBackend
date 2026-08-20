@@ -17,6 +17,7 @@ import { distributeStackedPercents, statusByTypeRows, statusByTypeTooltipRows } 
 vi.mock('@/api/client', () => ({
   api: {
     getBookAnalytics: vi.fn(),
+    getBookSearchSuggestions: vi.fn(),
     getReadingTimeSettings: vi.fn(),
     updateReadingTimeSettings: vi.fn(),
   },
@@ -25,6 +26,7 @@ vi.mock('@/api/client', () => ({
 describe('AnalyticsPage', () => {
   beforeEach(() => {
     vi.mocked(api.getBookAnalytics).mockReset()
+    vi.mocked(api.getBookSearchSuggestions).mockReset().mockResolvedValue([])
     vi.mocked(api.getReadingTimeSettings).mockReset()
     vi.mocked(api.updateReadingTimeSettings).mockReset()
     vi.mocked(api.getReadingTimeSettings).mockResolvedValue([])
@@ -279,6 +281,7 @@ describe('AnalyticsPage', () => {
 
   it('starts a fresh custom range after a preset before updating the end date', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics())
+    setStoredSession({ ...testSession, createdAt: '2025-12-15T10:30:00Z' })
     const user = userEvent.setup()
     const today = getTodayForTest()
     const start = subMonths(today, 1)
@@ -561,7 +564,7 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByRole('link', { name: 'Drama "Special" / 2026' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20genre%3A%22Drama%20%5C%22Special%5C%22%20%2F%202026%22')
     expect(await screen.findByRole('link', { name: 'slow burn' })).toHaveAttribute('href', '/books?query=created%3A%3E%3D2026-01-01%20created%3A%3C2026-02-01%20tag%3A%22slow%20burn%22')
     expect(await screen.findByText('Other')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: 'Show all 7' }))
+    await user.click(screen.getByRole('button', { name: 'Show 2 more' }))
     expect(screen.getByRole('link', { name: 'Very Long Genre Name That Must Stay Readable' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show top 5' })).toHaveAttribute('aria-expanded', 'true')
 
@@ -741,6 +744,7 @@ describe('AnalyticsPage', () => {
   it('renders reading activity and library growth trends for empty buckets, one point, and import jumps', async () => {
     vi.mocked(api.getBookAnalytics).mockResolvedValue(createAnalytics({
       activity: {
+        baselineChapters: 0,
         points: [
           { date: '2026-01-01', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
           { date: '2026-01-08', progressEvents: 0, booksTouched: 0, chaptersAdvanced: 0 },
@@ -814,6 +818,8 @@ describe('AnalyticsPage', () => {
 
     expect(readingActivityChartPoints(activityPoints, 'day')).toHaveLength(4)
     expect(readingActivityChartPoints(activityPoints, 'day').map((point) => point.cumulativeChapters)).toEqual([0, 0, 7, 7])
+    expect(readingActivityChartPoints(activityPoints, 'day', 150_000).map((point) => point.cumulativeChapters))
+      .toEqual([150_000, 150_000, 150_007, 150_007])
     expect(libraryGrowthChartPoints(growthPoints, 'day')).toHaveLength(4)
 
     renderWithProviders(<AnalyticsPage />, { route: '/analytics?from=2026-07-10&to=2026-07-14&bucket=day' })
@@ -1064,6 +1070,7 @@ function createAnalytics(overrides: AnalyticsOverrides = {}): BookAnalyticsDto {
     planning,
     progress,
     activity: {
+      baselineChapters: 0,
       points: overview.totalBooks > 0 ? [{
         date: '2026-01-05',
         progressEvents: 3,

@@ -276,6 +276,7 @@ export type BookAnalyticsTypeVolumeDto = {
 }
 
 export type BookAnalyticsActivityDto = {
+  baselineChapters: number
   points: BookAnalyticsActivityPointDto[]
 }
 

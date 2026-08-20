@@ -11,6 +11,7 @@ import {
   getBookSearchValue,
   getBookSearchScopeQuery,
   getLocalBookSearchSuggestions,
+  isBookSearchValueAlreadyApplied,
   type BookSearchSuggestionItem,
 } from './bookSearchSyntax'
 
@@ -20,9 +21,21 @@ const suggestionListId = 'book-search-suggestions'
 export function BookSearchInput({
   value,
   onChange,
+  appearance = 'panel',
+  ariaLabel = 'Search books',
+  placeholder = 'Search your library or type : for filters',
+  remoteSuggestionsEnabled = true,
+  showHelp = true,
+  allowedFields,
 }: {
   value: string
   onChange: (value: string) => void
+  appearance?: 'panel' | 'compact'
+  ariaLabel?: string
+  placeholder?: string
+  remoteSuggestionsEnabled?: boolean
+  showHelp?: boolean
+  allowedFields?: readonly string[]
 }) {
   const [draftValue, setDraftValue] = useState(value)
   const [caret, setCaret] = useState(value.length)
@@ -49,7 +62,7 @@ export function BookSearchInput({
   }, [draftValue])
 
   const context = useMemo(() => analyzeBookSearch(draftValue, caret), [caret, draftValue])
-  const remoteField = context.definition?.remote && context.hasColon
+  const remoteField = remoteSuggestionsEnabled && context.definition?.remote && context.hasColon
     ? context.definition.canonical
     : null
   const searchValue = getBookSearchValue(context)
@@ -71,14 +84,15 @@ export function BookSearchInput({
   })
 
   const suggestions = useMemo(() => {
-    const local = getLocalBookSearchSuggestions(context)
+    const local = getLocalBookSearchSuggestions(context, allowedFields)
     if (!remoteField) {
       return local
     }
 
     const response = debouncedRequest === remoteRequest
       ? (remoteSuggestions.data ?? []).filter(
-          (suggestion) => suggestion.value.trim().toLocaleLowerCase() !== 'none',
+          (suggestion) => suggestion.value.trim().toLocaleLowerCase() !== 'none' &&
+            !isBookSearchValueAlreadyApplied(draftValue, context, remoteField, suggestion.value),
         )
       : []
     if (context.complete && response.some((suggestion) => suggestion.isExact && suggestion.isAvailable)) {
@@ -96,7 +110,7 @@ export function BookSearchInput({
       value: suggestion.value,
     }))
     return [...local, ...values]
-  }, [context, debouncedRequest, remoteField, remoteRequest, remoteSuggestions.data])
+  }, [allowedFields, context, debouncedRequest, remoteField, remoteRequest, remoteSuggestions.data])
 
   const suggestionSignature = suggestions.map((suggestion) => suggestion.id).join('|')
   useEffect(() => {
@@ -134,10 +148,10 @@ export function BookSearchInput({
   const loadingRemote = remoteField != null &&
     (remoteRequest !== debouncedRequest || remoteSuggestions.isFetching)
 
-  return (
-    <Surface className="relative grid gap-2 p-4" tone="muted">
+  const content = (
+    <>
       <div className="relative" ref={rootRef}>
-        <label className="sr-only" htmlFor="book-search-input">Search books</label>
+        <label className="sr-only" htmlFor="book-search-input">{ariaLabel}</label>
         <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400" />
         <input
           aria-activedescendant={open && suggestions[activeIndex] ? `${suggestionListId}-${activeIndex}` : undefined}
@@ -145,11 +159,14 @@ export function BookSearchInput({
           aria-controls={suggestionListId}
           aria-expanded={open}
           autoComplete="off"
+          autoCapitalize="none"
+          autoCorrect="off"
           className={`${inputClass} ui-control--search ${draftValue ? 'pr-12' : ''}`}
           id="book-search-input"
-          placeholder="Search your library or type : for filters"
+          placeholder={placeholder}
           ref={inputRef}
           role="combobox"
+          spellCheck={false}
           value={draftValue}
           onChange={(event) => {
             const nextValue = event.target.value
@@ -280,15 +297,19 @@ export function BookSearchInput({
         ) : null}
       </div>
 
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
+      {showHelp ? <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
         <span>Choose a suggestion or type</span>
         <code>:</code>
         <span>to build a filter.</span>
         <code>-</code>
         <span>excludes a term.</span>
-      </p>
-    </Surface>
+      </p> : null}
+    </>
   )
+
+  return appearance === 'panel'
+    ? <Surface className="relative grid gap-2 p-4" tone="muted">{content}</Surface>
+    : <div className="relative grid gap-2">{content}</div>
 }
 
 function SuggestionIcon({ item }: { item: BookSearchSuggestionItem }) {
