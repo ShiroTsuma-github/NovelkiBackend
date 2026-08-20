@@ -421,7 +421,7 @@ export function BooksPage() {
             renderActions={(book) => (
               <div className="flex justify-end gap-2">
                 <BookDetailsLink ariaLabel={`View ${book.primaryTitle}`} bookId={book.id} className={`${secondaryButtonClass} ui-icon-button`}><Eye className="h-4 w-4" /></BookDetailsLink>
-                <Link aria-label={`Edit ${book.primaryTitle}`} className={`${secondaryButtonClass} ui-icon-button`} to={`/books/${book.id}/edit`}><Edit className="h-4 w-4" /></Link>
+                <BookEditLink ariaLabel={`Edit ${book.primaryTitle}`} bookId={book.id} className={`${secondaryButtonClass} ui-icon-button`}><Edit className="h-4 w-4" /></BookEditLink>
               </div>
             )}
             sortBy={sortBy}
@@ -1014,6 +1014,41 @@ function BookDetailsLink({
       className={className}
       state={{ bookListReturnTo: returnTo }}
       to={`/books/${bookId}`}
+      onClick={rememberScrollPosition}
+    >
+      {children}
+    </Link>
+  )
+}
+
+function BookEditLink({
+  ariaLabel,
+  bookId,
+  children,
+  className,
+}: {
+  ariaLabel?: string
+  bookId: string
+  children: ReactNode
+  className: string
+}) {
+  const location = useLocation()
+  const returnTo = `${location.pathname}${location.search}`
+
+  function rememberScrollPosition(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+      return
+    }
+
+    saveBookListScrollPosition(returnTo, window.scrollY)
+  }
+
+  return (
+    <Link
+      aria-label={ariaLabel}
+      className={className}
+      state={{ bookListReturnTo: returnTo }}
+      to={`/books/${bookId}/edit`}
       onClick={rememberScrollPosition}
     >
       {children}

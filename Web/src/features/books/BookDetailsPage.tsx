@@ -122,7 +122,7 @@ export function BookDetailsPage() {
           </Link>
           <div className="flex flex-wrap gap-2">
             <ProgressDialog book={book} />
-            <Link className={buttonClass} to={`/books/${book.id}/edit`}>
+            <Link className={buttonClass} state={{ bookListReturnTo }} to={`/books/${book.id}/edit`}>
               <Edit className="h-4 w-4" />
               Edit
             </Link>

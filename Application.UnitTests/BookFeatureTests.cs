@@ -39,6 +39,25 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task CreateBook_ShouldIgnoreAlternativeTitlesThatNormalizeToAnExistingTitle()
+    {
+        var fixture = CreateFixture();
+        var command = ValidCreateCommand(new[]
+        {
+            new BookTitleInput("MEMORIZE"),
+            new BookTitleInput("m e m o r i z e"),
+            new BookTitleInput("Memorize: The Second Coming")
+        }) with { PrimaryTitle = "MEMORIZE" };
+
+        await fixture.Handler.Handle(command, CancellationToken.None);
+
+        var titles = fixture.BookRepository.LastBook!.Titles;
+        Assert.Equal(2, titles.Count);
+        Assert.Contains(titles, title => title.IsPrimary && title.Title == "MEMORIZE");
+        Assert.Contains(titles, title => !title.IsPrimary && title.Title == "Memorize: The Second Coming");
+    }
+
+    [Fact]
     public async Task CreateBook_ShouldCreateAuthorFromName()
     {
         var fixture = CreateFixture();

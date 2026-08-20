@@ -3,7 +3,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { ArrowLeft, FileCode2, Link2, Save, Star, Upload, X } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { api } from '@/api/client'
 import { HttpError } from '@/api/http'
@@ -15,6 +15,7 @@ import { BookCoverArtwork, CoverLightbox, useResolvedCoverImage } from './BookCo
 import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type BookFormValues } from './bookFormSchema'
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
 import { BookHtmlParseDialog, type BookHtmlParseField } from './BookHtmlParseDialog'
+import { getBookListReturnTo } from './bookListNavigation'
 
 type BookFormPageProps = {
   mode: 'create' | 'edit'
@@ -52,7 +53,9 @@ const suggestionSearchDelayMs = 150
 
 export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
   const { id } = useParams<{ id: string }>()
+  const location = useLocation()
   const navigate = useNavigate()
+  const bookListReturnTo = getBookListReturnTo(location.state)
   const queryClient = useQueryClient()
   const initializedBookIdRef = useRef<string | null>(null)
   const [authorSuggestionsOpen, setAuthorSuggestionsOpen] = useState(false)
@@ -373,7 +376,10 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       } else {
         toast.success(mode === 'create' ? 'Book added.' : 'Book updated.')
       }
-      navigate(admin ? '/admin' : `/books/${response.id}`, { replace: true })
+      navigate(admin ? '/admin' : `/books/${response.id}`, {
+        replace: true,
+        state: admin ? undefined : { bookListReturnTo },
+      })
     },
     onError: (error) => {
       toast.error(error instanceof HttpError ? error.apiError.detail : error.message)
@@ -579,7 +585,7 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
                 </div>
               </div>
               <div className="book-form-action-buttons">
-                <Link className={secondaryButtonClass} to={backHref}>
+                <Link className={secondaryButtonClass} state={admin ? undefined : { bookListReturnTo }} to={backHref}>
                   <ArrowLeft className="h-4 w-4" />
                   Back
                 </Link>

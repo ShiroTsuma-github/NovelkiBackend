@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Ban, CalendarDays, Hash, ListFilter, Search, TextCursorInput, Trash2, Undo2 } from 'lucide-react'
+import { ArrowRight, Ban, CalendarDays, Hash, ListFilter, Search, TextCursorInput, Trash2, Undo2, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { api } from '@/api/client'
 import { inputClass } from '@/components/app/FormField'
@@ -144,7 +144,7 @@ export function BookSearchInput({
           aria-controls={suggestionListId}
           aria-expanded={open}
           autoComplete="off"
-          className={`${inputClass} ui-control--search`}
+          className={`${inputClass} ui-control--search ${draftValue ? 'pr-12' : ''}`}
           id="book-search-input"
           placeholder="Search your library or type : for filters"
           ref={inputRef}
@@ -191,6 +191,20 @@ export function BookSearchInput({
             }
           }}
         />
+        {draftValue ? (
+          <button
+            aria-label="Clear search and filters"
+            className="absolute right-1.5 top-1/2 z-10 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-[var(--qs-control-radius)] text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950"
+            type="button"
+            onClick={() => {
+              updateDraft('', 0)
+              setOpen(false)
+              inputRef.current?.focus()
+            }}
+          >
+            <X aria-hidden="true" className="h-4 w-4" />
+          </button>
+        ) : null}
 
         {open ? (
           <div

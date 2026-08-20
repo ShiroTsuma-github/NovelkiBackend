@@ -699,6 +699,10 @@ describe('AnalyticsPage', () => {
     expect(await screen.findByText('15.6 h')).toBeInTheDocument()
     expect(screen.getByText(/0\.0 years based on known current chapters/i)).toBeInTheDocument()
     const requestCount = vi.mocked(api.getBookAnalytics).mock.calls.length
+    expect(screen.getByText('2 minutes per chapter')).toBeInTheDocument()
+    expect(screen.queryByRole('spinbutton', { name: /novel minutes per chapter/i })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /edit estimates/i }))
     const input = screen.getByRole('spinbutton', { name: /novel minutes per chapter/i })
 
     await user.clear(input)

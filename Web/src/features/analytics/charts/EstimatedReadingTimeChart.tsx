@@ -1,6 +1,7 @@
+import { Check, Pencil } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import type { BookAnalyticsDto } from '@/api/types'
-import { Surface } from '@/components/app/DesignSystem'
+import { buttonVariants, Surface } from '@/components/app/DesignSystem'
 import { inputClass } from '@/components/app/FormField'
 import { formatChapterCount } from '@/features/books/BooksPage'
 import { readReadingTimeSettings, writeReadingTimeSettings } from '../readingTimeSettings'
@@ -13,6 +14,7 @@ type EstimatedReadingTimeChartProps = {
 export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartProps) {
   const items = data?.progress.typeVolumes ?? []
   const [minutesPerType, setMinutesPerType] = useState<Record<string, number>>(() => readReadingTimeSettings())
+  const [isEditing, setIsEditing] = useState(false)
   const estimates = useMemo(() => getEstimatedReadingRows(items, minutesPerType), [items, minutesPerType])
   const totalHours = estimates.reduce((sum, item) => sum + item.hours, 0)
 
@@ -23,8 +25,21 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
   return (
     <div className="grid gap-4">
       <Surface as="div" className="p-4" tone="elevated">
-        <div className="text-sm font-semibold text-slate-950">Estimated total</div>
-        <div className="mt-1 text-3xl font-semibold text-slate-950">{formatHours(totalHours)}</div>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-950">Estimated total</div>
+            <div className="mt-1 text-3xl font-semibold text-slate-950">{formatHours(totalHours)}</div>
+          </div>
+          <button
+            aria-pressed={isEditing}
+            className={buttonVariants.secondary}
+            type="button"
+            onClick={() => setIsEditing((current) => !current)}
+          >
+            {isEditing ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+            {isEditing ? 'Done' : 'Edit estimates'}
+          </button>
+        </div>
         <div className="mt-2 text-sm text-slate-500">
           {formatDays(totalHours)} · {formatMonths(totalHours)} · {formatYears(totalHours)} based on known current chapters.
         </div>
@@ -36,25 +51,29 @@ export function EstimatedReadingTimeChart({ data }: EstimatedReadingTimeChartPro
               <span className="font-semibold text-slate-950">{item.type}</span>
               <span className="text-sm text-slate-500">{formatChapterCount(item.currentChapters)} chapters · {formatHours(item.hours)}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <input
-                aria-label={`${item.type} minutes per chapter`}
-                className={`${inputClass} w-28`}
-                min="0"
-                step="1"
-                type="number"
-                value={item.minutesPerChapter}
-                onChange={(event) => {
-                  const nextValue = normalizeMinutes(Number(event.target.value))
-                  setMinutesPerType((current) => {
-                    const updated = { ...current, [item.type]: nextValue }
-                    writeReadingTimeSettings(updated)
-                    return updated
-                  })
-                }}
-              />
-              <span className="text-sm text-slate-600">minutes per chapter</span>
-            </div>
+            {isEditing ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  aria-label={`${item.type} minutes per chapter`}
+                  className={`${inputClass} w-28`}
+                  min="0"
+                  step="1"
+                  type="number"
+                  value={item.minutesPerChapter}
+                  onChange={(event) => {
+                    const nextValue = normalizeMinutes(Number(event.target.value))
+                    setMinutesPerType((current) => {
+                      const updated = { ...current, [item.type]: nextValue }
+                      writeReadingTimeSettings(updated)
+                      return updated
+                    })
+                  }}
+                />
+                <span className="text-sm text-slate-600">minutes per chapter</span>
+              </div>
+            ) : (
+              <div className="text-sm text-slate-600">{formatCount(item.minutesPerChapter)} minutes per chapter</div>
+            )}
           </Surface>
         ))}
       </div>

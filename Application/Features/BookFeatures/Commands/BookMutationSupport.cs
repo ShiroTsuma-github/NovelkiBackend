@@ -120,10 +120,24 @@ internal static class BookMutationSupport
 
     public static List<BookTitle> BuildTitles(string primaryTitle, IEnumerable<BookTitleInput>? alternativeTitles)
     {
-        var titles = new List<BookTitle> { primaryTitle.ToPrimaryTitle() };
-        titles.AddRange((alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
-            .Where(title => !string.IsNullOrWhiteSpace(title.Title))
-            .Select(title => title.ToBookTitle()));
+        var primary = primaryTitle.ToPrimaryTitle();
+        var titles = new List<BookTitle> { primary };
+        var normalizedTitles = new HashSet<string>(StringComparer.Ordinal) { primary.NormalizedTitle };
+
+        foreach (var alternative in alternativeTitles ?? Enumerable.Empty<BookTitleInput>())
+        {
+            if (string.IsNullOrWhiteSpace(alternative.Title))
+            {
+                continue;
+            }
+
+            var title = alternative.ToBookTitle();
+            if (normalizedTitles.Add(title.NormalizedTitle))
+            {
+                titles.Add(title);
+            }
+        }
+
         return titles;
     }
 

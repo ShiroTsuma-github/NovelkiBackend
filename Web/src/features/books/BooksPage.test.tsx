@@ -171,6 +171,19 @@ describe('BooksPage', () => {
     })))
   })
 
+  it('clears the active search from the right-side clear button', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+
+    renderWithProviders(<BooksPage />, { route: '/books?query=status%3AReading' })
+
+    const searchInput = await screen.findByRole('combobox', { name: /search books/i })
+    await user.click(screen.getByRole('button', { name: /clear search and filters/i }))
+
+    expect(searchInput).toHaveValue('')
+    await waitFor(() => expect(api.getBooks).toHaveBeenLastCalledWith(expect.objectContaining({ query: '' })))
+  })
+
   it('inserts frequency-ranked text suggestions as quoted filter values', async () => {
     vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
     vi.mocked(api.getBookSearchSuggestions).mockResolvedValue([
@@ -330,6 +343,20 @@ describe('BooksPage', () => {
     renderWithProviders(<BooksPage />, { route: '/books?take=50&query=Fantasy' })
 
     await user.click(await screen.findByLabelText('View Lord of Mysteries'))
+
+    expect(window.sessionStorage.getItem(
+      'novelki.books.scroll-position.v1:/books?take=50&query=Fantasy',
+    )).toBe('731')
+  })
+
+  it('remembers the exact scroll position and filtered list url before editing directly', async () => {
+    vi.mocked(api.getBooks).mockResolvedValue(paginated(bookListItems))
+    const user = userEvent.setup()
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 731 })
+
+    renderWithProviders(<BooksPage />, { route: '/books?take=50&query=Fantasy' })
+
+    await user.click(await screen.findByLabelText('Edit Lord of Mysteries'))
 
     expect(window.sessionStorage.getItem(
       'novelki.books.scroll-position.v1:/books?take=50&query=Fantasy',
