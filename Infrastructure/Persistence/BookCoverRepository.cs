@@ -26,6 +26,13 @@ public class BookCoverRepository : IBookCoverRepository
             .FirstOrDefaultAsync(c => c.BookId == bookId, cancellationToken);
     }
 
+    public Task<BookCover?> GetByPendingUploadTokenAsync(Guid token, Guid ownerId, CancellationToken cancellationToken)
+    {
+        return _context.BookCovers
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.PendingUploadToken == token && c.Book.OwnerId == ownerId, cancellationToken);
+    }
+
     public async Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken)
     {
         var retryBefore = DateTimeOffset.UtcNow.AddMinutes(-15);
@@ -35,6 +42,7 @@ public class BookCoverRepository : IBookCoverRepository
             .Include(c => c.Book)
             .ThenInclude(b => b.Links)
             .Where(c => c.Status == BookCoverStatus.Pending &&
+                        !(c.Source == BookCoverSource.ManualUpload && c.PendingUploadToken != null) &&
                         (c.LastAttemptAt == null || c.LastAttemptAt < retryBefore))
             .OrderBy(c => c.Created)
             .Take(take)

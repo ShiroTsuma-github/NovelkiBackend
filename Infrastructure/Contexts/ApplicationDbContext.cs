@@ -137,6 +137,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
         {
             entity.HasIndex(c => c.BookId).IsUnique();
             entity.HasIndex(c => new { c.BookId, c.Status, c.Source });
+            entity.HasIndex(c => c.PendingUploadToken).IsUnique().HasFilter("\"PendingUploadToken\" IS NOT NULL");
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.Source).HasConversion<string>().HasMaxLength(32);
             entity.Property(c => c.StoragePath).HasMaxLength(500);

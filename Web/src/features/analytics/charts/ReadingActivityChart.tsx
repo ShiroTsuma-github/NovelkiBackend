@@ -1,7 +1,7 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsActivityPointDto, BookAnalyticsDto } from '@/api/types'
 import { Surface } from '@/components/app/DesignSystem'
-import { analyticsTooltipProps, dateRangeForBucket, formatCount, formatDateRange } from './chartUtils'
+import { analyticsTooltipProps, dateRangeForBucket, focusedValueDomain, formatCount, formatDateRange } from './chartUtils'
 
 type ReadingActivityChartProps = {
   data: BookAnalyticsDto | undefined
@@ -12,6 +12,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
   const baselineChapters = data?.activity.baselineChapters ?? 0
   const bucket = data?.scope.bucket ?? 'day'
   const chartPoints = readingActivityChartPoints(points, bucket, baselineChapters)
+  const cumulativeDomain = focusedValueDomain(chartPoints.map((point) => point.cumulativeChapters))
   const displayPoints = compactActivityPoints(points, bucket, baselineChapters)
   const newestDisplayPoints = [...displayPoints].reverse()
 
@@ -26,7 +27,7 @@ export function ReadingActivityChart({ data }: ReadingActivityChartProps) {
           <LineChart data={chartPoints}>
             <XAxis dataKey="date" tickLine={false} />
             <YAxis allowDecimals={false} tickLine={false} yAxisId="daily" />
-            <YAxis allowDecimals={false} orientation="right" tickLine={false} yAxisId="cumulative" />
+            <YAxis allowDecimals={false} domain={cumulativeDomain} orientation="right" tickLine={false} yAxisId="cumulative" />
             <Tooltip
               {...analyticsTooltipProps}
               formatter={(value, name) => [`${formatCount(Number(value))}`, activityLabel(name)]}

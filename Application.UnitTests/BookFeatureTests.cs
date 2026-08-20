@@ -39,6 +39,36 @@ public class BookFeatureTests
     }
 
     [Fact]
+    public async Task CreateBook_ShouldQueueAnInitialManualCoverUrl()
+    {
+        var fixture = CreateFixture();
+        var command = ValidCreateCommand() with { InitialCoverUrl = "https://cdn.example.com/covers/returnee.jpg" };
+
+        await fixture.Handler.Handle(command, CancellationToken.None);
+
+        var cover = Assert.IsType<BookCover>(fixture.BookRepository.LastBook!.Cover);
+        Assert.Equal(BookCoverStatus.Pending, cover.Status);
+        Assert.Equal(BookCoverSource.ManualUrl, cover.Source);
+        Assert.Equal("https://cdn.example.com/covers/returnee.jpg", cover.OriginalImageUrl);
+        Assert.Equal(fixture.BookRepository.LastBook.Id, fixture.BookCoverQueue.QueuedBookId);
+    }
+
+    [Fact]
+    public async Task CreateBook_ShouldKeepAnInitialManualUploadPendingForTheBrowserOutbox()
+    {
+        var fixture = CreateFixture();
+        var token = Guid.NewGuid();
+        var command = ValidCreateCommand() with { InitialCoverUploadToken = token };
+
+        await fixture.Handler.Handle(command, CancellationToken.None);
+
+        var cover = Assert.IsType<BookCover>(fixture.BookRepository.LastBook!.Cover);
+        Assert.Equal(BookCoverStatus.Pending, cover.Status);
+        Assert.Equal(BookCoverSource.ManualUpload, cover.Source);
+        Assert.Equal(token, cover.PendingUploadToken);
+    }
+
+    [Fact]
     public async Task CreateBook_ShouldIgnoreAlternativeTitlesThatNormalizeToAnExistingTitle()
     {
         var fixture = CreateFixture();

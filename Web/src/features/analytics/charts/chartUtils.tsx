@@ -39,6 +39,21 @@ export function normalizedPercent(part: number, total: number) {
   return Math.round(percent(part, total) * 10) / 10
 }
 
+export function focusedValueDomain(values: readonly number[]): [number, number] {
+  const finiteValues = values.filter(Number.isFinite)
+  if (!finiteValues.length) {
+    return [0, 1]
+  }
+
+  const minimum = Math.min(...finiteValues)
+  const maximum = Math.max(...finiteValues)
+  const span = maximum - minimum
+  const magnitude = Math.max(Math.abs(minimum), Math.abs(maximum))
+  const padding = Math.max(1, span * 0.12, magnitude * 0.002)
+
+  return [Math.floor(minimum - padding), Math.ceil(maximum + padding)]
+}
+
 export function booksHref(query: string) {
   return `/books?query=${encodeURIComponent(query)}`
 }

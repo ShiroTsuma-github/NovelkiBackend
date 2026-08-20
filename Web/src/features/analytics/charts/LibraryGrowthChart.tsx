@@ -1,7 +1,7 @@
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { BookAnalyticsDto, BookAnalyticsLibraryGrowthPointDto } from '@/api/types'
 import { Surface } from '@/components/app/DesignSystem'
-import { analyticsTooltipProps, dateRangeForBucket, DrilldownLink, fieldQuery, formatCount, formatDateRange } from './chartUtils'
+import { analyticsTooltipProps, dateRangeForBucket, DrilldownLink, fieldQuery, focusedValueDomain, formatCount, formatDateRange } from './chartUtils'
 
 type LibraryGrowthChartProps = {
   data: BookAnalyticsDto | undefined
@@ -12,6 +12,7 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
   const openingCount = data?.libraryGrowth.openingCount ?? 0
   const bucket = data?.scope.bucket ?? 'day'
   const chartPoints = libraryGrowthChartPoints(points, bucket)
+  const cumulativeDomain = focusedValueDomain(chartPoints.map((point) => point.cumulativeBooks))
   const displayPoints = compactGrowthPoints(points, bucket)
   const newestDisplayPoints = [...displayPoints].reverse()
 
@@ -35,14 +36,15 @@ export function LibraryGrowthChart({ data }: LibraryGrowthChartProps) {
         <ResponsiveContainer>
           <LineChart data={chartPoints}>
             <XAxis dataKey="date" tickLine={false} />
-            <YAxis allowDecimals={false} tickLine={false} />
+            <YAxis allowDecimals={false} tickLine={false} yAxisId="daily" />
+            <YAxis allowDecimals={false} domain={cumulativeDomain} orientation="right" tickLine={false} yAxisId="cumulative" />
             <Tooltip
               {...analyticsTooltipProps}
               formatter={(value, name) => [`${formatCount(Number(value))}`, growthLabel(name)]}
               labelFormatter={(label) => `Bucket ${label}`}
             />
-            <Line dataKey="cumulativeBooks" name="cumulativeBooks" stroke="#8b92d8" strokeWidth={2} dot={{ r: 3 }} />
-            <Line dataKey="booksAdded" name="booksAdded" stroke="#d1aa6e" strokeWidth={2} dot={{ r: 3 }} />
+            <Line dataKey="cumulativeBooks" name="cumulativeBooks" stroke="#8b92d8" strokeWidth={2} yAxisId="cumulative" dot={{ r: 3 }} />
+            <Line dataKey="booksAdded" name="booksAdded" stroke="#d1aa6e" strokeWidth={2} yAxisId="daily" dot={{ r: 3 }} />
           </LineChart>
         </ResponsiveContainer>
       </div>

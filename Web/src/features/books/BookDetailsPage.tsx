@@ -31,6 +31,7 @@ export function BookDetailsPage() {
     queryKey: ['book', id],
     queryFn: () => api.getBook(id!),
     enabled: Boolean(id),
+    refetchInterval: (query) => query.state.data?.cover?.status === 'Pending' ? 2_000 : false,
   })
   const previewImageUrl = useResolvedCoverImage(bookQuery.data?.cover)
   const deleteMutation = useMutation({

@@ -22,6 +22,23 @@ public class CreateBookCommandValidator : AbstractValidator<CreateBookCommand>
             x => x.Notes,
             x => x.RawImportedLine,
             x => x.Links));
+
+        RuleFor(x => x.InitialCoverUrl)
+            .MaximumLength(2000)
+            .Must(BeAbsoluteHttpUrl)
+            .When(x => !string.IsNullOrWhiteSpace(x.InitialCoverUrl))
+            .WithMessage("Initial cover URL must be an absolute HTTP or HTTPS URL.");
+
+        RuleFor(x => x)
+            .Must(x => string.IsNullOrWhiteSpace(x.InitialCoverUrl) || x.InitialCoverUploadToken == null)
+            .WithName("InitialCoverUploadToken")
+            .WithMessage("Provide either an initial cover URL or a pending cover upload, not both.");
+    }
+
+    private static bool BeAbsoluteHttpUrl(string? value)
+    {
+        return Uri.TryCreate(value, UriKind.Absolute, out var uri) &&
+               (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
     }
 }
 

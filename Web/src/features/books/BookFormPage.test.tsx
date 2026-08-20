@@ -6,6 +6,7 @@ import { api } from '@/api/client'
 import { books, dictionaries, genres, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { BookFormPage } from './BookFormPage'
+import { bindPendingCoverUpload, stagePendingCoverUpload } from './coverUploadOutbox'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -35,6 +36,12 @@ vi.mock('sonner', () => ({
   },
 }))
 
+vi.mock('./coverUploadOutbox', () => ({
+  stagePendingCoverUpload: vi.fn(),
+  bindPendingCoverUpload: vi.fn(),
+  discardPendingCoverUpload: vi.fn(),
+}))
+
 describe('BookFormPage', () => {
   beforeEach(() => {
     vi.mocked(api.getTypes).mockResolvedValue(paginated(dictionaries))
@@ -44,6 +51,8 @@ describe('BookFormPage', () => {
     vi.mocked(api.searchTags).mockResolvedValue([])
     vi.mocked(api.getBooks).mockResolvedValue({ skip: 0, take: 10, total: 0, data: [] })
     vi.mocked(api.createBook).mockResolvedValue({ id: 'book-1' })
+    vi.mocked(stagePendingCoverUpload).mockResolvedValue('11111111-1111-1111-1111-111111111111')
+    vi.mocked(bindPendingCoverUpload).mockResolvedValue()
   })
 
   it('disables native browser validation for numeric fields and keeps the controlled inputs text-based', async () => {
@@ -145,7 +154,31 @@ describe('BookFormPage', () => {
     })
     expect(request.alternativeTitles.map((title) => title.title)).toEqual(['Alternate Name'])
     expect(request.links.map((link) => link.url)).toContain('https://www.novelupdates.com/series/parsed-novel/')
-    expect(api.setBookCoverFromUrl).toHaveBeenCalledWith('book-1', 'https://cdn.example.com/parsed-cover.jpg')
+    expect(request.initialCoverUrl).toBe('https://cdn.example.com/parsed-cover.jpg')
+    expect(api.setBookCoverFromUrl).not.toHaveBeenCalled()
+  })
+
+  it('queues a local cover upload before creating the book instead of waiting for the network upload', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<BookFormPage mode="create" />, { route: '/books/new' })
+
+    await screen.findByText('Add book')
+    await user.type(screen.getByLabelText('Primary title'), 'Shadow Slave')
+    await user.type(screen.getByLabelText('Current chapter'), '0')
+    await user.click(screen.getByText('Add cover'))
+    const dialog = screen.getByRole('dialog')
+    const input = within(dialog).getByLabelText(/upload image/i)
+    const file = new File(['cover'], 'cover.jpg', { type: 'image/jpeg' })
+    await user.upload(input, file)
+
+    await user.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(api.createBook).toHaveBeenCalled())
+    expect(stagePendingCoverUpload).toHaveBeenCalledWith(file)
+    expect(vi.mocked(api.createBook).mock.calls[0][0].initialCoverUploadToken)
+      .toBe('11111111-1111-1111-1111-111111111111')
+    expect(bindPendingCoverUpload).toHaveBeenCalledWith('11111111-1111-1111-1111-111111111111', 'book-1')
+    expect(api.uploadBookCover).not.toHaveBeenCalled()
   })
 
   it('keeps an existing field when the user deselects it in the HTML preview', async () => {

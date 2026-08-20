@@ -409,6 +409,8 @@ export type BookMutationRequest = {
   notes?: string | null
   rawImportedLine?: string | null
   links: BookLinkInput[]
+  initialCoverUrl?: string | null
+  initialCoverUploadToken?: string | null
 }
 
 export type BookHtmlDictionaryMatch = {

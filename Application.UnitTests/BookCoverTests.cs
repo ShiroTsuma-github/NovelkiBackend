@@ -1059,6 +1059,11 @@ public class BookCoverTests
             return Task.FromResult(Cover);
         }
 
+        public Task<BookCover?> GetByPendingUploadTokenAsync(Guid token, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Cover?.PendingUploadToken == token && Cover.Book.OwnerId == ownerId ? Cover : null);
+        }
+
         public Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken)
         {
             return Task.FromResult<IReadOnlyCollection<BookCover>>(Array.Empty<BookCover>());

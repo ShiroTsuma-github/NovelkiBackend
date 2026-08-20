@@ -10,6 +10,7 @@ import { RegisterPage } from '@/features/auth/RegisterPage'
 import { AnalyticsPage } from '@/features/analytics/AnalyticsPage'
 import { BookDetailsPage } from '@/features/books/BookDetailsPage'
 import { BookFormPage } from '@/features/books/BookFormPage'
+import { CoverUploadOutbox } from '@/features/books/CoverUploadOutboxWorker'
 import { BooksPage } from '@/features/books/BooksPage'
 import { ManagePage } from '@/features/manage/ManagePage'
 import { DiscoverPage } from '@/features/discover/DiscoverPage'
@@ -73,5 +74,8 @@ function ProtectedLayout() {
     return <Navigate to="/login" replace />
   }
 
-  return <AppShell />
+  return <>
+    <CoverUploadOutbox />
+    <AppShell />
+  </>
 }

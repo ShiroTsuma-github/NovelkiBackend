@@ -9,6 +9,7 @@ public class BookCover : BaseAuditableEntity
     public string? StoragePath { get; set; }
     public string? ThumbnailStoragePath { get; set; }
     public string? OriginalImageUrl { get; set; }
+    public Guid? PendingUploadToken { get; set; }
     public string? MimeType { get; set; }
     public string? ThumbnailMimeType { get; set; }
     public long? SizeBytes { get; set; }

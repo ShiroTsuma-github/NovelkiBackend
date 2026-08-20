@@ -20,7 +20,9 @@ public sealed record CreateBookCommand(
     string? Description,
     string? Notes,
     string? RawImportedLine,
-    IEnumerable<BookLinkInput>? Links) : IRequest<Guid>;
+    IEnumerable<BookLinkInput>? Links,
+    string? InitialCoverUrl = null,
+    Guid? InitialCoverUploadToken = null) : IRequest<Guid>;
 
 public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
 {
@@ -79,6 +81,7 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
         var currentChapterLabel = BookMutationSupport.TrimToNull(request.CurrentChapterLabel);
         var notes = BookMutationSupport.TrimToNull(request.Notes);
         var rawImportedLine = BookMutationSupport.TrimToNull(request.RawImportedLine);
+        var initialCoverUrl = BookMutationSupport.TrimToNull(request.InitialCoverUrl);
         var book = new Book
         {
             PrimaryTitle = primaryTitle,
@@ -99,7 +102,14 @@ public class CreateBookHandler : IRequestHandler<CreateBookCommand, Guid>
             Priority = request.Priority,
             Notes = notes,
             RawImportedLine = rawImportedLine,
-            Cover = new BookCover()
+            Cover = new BookCover
+            {
+                Source = initialCoverUrl != null
+                    ? BookCoverSource.ManualUrl
+                    : request.InitialCoverUploadToken != null ? BookCoverSource.ManualUpload : null,
+                OriginalImageUrl = initialCoverUrl,
+                PendingUploadToken = request.InitialCoverUploadToken
+            }
         };
 
         foreach (var title in BookMutationSupport.BuildTitles(primaryTitle, request.AlternativeTitles))

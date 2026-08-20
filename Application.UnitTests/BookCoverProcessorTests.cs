@@ -96,6 +96,43 @@ public class BookCoverProcessorTests
     }
 
     [Fact]
+    public async Task ProcessAsync_ShouldPrioritizeTheQueuedManualCoverUrl()
+    {
+        var cover = Cover(BookCoverStatus.Pending);
+        cover.Source = BookCoverSource.ManualUrl;
+        cover.OriginalImageUrl = "https://cdn.example.com/covers/manual.jpg";
+        var repository = new FakeBookCoverRepository { Cover = cover };
+        var storage = new FakeBookCoverStorage();
+        var processor = CreateProcessor(
+            repository,
+            storage,
+            provider: new FakeBookCoverProvider(null),
+            httpClientFactory: new FakeHttpClientFactory(new ByteArrayContent([1, 2, 3])));
+
+        await processor.ProcessAsync(BookId, CancellationToken.None);
+
+        Assert.Equal(BookCoverStatus.Found, cover.Status);
+        Assert.Equal(BookCoverSource.ManualUrl, cover.Source);
+        Assert.Equal("https://cdn.example.com/covers/manual.jpg", cover.OriginalImageUrl);
+        Assert.Equal(1, storage.SaveCount);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ShouldLeaveAQueuedBrowserUploadForTheBrowserOutbox()
+    {
+        var cover = Cover(BookCoverStatus.Pending);
+        cover.Source = BookCoverSource.ManualUpload;
+        cover.PendingUploadToken = Guid.NewGuid();
+        var repository = new FakeBookCoverRepository { Cover = cover };
+        var processor = CreateProcessor(repository);
+
+        await processor.ProcessAsync(BookId, CancellationToken.None);
+
+        Assert.Equal(BookCoverStatus.Pending, cover.Status);
+        Assert.Equal(0, repository.SaveCount);
+    }
+
+    [Fact]
     public async Task ProcessAsync_ShouldMarkFailedAndInvalidateCacheForValidationFailure()
     {
         var cover = Cover(BookCoverStatus.Pending);
@@ -233,6 +270,11 @@ public class BookCoverProcessorTests
         public Task<BookCover?> GetByBookIdAsync(Guid bookId, CancellationToken cancellationToken)
         {
             return Task.FromResult(Cover);
+        }
+
+        public Task<BookCover?> GetByPendingUploadTokenAsync(Guid token, Guid ownerId, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Cover?.PendingUploadToken == token && Cover.Book.OwnerId == ownerId ? Cover : null);
         }
 
         public Task<IReadOnlyCollection<BookCover>> GetPendingAsync(int take, CancellationToken cancellationToken)

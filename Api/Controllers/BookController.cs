@@ -427,6 +427,14 @@ public partial class BookController : ControllerBase
         return Ok(cover);
     }
 
+    [HttpGet("cover/uploads/{token:guid}")]
+    [Authorize]
+    public async Task<IActionResult> ResolvePendingCoverUpload(Guid token, CancellationToken cancellationToken)
+    {
+        var bookId = await _mediator.Send(new ResolvePendingCoverUploadQuery(token), cancellationToken);
+        return bookId is null ? NotFound() : Ok(new { BookId = bookId });
+    }
+
     [HttpPut("{id:guid}/cover/url")]
     [Authorize]
     [EnableRateLimiting(DependencyInjection.ExpensiveUserActionRateLimitPolicy)]

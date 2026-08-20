@@ -16,6 +16,11 @@ import { bookFormSchema, defaultBookFormValues, toBookMutationRequest, type Book
 import { getDisplayCoverFailure, getDisplayCoverStatus } from './coverFailure'
 import { BookHtmlParseDialog, type BookHtmlParseField } from './BookHtmlParseDialog'
 import { getBookListReturnTo } from './bookListNavigation'
+import {
+  bindPendingCoverUpload,
+  discardPendingCoverUpload,
+  stagePendingCoverUpload,
+} from './coverUploadOutbox'
 
 type BookFormPageProps = {
   mode: 'create' | 'edit'
@@ -30,6 +35,7 @@ type DraftCoverState =
 type SaveResult = {
   id: string
   coverError?: string | null
+  coverQueued?: boolean
 }
 
 type SelectedAuthorDisplay = {
@@ -335,18 +341,35 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       const request = toBookMutationRequest(resolvedValues)
 
       if (mode === 'create') {
-        const created = await api.createBook(request)
-        let coverError: string | null = null
+        const pendingCoverUploadToken = draftCover?.kind === 'file'
+          ? await stagePendingCoverUpload(draftCover.file)
+          : null
+        let created: { id: string }
         try {
-          if (draftCover) {
-            const savedCover = await saveCover(created.id, draftCover)
-            await saveBookWithCoverSourceLink(created.id, request, savedCover)
-          }
+          const createRequest = draftCover?.kind === 'url'
+            ? { ...request, initialCoverUrl: draftCover.imageUrl }
+            : pendingCoverUploadToken
+              ? { ...request, initialCoverUploadToken: pendingCoverUploadToken }
+              : request
+          created = await api.createBook(createRequest)
         } catch (error) {
-          coverError = error instanceof HttpError ? error.apiError.detail : error instanceof Error ? error.message : 'Failed to save cover.'
+          if (pendingCoverUploadToken) {
+            await discardPendingCoverUpload(pendingCoverUploadToken)
+          }
+          throw error
         }
 
-        return { id: created.id, coverError }
+        if (pendingCoverUploadToken) {
+          try {
+            await bindPendingCoverUpload(pendingCoverUploadToken, created.id)
+          } catch {
+            // The global queue can recover the book from the durable token after a reload.
+          }
+        }
+        return {
+          id: created.id,
+          coverQueued: draftCover?.kind === 'url' || pendingCoverUploadToken != null,
+        }
       }
 
       await (admin ? api.updateAdminBook(id!, request) : api.updateBook(id!, request))
@@ -365,16 +388,33 @@ export function BookFormPage({ mode, admin = false }: BookFormPageProps) {
       return { id: id!, coverError }
     },
     onSuccess: async (response) => {
-      await Promise.all([
+      const invalidateQueries = Promise.all([
         queryClient.invalidateQueries({ queryKey: ['books'] }),
         queryClient.invalidateQueries({ queryKey: ['adminBooks'] }),
         queryClient.invalidateQueries({ queryKey: ['book', response.id] }),
         queryClient.invalidateQueries({ queryKey: ['adminBook', response.id] }),
       ])
+      if (mode === 'create') {
+        void invalidateQueries
+        if (response.coverError) {
+          toast.warning(`Book added, but cover failed: ${response.coverError}`)
+        } else if (response.coverQueued) {
+          toast.success('Book added. Cover is being saved in the background.')
+        } else {
+          toast.success('Book added.')
+        }
+        navigate(admin ? '/admin' : `/books/${response.id}`, {
+          replace: true,
+          state: admin ? undefined : { bookListReturnTo },
+        })
+        return
+      }
+
+      await invalidateQueries
       if (response.coverError) {
         toast.warning(`Book saved, but cover failed: ${response.coverError}`)
       } else {
-        toast.success(mode === 'create' ? 'Book added.' : 'Book updated.')
+        toast.success('Book updated.')
       }
       navigate(admin ? '/admin' : `/books/${response.id}`, {
         replace: true,

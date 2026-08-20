@@ -10,9 +10,9 @@ type TopRelationsChartProps = {
 }
 
 const topLimit = 5
-const moreLimit = 50
 
 export function TopRelationsChart({ field, items, title }: TopRelationsChartProps) {
+  const moreLimit = field === 'tag' ? 20 : 50
   const [visibleLimit, setVisibleLimit] = useState(topLimit)
   const rows = toLimitedRelationRows(items, visibleLimit)
   const remainingCount = Math.max(0, items.length - visibleLimit)
@@ -44,15 +44,28 @@ export function TopRelationsChart({ field, items, title }: TopRelationsChartProp
         </div>
       ))}
       {remainingCount > 0 || expanded ? (
-        <button
-          aria-expanded={expanded}
-          className={`${buttonVariants.ghost} justify-self-start`}
-          type="button"
-          onClick={() => setVisibleLimit((current) =>
-            current >= items.length ? topLimit : current + moreLimit)}
-        >
-          {remainingCount > 0 ? `Show ${nextBatchCount} more` : `Show top ${topLimit}`}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          {remainingCount > 0 ? (
+            <button
+              aria-expanded={expanded}
+              className={buttonVariants.ghost}
+              type="button"
+              onClick={() => setVisibleLimit((current) => current + moreLimit)}
+            >
+              Show {nextBatchCount} more
+            </button>
+          ) : null}
+          {expanded ? (
+            <button
+              aria-expanded={expanded}
+              className={buttonVariants.ghost}
+              type="button"
+              onClick={() => setVisibleLimit(topLimit)}
+            >
+              Show top {topLimit}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </div>
   )

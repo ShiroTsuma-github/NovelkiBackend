@@ -88,6 +88,8 @@ public sealed class BookCoverProcessor
 {
     private const string CoverDownloadFailureMessage =
         "A cover was found, but the image could not be downloaded. Try searching again or upload a cover manually.";
+    private const string ManualCoverDownloadFailureMessage =
+        "The selected cover URL could not be downloaded. Try another URL or upload a cover manually.";
 
     private readonly IBookListCacheInvalidator _cacheInvalidator;
     private readonly IBookCoverRepository _coverRepository;
@@ -123,13 +125,21 @@ public sealed class BookCoverProcessor
         {
             return;
         }
+        if (cover.Source == BookCoverSource.ManualUpload && cover.PendingUploadToken != null)
+        {
+            return;
+        }
 
         cover.LastAttemptAt = DateTimeOffset.UtcNow;
         await _coverRepository.SaveAsync(cancellationToken);
+        var hasQueuedManualUrl = cover.Source == BookCoverSource.ManualUrl &&
+                                  !string.IsNullOrWhiteSpace(cover.OriginalImageUrl);
 
         try
         {
-            var candidate = await _resolver.FindAsync(cover.Book, cancellationToken);
+            var candidate = hasQueuedManualUrl
+                ? new BookCoverCandidate(BookCoverSource.ManualUrl, cover.OriginalImageUrl!)
+                : await _resolver.FindAsync(cover.Book, cancellationToken);
             if (candidate == null)
             {
                 cover.Status = BookCoverStatus.NotFound;
@@ -189,7 +199,9 @@ public sealed class BookCoverProcessor
             else if (ex is HttpRequestException)
             {
                 cover.Status = BookCoverStatus.Failed;
-                cover.FailureReason = CoverDownloadFailureMessage;
+                cover.FailureReason = hasQueuedManualUrl
+                    ? ManualCoverDownloadFailureMessage
+                    : CoverDownloadFailureMessage;
             }
             else
             {

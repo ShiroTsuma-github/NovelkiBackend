@@ -16,6 +16,7 @@ internal static class BookCoverMutationSupport
         cover.StoragePath = stored.Original.StoragePath;
         cover.ThumbnailStoragePath = stored.Thumbnail.StoragePath;
         cover.OriginalImageUrl = originalImageUrl;
+        cover.PendingUploadToken = null;
         cover.MimeType = stored.Original.MimeType;
         cover.ThumbnailMimeType = stored.Thumbnail.MimeType;
         cover.SizeBytes = stored.Original.SizeBytes;
@@ -41,6 +42,7 @@ internal static class BookCoverMutationSupport
         cover.StoragePath = null;
         cover.ThumbnailStoragePath = null;
         cover.OriginalImageUrl = null;
+        cover.PendingUploadToken = null;
         cover.MimeType = null;
         cover.ThumbnailMimeType = null;
         cover.SizeBytes = null;

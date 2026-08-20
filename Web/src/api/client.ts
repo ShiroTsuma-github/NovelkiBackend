@@ -138,6 +138,8 @@ export const api = {
     formData.set('file', file)
     return apiFormRequest<BookCoverDto>(`/book/${id}/cover`, formData, { method: 'PUT' })
   },
+  resolvePendingBookCoverUpload: (token: string) =>
+    apiRequest<{ bookId: string }>(`/book/cover/uploads/${token}`),
   refreshBookCover: (id: string) =>
     apiRequest<BookCoverDto>(`/book/${id}/cover/refresh`, { method: 'POST' }),
   deleteBookCover: (id: string) =>
