@@ -101,13 +101,14 @@ export function BooksPage() {
   const [cardFieldPreferences, setCardFieldPreferences] = useColumnPreferences(bookCardFieldsStorageKey, bookCardFields)
   const [viewMode, setViewMode] = useViewMode(bookLayoutStorageKey)
   const [cardsPerRow, setCardsPerRow] = useCardsPerRow(cardsPerRowStorageKey)
+  const effectiveCardsPerRow = useResponsiveCardsPerRow(cardsPerRow)
   const [lastImportResult, setLastImportResult] = useState<BookImportFinalizeResult | null>(null)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [importMenuOpen, setImportMenuOpen] = useState(false)
   const [importMode, setImportMode] = useState<'csv' | 'full'>('csv')
   const [summaryOpen, setSummaryOpen] = useState(false)
   const pageSizeOptions = viewMode === 'cards'
-    ? getCardPageSizeOptions(cardsPerRow)
+    ? getCardPageSizeOptions(effectiveCardsPerRow)
     : bookListPageSizeOptions
   const {
     pageSize: requestedPageSize,
@@ -431,7 +432,7 @@ export function BooksPage() {
         ) : (
           <BookCardGrid
             books={booksQuery.data?.data ?? []}
-            cardsPerRow={cardsPerRow}
+            cardsPerRow={effectiveCardsPerRow}
             fields={visibleCardFields}
             isLoading={booksQuery.isLoading}
           />
@@ -471,7 +472,7 @@ function CardsPerRowControl({
   onChange: (value: number) => void
 }) {
   return (
-    <label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <label className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500 lg:flex">
       <span>Cards / row</span>
       <span className="relative inline-flex">
         <select
@@ -706,6 +707,33 @@ export function useCardsPerRow(storageKey: string) {
   return [cardsPerRow, setCardsPerRow] as const
 }
 
+export function getResponsiveCardsPerRow(cardsPerRow: number, viewportWidth: number) {
+  if (viewportWidth < 640) {
+    return 1
+  }
+
+  if (viewportWidth < 1024) {
+    return 2
+  }
+
+  return normalizeCardsPerRow(cardsPerRow)
+}
+
+function useResponsiveCardsPerRow(cardsPerRow: number) {
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth)
+
+  useEffect(() => {
+    function updateViewportWidth() {
+      setViewportWidth(window.innerWidth)
+    }
+
+    window.addEventListener('resize', updateViewportWidth)
+    return () => window.removeEventListener('resize', updateViewportWidth)
+  }, [])
+
+  return getResponsiveCardsPerRow(cardsPerRow, viewportWidth)
+}
+
 function BookCardGrid({
   books,
   cardsPerRow,
@@ -742,7 +770,7 @@ function BookCardGrid({
   })
 
   return (
-    <div className={`grid min-w-0 gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
+    <div className={`book-card-grid grid min-w-0 gap-4 p-4 sm:grid-cols-2 ${getDesktopCardsPerRowClass(cardsPerRow)}`}>
       {books.map((book) => (
         <Surface
           as="article"
@@ -1030,7 +1058,7 @@ function normalizeCardsPerRow(value: number) {
 }
 
 export function getCardPageSizeOptions(cardsPerRow: number) {
-  const normalizedCardsPerRow = normalizeCardsPerRow(cardsPerRow)
+  const normalizedCardsPerRow = cardsPerRow === 1 ? 1 : normalizeCardsPerRow(cardsPerRow)
   const maximumPageSize = Math.max(...bookListPageSizeOptions)
   return [...new Set(bookListPageSizeOptions.map((pageSize) => {
     const roundedUp = Math.ceil(pageSize / normalizedCardsPerRow) * normalizedCardsPerRow

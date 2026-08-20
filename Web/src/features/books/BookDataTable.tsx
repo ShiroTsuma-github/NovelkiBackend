@@ -35,7 +35,7 @@ export function BookDataTable<T extends { id: string }>({
   const tableMinWidthRem = getBookTableMinWidthRem(columns)
 
   return (
-    <div className={`${wrapperClassName} max-w-full overflow-x-auto`}>
+    <div className={`book-table-scroll ${wrapperClassName} max-w-full overflow-x-auto`}>
       <table className="w-full table-fixed border-collapse text-left text-sm" style={{ minWidth: `${tableMinWidthRem}rem` }}>
         <colgroup>
           {columns.map((column) => <col className={column.widthClass ?? ''} key={column.id} />)}

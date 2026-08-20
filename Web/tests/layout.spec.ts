@@ -7,6 +7,7 @@ import {
   expectFitsViewportWidth,
   expectInViewport,
   expectMinHeight,
+  expectMinTouchTarget,
   expectNoHorizontalOverflow,
   expectNoVerticalDocumentOverflow,
   requiredBox,
@@ -80,8 +81,10 @@ test('books table layout has no horizontal overflow and keeps controls in viewpo
 
   await expectNoHorizontalOverflow(page)
   await expectInViewport(page.getByRole('button', { name: /columns/i }))
-  if (page.viewportSize()!.width >= 768) {
+  if (page.viewportSize()!.width >= 1024) {
     await expectInViewport(page.getByRole('table'))
+  } else if (page.viewportSize()!.width >= 768) {
+    await expectFitsViewportWidth(page.locator('.book-table-scroll'))
   }
 
   await page.reload()
@@ -130,6 +133,7 @@ test('books table hover highlight reaches the sticky actions cell', async ({ pag
 })
 
 test('quiet structure reference screens stay visually stable', async ({ page }, testInfo) => {
+  test.skip(isTabletProject(testInfo.project.name), 'Tablet baselines are covered by the dedicated Xiaomi Pad 6 suite')
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
   await page.goto('/books')
@@ -300,10 +304,20 @@ test('search and compact selects reserve space for their icons', async ({ page }
 
   await page.getByRole('button', { name: /cards/i }).click()
   const cardsPerRow = page.getByLabel('Cards per row')
-  await expect(cardsPerRow).toHaveCSS('padding-right', '32px')
-  const cardsPerRowBox = await requiredBox(cardsPerRow)
-  expect(cardsPerRowBox.width).toBeGreaterThanOrEqual(64)
-  expect(cardsPerRowBox.width).toBeLessThanOrEqual(66)
+  const expectedColumnCount = page.viewportSize()!.width >= 1024
+    ? 4
+    : page.viewportSize()!.width >= 640 ? 2 : 1
+  await expect.poll(() => page.locator('.book-card-grid').evaluate(
+    (element) => getComputedStyle(element).gridTemplateColumns.split(' ').length,
+  )).toBe(expectedColumnCount)
+  if (page.viewportSize()!.width >= 1024) {
+    await expect(cardsPerRow).toHaveCSS('padding-right', '32px')
+    const cardsPerRowBox = await requiredBox(cardsPerRow)
+    expect(cardsPerRowBox.width).toBeGreaterThanOrEqual(64)
+    expect(cardsPerRowBox.width).toBeLessThanOrEqual(66)
+  } else {
+    await expect(cardsPerRow).toBeHidden()
+  }
 })
 
 test('advanced search suggestions stay usable inside desktop and mobile viewports', async ({ page }) => {
@@ -414,7 +428,7 @@ test('progress dialog exposes error state through DOM and stays centered', async
   await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled()
 })
 
-test('book form create layout fits desktop and mobile viewports', async ({ page }) => {
+test('book form create layout fits desktop and mobile viewports', async ({ page }, testInfo) => {
   await page.goto('/books/new')
   await expect(page.getByRole('heading', { name: 'Add book' })).toBeVisible()
 
@@ -425,15 +439,17 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
   await expectFitsViewportWidth(page.getByRole('heading', { name: 'Library details' }).locator('xpath=ancestor::section[1]'))
 
   const cover = page.locator('.book-form-cover-artwork')
+  const coverPanel = page.getByTestId('book-cover-editor')
   const actions = page.getByTestId('book-form-rail').locator('.book-form-actions')
   const saveButton = actions.getByRole('button', { name: 'Save' })
   const identityBox = await requiredBox(identity)
   const coverBox = await requiredBox(cover)
+  const coverPanelBox = await requiredBox(coverPanel)
   const ratingOption = page.getByRole('button', { name: 'Set rating to 1/10' })
 
   await expect(ratingOption).toHaveCSS('border-top-width', '0px')
   await expect(ratingOption).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)')
-  await expectMinHeight(ratingOption, page.viewportSize()!.width < 768 ? 44 : 32)
+  await expectMinHeight(ratingOption, page.viewportSize()!.width < 768 || isTabletProject(testInfo.project.name) ? 44 : 32)
 
   const descriptionBox = await requiredBox(page.locator('textarea[name="description"]'))
   const alternativeTitlesBox = await requiredBox(page.locator('textarea[name="alternativeTitlesText"]'))
@@ -444,9 +460,21 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
   expect(linksBox.height).toBeGreaterThanOrEqual(192)
   expect(notesBox.height).toBeGreaterThanOrEqual(144)
 
-  if (page.viewportSize()!.width < 1280) {
+  if (page.viewportSize()!.width < 768) {
     expect(coverBox.y).toBeGreaterThan(identityBox.y + identityBox.height)
     expect(coverBox.width).toBeLessThanOrEqual(136)
+    await expect(actions).toHaveCSS('position', 'fixed')
+    await expectMinHeight(saveButton, 44)
+  } else if (page.viewportSize()!.width < 1280) {
+    expect(coverPanelBox.x).toBeGreaterThan(identityBox.x + identityBox.width)
+    expect(Math.abs(coverPanelBox.y - identityBox.y)).toBeLessThanOrEqual(1)
+    expect(Math.abs(coverPanelBox.height - identityBox.height)).toBeLessThanOrEqual(1)
+    expect(coverBox.width).toBeLessThanOrEqual(160)
+    const readingBox = await requiredBox(page.getByRole('heading', { name: 'Reading state' }).locator('xpath=ancestor::section[1]'))
+    expect(readingBox.y).toBeGreaterThanOrEqual(Math.max(
+      identityBox.y + identityBox.height,
+      coverPanelBox.y + coverPanelBox.height,
+    ))
     await expect(actions).toHaveCSS('position', 'fixed')
     await expectMinHeight(saveButton, 44)
   } else {
@@ -458,6 +486,13 @@ test('book form create layout fits desktop and mobile viewports', async ({ page 
 
   if (page.viewportSize()!.width < 1280) {
     await expectInViewport(saveButton)
+  }
+
+  if (testInfo.project.name === 'chromium-xiaomi-pad-6-portrait') {
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+    const notesBox = await requiredBox(page.locator('textarea[name="notes"]'))
+    const actionsBox = await requiredBox(actions)
+    expect(notesBox.y + notesBox.height).toBeLessThanOrEqual(actionsBox.y - 8)
   }
 
   await page.getByRole('button', { name: 'Parse HTML' }).click()
@@ -524,3 +559,179 @@ test('csv import invalid rows panel keeps usable height in the browser layout', 
     await expectElementBottomVisible(invalidRowsPanel, page.getByLabel('Notes'))
   }
 })
+
+test.describe('Xiaomi Pad 6 tablet layout', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(!isTabletProject(testInfo.project.name), 'Xiaomi Pad 6 project only')
+  })
+
+  test('critical routes fit portrait and landscape viewports', async ({ page }) => {
+    const routes = [
+      { path: '/books', heading: 'Books' },
+      { path: '/books/new', heading: 'Add book' },
+      { path: `/books/${layoutBooks[0].id}`, heading: layoutBooks[0].primaryTitle },
+      { path: '/analytics', heading: 'Analytics' },
+      { path: '/manage', heading: 'Manage' },
+      { path: '/discover', heading: 'Discover books' },
+    ]
+
+    for (const route of routes) {
+      await page.goto(route.path)
+      await expect(page.getByRole('heading', { name: route.heading, exact: true })).toBeVisible()
+      await expectNoHorizontalOverflow(page)
+      await expectFitsViewportWidth(page.locator('main'))
+    }
+  })
+
+  test('table scrolling stays inside its surface', async ({ page }) => {
+    await page.goto('/books')
+    const scrollSurface = page.locator('.book-table-scroll')
+    await expect(page.getByRole('table')).toBeVisible()
+    await expectFitsViewportWidth(scrollSurface)
+    await expectNoHorizontalOverflow(page)
+
+    const scrollState = await scrollSurface.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      overflowX: getComputedStyle(element).overflowX,
+      scrollWidth: element.scrollWidth,
+    }))
+    expect(scrollState.overflowX).toBe('auto')
+
+    if (page.viewportSize()!.width === 900) {
+      expect(scrollState.scrollWidth).toBeGreaterThan(scrollState.clientWidth)
+      await scrollSurface.evaluate((element) => { element.scrollLeft = element.scrollWidth })
+      await expectInViewport(page.getByTestId(`book-table-actions-cell-${layoutBooks[0].id}`))
+    }
+  })
+
+  test('cards per row is adaptive in portrait and user-controlled in landscape', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('novelki.books.cards-per-row.v1', '8')
+    })
+    await page.goto('/books')
+    await page.getByRole('button', { name: /cards/i }).click()
+
+    const grid = page.locator('.book-card-grid')
+    const cardsPerRow = page.getByLabel('Cards per row')
+    const columnCount = () => grid.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(' ').length)
+
+    if (page.viewportSize()!.width === 900) {
+      await expect(cardsPerRow).toBeHidden()
+      expect(await columnCount()).toBe(2)
+      await expect(page.locator('.book-card h2').first()).toHaveCSS('font-size', '18px')
+      await expect(page.getByLabel('Per page')).toContainText('50')
+    } else {
+      await expect(cardsPerRow).toBeVisible()
+      expect(await columnCount()).toBe(8)
+      await cardsPerRow.selectOption('3')
+      await expect.poll(columnCount).toBe(3)
+      expect(await page.evaluate(() => window.localStorage.getItem('novelki.books.cards-per-row.v1'))).toBe('3')
+    }
+  })
+
+  test('touch controls, popovers, and dialogs stay usable', async ({ page }) => {
+    await page.route('**/api/v1/book?**', async (route) => {
+      await route.fulfill({ json: { skip: 0, take: 20, total: 220, data: layoutBooks } })
+    })
+    await page.goto('/books')
+
+    const primaryNav = page.getByRole('navigation', { name: /primary/i })
+    await expectMinTouchTarget(primaryNav.getByRole('link', { name: /books/i }))
+    await expectMinTouchTarget(page.getByRole('button', { name: /log out/i }))
+    await expectMinTouchTarget(page.getByRole('link', { name: /add book/i }))
+    await expectMinTouchTarget(page.getByRole('link', { name: /view .*long book title/i }))
+    await expectMinTouchTarget(page.getByRole('button', { name: '1', exact: true }))
+    await expectMinTouchTarget(page.getByRole('button', { name: /next page/i }))
+
+    const search = page.getByRole('combobox', { name: 'Search books' })
+    await expectMinTouchTarget(search)
+    await search.click()
+    const suggestions = page.getByRole('listbox')
+    await expectInViewport(suggestions)
+    await expectMinTouchTarget(suggestions.getByRole('option').first())
+    await search.press('Escape')
+    await expect(suggestions).toBeHidden()
+
+    const cardsButton = page.getByRole('button', { name: /cards/i })
+    const tableButton = page.getByRole('button', { name: /table/i })
+    await expectMinTouchTarget(cardsButton)
+    await cardsButton.click()
+    await expect(page.locator('.book-card').first()).toBeVisible()
+    await expectMinTouchTarget(tableButton)
+    await tableButton.click()
+
+    const columnsButton = page.getByRole('button', { name: /columns/i })
+    await expectMinTouchTarget(columnsButton)
+    await columnsButton.click()
+    const columnPopup = page.getByTestId('column-settings-popup')
+    await expectInViewport(columnPopup)
+    await expectMinTouchTarget(columnPopup.getByRole('button', { name: /title/i }))
+    await expectMinTouchTarget(columnPopup.getByRole('button', { name: /reset/i }))
+    await columnsButton.click()
+
+    await page.getByRole('button', { name: /^import$/i }).click()
+    const importMenu = page.getByRole('menu')
+    await expectInViewport(importMenu)
+    await expectMinTouchTarget(importMenu.getByRole('menuitem', { name: /^csv/i }))
+    await importMenu.getByRole('menuitem', { name: /^csv/i }).click()
+    const importDialog = page.getByTestId('import-dialog-panel')
+    await expectInViewport(importDialog)
+    await expectMinTouchTarget(page.getByRole('button', { name: /close import dialog/i }))
+    await page.getByRole('button', { name: /close import dialog/i }).click()
+
+    await page.goto('/analytics')
+    const dateRangeButton = page.getByRole('button', { name: /date range/i })
+    await expectMinTouchTarget(dateRangeButton)
+    await dateRangeButton.click()
+    const datePopover = page.locator('.ui-popover').filter({ has: page.getByRole('button', { name: 'Last 3 months' }) })
+    await expectInViewport(datePopover)
+    await expectMinTouchTarget(datePopover.getByRole('button', { name: 'Last 3 months' }))
+    await expectMinTouchTarget(datePopover.locator('.analytics-calendar-day-button').filter({ visible: true }).first())
+    await expectNoHorizontalOverflow(page)
+  })
+
+  test('critical screens have dedicated tablet baselines', async ({ page }, testInfo) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    const capture = async (name: string) => {
+      await page.evaluate(() => window.scrollTo(0, 0))
+      await waitForVisualReady(page)
+      await expect(page).toHaveScreenshot(`xiaomi-pad-6-${name}-${testInfo.project.name}.png`, {
+        animations: 'disabled',
+        fullPage: false,
+      })
+    }
+
+    await page.goto('/books')
+    await expect(page.getByRole('table')).toBeVisible()
+    await capture('books-table')
+
+    await page.getByRole('button', { name: /cards/i }).click()
+    await expect(page.locator('.book-card').first()).toBeVisible()
+    await capture('books-cards')
+
+    await page.goto('/books/new')
+    await expect(page.getByRole('heading', { name: 'Add book' })).toBeVisible()
+    await page.getByLabel('Primary title').blur()
+    await capture('book-form')
+
+    await page.goto(`/books/${layoutBooks[0].id}`)
+    await expect(page.getByRole('heading', { name: layoutBooks[0].primaryTitle })).toBeVisible()
+    await capture('book-details')
+
+    await page.goto('/analytics')
+    await expect(page.getByRole('heading', { name: 'Analytics' })).toBeVisible()
+    await capture('analytics')
+
+    await page.goto('/manage')
+    await expect(page.getByRole('heading', { name: 'Manage' })).toBeVisible()
+    await capture('manage')
+
+    await page.goto('/discover')
+    await expect(page.getByRole('heading', { name: 'Discover books' })).toBeVisible()
+    await capture('discover')
+  })
+})
+
+function isTabletProject(projectName: string) {
+  return projectName.startsWith('chromium-xiaomi-pad-6-')
+}

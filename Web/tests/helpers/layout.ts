@@ -72,6 +72,12 @@ export async function expectMinHeight(locator: Locator, minHeightPx: number) {
   expect(box.height).toBeGreaterThanOrEqual(minHeightPx)
 }
 
+export async function expectMinTouchTarget(locator: Locator, minSizePx = 44) {
+  const box = await requiredBox(locator)
+  expect(box.width).toBeGreaterThanOrEqual(minSizePx)
+  expect(box.height).toBeGreaterThanOrEqual(minSizePx)
+}
+
 export async function expectElementBottomVisible(container: Locator, element: Locator) {
   const containerBox = await requiredBox(container)
   const elementBox = await requiredBox(element)

@@ -2217,6 +2217,74 @@ select.ui-control {
   }
 }
 
+@media (min-width: 768px) and (max-width: 1279px) {
+  .book-form-layout {
+    grid-template-columns: minmax(0, 1fr) clamp(13rem, 24vw, 16rem);
+    grid-template-areas:
+      "identity rail"
+      "reading reading"
+      "details details";
+    align-items: stretch;
+  }
+
+  .book-form-rail {
+    align-self: stretch;
+  }
+
+  .book-form-cover-panel {
+    height: 100%;
+    align-content: center;
+  }
+}
+
+@media (pointer: coarse) and (min-width: 768px) and (max-width: 1440px) {
+  .ui-segmented-control__item,
+  .book-form-rating-option,
+  .tablet-touch-target {
+    min-height: 44px;
+  }
+
+  .tablet-touch-target {
+    min-width: 44px;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1023px) and (orientation: portrait) {
+  .app-header__inner {
+    display: grid;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 0.75rem 1.5rem 0.625rem;
+  }
+
+  .app-brand {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .app-session-actions {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .app-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex: none;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding: 0.125rem 0 0.25rem;
+  }
+
+  .book-form-page {
+    padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+  }
+
+  .book-form-actions {
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+}
+
 @media (min-width: 1024px) {
   .app-header__inner,
   .app-main {

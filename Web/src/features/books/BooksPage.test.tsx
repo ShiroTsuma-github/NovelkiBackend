@@ -8,7 +8,7 @@ import { expectReadableTextContrast } from '@/test/contrast'
 import { bookListItems, books, dictionaries, paginated, statuses } from '@/test/fixtures'
 import { renderWithProviders } from '@/test/render'
 import { toast } from 'sonner'
-import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardPageSizeOptions, getCardRowMinHeightClasses, getCardTextSizeClasses, getClosestPageSize, getColumnPopupPosition, getVisibleColumns, readCardsPerRow } from './BooksPage'
+import { BooksPage, defaultColumnPreferences, formatAverageRating, formatProgress, getCardDetailRowClass, getCardPageSizeOptions, getCardRowMinHeightClasses, getCardTextSizeClasses, getClosestPageSize, getColumnPopupPosition, getResponsiveCardsPerRow, getVisibleColumns, readCardsPerRow } from './BooksPage'
 
 vi.mock('@/api/client', () => ({
   api: {
@@ -1140,6 +1140,7 @@ describe('BooksPage', () => {
   })
 
   it('keeps card page sizes aligned to complete rows', () => {
+    expect(getCardPageSizeOptions(1)).toEqual([20, 50, 100, 500])
     expect(getCardPageSizeOptions(3)).toEqual([21, 51, 102, 498])
     expect(getCardPageSizeOptions(4)).toEqual([20, 52, 100, 500])
     expect(getCardPageSizeOptions(6)).toEqual([24, 54, 102, 498])
@@ -1152,6 +1153,13 @@ describe('BooksPage', () => {
         pageSize <= 500 && pageSize % cardsPerRow === 0
       ))).toBe(true)
     }
+  })
+
+  it('uses adaptive card counts until the cards-per-row control becomes effective', () => {
+    expect(getResponsiveCardsPerRow(8, 412)).toBe(1)
+    expect(getResponsiveCardsPerRow(8, 900)).toBe(2)
+    expect(getResponsiveCardsPerRow(8, 1024)).toBe(8)
+    expect(getResponsiveCardsPerRow(3, 1440)).toBe(3)
   })
 
   it('scales card text sizes with the cards-per-row setting', () => {

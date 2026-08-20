@@ -147,7 +147,7 @@ export function ColumnSettingsPopup<T>({
               <div className="text-sm font-semibold text-slate-950">{title}</div>
               <div className="text-xs font-normal text-slate-500">{description}</div>
             </div>
-            <button className="text-xs font-semibold text-slate-500 hover:text-slate-950" type="button" onClick={resetColumns}>Reset</button>
+            <button className="tablet-touch-target text-xs font-semibold text-slate-500 hover:text-slate-950" type="button" onClick={resetColumns}>Reset</button>
           </div>
           {preferences.map((preference, index) => {
             const column = columns.find((item) => item.id === preference.id)
@@ -159,7 +159,7 @@ export function ColumnSettingsPopup<T>({
               <div className={`flex items-center justify-between gap-3 rounded-md border bg-white px-3.5 py-2.5 text-sm text-slate-700 ${preference.visible ? 'border-emerald-400' : 'border-slate-200'}`} key={preference.id}>
                 <button
                   aria-pressed={preference.visible}
-                  className="inline-flex min-w-0 flex-1 items-center gap-2 text-left font-medium text-inherit"
+                  className="tablet-touch-target inline-flex min-w-0 flex-1 items-center gap-2 text-left font-medium text-inherit"
                   type="button"
                   onClick={() => toggleColumn(preference.id)}
                 >

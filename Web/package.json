@@ -12,6 +12,8 @@
     "test:layout": "node ./scripts/run-playwright-layout.mjs",
     "test:layout:desktop": "node ./scripts/run-playwright-layout.mjs --project chromium-desktop",
     "test:layout:mobile": "node ./scripts/run-playwright-layout.mjs --project chromium-mobile",
+    "test:layout:tablet": "node ./scripts/run-playwright-layout.mjs --project chromium-xiaomi-pad-6-portrait --project chromium-xiaomi-pad-6-landscape",
+    "test:layout:tablet:update": "node ./scripts/run-playwright-layout.mjs --project chromium-xiaomi-pad-6-portrait --project chromium-xiaomi-pad-6-landscape --update-snapshots",
     "test:all": "npm run lint && npm run test:run && npm run test:layout"
   },
   "dependencies": {
