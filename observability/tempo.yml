@@ -1,3 +1,5 @@
+stream_over_http_enabled: true
+
 server:
   http_listen_port: 3200
 
@@ -13,5 +15,38 @@ distributor:
 storage:
   trace:
     backend: local
+    wal:
+      path: /var/tempo/wal
     local:
+      # Keep the existing location so a restart does not hide stored traces.
       path: /var/tempo/traces
+
+# Tempo 2.9 serves TraceQL metric queries through the metrics-generator.  The
+# in-memory ring is deliberate here: this compose stack runs a single Tempo
+# instance, so no external KV store is needed.
+metrics_generator:
+  ring:
+    kvstore:
+      store: inmemory
+  registry:
+    external_labels:
+      source: tempo
+      cluster: novelki-compose
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+  traces_storage:
+    path: /var/tempo/generator/traces
+  processor:
+    local_blocks:
+      # Keep server spans: they are the request roots shown in TraceQL.
+      filter_server_spans: false
+
+overrides:
+  defaults:
+    metrics_generator:
+      # local-blocks is required by Tempo 2.9 for TraceQL metric queries;
+      # the other two processors power the service graph and span RED metrics.
+      processors: [service-graphs, span-metrics, local-blocks]

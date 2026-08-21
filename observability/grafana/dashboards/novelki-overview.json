@@ -722,7 +722,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 10,
+        "h": 16,
         "w": 24,
         "x": 0,
         "y": 23
@@ -748,12 +748,12 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{service_name=\"novelki-api\", level=~\"$level\"} |~ `(?i)$search`",
+          "expr": "{service_name=\"novelki-api\"} | severity_text=~\"$level\" |~ `$search`",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Application Logs (Filtered by $level, matching \"$search\")",
+      "title": "Application Logs (OTLP severity $level, matching \"$search\")",
       "type": "logs"
     }
   ],
@@ -808,17 +808,17 @@
           {
             "selected": false,
             "text": "ERROR",
-            "value": "(?i)error|fatal"
+            "value": "(?i)(error|fatal)"
           },
           {
             "selected": false,
             "text": "WARN",
-            "value": "(?i)warn.*"
+            "value": "(?i)(warning|warn)"
           },
           {
             "selected": false,
             "text": "INFO",
-            "value": "(?i)info"
+            "value": "(?i)(information|info)"
           },
           {
             "selected": false,
@@ -826,7 +826,7 @@
             "value": "(?i)debug"
           }
         ],
-        "query": ".*, (?i)error|fatal, (?i)warn.*, (?i)info, (?i)debug",
+        "query": ".*, (?i)(error|fatal), (?i)(warning|warn), (?i)(information|info), (?i)debug",
         "type": "custom"
       },
       {
