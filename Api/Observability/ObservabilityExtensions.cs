@@ -7,11 +7,18 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog.Events;
 using Serilog.Sinks.OpenTelemetry;
+using System.Text.RegularExpressions;
 
 public static class ObservabilityExtensions
 {
     private const string OtlpEndpointVariable = "OTEL_EXPORTER_OTLP_ENDPOINT";
     private const string DeploymentEnvironmentAttribute = "deployment.environment";
+    private static readonly Regex SqlOperationPattern = new(
+        @"^\s*(?:/\*.*?\*/\s*)*(?<operation>SELECT|INSERT|UPDATE|DELETE|MERGE|EXEC(?:UTE)?)\b",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+    private static readonly Regex SqlRelationPattern = new(
+        @"\b(?:FROM|INTO|UPDATE)\s+(?<relation>(?:\[[^\]]+\]|""[^""]+""|`[^`]+`|[A-Za-z_][\w$]*)(?:\.(?:\[[^\]]+\]|""[^""]+""|`[^`]+`|[A-Za-z_][\w$]*))*)",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
 
     public static void AddObservability(this WebApplicationBuilder builder)
     {
@@ -61,9 +68,15 @@ public static class ObservabilityExtensions
                     {
                         options.EnrichWithIDbCommand = (activity, command) =>
                         {
-                            activity.DisplayName = $"db {command.CommandType.ToString().ToLowerInvariant()}";
+                            var dbCommand = DescribeDbCommand(command);
+                            activity.DisplayName = dbCommand.DisplayName;
                             activity.SetTag("db.system", GetDbSystem(command));
-                            activity.SetTag("db.operation.name", command.CommandType.ToString());
+                            activity.SetTag("db.operation.name", dbCommand.Operation);
+
+                            if (!string.IsNullOrWhiteSpace(dbCommand.Relation))
+                            {
+                                activity.SetTag("db.collection.name", dbCommand.Relation);
+                            }
 
                             if (command.CommandType == CommandType.Text)
                             {
@@ -134,6 +147,30 @@ public static class ObservabilityExtensions
         return "database";
     }
 
+    private static DbCommandDescription DescribeDbCommand(IDbCommand command)
+    {
+        if (command.CommandType != CommandType.Text || string.IsNullOrWhiteSpace(command.CommandText))
+        {
+            var commandOperation = command.CommandType.ToString().ToUpperInvariant();
+            return new DbCommandDescription($"DB {commandOperation}", commandOperation, null);
+        }
+
+        var operationMatch = SqlOperationPattern.Match(command.CommandText);
+        var operation = operationMatch.Success
+            ? operationMatch.Groups["operation"].Value.ToUpperInvariant()
+            : "QUERY";
+        var relationMatch = SqlRelationPattern.Match(command.CommandText);
+        var relation = relationMatch.Success
+            ? relationMatch.Groups["relation"].Value.Trim('"', '`', '[', ']')
+            : null;
+
+        var displayName = string.IsNullOrWhiteSpace(relation)
+            ? $"DB {operation}"
+            : $"{operation} {relation}";
+
+        return new DbCommandDescription(displayName, operation, relation);
+    }
+
     private static string GetServiceName(IConfiguration configuration)
     {
         return configuration["OTEL_SERVICE_NAME"] ?? "novelki-api";
@@ -143,4 +180,6 @@ public static class ObservabilityExtensions
     {
         return path.StartsWithSegments("/health", StringComparison.OrdinalIgnoreCase);
     }
+
+    private sealed record DbCommandDescription(string DisplayName, string Operation, string? Relation);
 }

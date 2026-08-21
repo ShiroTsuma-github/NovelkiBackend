@@ -90,7 +90,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum(rate(http_server_request_duration_seconds_count{http_route=~\"$route\"}[$__rate_interval])) or vector(0)",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval])) or vector(0)",
           "instant": false,
           "legendFormat": "Total Requests",
           "range": true,
@@ -166,7 +166,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\", http_route=~\"$route\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{http_route=~\"$route\"}[$__rate_interval])), 0.001)) or vector(0)",
+          "expr": "(sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\", http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval])) / clamp_min(sum(rate(http_server_request_duration_seconds_count{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval])), 0.001)) or vector(0)",
           "instant": false,
           "legendFormat": "5xx Error Rate",
           "range": true,
@@ -240,7 +240,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route=~\"$route\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "p95 Duration",
           "range": true,
@@ -314,7 +314,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route=~\"$route\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval])))",
           "instant": false,
           "legendFormat": "p50 Duration",
           "range": true,
@@ -432,7 +432,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{http_route=~\"$route\"}[$__rate_interval])) > 0",
+          "expr": "sum by (http_route, http_response_status_code) (rate(http_server_request_duration_seconds_count{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval])) > 0",
           "instant": false,
           "legendFormat": "{{http_route}} [{{http_response_status_code}}]",
           "range": true,
@@ -537,7 +537,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{http_route=~\"$route\"}[$__rate_interval]))) > 0",
+          "expr": "histogram_quantile(0.95, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval]))) > 0",
           "instant": false,
           "legendFormat": "p95 {{http_route}}",
           "range": true,
@@ -549,7 +549,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{http_route=~\"$route\"}[$__rate_interval]))) > 0",
+          "expr": "histogram_quantile(0.50, sum by (le, http_route) (rate(http_server_request_duration_seconds_bucket{http_route!~\"/health/.*\", http_route=~\"${route:raw}\"}[$__rate_interval]))) > 0",
           "instant": false,
           "legendFormat": "p50 {{http_route}}",
           "range": true,
@@ -722,7 +722,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 16,
+        "h": 22,
         "w": 24,
         "x": 0,
         "y": 23
@@ -730,12 +730,12 @@
       "id": 5,
       "options": {
         "dedupStrategy": "none",
-        "enableInfiniteScrolling": false,
+        "enableInfiniteScrolling": true,
         "enableLogDetails": true,
         "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showControls": false,
-        "showLabels": false,
+        "showCommonLabels": true,
+        "showControls": true,
+        "showLabels": true,
         "showTime": true,
         "sortOrder": "Descending",
         "wrapLogMessage": true
@@ -748,12 +748,13 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{service_name=\"novelki-api\"} | severity_text=~\"$level\" |~ `$search`",
+          "expr": "{service_name=\"novelki-api\"} !~ `RequestPath=/health(?:/|$)` | severity_text=~\"${level:raw}\" |~ `${search:raw}`",
+          "maxLines": 5000,
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Application Logs (OTLP severity $level, matching \"$search\")",
+      "title": "Application Logs — expandable context, OTLP severity $level, matching \"$search\"",
       "type": "logs"
     }
   ],
@@ -776,14 +777,15 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(http_server_request_duration_seconds_count, http_route)",
+        "definition": "label_values(http_server_request_duration_seconds_count{http_route!~\"/health/.*\"}, http_route)",
+        "allValue": ".*",
         "includeAll": true,
         "label": "Route",
         "multi": true,
         "name": "route",
         "options": [],
         "query": {
-          "query": "label_values(http_server_request_duration_seconds_count, http_route)",
+          "query": "label_values(http_server_request_duration_seconds_count{http_route!~\"/health/.*\"}, http_route)",
           "refId": "Prometheus-route-Variable-Query"
         },
         "refresh": 2,
@@ -796,6 +798,7 @@
           "text": "All",
           "value": ".*"
         },
+        "allValue": ".*",
         "includeAll": true,
         "label": "Log Level",
         "name": "level",
@@ -847,12 +850,12 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "Novelki Overview",
   "uid": "novelki-overview",
-  "version": 2
+  "version": 3
 }
